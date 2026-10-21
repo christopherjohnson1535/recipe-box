@@ -1,0 +1,55 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+/** The contents listing: entries between hairlines, two columns from 1024px. Children are `<ContentsEntry>`s. */
+export function Contents({ label, children }: { label?: string; children: ReactNode }) {
+  return (
+    <ul aria-label={label} className="grid grid-cols-1 gap-x-14 border-b border-(--rule-hair) lg:grid-cols-2">
+      {children}
+    </ul>
+  );
+}
+
+type EntryProps = {
+  href: string;
+  title: string;
+  /** Small accent line above the title, e.g. tags. */
+  kicker?: ReactNode;
+  /** Italic line under the title, clamped to two lines. */
+  deck?: string;
+  /** Uppercase muted line at the foot, e.g. total time. */
+  meta?: ReactNode;
+  /** Thumbnail on the right. Decorative: the title already names it. */
+  imageSrc?: string | null;
+};
+
+/** One entry in the contents. The whole entry is the link target; the focus ring wraps the entry. */
+export function ContentsEntry({ href, title, kicker, deck, meta, imageSrc }: EntryProps) {
+  return (
+    <li>
+      <article className="group relative flex h-full gap-5 border-t border-(--rule-hair) py-6 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-4 has-[a:focus-visible]:outline-(--focus-ring) sm:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          {kicker && <div className="label">{kicker}</div>}
+          <h2 className="font-display text-title-sm text-ink transition-[color] duration-150 ease-out group-hover:text-(--entry-title-hover)">
+            <Link href={href} className="line-clamp-3 after:absolute after:inset-0 focus-visible:outline-none">
+              {title}
+            </Link>
+          </h2>
+          {deck && <p className="line-clamp-2 text-body text-ink-muted italic">{deck}</p>}
+          {meta && <p className="label mt-1 text-ink-muted">{meta}</p>}
+        </div>
+        {imageSrc && (
+          // Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send.
+          <img
+            src={imageSrc}
+            alt=""
+            width={160}
+            height={120}
+            loading="lazy"
+            className="aspect-[4/3] h-auto w-24 shrink-0 self-start object-cover sm:w-36 [filter:var(--photo-filter)]"
+          />
+        )}
+      </article>
+    </li>
+  );
+}

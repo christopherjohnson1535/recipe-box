@@ -1,0 +1,74 @@
+/*
+ * Layer 3: component tokens. Each names one decision inside one component and points at a semantic token, so a
+ * component can be retuned (say, a red primary button) without touching the theme or the component's code.
+ * Only src/components/ui/* reads these, as Tailwind arbitrary values like bg-(--button-primary-bg); a guard test
+ * fails anywhere else. They inherit the active theme automatically. See docs/THEMING.md.
+ */
+:root {
+  /* Button */
+  --button-primary-bg: var(--color-ink);
+  --button-primary-fg: var(--color-paper);
+  --button-primary-bg-hover: var(--color-accent);
+  --button-primary-fg-hover: var(--color-on-accent);
+  --button-secondary-border: var(--color-ink);
+  --button-secondary-fg: var(--color-ink);
+  --button-secondary-hover: var(--color-accent);
+  --button-ghost-fg: var(--color-ink);
+  --button-ghost-underline: var(--color-rule-strong);
+  --button-ghost-hover: var(--color-accent);
+  --button-danger-bg: var(--color-accent);
+  --button-danger-fg: var(--color-on-accent);
+  --button-danger-bg-hover: var(--color-accent-hover);
+
+  /* Input */
+  --input-bg: var(--color-paper);
+  --input-fg: var(--color-ink);
+  --input-placeholder: var(--color-ink-muted);
+  --input-border: var(--color-rule-strong);
+  --input-border-hover: var(--color-ink);
+  --input-border-invalid: var(--color-danger);
+
+  /* Chip (tag index) and masthead nav */
+  --chip-fg: var(--color-ink-muted);
+  --chip-fg-hover: var(--color-ink);
+  --chip-fg-selected: var(--color-ink);
+  --chip-underline-hover: var(--color-rule-strong);
+  --chip-underline-selected: var(--color-accent);
+  --nav-fg: var(--color-ink-muted);
+  --nav-fg-active: var(--color-ink);
+  --nav-underline-active: var(--color-accent);
+
+  /* Alert */
+  --alert-bg: var(--color-paper-deep);
+  --alert-fg: var(--color-ink);
+  --alert-rule: var(--color-ink-muted);
+  --alert-rule-error: var(--color-danger);
+  --alert-title-error: var(--color-danger);
+
+  /* Panels, rules, entries */
+  --panel-bg: var(--color-paper-deep);
+  --card-border: var(--color-rule);
+  --rule-hair: var(--color-rule);
+  --rule-double: var(--color-ink);
+  --entry-title-hover: var(--color-accent);
+
+  /* Editorial accents */
+  --kicker-fg: var(--color-accent);
+  --numeral-fg: var(--color-accent);
+  --drop-cap-fg: var(--color-accent);
+  --link-fg: var(--color-accent);
+  --link-fg-hover: var(--color-accent-hover);
+  --focus-ring: var(--color-focus);
+  --selection-bg: var(--color-accent);
+  --selection-fg: var(--color-on-accent);
+}
+
+/* Not a colour, so it is set per scheme here rather than in a theme file: photos sit a touch dimmer in the evening. */
+:root {
+  --photo-filter: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --photo-filter: brightness(0.9) contrast(1.02);
+  }
+}

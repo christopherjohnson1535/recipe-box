@@ -7,10 +7,13 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 const base =
   "label inline-flex min-h-control items-center justify-center gap-2 whitespace-nowrap rounded-control px-5 transition-[background-color,border-color,color] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-55";
 const variants: Record<Variant, string> = {
-  primary: "bg-ink text-paper hover:bg-accent hover:text-on-accent",
-  secondary: "border border-ink text-ink hover:border-accent hover:text-accent",
-  ghost: "px-2 text-ink underline decoration-rule underline-offset-[0.3em] hover:text-accent hover:decoration-accent",
-  danger: "bg-accent text-on-accent hover:bg-accent-hover",
+  primary:
+    "bg-(--button-primary-bg) text-(--button-primary-fg) hover:bg-(--button-primary-bg-hover) hover:text-(--button-primary-fg-hover)",
+  secondary:
+    "border border-(--button-secondary-border) text-(--button-secondary-fg) hover:border-(--button-secondary-hover) hover:text-(--button-secondary-hover)",
+  ghost:
+    "px-2 text-(--button-ghost-fg) underline decoration-(--button-ghost-underline) underline-offset-[0.3em] hover:text-(--button-ghost-hover) hover:decoration-(--button-ghost-hover)",
+  danger: "bg-(--button-danger-bg) text-(--button-danger-fg) hover:bg-(--button-danger-bg-hover)",
 };
 
 export function buttonClass(variant: Variant = "primary", className?: string) {

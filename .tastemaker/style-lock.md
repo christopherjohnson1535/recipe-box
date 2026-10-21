@@ -2,7 +2,8 @@
 
 Established: 2026-10-21. Source: user-specified direction (classic editorial magazine, literary-weekly feel; original
 design, no trademarked names, logos or typefaces). No reference images; palette hand-set and matrix-checked.
-Full guide for builders: `docs/UI.md`. Tokens live in `frontend/src/app/globals.css`.
+Full guide for builders: `docs/UI.md`. Colour tokens live in `frontend/src/styles/` (primitives, themes/day + evening,
+component tokens; see `docs/THEMING.md`), and this contract is enforced by `frontend/src/styles/tokens.test.ts`.
 
 ## Palette (light: "day edition")
 - Paper `#fbf8f1` (page) · Paper-deep `#f3eee3` (ingredient sidebar, alerts)
@@ -10,13 +11,13 @@ Full guide for builders: `docs/UI.md`. Tokens live in `frontend/src/app/globals.
 - Ink-muted `#5c554c` (decks, bylines, metadata, hints) — 6.93:1 on paper, 6.35:1 on paper-deep
 - Accent `#9b1c1c` deep red, sparingly (kickers, step numerals, links, active underline, focus) — 7.68:1 on paper
 - Accent-hover `#7e1414` (9.91:1) · On-accent `#fbf8f1`
-- Rule `#d9d1c3` decorative hairlines only · Rule-strong `#8c8377` control borders (3.52:1 paper, 3.22:1 paper-deep)
+- Rule `#cdc3b0` decorative hairlines only · Rule-strong `#8c8377` control borders (3.52:1 paper, 3.22:1 paper-deep)
 - Button label: paper on ink (16.83:1); paper on accent (7.68:1)
 
 ## Dark mode: runtime via prefers-color-scheme ("evening edition")
 - Paper `#16130f` · Paper-deep `#211c17` · Ink `#efe8da` (15.19:1) · Ink-muted `#b3a999` (7.98:1 / 7.28:1)
 - Accent `#d98c7f` desaturated red (7.06:1 on paper, 6.44:1 on paper-deep) · Accent-hover/focus `#e6a497` (8.92:1)
-- Rule `#3a332b` decorative · Rule-strong `#7a7064` (3.82:1 on paper) · On-accent `#16130f`
+- Rule `#463e33` decorative · Rule-strong `#7a7064` (3.82:1 on paper) · On-accent `#16130f`
 
 ## Color contract (check_contrast.py --matrix, both modes)
 - Text-safe: ink/paper, ink/paper-deep, ink-muted/paper, ink-muted/paper-deep, accent/paper, accent/paper-deep,

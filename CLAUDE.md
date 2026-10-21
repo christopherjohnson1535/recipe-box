@@ -33,10 +33,12 @@ For an issue:
    something else, say why in the PR.
 3. Follow `docs/agents/agent-preamble.md` (ponytail coding rules, scoped checks, commit hygiene). Fetch the vendor
    skills once with `sh scripts/factory/fetch-skills.sh`.
-4. For bigger issues use the factory stages: `factory-plan` (short plan in the PR description), `factory-build`
-   (agents only if the issue splits cleanly by files), `factory-verify` (an independent reviewer for anything
-   touching auth, uploads, outbound fetches or data deletion), `factory-test` (all checks + a smoke run; UI changes
-   get screenshots that you actually look at).
+4. Run every issue through the full factory loop (`.claude/skills/factory`) with **subagents on a cheaper model
+   (Sonnet)** doing the stages, while the session's main model orchestrates: briefs agents, routes findings, keeps
+   the ledger, looks at screenshots and opens the PR. Stages: `factory-plan` (short plan in the PR description),
+   `factory-build` (builder agents, split by owned files), `factory-verify` (independent reviewer agents, then
+   separate fixer agents; always for auth, uploads, outbound fetches or data deletion), `factory-test` (all checks +
+   a smoke run; UI changes get screenshots the orchestrator actually looks at), `factory-design-qa` for UI work.
 5. Run every check for the tree you touched (table above). Backend tests need Postgres:
    `TEST_DATABASE_URL=postgres://recipes:recipes@127.0.0.1:5432/recipes_test`.
 6. Update docs: `docs/API.md` if a contract changed, the matching wiki page in `docs/wiki/`, and README if setup changed.

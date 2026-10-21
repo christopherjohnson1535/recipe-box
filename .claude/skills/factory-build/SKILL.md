@@ -5,7 +5,7 @@ description: Stage 3 of the software factory — build from docs/SPEC.md with a 
 
 # Build with an agent team
 
-You orchestrate; agents write the code. Agent model: whatever the owner asked for, otherwise the session default.
+You orchestrate; agents write the code. Agent model: Sonnet (the owner wants stage agents on a cheaper model) unless the owner says otherwise.
 For a small issue, one builder agent (or you, if the owner prefers) is enough — the rules below still apply.
 
 ## Waves

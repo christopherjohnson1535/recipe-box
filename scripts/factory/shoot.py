@@ -1,4 +1,4 @@
-# Screenshot every page in light and dark at desktop, iPad and phone size, signed in.
+# Screenshot every page in light and dark at desktop, iPad portrait + landscape and phone size, signed in.
 # Usage: SHOOT_USER=chris SHOOT_PASSWORD=... python3 scripts/factory/shoot.py <base-url> <out-dir> <recipe-id>
 # Prints WARN lines for pages scrolled on load or overflowing horizontally.
 import os
@@ -11,7 +11,7 @@ user, password = os.environ.get("SHOOT_USER", "chris"), os.environ["SHOOT_PASSWO
 pages = {"home": "/", "recipe": f"/recipes/{rid}", "new": "/recipes/new", "edit": f"/recipes/{rid}/edit",
          "cook": f"/recipes/{rid}/cook", "import": "/import", "settings": "/settings",
          "notfound": "/recipes/00000000-0000-0000-0000-000000000000"}
-sizes = {"desktop": (1440, 900), "ipad": (820, 1180), "phone": (390, 844)}
+sizes = {"desktop": (1440, 900), "ipad": (820, 1180), "ipad-landscape": (1180, 820), "phone": (390, 844)}
 os.makedirs(out, exist_ok=True)
 
 with sync_playwright() as p:

@@ -1,0 +1,21 @@
+/*
+ * Layer 2: semantic tokens, evening edition (dark). Follows the device setting. Must define every name in
+ * day.css; src/styles/tokens.test.ts checks that and the contrast contract. See docs/THEMING.md.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --color-paper: var(--umber-950);
+    --color-paper-deep: var(--umber-900);
+    --color-ink: var(--umber-50);
+    --color-ink-muted: var(--umber-300);
+    --color-rule: var(--umber-700);
+    --color-rule-strong: var(--umber-500);
+    --color-accent: var(--claret-300);
+    --color-accent-hover: var(--claret-200);
+    --color-on-accent: var(--umber-950);
+    --color-danger: var(--claret-200);
+    --color-focus: var(--claret-200);
+  }
+}

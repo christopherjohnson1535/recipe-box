@@ -45,7 +45,8 @@ Loop back freely: a verify or test failure sends you to a fix wave (stage 4 rule
 - **Reviewers never fix; fixers never review their own work.** Fresh agents for each.
 - **Look at it yourself.** After any UI change, screenshot every page × light/dark × iPad/phone/desktop
   (`factory-test`) and open a few. Type checks and unit tests miss layout bugs.
-- **Model choice:** use the model the owner asked for; otherwise the session default. Escalate only if asked.
+- **Model choice:** the owner wants stage agents (builders, reviewers, fixers, testers, design QA) on a cheaper
+  model: Sonnet unless the owner says otherwise. The orchestrator stays on the session model. Escalate only if asked.
 - **Tell the owner the state after each stage** in one or two sentences; drafts and docs as soon as useful.
 
 ## Status board

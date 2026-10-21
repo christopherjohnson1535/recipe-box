@@ -13,7 +13,13 @@ and finish it.
 ## The software factory
 Built with the software factory process: requirements → plan → build (agent waves) → verify
 (independent reviewers, fix waves, `docs/review/FIXES.md`) → test (smoke + screenshots) → design QA → ship.
-Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
+Every issue goes through the whole loop, with the stages done by subagents on a cheaper model (Sonnet) and the main
+session orchestrating. Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
+
+## UI work
+Read `docs/UI.md` (the editorial look and the ui components) and `docs/THEMING.md` (the three token layers, how to
+change a colour or add a theme). Pages only arrange `src/components/ui/*` components with layout utilities;
+guard tests in `frontend/src/styles/` fail on page-level styling, a theme missing a token, or low contrast.
 
 ## Checks
 | Tree | Commands |
