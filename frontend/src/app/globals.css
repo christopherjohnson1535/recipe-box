@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Components read these (via the Tailwind theme below) so the design-system
+ * issue can retheme the app by changing values here only. Neutrals are tinted warm (hue ~70).
+ */
+:root {
+  color-scheme: light;
+
+  --bg: #faf6ef; /* keep in sync with theme-color in layout.tsx and manifest */
+  --surface: oklch(0.995 0.004 80);
+  --surface-sunk: oklch(0.95 0.016 75);
+  --text: oklch(0.26 0.02 50);
+  --text-muted: oklch(0.46 0.025 55);
+  --border: oklch(0.88 0.02 70);
+  --border-strong: oklch(0.72 0.03 65);
+  --accent: oklch(0.52 0.15 38); /* terracotta */
+  --accent-hover: oklch(0.46 0.15 38);
+  --on-accent: oklch(0.99 0.005 80);
+  --accent-soft: oklch(0.93 0.045 55);
+  --accent-ink: oklch(0.42 0.13 38);
+  --danger: oklch(0.5 0.18 27);
+  --danger-soft: oklch(0.95 0.03 27);
+  --focus: oklch(0.5 0.16 250);
+
+  --face-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --face-display: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+
+  --r-control: 0.625rem;
+  --r-card: 1rem;
+  --r-pill: 999px;
+  --card-shadow: 0 1px 2px oklch(0.3 0.03 50 / 0.06), 0 4px 16px oklch(0.3 0.03 50 / 0.05);
+  --control-height: 2.75rem; /* 44px touch target */
+  --gutter: 1rem;
+  --content-width: 72rem;
+  --ease-out-curve: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --gutter: 2rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg: #1c1814;
+    --surface: oklch(0.25 0.013 60);
+    --surface-sunk: oklch(0.18 0.01 60);
+    --text: oklch(0.94 0.012 80);
+    --text-muted: oklch(0.75 0.02 70);
+    --border: oklch(0.35 0.015 60);
+    --border-strong: oklch(0.5 0.02 60);
+    --accent: oklch(0.74 0.13 48);
+    --accent-hover: oklch(0.8 0.12 50);
+    --on-accent: oklch(0.2 0.03 45);
+    --accent-soft: oklch(0.33 0.05 45);
+    --accent-ink: oklch(0.84 0.1 55);
+    --danger: oklch(0.72 0.15 27);
+    --danger-soft: oklch(0.3 0.06 27);
+    --focus: oklch(0.75 0.13 250);
+    --card-shadow: 0 1px 2px oklch(0 0 0 / 0.3);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-focus: var(--focus);
+  --font-sans: var(--face-body);
+  --font-display: var(--face-display);
+  --radius-control: var(--r-control);
+  --radius-card: var(--r-card);
+  --radius-pill: var(--r-pill);
+  --shadow-card: var(--card-shadow);
+  --spacing-control: var(--control-height);
+  --spacing-gutter: var(--gutter);
+  --container-content: var(--content-width);
+  --ease-out: var(--ease-out-curve);
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--face-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--face-display);
+  line-height: 1.15;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
