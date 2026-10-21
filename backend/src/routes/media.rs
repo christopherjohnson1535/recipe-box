@@ -21,6 +21,10 @@ use crate::{
 
 pub const MAX_EDGE: u32 = 2400;
 const JPEG_QUALITY: u8 = 85;
+/// Decode bounds (S-01): per side, total pixels, and bytes the decoder may allocate.
+const MAX_SIDE_PX: u32 = 10_000;
+const MAX_PIXELS: u64 = 40_000_000;
+const MAX_DECODE_ALLOC: u64 = 256 << 20;
 
 /// `POST /api/media`, multipart field `file`. The image is decoded and re-encoded, never stored as sent.
 pub async fn upload(
@@ -94,6 +98,18 @@ pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
         .with_guessed_format()
         .map_err(|_| unsupported())?;
     let mut decoder = reader.into_decoder().map_err(|_| unsupported())?;
+    // Bound the work before decoding: a tiny file can claim a huge canvas (decompression bomb).
+    let (w, h) = decoder.dimensions();
+    if w > MAX_SIDE_PX || h > MAX_SIDE_PX || u64::from(w) * u64::from(h) > MAX_PIXELS {
+        return Err(AppError::UnsupportedMedia(
+            "That image is too large to read (over 10,000 px a side or 40 megapixels).".into(),
+        ));
+    }
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_SIDE_PX);
+    limits.max_image_height = Some(MAX_SIDE_PX);
+    limits.max_alloc = Some(MAX_DECODE_ALLOC);
+    decoder.set_limits(limits).map_err(|_| unsupported())?;
     let orientation = decoder.orientation().map_err(|_| unsupported())?;
     let mut img = DynamicImage::from_decoder(decoder).map_err(|_| unsupported())?;
     img.apply_orientation(orientation);
@@ -162,6 +178,59 @@ mod tests {
         assert!(!valid_file_name("../../../../../../../../etc/passwd.jpg"));
         assert!(!valid_file_name("0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.png"));
         assert!(!valid_file_name(".jpg"));
+    }
+
+    /// A PNG header (valid CRCs) claiming `w`x`h`; the pixel data is absent, so only the bounds can reject it.
+    pub(crate) fn png_claiming(w: u32, h: u32) -> Vec<u8> {
+        fn chunk(out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
+            out.extend((data.len() as u32).to_be_bytes());
+            let mut body = kind.to_vec();
+            body.extend(data);
+            out.extend(&body);
+            out.extend(crc32(&body).to_be_bytes());
+        }
+        fn crc32(data: &[u8]) -> u32 {
+            let mut c = !0u32;
+            for &b in data {
+                c ^= u32::from(b);
+                for _ in 0..8 {
+                    c = if c & 1 != 0 {
+                        0xEDB8_8320 ^ (c >> 1)
+                    } else {
+                        c >> 1
+                    };
+                }
+            }
+            !c
+        }
+        let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+        let mut ihdr = Vec::new();
+        ihdr.extend(w.to_be_bytes());
+        ihdr.extend(h.to_be_bytes());
+        ihdr.extend([8, 2, 0, 0, 0]);
+        chunk(&mut out, b"IHDR", &ihdr);
+        chunk(
+            &mut out,
+            b"IDAT",
+            &[0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01],
+        );
+        chunk(&mut out, b"IEND", &[]);
+        out
+    }
+
+    #[test]
+    fn reencode_refuses_huge_canvases_quickly() {
+        let t = std::time::Instant::now();
+        for (w, h) in [(20_000, 20_000), (10_001, 10), (9_000, 9_000)] {
+            assert!(
+                matches!(
+                    reencode(&png_claiming(w, h)),
+                    Err(AppError::UnsupportedMedia(_))
+                ),
+                "{w}x{h}"
+            );
+        }
+        assert!(t.elapsed().as_secs() < 2);
     }
 
     #[test]

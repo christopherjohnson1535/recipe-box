@@ -26,6 +26,18 @@ D-13 skipped — italic placeholders are the documented style (docs/UI.md).
 D-14 fixed — `overflow-wrap: anywhere` on h1–h3 became `break-word` and the redundant `break-words` on the entry link was removed, so only words longer than the line break.
 D-15..D-22 (P2) deferred — not in scope for #2; revisit in Phase 1 design QA (#9).
 R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` keyword in lib/api.ts; `class` now only counts as a prop or key (`class=` / `class:`), with self-tests for both.
+#6 S-01 fixed — `reencode` reads dimensions first (refuses >10,000 px a side or >40 MP as unsupported_media, an import warning) and sets decoder limits (max_alloc 256 MB); unit + upload + import tests with a generated 20000x20000 PNG header.
+#6 S-02 fixed — `extract` runs in `spawn_blocking` under what is left of the 15 s budget (timeout → fetch_failed "took too long to read"); JSON-LD is found by a cheap scan, the DOM is only built for the microdata fallback and refused above 60k tags or depth 400 (→ no_recipe_found); og:/title via scans; tests with 100k nested divs.
+#6 S-03 fixed — max 500 items per list, 10,000 chars per text field before cleanup, with a warning; runs inside the blocking task.
+#6 S-04 fixed — durations over 7 days become null with a warning.
+#6 S-05 fixed — tests added: redirect to ftp/gopher (loopback port allowed so only the scheme check refuses), chunked body with no Content-Length, slow-drip timeout (test-only FetchPolicy::with_timeout_for_tests), bad/huge/js:/data:/internal image URLs are warnings, loopback allowance is one port only. Removing the scheme check, chunk cap or DOM guard makes the matching test fail.
+#6 S-06 skipped — test hook is unreachable from production; a cargo feature adds CI complexity for no gain.
+#6 S-07 skipped — would break sites on odd ports for little gain (blind GET).
+#6 S-08 skipped — wrong text only, not a one-liner.
+#6 S-09 skipped — no change; frontend must keep escaping text (no dangerouslySetInnerHTML).
+#6 S-10 skipped — orphan-image sweep belongs in a later cleanup issue.
+#6 S-11 fixed (partly) — sourceUrl drops userinfo and fragment; first-recipe-wins and the second 15 s image budget left as is.
+#6 ORCH-01 fixed (orchestrator, smoke test) — an invalid `url` reported `sourceUrl: …` from the shared helper, so the import form could not map it to its field; the route now answers `url: …`, asserted in import_url.rs.
 #3 E-01 fixed — dirty form is stashed to sessionStorage (`rb-draft:<id|new>`, 400 ms debounce, all access try/catch, `recipe-form/draft-stash.ts` + test); cleared on save and on confirmed Cancel; on load a differing stash shows an Alert with Restore/Discard. beforeunload kept.
 #3 E-02 fixed — Enter in a section heading is prevented and moves focus to the row text; `isComposing` Enter is ignored in item inputs, headings and the tag input (covers the IME Nice item).
 #3 E-03 fixed — a blank heading after a named section shows the placeholder "No heading: continues without a section" and its remove button is labelled "Join <item> N to the previous section" and announces the join; smallest behaviour that makes the merge visible and deliberate.

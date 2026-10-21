@@ -1,0 +1,29 @@
+<!-- FIXTURE (reproduction): the structure of an older blog theme / recipe plugin that publishes schema.org microdata only
+     (no JSON-LD): meta content durations, ingredients and steps as list items, a nested Person for the author. Written
+     from memory of that markup (no live download was possible in the build sandbox); names, text and URLs are invented. -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Grandma's Lentil Stew - Old Pantry Notes</title></head>
+<body>
+<div itemscope itemtype="http://schema.org/Recipe">
+  <h1 itemprop="name">Grandma&#8217;s Lentil Stew</h1>
+  <img itemprop="image" src="/photos/lentil-stew.jpg" alt="Stew">
+  <span itemprop="author" itemscope itemtype="http://schema.org/Person">By <span itemprop="name">Ruth Adler</span></span>
+  <p itemprop="description">A thick, cheap, filling stew.</p>
+  <meta itemprop="prepTime" content="PT10M"><meta itemprop="cookTime" content="PT45M">
+  <time itemprop="totalTime" datetime="PT55M">55 minutes</time>
+  Serves <span itemprop="recipeYield">6 bowls</span>
+  <ul>
+    <li itemprop="recipeIngredient">1 1/2 cups brown lentils</li>
+    <li itemprop="recipeIngredient">2 carrots, diced</li>
+    <li itemprop="ingredients">1 onion, diced</li>
+    <li itemprop="recipeIngredient">6 cups water</li>
+  </ul>
+  <div itemprop="recipeInstructions"><ol>
+    <li>Sweat the onion and carrots in oil.</li>
+    <li>Add lentils and water; simmer 45 minutes.</li>
+    <li>Season and serve with bread.</li>
+  </ol></div>
+  <span itemprop="recipeCategory">Soup</span>, <span itemprop="recipeCuisine">Jewish</span>
+  <meta itemprop="keywords" content="lentils, Stew, budget">
+</div>
+</body></html>

@@ -1,0 +1,19 @@
+<!-- FIXTURE (reproduction): the structure of a Tasty Recipes (Tasty Pins plugin) food-blog page: one standalone Recipe
+     JSON-LD object, HTML inside step text, keywords as a comma string. Written from memory of that markup (no live
+     download was possible in the build sandbox); names, text and URLs are invented. -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Sheet Pan Chicken Fajitas | Weeknight Wins</title>
+<meta property="og:site_name" content="Weeknight Wins">
+<script type="application/ld+json">
+{"@context":"https://schema.org/","@type":"Recipe","name":"Sheet Pan Chicken Fajitas",
+"author":{"@type":"Person","name":"Dana Whitfield"},
+"description":"Everything roasts on <strong>one pan</strong> &ndash; no stovetop splatter.",
+"image":["https://weeknightwins.example/images/fajitas.jpg","https://weeknightwins.example/images/fajitas-1x1.jpg"],
+"recipeYield":"4 servings","prepTime":"PT15M","cookTime":"PT25M","totalTime":"PT40M",
+"recipeIngredient":["1.5 lb chicken breast, sliced","3 bell peppers, sliced","1 red onion, sliced","2 tbsp olive oil","2 tsp chili powder","8 small flour tortillas"],
+"recipeInstructions":[
+ {"@type":"HowToStep","text":"Heat the oven to <strong>425&deg;F</strong> and line a sheet pan."},
+ {"@type":"HowToStep","text":"Toss the chicken, peppers and onion with the oil and spices. Spread on the pan."},
+ {"@type":"HowToStep","text":"Roast 22 to 25 minutes, then serve in warm tortillas."}],
+"keywords":"fajitas, sheet pan, Chicken, easy dinner","recipeCuisine":"Mexican","recipeCategory":"Main Course"}
+</script></head><body><h1>Sheet Pan Chicken Fajitas</h1></body></html>

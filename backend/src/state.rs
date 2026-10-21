@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use sqlx::PgPool;
 
-use crate::config::Config;
+use crate::{config::Config, import::safe_fetch::FetchPolicy};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -10,6 +10,8 @@ pub struct AppState {
     pub config: Arc<Config>,
     /// Outbound client. Redirects are off: `import::safe_fetch` must follow them itself, re-checking each hop.
     pub http: reqwest::Client,
+    /// Which addresses link import may fetch. Public only; tests may widen it for their local server.
+    pub fetch_policy: FetchPolicy,
 }
 
 impl AppState {
@@ -23,6 +25,7 @@ impl AppState {
             pool,
             config: Arc::new(config),
             http,
+            fetch_policy: FetchPolicy::default(),
         })
     }
 }
