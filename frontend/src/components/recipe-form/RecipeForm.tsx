@@ -24,8 +24,10 @@ export type RecipeFormProps = {
   /** Saves the recipe and navigates away. Throw an ApiError to show it on the form. */
   onSubmit: (input: RecipeInput) => Promise<void>;
   cancelHref: string;
-  /** Names the unsaved-draft stash: the recipe id, or "new". */
-  draftKey?: string;
+  /** Names the unsaved-draft stash: the recipe id, or "new". `null` keeps no stash (import review: a reload loses the draft anyway). */
+  draftKey?: string | null;
+  /** Treat the starting values as unsaved, so leaving warns even before any edit (an import draft nobody has seen yet). */
+  startDirty?: boolean;
   api?: Pick<Api, "uploadMedia" | "listTags">;
 };
 
@@ -111,7 +113,7 @@ function explain(error: unknown): { field?: string; message: string } {
 }
 
 /** The recipe editor used for new recipes, edits and import review. */
-export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKey = "new", api = browserApi }: RecipeFormProps) {
+export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKey = "new", startDirty, api = browserApi }: RecipeFormProps) {
   const router = useRouter();
   const [state, setState] = useState(() => initialState(initial));
   const [saving, setSaving] = useState(false);
@@ -124,7 +126,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
   const alertRef = useRef<HTMLDivElement>(null);
   const saved = useRef(false);
   const [stashed, setStashed] = useState<State | null>(null);
-  const [baseline] = useState(() => JSON.stringify(buildInput(state, initial)));
+  const [baseline] = useState(() => (startDirty ? "" : JSON.stringify(buildInput(state, initial))));
 
   const set = <K extends keyof State>(key: K, value: State[K]) => setState((s) => ({ ...s, [key]: value }));
   const dirty = JSON.stringify(buildInput(state, initial)) !== baseline;
@@ -153,14 +155,14 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
 
   // Offer back a draft left behind by an earlier visit (navigation on the iPad never shows the beforeunload prompt).
   useEffect(() => {
-    const old = loadStash<State>(draftKey);
+    const old = draftKey === null ? null : loadStash<State>(draftKey);
     if (old && JSON.stringify(buildInput(old, initial)) !== baseline) setStashed(old);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on arrival
   }, []);
 
   // While dirty, keep the form value in the stash (debounced).
   useEffect(() => {
-    if (!dirty || stashed) return;
+    if (!dirty || stashed || draftKey === null) return;
     const t = setTimeout(() => {
       if (!saved.current) saveStash(draftKey, state);
     }, 400);
@@ -176,7 +178,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
   }
 
   function discardStash() {
-    clearStash(draftKey);
+    if (draftKey !== null) clearStash(draftKey);
     setStashed(null);
   }
 
@@ -209,7 +211,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
     saved.current = true;
     try {
       await onSubmit(input);
-      clearStash(draftKey);
+      if (draftKey !== null) clearStash(draftKey);
     } catch (err) {
       saved.current = false;
       setSaving(false);
@@ -235,7 +237,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
   function cancel() {
     if (dirty && !window.confirm("Discard your changes?")) return;
     saved.current = true; // stop the debounced stash writing it back
-    clearStash(draftKey);
+    if (draftKey !== null) clearStash(draftKey);
     router.push(cancelHref);
   }
 
@@ -243,7 +245,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
   const described = (id: string, key: string) => (errors[key] ? `${id}-msg` : undefined);
 
   return (
-    <form ref={formRef} noValidate onSubmit={submit} className="flex max-w-measure flex-col gap-10">
+    <form ref={formRef} method="post" noValidate onSubmit={submit} className="flex max-w-measure flex-col gap-10">
       {initial?.warnings && initial.warnings.length > 0 && (
         <Alert title="Check these before saving">
           <ul className="flex flex-col gap-1">
