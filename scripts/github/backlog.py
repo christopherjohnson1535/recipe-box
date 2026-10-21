@@ -192,7 +192,7 @@ ISSUES = [
         "Implement `POST /api/import/photo` per `docs/API.md`: 1–6 files, store each as an image first (originals "
         "kept → `photoImageIds`), HEIC/HEIF support (libheif in the container or decode another way — document the "
         "choice), call the provider with all pages in order, `mode=dish` adds the 'guessed' warning. Without AI: 422 "
-        "`ai_disabled` carrying `photoImageIds`. Saving a recipe with `photoImageIds` fills `recipe_photos`.",
+        "`ai_disabled` carrying `photoImageIds`. Saving a recipe with `photoImageIds` fills `recipe_photos`. Scaffold notes: the global body limit is `MAX_UPLOAD_MB` for every route, so give this route its own larger limit (6 × MAX_UPLOAD_MB); `AppError` needs a way to carry extra fields (`photoImageIds`) in the error body.",
         "`backend/src/routes/imports.rs` (photo route), `backend/src/import/photo.rs`, `backend/src/routes/media.rs` (HEIC), `backend/Dockerfile` (libheif if needed), `backend/tests/import_photo.rs`",
         ["iPhone HEIC sample decodes", "Two-page recipe merges into one draft (mock provider)", "No-AI path returns stored photo ids"],
     ),

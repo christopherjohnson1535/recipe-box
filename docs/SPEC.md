@@ -15,7 +15,7 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
  browser / iPad PWA
         │  https (Caddy in deployed setups; plain :3000 locally)
         ▼
- ┌──────────────┐   /api/*, /media/*  (Next rewrites, same origin → cookies just work)
+ ┌──────────────┐   /api/*, /media/*  (runtime proxy route handlers, same origin)
  │ web (Next.js)│ ───────────────────────────────▶ ┌──────────────┐     ┌──────────┐
  │  :3000       │                                  │ api (axum)   │ ──▶ │ postgres │
  └──────────────┘                                  │  :8080       │     │  :5432   │
@@ -23,8 +23,10 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
                                                           │ media volume (/data/media)
                                                           └──▶ outbound: recipe sites, AI provider (optional)
 ```
-- The browser only ever talks to the web origin. Next.js rewrites `/api/:path*` and `/media/:path*` to
-  `API_INTERNAL_URL` (default `http://api:8080`). Server components may call the API directly with the same URL,
+- The browser only ever talks to the web origin. Route handlers `frontend/src/app/api/[...path]` and
+  `frontend/src/app/media/[...path]` stream requests to `API_INTERNAL_URL` (read per request, default
+  `http://api:8080`), keeping method, query, cookie, content-type, body and every `Set-Cookie`. Rewrites were not
+  used because their destination is fixed at build time. Server components may call the API directly with the same URL,
   forwarding the session cookie.
 - The API is the only thing that touches the database, the media volume, external websites and the AI provider.
 
@@ -69,7 +71,7 @@ Anything else needs a one-line reason in the agent's report.
 | `ANTHROPIC_API_KEY` | api | — | only when provider = anthropic |
 | `AI_MODEL` | api | `claude-sonnet-5-5` | |
 | `MAX_UPLOAD_MB` | api | `15` | |
-| `API_INTERNAL_URL` | web | `http://api:8080` | rewrite target |
+| `API_INTERNAL_URL` | web | `http://api:8080` | runtime proxy target |
 | `PUBLIC_HOSTNAME` | caddy | — | deployed HTTPS |
 
 ## Data model (Postgres, `backend/migrations/0001_init.sql`)

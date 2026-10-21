@@ -25,6 +25,8 @@ Every non-2xx response:
 | 502 | `fetch_failed` | DNS, timeout, too large, other HTTP error |
 | 501 | `not_implemented` | scaffold stub |
 | 500 | `internal` | logged; message is generic |
+| 502 | `api_unreachable` | **frontend proxy only**: the web container can't reach the API |
+| 0 | `network` | **browser client only** (`ApiError`): the browser can't reach the web server |
 
 ## Types
 ```ts
