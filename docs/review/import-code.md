@@ -17,7 +17,7 @@ message has a next step". Fix: default message = `${server message} Try again, o
 **I-02 Should** `import-errors.ts:540-541`. `unauthenticated` says "Sign in again" with no link (the other-tab sign-out case).
 Fix: add an offer `sign-in` rendering `ButtonLink href="/login"` (check the login route name).
 
-**I-03 Should** `ImportScreen.tsx:512-517,91` (`field` is a boolean). Text mode: a `sourceUrl: …` validation error is
+**I-03 Should** `import-errors.ts:512-517`, `ImportScreen.tsx:91` (`field` is a boolean). Text mode: a `sourceUrl: …` validation error is
 shown under "Recipe text" and focus goes to the textarea, but the bad value is in the source field. Fix: parse the
 `name:` prefix and map `url`->import-url, `text`->import-text, `sourceUrl`->import-source; make `field` an id/name. (Text
 endpoint is 501 today, so it bites when #text lands.)
@@ -41,7 +41,7 @@ skips it. Fix: keep an always-present `<div role="status">` wrapper in ImportScr
 **I-07 Nice** `ImportScreen.tsx:78-84`. Address bar keeps `?url=`; Back from the saved recipe or a reload re-fetches the
 page (duplicate Alert then protects, so only wasted work). Fix: after starting, `history.replaceState(null,"","/import?mode=link")`.
 
-**I-08 Nice** `ImportScreen.tsx:122-125,166-169,205`. Focus is dropped to body after "Stop waiting", "Go back", and
+**I-08 Nice** `ImportScreen.tsx:155-169,205`. Focus is dropped to body after "Stop waiting", "Go back", and
 "Start over" (the focused button unmounts). Fix: focus `#import-url` / the tab after these.
 
 **I-09 Nice** `import-errors.ts:516`, `PhotoPicker.tsx:126`. Photo validation is `field: false`, so `PhotoPicker`'s `error`
