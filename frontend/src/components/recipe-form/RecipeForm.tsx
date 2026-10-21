@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { api as browserApi, ApiError, type Api, type RecipeInput } from "@/lib/api";
 import { ListField } from "./ListField";
 import { TagsField } from "./TagsField";
+import { clearStash, loadStash, saveStash } from "./draft-stash";
 import { addTags, fromItems, newRow, toItems, type Row } from "./list-model";
 
 /** What the form starts from: a saved recipe, an import draft (with warnings) or nothing. */
@@ -23,6 +24,8 @@ export type RecipeFormProps = {
   /** Saves the recipe and navigates away. Throw an ApiError to show it on the form. */
   onSubmit: (input: RecipeInput) => Promise<void>;
   cancelHref: string;
+  /** Names the unsaved-draft stash: the recipe id, or "new". */
+  draftKey?: string;
   api?: Pick<Api, "uploadMedia" | "listTags">;
 };
 
@@ -66,6 +69,9 @@ function initialState(i: RecipeFormInitial = { title: "" }): State {
   };
 }
 
+const MAX_MINUTES = 10000;
+/** Empty, or a whole number of minutes from 0 to MAX_MINUTES (no decimals, which would be silently rounded). */
+const validMinutes = (s: string) => s.trim() === "" || (/^\d+$/.test(s.trim()) && Number(s) <= MAX_MINUTES);
 const minutes = (s: string) => (s.trim() === "" ? null : Math.round(Number(s)));
 
 /** PUT replaces everything, so what the form doesn't edit (source type, import photos) is carried over. */
@@ -96,8 +102,6 @@ const FIELD_KEYS: Record<string, string> = {
   cookMinutes: "cook",
   totalMinutes: "total",
   sourceUrl: "sourceUrl",
-  imageId: "photo",
-  photoImageIds: "photo",
 };
 
 function explain(error: unknown): { field?: string; message: string } {
@@ -107,7 +111,7 @@ function explain(error: unknown): { field?: string; message: string } {
 }
 
 /** The recipe editor used for new recipes, edits and import review. */
-export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, api = browserApi }: RecipeFormProps) {
+export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKey = "new", api = browserApi }: RecipeFormProps) {
   const router = useRouter();
   const [state, setState] = useState(() => initialState(initial));
   const [saving, setSaving] = useState(false);
@@ -119,6 +123,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, api = b
   const formRef = useRef<HTMLFormElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
   const saved = useRef(false);
+  const [stashed, setStashed] = useState<State | null>(null);
   const [baseline] = useState(() => JSON.stringify(buildInput(state, initial)));
 
   const set = <K extends keyof State>(key: K, value: State[K]) => setState((s) => ({ ...s, [key]: value }));
@@ -146,6 +151,35 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, api = b
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  // Offer back a draft left behind by an earlier visit (navigation on the iPad never shows the beforeunload prompt).
+  useEffect(() => {
+    const old = loadStash<State>(draftKey);
+    if (old && JSON.stringify(buildInput(old, initial)) !== baseline) setStashed(old);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on arrival
+  }, []);
+
+  // While dirty, keep the form value in the stash (debounced).
+  useEffect(() => {
+    if (!dirty || stashed) return;
+    const t = setTimeout(() => {
+      if (!saved.current) saveStash(draftKey, state);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [dirty, state, stashed, draftKey]);
+
+  function restore() {
+    if (!stashed) return;
+    // fresh row keys so they cannot clash with rows made since
+    const again = (rows: Row[]) => rows.map((r) => newRow(r.text, r.heading));
+    setState({ ...stashed, ingredients: withBlank(again(stashed.ingredients)), steps: withBlank(again(stashed.steps)) });
+    setStashed(null);
+  }
+
+  function discardStash() {
+    clearStash(draftKey);
+    setStashed(null);
+  }
+
   // After a failed save, move focus to the first field with an error, else to the message at the top.
   useEffect(() => {
     if (focusTick === 0) return;
@@ -163,13 +197,19 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, api = b
     e.preventDefault();
     if (saving || uploading) return;
     const input = buildInput(state, initial);
-    if (!input.title) return fail({ title: "Give the recipe a title." });
+    const problems: Record<string, string> = {};
+    if (!input.title) problems.title = "Give the recipe a title.";
+    for (const key of ["prep", "cook", "total"] as const) {
+      if (!validMinutes(state[key])) problems[key] = `Whole minutes, 0 to ${MAX_MINUTES.toLocaleString("en")}.`;
+    }
+    if (Object.keys(problems).length > 0) return fail(problems);
     setErrors({});
     setFormError(null);
     setSaving(true);
     saved.current = true;
     try {
       await onSubmit(input);
+      clearStash(draftKey);
     } catch (err) {
       saved.current = false;
       setSaving(false);
@@ -194,6 +234,8 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, api = b
 
   function cancel() {
     if (dirty && !window.confirm("Discard your changes?")) return;
+    saved.current = true; // stop the debounced stash writing it back
+    clearStash(draftKey);
     router.push(cancelHref);
   }
 
@@ -209,6 +251,18 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, api = b
               <li key={w}>{w}</li>
             ))}
           </ul>
+        </Alert>
+      )}
+      {stashed && (
+        <Alert title="You have unsaved changes from earlier">
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={restore}>
+              Restore
+            </Button>
+            <Button variant="ghost" onClick={discardStash}>
+              Discard
+            </Button>
+          </div>
         </Alert>
       )}
       <div ref={alertRef} tabIndex={-1}>
@@ -267,6 +321,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, api = b
                 type="number"
                 inputMode="numeric"
                 min={0}
+                max={MAX_MINUTES}
                 step={1}
                 aria-invalid={bad(key)}
                 aria-describedby={described(id, key)}

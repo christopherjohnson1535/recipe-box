@@ -109,7 +109,9 @@ Controls and states:
 App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
 - `recipe-form/RecipeForm`: the editor for new recipes, edits and import review. Props `initial`
   (`RecipeInput`, `RecipeDraft` or `Recipe`; draft `warnings` are shown), `submitLabel`, `onSubmit(input)` (saves and
-  navigates; throw an `ApiError` to show it), `cancelHref`. `recipe-form/list-model.ts` holds the pure list logic.
+  navigates; throw an `ApiError` to show it), `cancelHref`, `draftKey` (recipe id or "new": names the
+  sessionStorage draft that `recipe-form/draft-stash.ts` keeps while the form is dirty and offers back with
+  Restore/Discard). `recipe-form/list-model.ts` holds the pure list logic.
 - `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `ContentsEntry`.
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 

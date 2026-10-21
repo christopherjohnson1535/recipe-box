@@ -101,3 +101,9 @@ describe("addTags", () => {
     expect(addTags(["dinner"], " Pasta, dinner ,, Quick ")).toEqual(["dinner", "pasta", "quick"]);
   });
 });
+
+describe("splitLines glyphs and breaks", () => {
+  it("strips checkbox glyphs and splits on a lone CR", () => {
+    expect(splitLines("▢ 2 cups flour\r☐ 1 egg\r\n□ salt")).toEqual(["2 cups flour", "1 egg", "salt"]);
+  });
+});

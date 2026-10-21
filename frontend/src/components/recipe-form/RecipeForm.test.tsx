@@ -10,6 +10,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   push.mockReset();
+  sessionStorage.clear();
 });
 
 const api = () => ({
@@ -94,7 +95,7 @@ describe("RecipeForm", () => {
   it("shows an API validation error on its field and focuses it", async () => {
     const { onSubmit } = setup({ initial: { title: "Soup" } });
     onSubmit.mockRejectedValue(new ApiError(400, "validation", "prepMinutes: must be 0 or more."));
-    type("Prep (min)", "-5");
+    type("Prep (min)", "5"); // the client allows it; the server's message still lands on the field
     save();
     expect(await screen.findByText("must be 0 or more.")).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Prep (min)")));
@@ -172,5 +173,66 @@ describe("RecipeForm", () => {
     const e = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(false);
+  });
+  it("does not submit when Enter is pressed in a section heading", () => {
+    const { onSubmit } = setup();
+    type("Title", "T");
+    fireEvent.click(screen.getByRole("button", { name: "Start a section at ingredient 1" }));
+    const heading = screen.getByLabelText("Section heading above ingredient 1");
+    expect(fireEvent.keyDown(heading, { key: "Enter" })).toBe(false); // default prevented
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("ignores Enter that confirms an IME choice", () => {
+    setup();
+    fireEvent.keyDown(screen.getByLabelText("Ingredient 1"), { key: "Enter", isComposing: true });
+    expect(values(/^Ingredient \d+$/)).toEqual([""]);
+  });
+
+  it("shows a blank heading after a section as ending it, and the remove button says it joins", () => {
+    setup({ initial: { title: "t", ingredients: [{ text: "a", section: "Sauce" }, { text: "b", section: null }] } });
+    const heading = screen.getByLabelText("Section heading above ingredient 2");
+    expect(heading.getAttribute("placeholder")).toContain("No heading");
+    expect(screen.getByRole("button", { name: "Join ingredient 2 to the previous section" })).toBeTruthy();
+  });
+
+  it("rejects decimal and out-of-range minutes before sending, and focuses the field", async () => {
+    const { onSubmit } = setup();
+    type("Title", "T");
+    type("Prep (min)", "1.5");
+    save();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Prep (min)")));
+    type("Prep (min)", "10001");
+    save();
+    expect(await screen.findByText(/Whole minutes, 0 to 10,000/)).toBeTruthy();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("offers a stashed draft back and restores it", () => {
+    sessionStorage.setItem(
+      "rb-draft:new",
+      JSON.stringify({
+        title: "Half typed", description: "", servings: "", prep: "", cook: "", total: "", sourceUrl: "", sourceName: "", notes: "",
+        tags: [], tagDraft: "", ingredients: [{ key: "x", text: "salt", heading: null }], steps: [], imageId: null, imageUrl: null,
+      }),
+    );
+    setup();
+    expect(screen.getByText("You have unsaved changes from earlier")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Half typed");
+    expect(values(/^Ingredient \d+$/)).toEqual(["salt"]);
+    sessionStorage.clear();
+  });
+
+  it("stashes while dirty and clears the stash after a save", async () => {
+    vi.useFakeTimers();
+    const { onSubmit } = setup();
+    type("Title", "Soup");
+    await act(async () => void vi.advanceTimersByTime(500));
+    expect(sessionStorage.getItem("rb-draft:new")).toContain("Soup");
+    vi.useRealTimers();
+    save();
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    await waitFor(() => expect(sessionStorage.getItem("rb-draft:new")).toBeNull());
   });
 });

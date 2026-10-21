@@ -16,10 +16,14 @@ imported draft.
 - **Move up / down** and **Remove** buttons sit under each row. They work with the keyboard (Tab, then Enter or Space).
 - **Sections**: the heading button starts a section at that row ("For the sauce"). The section runs until the next
   heading. Moving rows keeps the headings where they are, so you can move an item from one section to another.
-  Clear a heading's text to end the section without starting another.
+  A blank heading under a section reads "No heading: continues without a section" and ends that section; its
+  remove button then says "Join … to the previous section".
 
 ## Saving
 - **Save** adds the recipe or replaces the saved one, then opens it.
 - If something is wrong, the message appears under the field (for example a negative number of minutes) or at the
   top of the form, and the cursor moves to the first problem.
 - Closing or reloading the page with unsaved changes asks first, and so does **Cancel**.
+- Unsaved changes are also kept for the browser session. If you leave by accident (the iPad does not ask), the form offers
+  **Restore** or **Discard** next time you open it.
+- Prep, cook and total minutes take whole numbers from 0 to 10,000.

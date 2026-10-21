@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { TagList } from "@/components/ui/TagList";
@@ -20,9 +21,20 @@ export function TagsField({ tags, onChange, draft, onDraft, suggestions }: TagsF
     onChange(addTags(tags, raw));
     onDraft("");
   };
+  // After removing a tag, focus moves to the next tag's remove button, else the previous one, else the tag input.
+  const focus = useRef<string | null>(null);
+  useEffect(() => {
+    if (focus.current) document.getElementById(focus.current)?.focus();
+    focus.current = null;
+  });
+  const remove = (index: number) => {
+    const left = tags.length - 1;
+    focus.current = left === 0 ? "rf-tags" : `rf-tag-remove-${Math.min(index, left - 1)}`;
+    onChange(tags.filter((_, i) => i !== index));
+  };
   return (
     <Field label="Tags" htmlFor="rf-tags" hint="Type a tag, then press comma or Enter. Pick one you have used before, or make a new one.">
-      <TagList tags={tags} onRemove={(t) => onChange(tags.filter((x) => x !== t))} />
+      <TagList tags={tags} onRemove={remove} />
       <Input
         id="rf-tags"
         list="rf-tag-options"
@@ -39,7 +51,7 @@ export function TagsField({ tags, onChange, draft, onDraft, suggestions }: TagsF
           onDraft(v.slice(cut + 1));
         }}
         onKeyDown={(e) => {
-          if (e.key !== "Enter") return;
+          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
           e.preventDefault(); // Enter makes the tag; it must not submit the form
           if (draft.trim()) commit(draft);
         }}

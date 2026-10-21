@@ -27,6 +27,8 @@ type ListFieldProps = {
 export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeholder, rows, onChange, multiline }: ListFieldProps) {
   const focus = useRef<string | null>(null);
   const [note, setNote] = useState("");
+  // A trailing zero-width space alternates so two identical messages in a row are still announced.
+  const announce = (text: string) => setNote((n) => text + (n.endsWith("\u200b") ? "" : "\u200b"));
   useEffect(() => {
     if (focus.current) document.getElementById(focus.current)?.focus();
     focus.current = null;
@@ -44,12 +46,12 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
     const key = rows[i].key;
     // At the end of the list the pressed button is disabled, so focus its partner instead.
     const part = by < 0 ? (j === 0 ? "down" : "up") : j === rows.length - 1 ? "up" : "down";
-    setNote(`${itemLabel} moved to position ${j + 1} of ${rows.length}.`);
+    announce(`${itemLabel} moved to position ${j + 1} of ${rows.length}.`);
     change(moveRow(rows, i, by), id(key, part));
   }
 
   function remove(i: number) {
-    setNote(`${itemLabel} ${i + 1} removed.`);
+    announce(`${itemLabel} ${i + 1} removed.`);
     const near = rows[i - 1] ?? rows[i + 1];
     change(removeRow(rows, i), near ? id(near.key, "text") : `${idPrefix}-add`);
   }
@@ -61,7 +63,7 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
     const el = e.currentTarget;
     const replace = el.value === "" || (el.selectionStart === 0 && el.selectionEnd === el.value.length);
     const result = pasteLines(rows, i, lines, replace);
-    setNote(`${lines.length} ${lower}s added.`);
+    announce(`${lines.length} ${lower}s added.`);
     change(result.rows, id(result.focus, "text"));
   }
 
@@ -69,6 +71,9 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
     <Fieldset legend={legend} hint={hint}>
       <EditorList>
         {rows.map((row, i) => {
+          // Does a named section run into this row? Then a blank heading here ends it.
+          const inSection = rows.slice(0, i).reduce<boolean>((s, r) => (r.heading === null ? s : r.heading.trim() !== ""), false);
+          const endsSection = row.heading === "" && inSection;
           const common = {
             id: id(row.key, "text"),
             "aria-label": `${itemLabel} ${i + 1}`,
@@ -86,14 +91,26 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
                     <Input
                       id={id(row.key, "heading")}
                       aria-label={`Section heading above ${lower} ${i + 1}`}
-                      placeholder="Section heading, e.g. For the sauce…"
+                      placeholder={endsSection ? "No heading: continues without a section" : "Section heading, e.g. For the sauce…"}
                       value={row.heading}
                       onChange={(e) => change(setHeading(rows, i, e.target.value))}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                        e.preventDefault(); // Enter must not save the recipe; move on to the row
+                        document.getElementById(id(row.key, "text"))?.focus();
+                      }}
                     />
                     <IconButton
                       icon="remove"
-                      label={`Remove section heading above ${lower} ${i + 1}`}
-                      onClick={() => change(setHeading(rows, i, null), id(row.key, "text"))}
+                      label={
+                        endsSection
+                          ? `Join ${lower} ${i + 1} to the previous section`
+                          : `Remove section heading above ${lower} ${i + 1}`
+                      }
+                      onClick={() => {
+                        if (endsSection) announce(`${itemLabel} ${i + 1} now belongs to the previous section.`);
+                        change(setHeading(rows, i, null), id(row.key, "text"));
+                      }}
                     />
                   </div>
                 )
@@ -133,6 +150,7 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
                   onChange={(e) => change(setText(rows, i, e.target.value))}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter") return;
+                    if (e.nativeEvent.isComposing) return; // Enter that confirms an IME choice is not ours
                     e.preventDefault(); // Enter adds the next row instead of submitting the form
                     const next = insertAfter(rows, i);
                     change(next.rows, id(next.focus, "text"));

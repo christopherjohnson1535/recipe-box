@@ -24,7 +24,7 @@ export function IconButton({ icon, label, quiet, className, type = "button", ...
       aria-label={label}
       title={label}
       className={cx(
-        "inline-flex size-11 shrink-0 items-center justify-center rounded-control border text-(--button-ghost-fg)",
+        "inline-flex size-control shrink-0 items-center justify-center rounded-control border text-(--button-ghost-fg)",
         "transition-[border-color,color] duration-150 ease-out hover:text-(--button-ghost-hover) disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:text-(--button-ghost-fg)",
         quiet ? "border-transparent" : "border-(--input-border) hover:border-(--input-border-hover)",
         className,

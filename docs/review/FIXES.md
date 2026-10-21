@@ -26,3 +26,14 @@ D-13 skipped — italic placeholders are the documented style (docs/UI.md).
 D-14 fixed — `overflow-wrap: anywhere` on h1–h3 became `break-word` and the redundant `break-words` on the entry link was removed, so only words longer than the line break.
 D-15..D-22 (P2) deferred — not in scope for #2; revisit in Phase 1 design QA (#9).
 R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` keyword in lib/api.ts; `class` now only counts as a prop or key (`class=` / `class:`), with self-tests for both.
+#3 E-01 fixed — dirty form is stashed to sessionStorage (`rb-draft:<id|new>`, 400 ms debounce, all access try/catch, `recipe-form/draft-stash.ts` + test); cleared on save and on confirmed Cancel; on load a differing stash shows an Alert with Restore/Discard. beforeunload kept.
+#3 E-02 fixed — Enter in a section heading is prevented and moves focus to the row text; `isComposing` Enter is ignored in item inputs, headings and the tag input (covers the IME Nice item).
+#3 E-03 fixed — a blank heading after a named section shows the placeholder "No heading: continues without a section" and its remove button is labelled "Join <item> N to the previous section" and announces the join; smallest behaviour that makes the merge visible and deliberate.
+#3 E-04 fixed — minutes validated in `submit` (whole numbers 0-10,000; the backend only rejects negatives, so 10,000 is a client limit); errors show on the field and the first one is focused; `max=10000` on the inputs; nothing is rounded silently.
+#3 E-05 fixed (partial) — split-paste strips ▢ ☐ □ ✓ and splits on lone CR; test added. "For the sauce:" auto-heading skipped — a colon heuristic would misfire on ingredient lines ending in a colon.
+#3 E-06 skipped — acceptable as is (Nice, no code change).
+#3 E-07 fixed — dead `imageId`/`photoImageIds` entries removed from FIELD_KEYS.
+#3 E-08 fixed — IME Enter ignored (see E-02); live note alternates a trailing zero-width space so repeated messages are re-announced (one line).
+#3 E-09 fixed (partial) — removing a tag focuses the next tag's remove button, else the previous, else the tag input. Alt+Up/Down for tab stops skipped (optional).
+#3 E-10 fixed (partial) — IconButton uses `size-control`. PhotoField button restyle skipped — the `file:` pseudo-element cannot take `buttonClass`; an sr-only input plus label is a bigger change. Double-announce of title+aria-label skipped.
+#3 reuse notes (start dirty, original-photos slot) deferred to #7.

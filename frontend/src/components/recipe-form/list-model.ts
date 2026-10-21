@@ -31,12 +31,12 @@ export function toItems(rows: Row[]): Item[] {
   return items;
 }
 
-const BULLET = /^\s*(?:[-*•·▪◦–—]\s*|\d+[.)]\s+|\(\d+\)\s+)/;
+const BULLET = /^\s*(?:[-*•·▪◦–—▢☐□✓]\s*|\d+[.)]\s+|\(\d+\)\s+)/;
 
 /** A pasted block as one string per line, without bullets, numbering or blank lines. */
 export function splitLines(text: string): string[] {
   return text
-    .split(/\r?\n/)
+    .split(/\r\n|\r|\n/)
     .map((line) => line.replace(BULLET, "").trim())
     .filter(Boolean);
 }

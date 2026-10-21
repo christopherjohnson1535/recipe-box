@@ -16,6 +16,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
       initial={recipe}
       submitLabel={recipe ? "Save changes" : "Save recipe"}
       onSubmit={save}
+      draftKey={recipe?.id ?? "new"}
       cancelHref={recipe ? `/recipes/${recipe.id}` : "/"}
     />
   );
