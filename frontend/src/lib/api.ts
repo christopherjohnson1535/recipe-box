@@ -165,8 +165,8 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
     createUser: (body: { username: string; displayName: string; password: string; role: Role }) =>
       request<User>("POST", "/api/users", body),
     deleteUser: (userId: string) => request<void>("DELETE", `/api/users/${id(userId)}`),
-    setPassword: (userId: string, password: string) =>
-      request<void>("PUT", `/api/users/${id(userId)}/password`, { password }),
+    setPassword: (userId: string, password: string, currentPassword?: string) =>
+      request<void>("PUT", `/api/users/${id(userId)}/password`, currentPassword === undefined ? { password } : { password, currentPassword }),
 
     exportAll: () => get<Blob>("/api/export"),
     importExport: (file: Blob) => {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ButtonHTMLAttributes, ComponentProps } from "react";
+import type { ComponentProps } from "react";
 import { cx } from "./cx";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -20,7 +20,7 @@ export function buttonClass(variant: Variant = "primary", className?: string) {
   return cx(base, variants[variant], className);
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; pending?: boolean };
+type ButtonProps = ComponentProps<"button"> & { variant?: Variant; pending?: boolean };
 
 export function Button({ variant, pending, className, children, disabled, type = "button", ...rest }: ButtonProps) {
   return (
