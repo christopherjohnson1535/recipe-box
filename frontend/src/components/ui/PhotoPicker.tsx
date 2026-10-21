@@ -82,13 +82,14 @@ export function PhotoPicker({ id, label, files, max, onAdd, onRemove, disabled, 
 }
 
 /** Photos already stored on the server, shown full width with a link to open each at full size. */
-export function PhotoGallery({ photos }: { photos: readonly { src: string; alt: string }[] }) {
+export function PhotoGallery({ photos, strip }: { photos: readonly { src: string; alt: string }[]; strip?: boolean }) {
+  // `strip`: below `lg` a compact horizontal row of thumbnails, so a long gallery does not push the form down.
   return (
-    <ul className="flex flex-col gap-4">
+    <ul className={strip ? "flex flex-row gap-3 overflow-x-auto pb-2 lg:flex-col lg:gap-4 lg:overflow-visible lg:pb-0" : "flex flex-col gap-4"}>
       {photos.map((p) => (
-        <li key={p.src}>
+        <li key={p.src} className={strip ? "shrink-0 lg:shrink" : undefined}>
           <a href={p.src} target="_blank" rel="noreferrer" className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring)">
-            <img src={p.src} alt={p.alt} width={600} height={800} className="h-auto w-full [filter:var(--photo-filter)]" />
+            <img src={p.src} alt={p.alt} width={600} height={800} className={strip ? "h-28 w-auto max-w-none lg:h-auto lg:w-full [filter:var(--photo-filter)]" : "h-auto w-full [filter:var(--photo-filter)]"} />
             <span className="sr-only"> (opens full size in a new tab)</span>
           </a>
         </li>

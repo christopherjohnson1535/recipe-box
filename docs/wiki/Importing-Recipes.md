@@ -11,9 +11,9 @@ Every import gives you a **draft** to check and fix before it is saved. Open **I
 | Safari share sheet | Apple Shortcut / bookmarklet | Planned (Phase 4). |
 
 **While it works**
-- A link takes a few seconds; reading photos can take about 20 seconds. **Stop waiting and edit** brings the form back (the server may still finish, its answer is ignored).
+- A link takes a few seconds; reading photos can take about 20 seconds. **Stop waiting and edit** brings the form back (the server may still finish, its answer is ignored). If an import fails you always get a next step: Try again, Type it in, or Sign in.
 - When the draft arrives you land on **Check the recipe**. Leaving without saving asks first.
-- The original photos stay beside the form while you check or type.
+- The original photos stay with the form while you check or type (beside it on wide screens, a scrollable strip above it on phones and iPad portrait).
 
 **If AI is switched off**
 - Photo: the photos are kept and shown next to an empty recipe, so you can type it in.

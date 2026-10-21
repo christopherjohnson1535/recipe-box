@@ -31,6 +31,22 @@ describe("explainImportError", () => {
     expect(explainImportError(err("validation", "files: 1 to 6 photos."), "photo").field).toBe(false);
   });
 
+  it("gives every failure a next step", () => {
+    expect(explainImportError(err("internal", "Something went wrong."), "link").offers).toEqual(["retry", "type-in"]);
+    expect(explainImportError(err("network"), "photo").offers).toEqual(["retry", "type-in"]);
+    expect(explainImportError(err("unauthenticated"), "link").offers).toEqual(["sign-in"]);
+  });
+
+  it("maps a sourceUrl error to the source field and a raw URL error to friendly copy", () => {
+    const s = explainImportError(err("validation", "sourceUrl: must be an http(s) URL."), "text");
+    expect(s).toMatchObject({ field: true, fieldId: "import-source", message: "Enter a full web address starting with https://" });
+    expect(explainImportError(err("validation", "url: must be an http(s) URL."), "link")).toMatchObject({
+      fieldId: "import-url",
+      message: "Enter a full web address starting with https://",
+    });
+    expect(explainImportError(err("validation", "text: required."), "text").fieldId).toBe("import-text");
+  });
+
   it("words too_large for photos and text differently", () => {
     expect(explainImportError(err("too_large"), "photo").title).toMatch(/photo/);
     expect(explainImportError(err("too_large"), "text").title).toMatch(/text/);

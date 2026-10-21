@@ -5,7 +5,7 @@ import { cx } from "./cx";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const base =
-  "label inline-flex min-h-control items-center justify-center gap-2 whitespace-nowrap rounded-control px-5 transition-[background-color,border-color,color] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-55";
+  "label inline-flex min-h-control items-center justify-center gap-2 whitespace-nowrap rounded-control px-5 max-sm:max-w-full max-sm:py-2 max-sm:text-center max-sm:whitespace-normal transition-[background-color,border-color,color] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-55";
 const variants: Record<Variant, string> = {
   primary:
     "bg-(--button-primary-bg) text-(--button-primary-fg) hover:bg-(--button-primary-bg-hover) hover:text-(--button-primary-fg-hover)",

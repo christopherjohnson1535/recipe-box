@@ -55,11 +55,12 @@ export function TextPanel({
   source,
   onSource,
   error,
+  sourceError,
   busy,
   onSubmit,
   aiOff,
   autoFocus,
-}: Common & { text: string; onText: (v: string) => void; source: string; onSource: (v: string) => void; error?: string; aiOff: boolean; autoFocus: boolean }) {
+}: Common & { text: string; onText: (v: string) => void; source: string; onSource: (v: string) => void; error?: string; sourceError?: string; aiOff: boolean; autoFocus: boolean }) {
   return (
     <form method="post" noValidate onSubmit={submitting(onSubmit)} className="flex max-w-measure flex-col gap-5">
       {aiOff && (
@@ -79,7 +80,7 @@ export function TextPanel({
           onChange={(e) => onText(e.target.value)}
         />
       </Field>
-      <Field label="Where it came from (optional)" htmlFor="import-source" hint="A link, kept with the recipe as its source.">
+      <Field label="Where it came from (optional)" htmlFor="import-source" error={sourceError} hint="A link, kept with the recipe as its source.">
         <Input
           id="import-source"
           name="sourceUrl"
@@ -89,6 +90,7 @@ export function TextPanel({
           autoCapitalize="none"
           spellCheck={false}
           placeholder="https://…"
+          aria-invalid={sourceError ? true : undefined}
           aria-describedby="import-source-msg"
           value={source}
           onChange={(e) => onSource(e.target.value)}

@@ -98,6 +98,49 @@ describe("ImportScreen", () => {
     expect(screen.getByLabelText("Recipe link").getAttribute("aria-invalid")).toBe("true");
   });
 
+  it("offers Try again and typing it in after a server error, and retries", async () => {
+    const importUrl = vi.fn().mockRejectedValueOnce(fail(500, "internal", "Something went wrong.")).mockResolvedValue(draft());
+    render(<ImportScreen api={mockApi({ importUrl })} />);
+    importLink();
+    expect((await screen.findByRole("alert")).textContent).toMatch(/Something went wrong/);
+    expect(screen.getByRole("link", { name: "Type it in" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByRole("heading", { name: "Check the recipe" });
+    expect(importUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it("links back to sign in when the session is gone", async () => {
+    render(<ImportScreen api={mockApi({ importUrl: vi.fn().mockRejectedValue(fail(401, "unauthenticated")) })} />);
+    importLink();
+    await screen.findByText("You have been signed out");
+    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/login?next=%2Fimport%3Fmode%3Dlink");
+  });
+
+  it("shows a sourceUrl error under the source field and focuses it", async () => {
+    render(<ImportScreen api={mockApi({ importText: vi.fn().mockRejectedValue(fail(400, "validation", "sourceUrl: must be an http(s) URL.")) })} initialMode="text" />);
+    fireEvent.change(screen.getByLabelText("Recipe text"), { target: { value: "2 eggs. Whisk." } });
+    fireEvent.click(screen.getByRole("button", { name: "Read the text" }));
+    expect(await screen.findByText("Enter a full web address starting with https://")).toBeTruthy();
+    const source = screen.getByLabelText(/Where it came from/);
+    expect(source.getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(source);
+    expect(screen.getByLabelText("Recipe text").getAttribute("aria-invalid")).toBeNull();
+  });
+
+  it("keeps the pending note when the tab is switched mid-request, and names the origin in Start over", async () => {
+    let resolve!: (d: RecipeDraft) => void;
+    const api = mockApi({ importUrl: vi.fn(() => new Promise<RecipeDraft>((r) => (resolve = r))) });
+    render(<ImportScreen api={api} />);
+    importLink();
+    await screen.findByRole("status");
+    fireEvent.click(screen.getByRole("tab", { name: "Photo" }));
+    expect((screen.getByRole("status")).textContent).toMatch(/Fetching the page/);
+    expect(screen.getByRole("button", { name: "Stop waiting and edit" })).toBeTruthy();
+    resolve(draft());
+    await screen.findByRole("heading", { name: "Check the recipe" });
+    expect(screen.getByRole("button", { name: "Start over with a different link" })).toBeTruthy();
+  });
+
   it("starts the link import by itself from ?url=", async () => {
     const api = mockApi();
     render(<ImportScreen api={api} initialUrl="https://example.com/pancakes" />);

@@ -90,7 +90,7 @@ Text and structure:
 
 Controls and states:
 - `ui/Button` / `ButtonLink`: `primary` ink fill (hover turns accent), `secondary` ink outline, `ghost` underlined,
-  `danger` accent fill. Labels are `.label`. 44px tall.
+  `danger` accent fill. Labels are `.label`. At least 44px tall; below `sm` long labels wrap (centred) instead of overflowing.
 - `ui/PageHeader`: `kicker`, `title` (display headline), `description` (italic deck), `byline`, `actions`,
   `align="start" | "center"`, `reserveDeck` (keeps the deck's height when there is no description); ends with a
   hairline.
@@ -119,7 +119,7 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   Restore/Discard; `null` keeps none), `startDirty` (the starting values count as unsaved, for an import draft). `recipe-form/list-model.ts` holds the pure list logic.
 - `import/ImportScreen` (+ `ImportPanels`, `import-errors.ts`): `/import` with Link, Photo and Text modes (mode in
   `?mode=`, `?url=` starts a link import), loading and error notes, review in `RecipeForm` with the original photos
-  beside it. `explainImportError` maps every API error code to a title, message and next steps.
+  beside it. `explainImportError` maps every API error code to a title, message and next steps (Try again, Type it in, Sign in, Paste the text instead). Below `lg` the original photos are a horizontal strip above the form.
 - `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `ContentsEntry`.
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 

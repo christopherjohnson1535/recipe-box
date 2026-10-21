@@ -2,7 +2,7 @@ import { ApiError } from "@/lib/api";
 
 export type ImportMode = "link" | "photo" | "text";
 /** A way forward the screen can offer as a button. */
-export type Offer = "paste-text" | "type-in";
+export type Offer = "paste-text" | "type-in" | "retry" | "sign-in";
 
 export type ImportProblem = {
   title: string;
@@ -12,13 +12,15 @@ export type ImportProblem = {
   offers: Offer[];
   /** Show the message under the input instead of in a note (a bad address, empty text). */
   field: boolean;
+  /** The input the message belongs to, when `field` is set. */
+  fieldId?: string;
   /** Photos the server stored before it refused (`ai_disabled`), for the by-hand form. */
   photoIds: string[];
 };
 
 const WHAT: Record<ImportMode, string> = { link: "links", photo: "photos", text: "pasted text" };
 
-type Rule = Partial<Pick<ImportProblem, "tone" | "field">> & Pick<ImportProblem, "title" | "message"> & { offers?: Offer[] };
+type Rule = Partial<Pick<ImportProblem, "tone" | "field" | "fieldId">> & Pick<ImportProblem, "title" | "message"> & { offers?: Offer[] };
 
 function rule(code: string, mode: ImportMode, serverMessage: string): Rule | undefined {
   switch (code) {
@@ -45,12 +47,19 @@ function rule(code: string, mode: ImportMode, serverMessage: string): Rule | und
         message: "The page does not publish its recipe in a form we can read. Paste the recipe text instead, or type it in.",
         offers: ["paste-text", "type-in"],
       };
-    case "validation":
+    case "validation": {
+      // The API prefixes the offending field ("sourceUrl: must be an http(s) URL."); show it under that input.
+      const named = /^(\w+):\s*(.*)$/.exec(serverMessage);
+      const name = named?.[1];
+      const rest = named ? named[2] : serverMessage;
+      const web = "Enter a full web address starting with https://";
       return {
         title: "Check what you entered",
-        message: serverMessage.replace(/^\w+:\s*/, ""),
+        message: (name === "url" || name === "sourceUrl") && /url/i.test(rest) ? web : rest,
         field: mode !== "photo",
+        fieldId: name === "sourceUrl" ? "import-source" : mode === "link" ? "import-url" : "import-text",
       };
+    }
     case "too_large":
       return mode === "photo"
         ? { title: "A photo is too big", message: "Remove the largest photo or take it again at a lower quality, then try again." }
@@ -74,9 +83,9 @@ function rule(code: string, mode: ImportMode, serverMessage: string): Rule | und
         offers: ["type-in"],
       };
     case "unauthenticated":
-      return { title: "You have been signed out", message: "Sign in again, then come back to import." };
+      return { title: "You have been signed out", message: "Sign in again, then come back to import.", offers: ["sign-in"] };
     case "network":
-      return { title: "Can’t reach Recipe Box", message: serverMessage };
+      return { title: "Can’t reach Recipe Box", message: serverMessage, offers: ["retry", "type-in"] };
     default:
       return undefined;
   }
@@ -88,7 +97,8 @@ export function explainImportError(error: unknown, mode: ImportMode): ImportProb
   const found = api && rule(api.code, mode, api.message);
   const r: Rule = found || {
     title: "The import failed",
-    message: api?.message || "Something went wrong. Try again.",
+    message: api?.message || "Something went wrong.",
+    offers: ["retry", "type-in"],
   };
   const ids = api?.details.photoImageIds;
   return {
@@ -98,6 +108,7 @@ export function explainImportError(error: unknown, mode: ImportMode): ImportProb
     // "Paste text" only makes sense as a way out of a link import.
     offers: (r.offers ?? []).filter((o) => o !== "paste-text" || mode === "link"),
     field: r.field ?? false,
+    fieldId: r.fieldId,
     photoIds: Array.isArray(ids) ? ids.filter((i): i is string => typeof i === "string") : [],
   };
 }

@@ -42,6 +42,8 @@ type Review = {
   photoIds: string[];
   /** AI was off: no draft, an empty form to type into. */
   byHand: boolean;
+  /** The mode the import came from, for the "Start over" label. */
+  from: ImportMode;
 };
 
 export function ImportScreen({ initialMode = "link", initialUrl = "", api = browserApi }: { initialMode?: ImportMode; initialUrl?: string; api?: ImportApi }) {
@@ -85,10 +87,15 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
 
   // A draft has arrived: move to it. A field error: put the cursor back in the field.
   useEffect(() => {
-    if (review) heading.current?.focus();
+    const h = heading.current;
+    if (!review || !h) return;
+    // Focus without the browser's own jump; scroll only when the heading is actually out of view.
+    h.focus({ preventScroll: true });
+    const r = h.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) h.scrollIntoView({ block: "start" });
   }, [review]);
   useEffect(() => {
-    if (problem?.value.field) document.getElementById(problem.from === "link" ? "import-url" : "import-text")?.focus();
+    if (problem?.value.field) document.getElementById(problem.value.fieldId ?? "import-text")?.focus();
   }, [problem]);
 
   const aiOff = caps?.ai === false;
@@ -115,6 +122,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
         duplicateOf,
         photoIds: draft.photoImageIds ?? [],
         byHand: false,
+        from,
       });
     } catch (e) {
       if (id !== request.current) return;
@@ -126,6 +134,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
           duplicateOf: null,
           photoIds: value.photoIds,
           byHand: true,
+          from,
         });
       } else {
         setProblem({ from, value });
@@ -155,6 +164,13 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
   function stopWaiting() {
     request.current++; // the answer, when it comes, is ignored
     setBusy(null);
+    document.getElementById(mode === "link" ? "import-url" : mode === "photo" ? "import-photos" : "import-text")?.focus();
+  }
+
+  function retry(from: ImportMode) {
+    if (from === "link") void importLink();
+    else if (from === "text") void importText();
+    else void importPhotos();
   }
 
   function pasteInstead() {
@@ -219,18 +235,18 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
               <div className="grid items-start gap-10 lg:grid-cols-2">
                 <div className="flex flex-col gap-3 lg:sticky lg:top-6">
                   <Heading level={3} size="label">
-                    Original {photos.length === 1 ? "photo" : "photos"}
+                    Your {photos.length === 1 ? "photo" : `photos (${photos.length})`}
                   </Heading>
-                  <PhotoGallery photos={photos} />
+                  <PhotoGallery photos={photos} strip />
                 </div>
                 {form}
               </div>
             ) : (
               form
             )}
-            <div>
+            <div className="-ml-2">
               <Button variant="ghost" onClick={backToInput}>
-                Start over with a different {mode === "link" ? "link" : mode === "photo" ? "photo" : "text"}
+                Start over with a different {review.from === "link" ? "link" : review.from === "photo" ? "photo" : "text"}
               </Button>
             </div>
           </>
@@ -240,12 +256,13 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
   }
 
   const here = problem && problem.from === mode ? problem.value : null;
-  const fieldError = here?.field ? here.message : undefined;
+  const fieldError = here?.field && here.fieldId !== "import-source" ? here.message : undefined;
+  const sourceError = here?.field && here.fieldId === "import-source" ? here.message : undefined;
   return (
     <div className="flex flex-col gap-8">
       <Tabs label="Import from" idPrefix="import" tabs={TABS} value={mode} onChange={pick} />
       <div role="tabpanel" id="import-panel" aria-labelledby={`import-tab-${mode}`} className="flex flex-col gap-6">
-        {mode === "link" && <LinkPanel url={url} onUrl={setUrl} error={fieldError} busy={busy === "link"} onSubmit={() => importLink()} aiOff={aiOff} />}
+        {mode === "link" && <LinkPanel url={url} onUrl={setUrl} error={fieldError} busy={busy !== null} onSubmit={() => importLink()} aiOff={aiOff} />}
         {mode === "text" && (
           <TextPanel
             text={text}
@@ -253,7 +270,8 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
             source={source}
             onSource={setSource}
             error={fieldError}
-            busy={busy === "text"}
+            sourceError={sourceError}
+            busy={busy !== null}
             onSubmit={importText}
             aiOff={aiOff}
             autoFocus={focusText}
@@ -267,12 +285,12 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
             kind={kind}
             onKind={setKind}
             error={fieldError}
-            busy={busy === "photo"}
+            busy={busy !== null}
             onSubmit={importPhotos}
             aiOff={aiOff}
           />
         )}
-        {busy === mode && (
+        {busy !== null && (
           <Pending
             action={
               <Button variant="secondary" onClick={stopWaiting}>
@@ -280,7 +298,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
               </Button>
             }
           >
-            {WAITING[mode]}
+            {WAITING[busy]}
           </Pending>
         )}
         {here && !here.field && (
@@ -289,6 +307,8 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
               <Text variant="small">{here.message}</Text>
               {here.offers.length > 0 && (
                 <div className="flex flex-wrap gap-3">
+                  {here.offers.includes("retry") && <Button onClick={() => retry(mode)}>Try again</Button>}
+                  {here.offers.includes("sign-in") && <ButtonLink href={`/login?next=${encodeURIComponent(`/import?mode=${mode}`)}`}>Sign in</ButtonLink>}
                   {here.offers.includes("paste-text") && <Button onClick={pasteInstead}>Paste the recipe text instead</Button>}
                   {here.offers.includes("type-in") && (
                     <ButtonLink href="/recipes/new" variant="secondary">
