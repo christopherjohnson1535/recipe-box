@@ -37,3 +37,4 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #6 S-09 skipped — no change; frontend must keep escaping text (no dangerouslySetInnerHTML).
 #6 S-10 skipped — orphan-image sweep belongs in a later cleanup issue.
 #6 S-11 fixed (partly) — sourceUrl drops userinfo and fragment; first-recipe-wins and the second 15 s image budget left as is.
+#6 ORCH-01 fixed (orchestrator, smoke test) — an invalid `url` reported `sourceUrl: …` from the shared helper, so the import form could not map it to its field; the route now answers `url: …`, asserted in import_url.rs.

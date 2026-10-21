@@ -507,6 +507,9 @@ async fn bad_input_and_no_session() {
             (StatusCode::BAD_REQUEST, "validation"),
             "{bad}"
         );
+        // The UI maps "field: message" to a form field; this endpoint's field is `url`.
+        let message = res.json["error"]["message"].as_str().unwrap_or("");
+        assert!(message.starts_with("url: "), "{bad}: {message}");
     }
     let res = ctx
         .call(

@@ -38,7 +38,10 @@ pub async fn from_url(
     CurrentUser(user): CurrentUser,
     AppJson(body): AppJson<UrlBody>,
 ) -> AppResult<Json<RecipeDraft>> {
-    let requested = validate::source_url(Some(&body.url))?
+    // The shared helper names `sourceUrl`; this endpoint's field is `url`, so use our own message.
+    let requested = validate::source_url(Some(&body.url))
+        .ok()
+        .flatten()
         .and_then(|u| Url::parse(&u).ok())
         .ok_or_else(|| {
             AppError::validation("url: enter a full web address starting with http:// or https://.")
