@@ -1,0 +1,82 @@
+# Recipe Box — local / single-host stack.
+#   cp .env.example .env      # then edit
+#   docker compose up -d --build
+#   open http://localhost:3000  (first visit creates the admin account)
+#
+# HTTPS (needed for iPad install, offline, camera, screen-awake) — set PUBLIC_HOSTNAME in .env and:
+#   docker compose --profile https up -d --build
+# Prebuilt images instead of building: see deploy/compose.prod.yml.
+
+name: recipe-box
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-recipes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-recipes}
+      POSTGRES_DB: ${POSTGRES_DB:-recipes}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-recipes} -d ${POSTGRES_DB:-recipes}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    image: recipe-box-api:local
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-recipes}:${POSTGRES_PASSWORD:-recipes}@db:5432/${POSTGRES_DB:-recipes}
+      MEDIA_DIR: /data/media
+      BIND_ADDR: 0.0.0.0:8080
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SESSION_DAYS: ${SESSION_DAYS:-30}
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-sonnet-5-5}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    # No published port: only the web container talks to the API.
+
+  web:
+    build: ./frontend
+    image: recipe-box-web:local
+    environment:
+      API_INTERNAL_URL: http://api:8080
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    profiles: ["https"]
+    image: caddy:2-alpine
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-}   # required for this profile — set it in .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:

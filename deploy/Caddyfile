@@ -1,0 +1,11 @@
+# HTTPS front door. Caddy gets and renews a Let's Encrypt certificate automatically when
+# PUBLIC_HOSTNAME is a real DNS name pointing at this host with ports 80/443 open.
+{$PUBLIC_HOSTNAME} {
+	encode zstd gzip
+	reverse_proxy web:3000
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

@@ -1,0 +1,34 @@
+name: Feature slice
+description: A piece of work a single session can finish
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What the user can do when this is done.
+    validations:
+      required: true
+  - type: input
+    id: reqs
+    attributes:
+      label: Requirements
+      description: IDs from docs/REQUIREMENTS.md, e.g. LNK-1, LNK-2
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and notes
+      description: SPEC sections, endpoints (docs/API.md), design decisions.
+  - type: textarea
+    id: owned
+    attributes:
+      label: Owned paths
+      description: Files/folders this issue may change.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      value: |
+        - [ ] ...
+        - [ ] Checks pass for the touched tree (see CLAUDE.md)
+        - [ ] Docs / wiki page updated

@@ -1,9 +1,14 @@
 ---
 name: factory
-description: Run the PhotoFlow software factory end to end — requirements, plan, build with an agent team, verify, test, design QA, ship. Use when starting a new feature or project phase, or when asked "build X end to end", "run the factory", or "what's the next step".
+description: Run the software factory (from PhotoFlow, used for Recipe Box) end to end — requirements, plan, build with an agent team, verify, test, design QA, ship. Use when starting a new feature or project phase, or when asked "build X end to end", "run the factory", or "what's the next step".
 ---
 
 # Software factory (orchestrator)
+
+> Recipe Box adaptation: the stack is a Rust API (`backend/`) + Next.js (`frontend/`). Where a stage says
+> `tsc/eslint/vitest/build`, also run the backend checks: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+> `cargo test`. Work is sliced into GitHub issues (`scripts/github/backlog.py`); one session usually takes one issue
+> through plan → build → verify → test. Filled-in builder rules: `docs/agents/agent-preamble.md`.
 
 You are the orchestrator. Once the plan is approved you do not write feature code yourself: you brief agents,
 route their findings, keep the ledger, and check the result with your own eyes (screenshots, smoke runs).
@@ -36,7 +41,7 @@ Loop back freely: a verify or test failure sends you to a fix wave (stage 4 rule
 - **Reviewers never fix; fixers never review their own work.** Fresh agents for each.
 - **Look at it yourself.** After any UI change, screenshot every page × theme × size (`factory-test`) and open a
   few. This caught a 250px scroll-on-load bug that every type check and unit test missed.
-- **Model choice:** use the model the owner asked for (this project: Haiku agents). Escalate only if asked.
+- **Model choice:** use the model the owner asked for (PhotoFlow: Haiku agents; Recipe Box: session default). Escalate only if asked.
 - **Tell the owner the state after each stage** in one or two sentences; drafts and docs as soon as useful.
 
 ## Status board

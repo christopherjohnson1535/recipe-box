@@ -1,0 +1,13 @@
+# Run published images (built by CI) instead of building on the host.
+#   docker compose -f docker-compose.yml -f deploy/compose.prod.yml --profile https up -d
+# Set IMAGE_TAG in .env (default: latest = newest main build; use a release tag like v0.2.0 to pin).
+
+services:
+  api:
+    build: !reset null
+    image: ghcr.io/christopherjohnson1535/recipe-box-api:${IMAGE_TAG:-latest}
+    pull_policy: always
+  web:
+    build: !reset null
+    image: ghcr.io/christopherjohnson1535/recipe-box-web:${IMAGE_TAG:-latest}
+    pull_policy: always

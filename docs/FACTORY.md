@@ -1,4 +1,7 @@
-# PhotoFlow software factory
+# Software factory (Recipe Box)
+
+This process and its skills come from the owner's PhotoFlow project. Recipe Box adds Rust checks for `backend/`
+and slices work into GitHub issues — see `CLAUDE.md`.
 
 How this project is built, end to end, by an orchestrator and a team of agents. Each stage is a skill in
 `.claude/skills/` — start with **`factory`**, which says which stage comes next and what its gate is.
