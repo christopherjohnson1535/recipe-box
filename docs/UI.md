@@ -99,9 +99,17 @@ Controls and states:
   name. `ChipRow` wraps the chips onto further lines (never a scroller). `Badge`: accent label for tags.
 - Photos (lead photo, listing thumbnails) read `--photo-filter`: none by day, slightly dimmed in the evening theme.
 - `ui/Field`, `ui/Label`, `ui/Input`: uppercase label, square input with a 3:1 border, italic hint.
+- `ui/Textarea` (shares `inputClass` with `Input`), `ui/Fieldset` (legend over a hairline, optional hint),
+  `ui/IconButton` (44px outlined icon button; `icon` is `up`, `down`, `remove` or `heading`, `label` is required;
+  `quiet` drops the outline), `ui/ListEditor` (`EditorList` + `EditorItem`: optional accent numeral, section heading
+  slot with a left rule, row controls), `ui/TagList` (removable tags), `ui/PhotoField` (file picker with preview,
+  Remove, busy and error states). These make up the recipe editor.
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
-App components (`src/components/*.tsx`, no styling of their own):
+App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
+- `recipe-form/RecipeForm`: the editor for new recipes, edits and import review. Props `initial`
+  (`RecipeInput`, `RecipeDraft` or `Recipe`; draft `warnings` are shown), `submitLabel`, `onSubmit(input)` (saves and
+  navigates; throw an `ApiError` to show it), `cancelHref`. `recipe-form/list-model.ts` holds the pure list logic.
 - `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `ContentsEntry`.
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 

@@ -1,6 +1,7 @@
 **Recipe Box**
 - [[Home]]
 - [[Getting Started]]
+- [[Adding and Editing Recipes]]
 - [[Importing Recipes]]
 - [[Using on iPad]]
 - [[AI Photo Import]]
