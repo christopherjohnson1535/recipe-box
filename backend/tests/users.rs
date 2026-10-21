@@ -323,6 +323,21 @@ async fn delete_rules_and_effects() {
         (own.status, own.code()),
         (StatusCode::FORBIDDEN, "forbidden")
     );
+    // With another admin present only the self check can refuse this (last-admin can't mask it).
+    let spare = id(&ctx.add(&admin, "spare", "admin").await);
+    let own = ctx
+        .call(Method::DELETE, &format!("/api/users/{admin_id}"), a, None)
+        .await;
+    assert_eq!(
+        (own.status, own.code()),
+        (StatusCode::FORBIDDEN, "forbidden")
+    );
+    assert_eq!(own.json["error"]["message"], "You can't remove yourself.");
+    assert_eq!(ctx.me_status(&admin).await, StatusCode::OK);
+    let del = ctx
+        .call(Method::DELETE, &format!("/api/users/{spare}"), a, None)
+        .await;
+    assert_eq!(del.status, StatusCode::NO_CONTENT);
     let gone = ctx
         .call(
             Method::DELETE,
@@ -483,6 +498,15 @@ async fn password_change_rules() {
         )
         .await;
     assert_eq!(reset.status, StatusCode::NO_CONTENT);
+    for bad in ["short".to_string(), "x".repeat(1025)] {
+        let res = ctx
+            .call(Method::PUT, &path, a, Some(json!({ "password": bad })))
+            .await;
+        assert_eq!(
+            (res.status, res.code()),
+            (StatusCode::BAD_REQUEST, "validation")
+        );
+    }
     assert_eq!(ctx.me_status(&phone).await, StatusCode::UNAUTHORIZED);
     assert_eq!(ctx.me_status(&again).await, StatusCode::UNAUTHORIZED);
     assert_eq!(ctx.me_status(&admin).await, StatusCode::OK);
@@ -503,5 +527,128 @@ async fn password_change_rules() {
         (missing.status, missing.code()),
         (StatusCode::NOT_FOUND, "not_found")
     );
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn id_edges_and_admin_own_password() {
+    let Some(ctx) = ctx().await else { return };
+    let admin = ctx.setup_admin().await;
+    let a = Some(admin.as_str());
+    ctx.add(&admin, "mem", "member").await;
+    let mem = session_pair(&ctx.login("mem", PW).await);
+
+    // A member gets 403 (never 404) for an id that doesn't exist: no existence oracle.
+    let res = ctx
+        .call(
+            Method::PUT,
+            &format!("/api/users/{}/password", Uuid::new_v4()),
+            Some(&mem),
+            Some(json!({ "password": "another password" })),
+        )
+        .await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::FORBIDDEN, "forbidden")
+    );
+    // Malformed ids are a 400.
+    for (method, path) in [
+        (Method::DELETE, "/api/users/abc"),
+        (Method::PUT, "/api/users/abc/password"),
+    ] {
+        let res = ctx
+            .call(
+                method,
+                path,
+                a,
+                Some(json!({ "password": "another password" })),
+            )
+            .await;
+        assert_eq!(
+            (res.status, res.code()),
+            (StatusCode::BAD_REQUEST, "validation"),
+            "{path}"
+        );
+    }
+
+    // An admin changing their own password needs the current one, keeps this session, ends the others.
+    let admin_id = id(&ctx.call(Method::GET, "/api/auth/me", a, None).await.json);
+    let other = session_pair(&ctx.login("admin", "correct horse battery").await);
+    let path = format!("/api/users/{admin_id}/password");
+    let res = ctx
+        .call(
+            Method::PUT,
+            &path,
+            a,
+            Some(json!({ "password": "a new admin password" })),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::UNAUTHORIZED);
+    let res = ctx
+        .call(
+            Method::PUT,
+            &path,
+            a,
+            Some(json!({ "password": "a new admin password", "currentPassword": "correct horse battery" })),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::NO_CONTENT);
+    assert_eq!(ctx.me_status(&admin).await, StatusCode::OK);
+    assert_eq!(ctx.me_status(&other).await, StatusCode::UNAUTHORIZED);
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn json_errors_do_not_echo_values() {
+    let Some(ctx) = ctx().await else { return };
+    let admin = ctx.setup_admin().await;
+    let res = ctx
+        .call(
+            Method::POST,
+            "/api/users",
+            Some(&admin),
+            Some(json!({ "username": "zed", "displayName": "Z", "password": 98765432101234_i64, "role": "member" })),
+        )
+        .await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::BAD_REQUEST, "validation")
+    );
+    let msg = res.json["error"]["message"].as_str().unwrap();
+    assert!(!msg.contains("98765432101234"), "{msg}");
+    assert!(msg.ends_with("invalid JSON or wrong field type"), "{msg}");
+    ctx.cleanup().await;
+}
+
+/// The delete takes row locks on every admin before checking "last admin". Hold one admin row from the test:
+/// the delete must wait for it. Without `for update` it would finish straight away.
+#[tokio::test]
+async fn remove_waits_for_the_admin_row_lock() {
+    let Some(ctx) = ctx().await else { return };
+    let admin = ctx.setup_admin().await;
+    let bob = id(&ctx.add(&admin, "bob", "admin").await);
+
+    let mut tx = ctx.pool.begin().await.unwrap();
+    sqlx::query("select id from users where username = 'admin' for update")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+
+    let app = ctx.app.clone();
+    let req = Request::builder()
+        .method(Method::DELETE)
+        .uri(format!("/api/users/{bob}"))
+        .header(header::COOKIE, &admin)
+        .body(Body::empty())
+        .unwrap();
+    let mut task = tokio::spawn(async move { app.oneshot(req).await.unwrap().status() });
+
+    let early = tokio::time::timeout(std::time::Duration::from_millis(500), &mut task).await;
+    assert!(
+        early.is_err(),
+        "delete finished while an admin row was locked"
+    );
+    tx.rollback().await.unwrap();
+    assert_eq!(task.await.unwrap(), StatusCode::NO_CONTENT);
     ctx.cleanup().await;
 }
