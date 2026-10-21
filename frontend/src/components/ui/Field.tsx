@@ -6,11 +6,11 @@ type FieldProps = { label: string; htmlFor: string; hint?: string; error?: strin
 export function Field({ label, htmlFor, hint, error, children }: FieldProps) {
   const message = error ?? hint;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {message && (
-        <p id={`${htmlFor}-msg`} className={error ? "text-sm text-danger" : "text-sm text-muted"}>
+        <p id={`${htmlFor}-msg`} className={error ? "text-small text-danger" : "text-small text-ink-muted italic"}>
           {message}
         </p>
       )}
@@ -20,7 +20,7 @@ export function Field({ label, htmlFor, hint, error, children }: FieldProps) {
 
 export function Label({ htmlFor, children }: { htmlFor: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="text-sm font-semibold text-text">
+    <label htmlFor={htmlFor} className="label text-ink">
       {children}
     </label>
   );

@@ -12,10 +12,10 @@ export default async function SetupPage() {
   if (!status.error && !status.needsSetup) redirect("/login");
 
   return (
-    <Card className="flex flex-col gap-6 p-6 sm:p-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold">Set up your recipe box</h1>
-        <p className="text-muted">
+    <Card className="flex flex-col gap-7 px-5 py-8 sm:px-10 sm:py-10">
+      <div className="flex flex-col gap-2">
+        <h1 className="font-display text-title text-ink">Set up your recipe box</h1>
+        <p className="text-deck text-ink-muted italic">
           Create the first account. It becomes the admin who can add the rest of your household.
         </p>
       </div>

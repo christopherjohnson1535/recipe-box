@@ -14,8 +14,9 @@ const NAV = [
 ];
 
 const navItem =
-  "inline-flex min-h-control items-center whitespace-nowrap rounded-control px-3 text-[0.9375rem] font-medium transition-[background-color,color] duration-150 ease-out";
+  "label inline-flex min-h-control items-center whitespace-nowrap border-b-2 px-2 max-sm:text-[0.8125rem] max-sm:tracking-[0.07em] sm:px-2.5 transition-[border-color,color] duration-150 ease-out";
 
+/** Masthead: wordmark, section links, and a thick-over-thin rule. */
 export function AppHeader({ displayName }: { displayName?: string }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -30,12 +31,12 @@ export function AppHeader({ displayName }: { displayName?: string }) {
   }
 
   return (
-    <header className="border-b border-border bg-surface">
-      <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-x-6 gap-y-1 px-gutter py-2">
-        <Link href="/" className="inline-flex min-h-control items-center rounded-control" aria-label="Recipe Box home">
+    <header className="mx-auto w-full max-w-page px-gutter pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-1 pb-2">
+        <Link href="/" className="inline-flex min-h-control items-center" aria-label="Recipe Box home">
           <Logo />
         </Link>
-        <nav aria-label="Main" className="-mx-3 flex max-w-full items-center overflow-x-auto sm:mx-0">
+        <nav aria-label="Main" className="-mx-2 flex max-w-full items-center overflow-x-auto sm:mx-0">
           {NAV.map((item) => {
             const active = item.match(pathname);
             return (
@@ -43,7 +44,10 @@ export function AppHeader({ displayName }: { displayName?: string }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={cx(navItem, active ? "text-accent-ink" : "text-muted hover:bg-surface-sunk hover:text-text")}
+                className={cx(
+                  navItem,
+                  active ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink",
+                )}
               >
                 {item.label}
               </Link>
@@ -53,13 +57,14 @@ export function AppHeader({ displayName }: { displayName?: string }) {
             type="button"
             onClick={signOut}
             disabled={signingOut}
-            className={cx(navItem, "text-muted hover:bg-surface-sunk hover:text-text disabled:opacity-55")}
+            className={cx(navItem, "border-transparent text-ink-muted hover:text-ink disabled:opacity-55")}
             title={displayName ? `Signed in as ${displayName}` : undefined}
           >
             {signingOut ? "Signing out…" : "Sign out"}
           </button>
         </nav>
       </div>
+      <div className="rule-double" aria-hidden="true" />
     </header>
   );
 }

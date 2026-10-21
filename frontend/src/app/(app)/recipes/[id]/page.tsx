@@ -38,127 +38,134 @@ export default async function RecipePage({ params }: Params) {
     { label: "Total", value: formatMinutes(recipe.totalMinutes) },
   ].filter((m) => m.value);
 
+  const source =
+    recipe.sourceUrl || recipe.sourceName ? (
+      recipe.sourceUrl && /^https?:\/\//i.test(recipe.sourceUrl) ? (
+        <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="link break-words">
+          {recipe.sourceName || (URL.canParse(recipe.sourceUrl) ? new URL(recipe.sourceUrl).hostname : recipe.sourceUrl)}
+        </a>
+      ) : (
+        (recipe.sourceName ?? recipe.sourceUrl)
+      )
+    ) : null;
+  // A short description reads as the deck under the headline; a long one opens the article with a drop cap.
+  const description = recipe.description?.trim() || "";
+  const deck = description.length > 0 && description.length <= 160 ? description : undefined;
+  const lede = description.length > 160 ? description : undefined;
+
   return (
-    <article className="flex flex-col gap-8">
+    <article className="flex flex-col gap-10">
       <PageHeader
-        title={recipe.title}
-        description={recipe.description || undefined}
-        actions={
-          <>
-            <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
-              Edit
-            </ButtonLink>
-            <ButtonLink href={`/recipes/${id}/cook`}>Start cooking</ButtonLink>
-          </>
-        }
-      />
-
-      {recipe.imageUrl && (
-        <img
-          src={recipe.imageUrl}
-          alt={recipe.title}
-          width={1200}
-          height={800}
-          fetchPriority="high"
-          className="aspect-[3/2] h-auto max-h-[28rem] w-full rounded-card object-cover"
-        />
-      )}
-
-      {(meta.length > 0 || recipe.tags.length > 0) && (
-        <div className="flex flex-col gap-4">
-          {meta.length > 0 && (
-            <dl className="flex flex-wrap gap-x-8 gap-y-3">
-              {meta.map((m) => (
-                <div key={m.label} className="flex flex-col">
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{m.label}</dt>
-                  <dd className="text-lg tabular-nums">{m.value}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-          {recipe.tags.length > 0 && (
-            <ul className="flex flex-wrap gap-1.5" aria-label="Tags">
+        align="center"
+        kicker={
+          recipe.tags.length > 0 ? (
+            <ul className="dot-list flex flex-wrap justify-center" aria-label="Tags">
               {recipe.tags.map((t) => (
                 <li key={t}>
                   <Badge>{t}</Badge>
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+          ) : undefined
+        }
+        title={recipe.title}
+        description={deck}
+        byline={
+          recipe.createdBy || source ? (
+            <p className="dot-list flex flex-wrap justify-center">
+              {recipe.createdBy && <span>Added by {recipe.createdBy.displayName}</span>}
+              {source && <span className="text-small font-normal normal-case italic tracking-normal">Source: {source}</span>}
+            </p>
+          ) : undefined
+        }
+        actions={
+          <>
+            <ButtonLink href={`/recipes/${id}/cook`}>Start cooking</ButtonLink>
+            <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
+              Edit
+            </ButtonLink>
+          </>
+        }
+      />
+
+      {meta.length > 0 && (
+        <dl className="label dot-list -mt-4 flex flex-wrap justify-center gap-y-2 text-ink">
+          {meta.map((m) => (
+            <div key={m.label}>
+              <dt className="inline text-ink-muted">{m.label}</dt> <dd className="inline">{m.value}</dd>
+            </div>
+          ))}
+        </dl>
       )}
 
-      <div className="grid grid-cols-1 gap-10 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <section aria-labelledby="ingredients" className="flex flex-col gap-4">
-          <h2 id="ingredients" className="text-2xl font-semibold">
+      {recipe.imageUrl && (
+        <figure className="mx-auto w-full max-w-measure-wide">
+          <img
+            src={recipe.imageUrl}
+            alt={recipe.title}
+            width={1200}
+            height={800}
+            fetchPriority="high"
+            className="aspect-[3/2] h-auto max-h-[36rem] w-full object-cover"
+          />
+        </figure>
+      )}
+
+      {lede && <p className="drop-cap mx-auto max-w-measure text-deck text-ink">{lede}</p>}
+
+      <div className="mx-auto grid w-full max-w-measure-wide grid-cols-1 gap-12 md:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] md:gap-14">
+        <aside aria-labelledby="ingredients" className="flex flex-col gap-4 self-start bg-paper-deep px-5 pt-1 pb-6 sm:px-6">
+          <div className="rule-double -mx-5 sm:-mx-6" aria-hidden="true" />
+          <h2 id="ingredients" className="label pt-3 text-ink">
             Ingredients
           </h2>
-          {recipe.ingredients.length === 0 && <p className="text-muted">No ingredients listed.</p>}
+          {recipe.ingredients.length === 0 && <p className="text-ink-muted italic">No ingredients listed.</p>}
           {groupBySection(recipe.ingredients).map((g, i) => (
-            <div key={i} className="flex flex-col gap-2">
-              {g.section && <h3 className="text-lg font-semibold">{g.section}</h3>}
-              <ul className="flex flex-col divide-y divide-border">
+            <div key={i} className="flex flex-col gap-1">
+              {g.section && <h3 className="text-small pt-2 font-semibold text-ink italic">{g.section}</h3>}
+              <ul className="flex flex-col divide-y divide-rule">
                 {g.items.map((ing, j) => (
-                  <li key={j} className="py-2">
+                  <li key={j} className="py-2.5 text-body leading-snug">
                     {ing.text}
                   </li>
                 ))}
               </ul>
             </div>
           ))}
-        </section>
+        </aside>
 
-        <section aria-labelledby="steps" className="flex flex-col gap-4">
-          <h2 id="steps" className="text-2xl font-semibold">
+        <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-6">
+          <h2 id="steps" className="flex items-center gap-4 font-display text-title text-ink">
             Method
+            <span className="h-px flex-1 bg-rule" aria-hidden="true" />
           </h2>
-          {recipe.steps.length === 0 && <p className="text-muted">No steps listed.</p>}
+          {recipe.steps.length === 0 && <p className="text-ink-muted italic">No steps listed.</p>}
           {groupBySection(recipe.steps).map((g, i) => (
-            <div key={i} className="flex flex-col gap-3">
-              {g.section && <h3 className="text-lg font-semibold">{g.section}</h3>}
-              <ol className="flex list-decimal flex-col gap-4 pl-6 marker:font-semibold marker:text-accent-ink">
+            <div key={i} className="flex flex-col gap-4">
+              {g.section && <h3 className="label text-accent">{g.section}</h3>}
+              <ol className="flex flex-col gap-6">
                 {g.items.map((s, j) => (
-                  <li key={j} className="pl-1 leading-relaxed">
-                    {s.text}
+                  <li key={j} className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.75rem_minmax(0,1fr)]">
+                    <span className="font-display text-[1.75rem] leading-none text-accent tabular-nums">
+                      {j + 1}
+                    </span>
+                    <p className="text-body">{s.text}</p>
                   </li>
                 ))}
               </ol>
             </div>
           ))}
+
+          {recipe.notes && (
+            <section aria-labelledby="notes" className="mt-4 flex flex-col gap-3 border-t border-rule pt-6">
+              <h2 id="notes" className="label text-ink">
+                Notes
+              </h2>
+              <p className="whitespace-pre-line text-body text-ink-muted italic">{recipe.notes}</p>
+            </section>
+          )}
         </section>
       </div>
-
-      {recipe.notes && (
-        <section aria-labelledby="notes" className="flex flex-col gap-2">
-          <h2 id="notes" className="text-2xl font-semibold">
-            Notes
-          </h2>
-          <p className="max-w-prose whitespace-pre-line">{recipe.notes}</p>
-        </section>
-      )}
-
-      {(recipe.sourceUrl || recipe.sourceName || recipe.createdBy) && (
-        <footer className="flex flex-col gap-1 border-t border-border pt-4 text-sm text-muted">
-          {(recipe.sourceUrl || recipe.sourceName) && (
-            <p>
-              Source:{" "}
-              {recipe.sourceUrl && /^https?:\/\//i.test(recipe.sourceUrl) ? (
-                <a
-                  href={recipe.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="break-words text-accent-ink underline underline-offset-2"
-                >
-                  {recipe.sourceName || (URL.canParse(recipe.sourceUrl) ? new URL(recipe.sourceUrl).hostname : recipe.sourceUrl)}
-                </a>
-              ) : (
-                (recipe.sourceName ?? recipe.sourceUrl)
-              )}
-            </p>
-          )}
-          {recipe.createdBy && <p>Added by {recipe.createdBy.displayName}</p>}
-        </footer>
-      )}
     </article>
   );
 }

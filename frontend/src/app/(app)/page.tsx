@@ -20,15 +20,19 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const sp = await searchParams;
   const q = firstParam(sp.q)?.trim() ?? "";
   const tag = firstParam(sp.tag) ?? "";
-  const header = (
+  const header = (count?: number) => (
     <PageHeader
+      kicker="The collection"
       title="Recipes"
+      description={
+        count === undefined ? undefined : `${count} ${count === 1 ? "recipe" : "recipes"} in your household’s box.`
+      }
       actions={
         <>
+          <ButtonLink href="/recipes/new">Add recipe</ButtonLink>
           <ButtonLink href="/import" variant="secondary">
             Import
           </ButtonLink>
-          <ButtonLink href="/recipes/new">Add recipe</ButtonLink>
         </>
       }
     />
@@ -42,7 +46,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   } catch (e) {
     return (
       <div className="flex flex-col gap-8">
-        {header}
+        {header()}
         <ServerError error={e} />
       </div>
     );
@@ -53,7 +57,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   if (total === 0 && !filtered) {
     return (
       <div className="flex flex-col gap-8">
-        {header}
+        {header()}
         <EmptyState
           title="No recipes yet"
           actions={
@@ -73,9 +77,9 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
 
   return (
     <div className="flex flex-col gap-8">
-      {header}
+      {header(filtered ? undefined : total)}
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <form role="search" action="/" className="flex max-w-xl gap-2">
           <label htmlFor="q" className="sr-only">
             Search recipes
@@ -89,7 +93,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
 
         {tags.length > 0 && (
           <nav aria-label="Filter by tag" className="-mx-gutter overflow-x-auto px-gutter">
-            <ul className="flex gap-2 pb-1">
+            <ul className="flex gap-4">
               <li>
                 <Chip href={homeHref(q)} selected={!tag}>
                   All
@@ -99,7 +103,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
                 <li key={t.name}>
                   <Chip href={homeHref(q, t.name === tag ? undefined : t.name)} selected={t.name === tag}>
                     {t.name}
-                    <span className="text-xs text-muted tabular-nums">{t.count}</span>
+                    <span className="text-ink-muted">{t.count}</span>
                   </Chip>
                 </li>
               ))}
@@ -121,7 +125,12 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         </EmptyState>
       ) : (
         <section aria-label={filtered ? `${total} matching recipes` : "All recipes"}>
-          <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered && (
+            <p className="label mb-2 text-ink-muted">
+              {total} {total === 1 ? "match" : "matches"}
+            </p>
+          )}
+          <ul className="grid grid-cols-1 gap-x-14 border-b border-rule lg:grid-cols-2">
             {items.map((r) => (
               <li key={r.id}>
                 <RecipeCard recipe={r} />

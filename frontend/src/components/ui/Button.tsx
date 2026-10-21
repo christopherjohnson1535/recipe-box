@@ -5,12 +5,12 @@ import { cx } from "./cx";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const base =
-  "inline-flex min-h-control items-center justify-center gap-2 whitespace-nowrap rounded-control px-4 text-[0.9375rem] font-semibold transition-[background-color,border-color,color] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-55";
+  "label inline-flex min-h-control items-center justify-center gap-2 whitespace-nowrap rounded-control px-5 transition-[background-color,border-color,color] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-55";
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-on-accent hover:bg-accent-hover",
-  secondary: "border border-border-strong bg-surface text-text hover:border-accent hover:text-accent-ink",
-  ghost: "text-text hover:bg-surface-sunk",
-  danger: "bg-danger text-on-accent hover:opacity-90",
+  primary: "bg-ink text-paper hover:bg-accent hover:text-on-accent",
+  secondary: "border border-ink text-ink hover:border-accent hover:text-accent",
+  ghost: "px-2 text-ink underline decoration-rule underline-offset-[0.3em] hover:text-accent hover:decoration-accent",
+  danger: "bg-accent text-on-accent hover:bg-accent-hover",
 };
 
 export function buttonClass(variant: Variant = "primary", className?: string) {

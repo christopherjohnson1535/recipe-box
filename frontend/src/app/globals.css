@@ -1,96 +1,96 @@
+/* tastemaker: lane=editorial-magazine · mood=elegant · macro=app-shell + article/TOC · palette=hand-set, matrix-checked (see .tastemaker/style-lock.md) · motion=colour-only hovers */
 @import "tailwindcss";
 
 /*
- * Design tokens. Components read these (via the Tailwind theme below) so the design-system
- * issue can retheme the app by changing values here only. Neutrals are tinted warm (hue ~70).
+ * Recipe Box, editorial edition. See docs/UI.md for the direction and rules.
+ *
+ * Tokens are semantic CSS variables. Declared in a non-inline @theme so Tailwind utilities
+ * (bg-paper, text-ink, font-display, ...) read var(--token) at runtime, which lets the dark
+ * "evening edition" below swap values without touching components.
  */
+@theme {
+  --color-*: initial;
+  --color-paper: #fbf8f1; /* page; keep in sync with theme-color in layout.tsx + manifest */
+  --color-paper-deep: #f3eee3; /* sidebars, alerts, empty states */
+  --color-ink: #1a1714; /* text, primary fills */
+  --color-ink-muted: #5c554c; /* bylines, metadata, hints (6.3:1 on paper-deep) */
+  --color-rule: #d9d1c3; /* decorative hairlines only, never the sole state cue */
+  --color-rule-strong: #8c8377; /* control borders (3.2:1+ on paper and paper-deep) */
+  --color-accent: #9b1c1c; /* deep red, sparingly: kickers, numerals, links, focus */
+  --color-accent-hover: #7e1414;
+  --color-on-accent: #fbf8f1;
+  --color-danger: #9b1c1c;
+  --color-focus: #9b1c1c;
+  --color-white: #fff;
+  --color-black: #000;
+  --color-transparent: transparent;
+
+  --font-*: initial;
+  --font-display: "Libre Caslon Display", "Iowan Old Style", Georgia, serif;
+  --font-text: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
+
+  /* Type scale: body is 19px for arm's-length iPad reading. */
+  --text-label: 0.875rem; /* uppercase, tracked: kickers, bylines, metadata, buttons */
+  --text-label--letter-spacing: 0.12em;
+  --text-label--line-height: 1.35;
+  --text-small: 1rem;
+  --text-small--line-height: 1.5;
+  --text-body: 1.1875rem;
+  --text-body--line-height: 1.6;
+  --text-deck: 1.375rem; /* italic standfirst */
+  --text-deck--line-height: 1.45;
+  --text-title-sm: 1.625rem; /* listing titles */
+  --text-title-sm--line-height: 1.2;
+  --text-title: 2.25rem; /* section titles, empty states */
+  --text-title--line-height: 1.15;
+  --text-headline: clamp(2.5rem, 2rem + 3vw, 4.5rem); /* page headline */
+  --text-headline--line-height: 1.05;
+
+  --radius-*: initial;
+  --radius-control: 2px;
+
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 :root {
   color-scheme: light;
-
-  --bg: #faf6ef; /* keep in sync with theme-color in layout.tsx and manifest */
-  --surface: oklch(0.995 0.004 80);
-  --surface-sunk: oklch(0.95 0.016 75);
-  --text: oklch(0.26 0.02 50);
-  --text-muted: oklch(0.46 0.025 55);
-  --border: oklch(0.88 0.02 70);
-  --border-strong: oklch(0.72 0.03 65);
-  --accent: oklch(0.52 0.15 38); /* terracotta */
-  --accent-hover: oklch(0.46 0.15 38);
-  --on-accent: oklch(0.99 0.005 80);
-  --accent-soft: oklch(0.93 0.045 55);
-  --accent-ink: oklch(0.42 0.13 38);
-  --danger: oklch(0.5 0.18 27);
-  --danger-soft: oklch(0.95 0.03 27);
-  --focus: oklch(0.5 0.16 250);
-
-  --face-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --face-display: "Source Serif 4 Variable", ui-serif, Georgia, serif;
-
-  --r-control: 0.625rem;
-  --r-card: 1rem;
-  --r-pill: 999px;
-  --card-shadow: 0 1px 2px oklch(0.3 0.03 50 / 0.06), 0 4px 16px oklch(0.3 0.03 50 / 0.05);
+  --measure: 38rem; /* ~68 characters of body text */
+  --measure-wide: 64rem;
+  --page-width: 72rem;
   --control-height: 2.75rem; /* 44px touch target */
   --gutter: 1rem;
-  --content-width: 72rem;
-  --ease-out-curve: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 @media (min-width: 48rem) {
   :root {
-    --gutter: 2rem;
+    --gutter: 2.5rem;
   }
 }
 
+/* Evening edition. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-
-    --bg: #1c1814;
-    --surface: oklch(0.25 0.013 60);
-    --surface-sunk: oklch(0.18 0.01 60);
-    --text: oklch(0.94 0.012 80);
-    --text-muted: oklch(0.75 0.02 70);
-    --border: oklch(0.35 0.015 60);
-    --border-strong: oklch(0.5 0.02 60);
-    --accent: oklch(0.74 0.13 48);
-    --accent-hover: oklch(0.8 0.12 50);
-    --on-accent: oklch(0.2 0.03 45);
-    --accent-soft: oklch(0.33 0.05 45);
-    --accent-ink: oklch(0.84 0.1 55);
-    --danger: oklch(0.72 0.15 27);
-    --danger-soft: oklch(0.3 0.06 27);
-    --focus: oklch(0.75 0.13 250);
-    --card-shadow: 0 1px 2px oklch(0 0 0 / 0.3);
+    --color-paper: #16130f;
+    --color-paper-deep: #211c17;
+    --color-ink: #efe8da;
+    --color-ink-muted: #b3a999;
+    --color-rule: #3a332b;
+    --color-rule-strong: #7a7064;
+    --color-accent: #d98c7f;
+    --color-accent-hover: #e6a497;
+    --color-on-accent: #16130f;
+    --color-danger: #e6a497;
+    --color-focus: #e6a497;
   }
 }
 
 @theme inline {
-  --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-sunk: var(--surface-sunk);
-  --color-text: var(--text);
-  --color-muted: var(--text-muted);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-on-accent: var(--on-accent);
-  --color-accent-soft: var(--accent-soft);
-  --color-accent-ink: var(--accent-ink);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
-  --color-focus: var(--focus);
-  --font-sans: var(--face-body);
-  --font-display: var(--face-display);
-  --radius-control: var(--r-control);
-  --radius-card: var(--r-card);
-  --radius-pill: var(--r-pill);
-  --shadow-card: var(--card-shadow);
+  --container-measure: var(--measure);
+  --container-measure-wide: var(--measure-wide);
+  --container-page: var(--page-width);
   --spacing-control: var(--control-height);
   --spacing-gutter: var(--gutter);
-  --container-content: var(--content-width);
-  --ease-out: var(--ease-out-curve);
 }
 
 html,
@@ -99,10 +99,12 @@ body {
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--face-body);
-  line-height: 1.55;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -111,15 +113,74 @@ body {
 h1,
 h2,
 h3 {
-  font-family: var(--face-display);
-  line-height: 1.15;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
 
+@layer components {
+  /* Libre Caslon Display ships one weight; never let the browser fake a bold. */
+  .font-display {
+    font-weight: 400;
+    font-synthesis: none;
+    letter-spacing: -0.01em;
+  }
+
+  /* Uppercase, tracked label: kickers, bylines, metadata, field labels, buttons. */
+  .label {
+    font-family: var(--font-text);
+    font-size: var(--text-label);
+    line-height: var(--text-label--line-height);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+    font-weight: 600;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  /* Inline lists separated by a trailing middle dot (no orphan dot when a line wraps), e.g. SERVES 4 · 30 MIN. */
+  .dot-list > :not(:last-child)::after {
+    content: "·";
+    margin-inline: 0.5em;
+    color: var(--color-ink-muted);
+  }
+
+  /* Drop cap for a lede paragraph. */
+  .drop-cap::first-letter {
+    float: left;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 4.1em;
+    line-height: 0.8;
+    margin: 0.08em 0.1em 0 0;
+    color: var(--color-accent);
+  }
+
+  /* Thick-over-thin rule under the masthead and above sidebars. */
+  .rule-double {
+    height: 7px;
+    border-top: 3px solid var(--color-ink);
+    border-bottom: 1px solid var(--color-ink);
+  }
+
+  a.link,
+  .link {
+    color: var(--color-accent);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+  }
+  a.link:hover {
+    color: var(--color-accent-hover);
+  }
+}
+
 :focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {

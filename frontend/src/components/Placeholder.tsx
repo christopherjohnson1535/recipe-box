@@ -5,8 +5,8 @@ import { PageHeader } from "./ui/PageHeader";
 /** Honest stand-in for a page a later GitHub issue builds. */
 export function Placeholder({ title, coming, issues }: { title: string; coming: string; issues: string }) {
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader title={title} />
+    <div className="flex flex-col gap-10">
+      <PageHeader kicker="Forthcoming" title={title} description={`${coming}.`} />
       <EmptyState
         title="Not built yet"
         actions={
@@ -16,7 +16,7 @@ export function Placeholder({ title, coming, issues }: { title: string; coming: 
         }
       >
         <p>
-          {coming} — coming in the <strong className="font-semibold text-text">{issues}</strong> issues.
+          This page arrives with the <span className="not-italic font-semibold text-ink">{issues}</span> issues.
         </p>
       </EmptyState>
     </div>

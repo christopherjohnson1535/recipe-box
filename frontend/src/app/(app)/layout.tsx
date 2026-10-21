@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <AppHeader displayName={user?.displayName} />
-      <main id="main" className="mx-auto w-full max-w-content px-gutter py-8 sm:py-10">
+      <main id="main" className="mx-auto w-full max-w-page px-gutter pt-10 pb-20 sm:pt-14">
         {failure ? <ServerError error={failure} /> : children}
       </main>
     </>
