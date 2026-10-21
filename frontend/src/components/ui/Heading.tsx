@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { cx } from "./cx";
 
 const sizes = {
@@ -20,14 +20,17 @@ type HeadingProps = {
   id?: string;
   /** A hairline runs from the end of the title to the column edge. */
   ruled?: boolean;
+  /** Lets a page move focus here (use with `tabIndex={-1}`), e.g. when a result arrives. */
+  ref?: Ref<HTMLHeadingElement>;
+  tabIndex?: number;
   children: ReactNode;
 };
 
 /** A heading in the type scale. Page headlines come from PageHeader; this is for everything below. */
-export function Heading({ level, size = "title", id, ruled, children }: HeadingProps) {
+export function Heading({ level, size = "title", id, ruled, ref, tabIndex, children }: HeadingProps) {
   const Tag = `h${level}` as const;
   return (
-    <Tag id={id} className={cx(sizes[size], ruled && "flex items-center gap-4")}>
+    <Tag id={id} ref={ref} tabIndex={tabIndex} className={cx(sizes[size], ruled && "flex items-center gap-4")}>
       {children}
       {ruled && <span className="h-px flex-1 bg-(--rule-hair)" aria-hidden="true" />}
     </Tag>

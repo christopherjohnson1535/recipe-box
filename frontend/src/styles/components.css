@@ -45,6 +45,9 @@
   --alert-rule-error: var(--color-danger);
   --alert-title-error: var(--color-danger);
 
+  /* Progress bar of a request in flight */
+  --progress-fg: var(--color-accent);
+
   /* Panels, rules, entries */
   --panel-bg: var(--color-paper-deep);
   --card-border: var(--color-rule);

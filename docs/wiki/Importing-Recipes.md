@@ -1,6 +1,6 @@
 # Importing recipes
 
-Every import gives you a **draft** to check and fix before it is saved.
+Every import gives you a **draft** to check and fix before it is saved. Open **Import** and pick Link, Photo or Text; the page address remembers the choice, and `/import?url=…` starts a link import straight away.
 
 | From | How | Notes |
 |---|---|---|
@@ -10,15 +10,29 @@ Every import gives you a **draft** to check and fix before it is saved.
 | A photo of a dish | Import → Photo → "Guess from a dish" | Clearly marked as a guess. Needs AI. |
 | Safari share sheet | Apple Shortcut / bookmarklet | Planned (Phase 4). |
 
+**While it works**
+- A link takes a few seconds; reading photos can take about 20 seconds. **Stop waiting and edit** brings the form back (the server may still finish, its answer is ignored).
+- When the draft arrives you land on **Check the recipe**. Leaving without saving asks first.
+- The original photos stay beside the form while you check or type.
+
+**If AI is switched off**
+- Photo: the photos are kept and shown next to an empty recipe, so you can type it in.
+- Text: this needs AI, so the page says so and links to the plain recipe form.
+- Links still work for sites that publish recipe data.
+
+**On the iPad**: *Take or choose photos* offers the camera as well as your photo library. Up to 6 photos.
+
 **If a link import fails**
 - *"We couldn't find a recipe on that page"*: the page has no machine-readable recipe. Paste the recipe text instead.
 - *"That site does not let us read its pages"*: the site blocks servers (login wall, bot check). Paste the text instead.
-- *"That address is not allowed"*: only public web addresses (http or https) can be imported, never ones inside your home network.
+- *"That address can’t be imported"*: only public web addresses (http or https) can be imported, never ones inside your home network.
 - If the recipe's photo cannot be downloaded you still get the draft, with a note; add a photo yourself. The same goes for photos that are too big (over 10,000 px a side or 40 megapixels).
 - Very long lists or text on a page are cut short (500 items, 10,000 characters per field) and the draft says so; cooking times over a week are left blank.
 - Pages that take too long to read, or are built in an unreadable way, are treated as failed or recipe-less; use "paste the recipe text" instead.
 
-Already saved that link? You'll get a link to the existing recipe instead of a duplicate.
+Already saved that link? You'll be told "You already have this recipe" with a link to it; **Import anyway** continues if you want a second copy.
+
+Photo and text import show **Coming soon** until they are released.
 
 Imported recipes keep the source link and author credit. Recipes are for private household use.
 
