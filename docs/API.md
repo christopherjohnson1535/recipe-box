@@ -103,7 +103,9 @@ type Image = { id: string; url: string; width: number; height: number };
 ### Import (drafts only — never saves)
 - `GET /api/import/capabilities` → `{ "ai": boolean, "provider": "none" | "anthropic" }`.
 - `POST /api/import/url` `{ url }` → `200 RecipeDraft`. Errors: `blocked_address`, `site_blocked`, `fetch_failed`,
-  `no_recipe_found`.
+  `no_recipe_found`. A bad URL is `400 validation`. `sourceUrl` is the final URL after redirects, `duplicateOf` the id
+  of a live recipe with the same normalised source URL, and `imageId`/`imageUrl` the stored copy of the main photo
+  (if it could not be fetched they are null and `warnings` says so).
 - `POST /api/import/text` `{ text, sourceUrl? }` → `200 RecipeDraft` (AI; `ai_disabled` without it).
 - `POST /api/import/photo` multipart `files` (1–6) + `mode` (`recipe`|`dish`) → `200 RecipeDraft` with
   `photoImageIds` set. Without AI: 422 `ai_disabled` **after** storing the photos — the body's `error` also carries

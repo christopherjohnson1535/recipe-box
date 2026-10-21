@@ -637,7 +637,6 @@ async fn capabilities_and_stubs() {
 
     let uid = Uuid::new_v4();
     let stubs = [
-        (Method::POST, "/api/import/url".to_string()),
         (Method::POST, "/api/import/text".to_string()),
         (Method::POST, "/api/import/photo".to_string()),
         (Method::GET, "/api/users".to_string()),
