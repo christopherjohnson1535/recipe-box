@@ -54,6 +54,11 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #3 P2-3 fixed — disabled IconButtons use text-ink-muted with a dotted border instead of opacity-55.
 #3 P2-6 fixed — wiki says section headings stay put when moving items; use the arrows to move items between sections.
 #3 P2-2, P2-4, P2-5 skipped — cosmetic / deliberate measure / "" matches the API default
+#29 A-01 fixed — `action` removed from the login and setup forms, so a native POST goes to the current URL and keeps `?next=`; test asserts method post and no action.
+#29 A-02 fixed — guard rewritten: every `<form` must state a literal method="post"|"get" (tag scanned past `{…}`, `method={"post"}` rejected as non-literal), and a file with a password input (any spelling) may not have a GET form; inline self-checks added; home search form got method="get"; RecipeForm got method="post" (one attribute, outside owned paths, needed by rule 1).
+#29 A-03 skipped — a no-JS submit is rare and harmless now.
+#29 A-04 skipped — acceptable.
+#29 A-05 fixed — stray `export` of the old scanner dropped (new scanner functions are test-local; `export` kept off).
 #7 I-01 fixed — unknown/500/502 and network errors offer "Try again" (re-runs the import) and "Type it in".
 #7 I-02 fixed — unauthenticated offers a Sign in link to /login?next=/import?mode=<mode>.
 #7 I-03 fixed — validation errors carry fieldId (url->import-url, sourceUrl->import-source, else text); shown under and focus that field.
