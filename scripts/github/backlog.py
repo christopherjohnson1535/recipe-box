@@ -166,7 +166,8 @@ ISSUES = [
         "All Phase 1 IDs",
         "Run `factory-verify` (reviewers: backend security — auth, sessions, uploads, SSRF; frontend UI audit; "
         "integration build + smoke through compose), then fix waves with `docs/review/FIXES.md`, then `factory-test` "
-        "(adapt `scripts/factory/shoot.py` pages to Recipe Box) and `factory-design-qa`.",
+        "(adapt `scripts/factory/shoot.py` pages to Recipe Box) and `factory-design-qa`. Known small item from the "
+        "scaffold check (`docs/review/SCAFFOLD.md`): the API prints a backtrace when its port is in use — make it a one-line error.",
         "`docs/review/**` plus whatever the fix waves own",
         ["Every Must fixed; Shoulds fixed or skipped with a reason", "Screenshot set reviewed (iPad + phone + desktop, light + dark)"],
     ),
