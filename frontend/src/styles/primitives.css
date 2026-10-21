@@ -1,0 +1,27 @@
+/*
+ * Layer 1: primitives. Raw values with no meaning attached. Only theme files (src/styles/themes/*) read these;
+ * nothing else should. Names say what the colour is, not what it is for. See docs/THEMING.md.
+ */
+:root {
+  /* Day edition: warm paper and brown-black ink. */
+  --cream-50: #fbf8f1;
+  --cream-100: #f3eee3;
+  --cream-300: #d9d1c3;
+  --stone-500: #8c8377;
+  --stone-700: #5c554c;
+  --stone-950: #1a1714;
+
+  /* Evening edition: the same browns, dark side up. */
+  --umber-50: #efe8da;
+  --umber-300: #b3a999;
+  --umber-500: #7a7064;
+  --umber-700: #3a332b;
+  --umber-900: #211c17;
+  --umber-950: #16130f;
+
+  /* The one accent: a deep claret, and its lighter evening tints. */
+  --claret-200: #e6a497;
+  --claret-300: #d98c7f;
+  --claret-700: #9b1c1c;
+  --claret-800: #7e1414;
+}

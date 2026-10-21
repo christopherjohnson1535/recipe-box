@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { EndNote, Lede, LeadPhoto, MetaStrip, RuledList, Sidebar, SidebarLayout, StepList } from "@/components/ui/Article";
 import { ButtonLink } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Chip";
+import { DotList } from "@/components/ui/DotList";
+import { ExternalLink } from "@/components/ui/ExternalLink";
+import { Heading } from "@/components/ui/Heading";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Text } from "@/components/ui/Text";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type Recipe } from "@/lib/api";
 import { formatMinutes, groupBySection } from "@/lib/recipe";
@@ -41,9 +46,9 @@ export default async function RecipePage({ params }: Params) {
   const source =
     recipe.sourceUrl || recipe.sourceName ? (
       recipe.sourceUrl && /^https?:\/\//i.test(recipe.sourceUrl) ? (
-        <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="link break-words">
+        <ExternalLink href={recipe.sourceUrl}>
           {recipe.sourceName || (URL.canParse(recipe.sourceUrl) ? new URL(recipe.sourceUrl).hostname : recipe.sourceUrl)}
-        </a>
+        </ExternalLink>
       ) : (
         (recipe.sourceName ?? recipe.sourceUrl)
       )
@@ -59,23 +64,27 @@ export default async function RecipePage({ params }: Params) {
         align="center"
         kicker={
           recipe.tags.length > 0 ? (
-            <ul className="dot-list flex flex-wrap justify-center" aria-label="Tags">
+            <DotList label="Tags" align="center">
               {recipe.tags.map((t) => (
                 <li key={t}>
                   <Badge>{t}</Badge>
                 </li>
               ))}
-            </ul>
+            </DotList>
           ) : undefined
         }
         title={recipe.title}
         description={deck}
         byline={
           recipe.createdBy || source ? (
-            <p className="dot-list flex flex-wrap justify-center">
+            <DotList as="p" align="center">
               {recipe.createdBy && <span>Added by {recipe.createdBy.displayName}</span>}
-              {source && <span className="text-small font-normal normal-case italic tracking-normal">Source: {source}</span>}
-            </p>
+              {source && (
+                <Text as="span" variant="aside">
+                  Source: {source}
+                </Text>
+              )}
+            </DotList>
           ) : undefined
         }
         actions={
@@ -88,84 +97,56 @@ export default async function RecipePage({ params }: Params) {
         }
       />
 
-      {meta.length > 0 && (
-        <dl className="label dot-list -mt-4 flex flex-wrap justify-center gap-y-2 text-ink">
-          {meta.map((m) => (
-            <div key={m.label}>
-              <dt className="inline text-ink-muted">{m.label}</dt> <dd className="inline">{m.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      <MetaStrip items={meta} />
 
-      {recipe.imageUrl && (
-        <figure className="mx-auto w-full max-w-measure-wide">
-          <img
-            src={recipe.imageUrl}
-            alt={recipe.title}
-            width={1200}
-            height={800}
-            fetchPriority="high"
-            className="aspect-[3/2] h-auto max-h-[36rem] w-full object-cover"
-          />
-        </figure>
-      )}
+      {recipe.imageUrl && <LeadPhoto src={recipe.imageUrl} alt={recipe.title} />}
 
-      {lede && <p className="drop-cap mx-auto max-w-measure text-deck text-ink">{lede}</p>}
+      {lede && <Lede>{lede}</Lede>}
 
-      <div className="mx-auto grid w-full max-w-measure-wide grid-cols-1 gap-12 md:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] md:gap-14">
-        <aside aria-labelledby="ingredients" className="flex flex-col gap-4 self-start bg-paper-deep px-5 pt-1 pb-6 sm:px-6">
-          <div className="rule-double -mx-5 sm:-mx-6" aria-hidden="true" />
-          <h2 id="ingredients" className="label pt-3 text-ink">
-            Ingredients
-          </h2>
-          {recipe.ingredients.length === 0 && <p className="text-ink-muted italic">No ingredients listed.</p>}
-          {groupBySection(recipe.ingredients).map((g, i) => (
-            <div key={i} className="flex flex-col gap-1">
-              {g.section && <h3 className="text-small pt-2 font-semibold text-ink italic">{g.section}</h3>}
-              <ul className="flex flex-col divide-y divide-rule">
-                {g.items.map((ing, j) => (
-                  <li key={j} className="py-2.5 text-body leading-snug">
-                    {ing.text}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </aside>
-
+      <SidebarLayout
+        sidebar={
+          <Sidebar title="Ingredients" id="ingredients">
+            {recipe.ingredients.length === 0 && <Text variant="note">No ingredients listed.</Text>}
+            {groupBySection(recipe.ingredients).map((g, i) => (
+              <div key={i} className="flex flex-col gap-1">
+                {g.section && (
+                  <div className="pt-2">
+                    <Heading level={3} size="group">
+                      {g.section}
+                    </Heading>
+                  </div>
+                )}
+                <RuledList items={g.items.map((ing) => ing.text)} />
+              </div>
+            ))}
+          </Sidebar>
+        }
+      >
         <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-6">
-          <h2 id="steps" className="flex items-center gap-4 font-display text-title text-ink">
+          <Heading level={2} id="steps" ruled>
             Method
-            <span className="h-px flex-1 bg-rule" aria-hidden="true" />
-          </h2>
-          {recipe.steps.length === 0 && <p className="text-ink-muted italic">No steps listed.</p>}
+          </Heading>
+          {recipe.steps.length === 0 && <Text variant="note">No steps listed.</Text>}
           {groupBySection(recipe.steps).map((g, i) => (
             <div key={i} className="flex flex-col gap-4">
-              {g.section && <h3 className="label text-accent">{g.section}</h3>}
-              <ol className="flex flex-col gap-6">
-                {g.items.map((s, j) => (
-                  <li key={j} className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.75rem_minmax(0,1fr)]">
-                    <span className="font-display text-[1.75rem] leading-none text-accent tabular-nums">
-                      {j + 1}
-                    </span>
-                    <p className="text-body">{s.text}</p>
-                  </li>
-                ))}
-              </ol>
+              {g.section && (
+                <Heading level={3} size="kicker">
+                  {g.section}
+                </Heading>
+              )}
+              <StepList steps={g.items.map((s) => s.text)} />
             </div>
           ))}
 
           {recipe.notes && (
-            <section aria-labelledby="notes" className="mt-4 flex flex-col gap-3 border-t border-rule pt-6">
-              <h2 id="notes" className="label text-ink">
-                Notes
-              </h2>
-              <p className="whitespace-pre-line text-body text-ink-muted italic">{recipe.notes}</p>
-            </section>
+            <EndNote title="Notes" id="notes">
+              <Text variant="note" preserveLines>
+                {recipe.notes}
+              </Text>
+            </EndNote>
           )}
         </section>
-      </div>
+      </SidebarLayout>
     </article>
   );
 }

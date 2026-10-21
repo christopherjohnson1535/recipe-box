@@ -4,6 +4,7 @@ import "@fontsource/libre-caslon-display/latin-400.css";
 import "@fontsource-variable/newsreader/opsz.css";
 import "@fontsource-variable/newsreader/opsz-italic.css";
 import "./globals.css";
+import { SkipLink } from "@/components/ui/SkipLink";
 
 export const metadata: Metadata = {
   title: { default: "Recipe Box", template: "%s · Recipe Box" },
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Matches --color-paper in globals.css (light and evening edition).
+  // Matches --color-paper in src/styles/themes/day.css and evening.css.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fbf8f1" },
     { media: "(prefers-color-scheme: dark)", color: "#16130f" },
@@ -26,12 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className="min-h-dvh">
-        <a
-          href="#main"
-          className="label sr-only bg-ink px-4 py-3 text-paper focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50"
-        >
-          Skip to content
-        </a>
+        <SkipLink />
         {children}
       </body>
     </html>

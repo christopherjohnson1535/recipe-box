@@ -7,11 +7,11 @@ export function Alert({ tone = "info", title, children }: { tone?: "info" | "err
     <div
       role={tone === "error" ? "alert" : "status"}
       className={cx(
-        "border-l-[3px] bg-paper-deep px-5 py-4 text-small text-ink",
-        tone === "error" ? "border-danger" : "border-ink-muted",
+        "border-l-[3px] bg-(--alert-bg) px-5 py-4 text-small text-(--alert-fg)",
+        tone === "error" ? "border-(--alert-rule-error)" : "border-(--alert-rule)",
       )}
     >
-      {title && <p className={cx("label", tone === "error" ? "text-danger" : "text-ink")}>{title}</p>}
+      {title && <p className={cx("label", tone === "error" ? "text-(--alert-title-error)" : "text-(--alert-fg)")}>{title}</p>}
       {children && <div className={title ? "mt-1.5" : undefined}>{children}</div>}
     </div>
   );

@@ -2,29 +2,18 @@
 @import "tailwindcss";
 
 /*
- * Recipe Box, editorial edition. See docs/UI.md for the direction and rules.
- *
- * Tokens are semantic CSS variables. Declared in a non-inline @theme so Tailwind utilities
- * (bg-paper, text-ink, font-display, ...) read var(--token) at runtime, which lets the dark
- * "evening edition" below swap values without touching components.
+ * Recipe Box, editorial edition. Direction and rules: docs/UI.md. How the tokens fit together: docs/THEMING.md.
+ *   1. primitives   raw colours                      src/styles/primitives.css
+ *   2. semantic     paper, ink, accent... per theme  src/styles/themes/{day,evening}.css
+ *   3. component    --button-primary-bg...           src/styles/components.css (read only by components/ui)
  */
-@theme {
-  --color-*: initial;
-  --color-paper: #fbf8f1; /* page; keep in sync with theme-color in layout.tsx + manifest */
-  --color-paper-deep: #f3eee3; /* sidebars, alerts, empty states */
-  --color-ink: #1a1714; /* text, primary fills */
-  --color-ink-muted: #5c554c; /* bylines, metadata, hints (6.3:1 on paper-deep) */
-  --color-rule: #d9d1c3; /* decorative hairlines only, never the sole state cue */
-  --color-rule-strong: #8c8377; /* control borders (3.2:1+ on paper and paper-deep) */
-  --color-accent: #9b1c1c; /* deep red, sparingly: kickers, numerals, links, focus */
-  --color-accent-hover: #7e1414;
-  --color-on-accent: #fbf8f1;
-  --color-danger: #9b1c1c;
-  --color-focus: #9b1c1c;
-  --color-white: #fff;
-  --color-black: #000;
-  --color-transparent: transparent;
+@import "../styles/primitives.css";
+@import "../styles/themes/day.css";
+@import "../styles/themes/evening.css";
+@import "../styles/components.css";
 
+/* Theme-independent tokens: type, shape, motion. */
+@theme static {
   --font-*: initial;
   --font-display: "Libre Caslon Display", "Iowan Old Style", Georgia, serif;
   --font-text: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
@@ -43,8 +32,14 @@
   --text-title-sm--line-height: 1.2;
   --text-title: 2.25rem; /* section titles, empty states */
   --text-title--line-height: 1.15;
+  --text-numeral: 1.75rem; /* method step numbers */
+  --text-numeral--line-height: 1;
   --text-headline: clamp(2.5rem, 2rem + 3vw, 4.5rem); /* page headline */
   --text-headline--line-height: 1.05;
+  --text-wordmark: clamp(1.875rem, 1.6rem + 0.6vw, 2.125rem);
+  --text-wordmark--line-height: 1;
+  --text-wordmark-lg: clamp(2.75rem, 2rem + 4vw, 4rem);
+  --text-wordmark-lg--line-height: 1;
 
   --radius-*: initial;
   --radius-control: 2px;
@@ -53,7 +48,6 @@
 }
 
 :root {
-  color-scheme: light;
   --measure: 38rem; /* ~68 characters of body text */
   --measure-wide: 64rem;
   --page-width: 72rem;
@@ -67,24 +61,7 @@
   }
 }
 
-/* Evening edition. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --color-paper: #16130f;
-    --color-paper-deep: #211c17;
-    --color-ink: #efe8da;
-    --color-ink-muted: #b3a999;
-    --color-rule: #3a332b;
-    --color-rule-strong: #7a7064;
-    --color-accent: #d98c7f;
-    --color-accent-hover: #e6a497;
-    --color-on-accent: #16130f;
-    --color-danger: #e6a497;
-    --color-focus: #e6a497;
-  }
-}
-
+/* Layout utilities pages may use: max-w-measure, max-w-page, px-gutter, min-h-control... */
 @theme inline {
   --container-measure: var(--measure);
   --container-measure-wide: var(--measure-wide);
@@ -117,6 +94,7 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+/* Helper classes. Like component tokens, only components/ui uses these (guard test). */
 @layer components {
   /* Libre Caslon Display ships one weight; never let the browser fake a bold. */
   .font-display {
@@ -151,36 +129,35 @@ h3 {
     font-size: 4.1em;
     line-height: 0.8;
     margin: 0.08em 0.1em 0 0;
-    color: var(--color-accent);
+    color: var(--drop-cap-fg);
   }
 
   /* Thick-over-thin rule under the masthead and above sidebars. */
   .rule-double {
     height: 7px;
-    border-top: 3px solid var(--color-ink);
-    border-bottom: 1px solid var(--color-ink);
+    border-top: 3px solid var(--rule-double);
+    border-bottom: 1px solid var(--rule-double);
   }
 
-  a.link,
   .link {
-    color: var(--color-accent);
+    color: var(--link-fg);
     text-decoration-line: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 0.18em;
   }
-  a.link:hover {
-    color: var(--color-accent-hover);
+  .link:hover {
+    color: var(--link-fg-hover);
   }
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 
 ::selection {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--selection-bg);
+  color: var(--selection-fg);
 }
 
 @media (prefers-reduced-motion: reduce) {

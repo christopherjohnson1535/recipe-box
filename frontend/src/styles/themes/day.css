@@ -1,0 +1,24 @@
+/*
+ * Layer 2: semantic tokens, day edition (the default theme). This block is also what registers the colour
+ * utilities with Tailwind (bg-paper, text-ink, border-rule, ...). Every theme file must define exactly these
+ * names; src/styles/tokens.test.ts checks that and the contrast contract. See docs/THEMING.md.
+ */
+@theme static {
+  --color-*: initial; /* Tailwind's default palette is off: every colour is one of ours. */
+
+  --color-paper: var(--cream-50); /* page; keep in sync with themeColor in app/layout.tsx */
+  --color-paper-deep: var(--cream-100); /* sidebars, alerts */
+  --color-ink: var(--stone-950); /* text, primary fills */
+  --color-ink-muted: var(--stone-700); /* decks, bylines, metadata, hints */
+  --color-rule: var(--cream-300); /* decorative hairlines only, never the sole state cue */
+  --color-rule-strong: var(--stone-500); /* control borders, 3:1 against paper */
+  --color-accent: var(--claret-700); /* sparingly: kickers, numerals, links, active underline */
+  --color-accent-hover: var(--claret-800);
+  --color-on-accent: var(--cream-50);
+  --color-danger: var(--claret-700);
+  --color-focus: var(--claret-700);
+}
+
+:root {
+  color-scheme: light;
+}

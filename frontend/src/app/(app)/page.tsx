@@ -1,8 +1,10 @@
 import { ButtonLink, Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { Contents } from "@/components/ui/Contents";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Text } from "@/components/ui/Text";
 import { RecipeCard } from "@/components/RecipeCard";
 import { ServerError } from "@/components/ServerError";
 import { firstParam, type SearchParams } from "@/lib/nav";
@@ -101,9 +103,12 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
               </li>
               {tags.map((t) => (
                 <li key={t.name}>
-                  <Chip href={homeHref(q, t.name === tag ? undefined : t.name)} selected={t.name === tag}>
+                  <Chip
+                    href={homeHref(q, t.name === tag ? undefined : t.name)}
+                    selected={t.name === tag}
+                    count={t.count}
+                  >
                     {t.name}
-                    <span className="text-ink-muted">{t.count}</span>
                   </Chip>
                 </li>
               ))}
@@ -124,19 +129,17 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           <p>Try a different word or another tag.</p>
         </EmptyState>
       ) : (
-        <section aria-label={filtered ? `${total} matching recipes` : "All recipes"}>
+        <section aria-label={filtered ? `${total} matching recipes` : "All recipes"} className="flex flex-col gap-2">
           {filtered && (
-            <p className="label mb-2 text-ink-muted">
+            <Text variant="meta">
               {total} {total === 1 ? "match" : "matches"}
-            </p>
+            </Text>
           )}
-          <ul className="grid grid-cols-1 gap-x-14 border-b border-rule lg:grid-cols-2">
+          <Contents label="Recipes">
             {items.map((r) => (
-              <li key={r.id}>
-                <RecipeCard recipe={r} />
-              </li>
+              <RecipeCard key={r.id} recipe={r} />
             ))}
-          </ul>
+          </Contents>
         </section>
       )}
     </div>
