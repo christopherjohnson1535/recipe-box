@@ -2,7 +2,8 @@
 
 Established: 2026-10-21. Source: user-specified direction (classic editorial magazine, literary-weekly feel; original
 design, no trademarked names, logos or typefaces). No reference images; palette hand-set and matrix-checked.
-Full guide for builders: `docs/UI.md`. Tokens live in `frontend/src/app/globals.css`.
+Full guide for builders: `docs/UI.md`. Colour tokens live in `frontend/src/styles/` (primitives, themes/day + evening,
+component tokens; see `docs/THEMING.md`), and this contract is enforced by `frontend/src/styles/tokens.test.ts`.
 
 ## Palette (light: "day edition")
 - Paper `#fbf8f1` (page) · Paper-deep `#f3eee3` (ingredient sidebar, alerts)

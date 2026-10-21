@@ -4,8 +4,9 @@ Recipe Box is set like a classic literary magazine: refined serif type, generous
 measure, hairline rules, uppercase letter-spaced kickers and bylines, italic decks under titles, and a near-monochrome
 palette with one deep red used sparingly. Read this before changing any UI so new screens keep the style.
 
-The machine-readable lock (palette, contrast contract, structure) is `.tastemaker/style-lock.md`. The tokens live in
-`frontend/src/app/globals.css`.
+The machine-readable lock (palette, contrast contract, structure) is `.tastemaker/style-lock.md`. The colour tokens
+live in `frontend/src/styles/` in three layers (primitives, semantic themes, component tokens): see
+`docs/THEMING.md`. Type scale, fonts and layout tokens are in `frontend/src/app/globals.css`.
 
 ## Originality and trademark rule (never bend)
 - This is an original design in the general editorial tradition. Do **not** use The New Yorker's name, logo, mascot or
@@ -32,9 +33,11 @@ Libre Caslon Display has one weight. Never put `font-semibold`/`font-bold` on it
 | `text-deck` | 22px, set italic | standfirsts under titles, empty-state copy, ledes |
 | `text-title-sm` | 26px | listing titles on the home contents |
 | `text-title` | 36px | section titles ("Method"), empty states, auth headings |
+| `text-numeral` | 28px | method step numbers (display serif, accent) |
+| `text-wordmark` / `text-wordmark-lg` | 30–34px / 44–64px | the Recipe Box wordmark in the masthead / on auth pages |
 | `text-headline` | clamp(40px, 72px) | page headline (`h1`) |
 
-## Tokens (semantic CSS variables)
+## Tokens (semantic CSS variables; full map in `docs/THEMING.md`)
 Colour (`bg-*`, `text-*`, `border-*` utilities): `--color-paper`, `--color-paper-deep`, `--color-ink`,
 `--color-ink-muted`, `--color-rule` (decorative hairline only), `--color-rule-strong` (control borders),
 `--color-accent`, `--color-accent-hover`, `--color-on-accent`, `--color-danger`, `--color-focus`.
@@ -43,13 +46,24 @@ Fonts: `--font-display`, `--font-text`. Layout: `--measure` (38rem, `max-w-measu
 (44px, `min-h-control`). Radius: `--radius-control` (2px).
 
 Tailwind's default colour palette and font stacks are switched off (`--color-*: initial`), so every colour must be a
-token. Dark mode (the "evening edition") redefines the same variables under `prefers-color-scheme: dark`; components
-never branch on theme.
+token. Dark mode (the "evening edition", `src/styles/themes/evening.css`) redefines the same variables under
+`prefers-color-scheme: dark`; components never branch on theme. Inside a ui component, themed decisions (button
+fills, input borders, chip underlines, kicker and numeral colour, focus ring) use component tokens such as
+`bg-(--button-primary-bg)`, so they can be retuned in `src/styles/components.css` without touching the component.
 
 Old scaffold names map as: surface → paper, surface-sunk → paper-deep, text → ink, muted → ink-muted, border → rule,
 border-strong → rule-strong, accent-ink → accent.
 
-## Helper classes (`globals.css`, components layer)
+## Where styling lives (enforced by `src/styles/page-styling.test.ts`)
+- **Only `src/components/ui/*` styles things.** Colour, type, borders, the helper classes below, arbitrary values
+  and component tokens appear there and nowhere else.
+- **Pages, layouts and app components** (`src/app/**`, `src/components/*.tsx`) compose ui components and use layout
+  utilities only: `flex`, `grid`, `gap-*`, `p*-*`, `m*-*`, widths/heights (`max-w-page`, `max-w-measure`,
+  `px-gutter`, `min-h-control`), `items-*`/`justify-*`/`self-*`, `overflow-*`, positioning, `sr-only`,
+  `text-center`. No `style={…}`, no `ui/cx`.
+- Need a look a page doesn't have? Add a variant to the ui component (or a new ui component), then use it.
+
+## Helper classes (`globals.css`, components layer; ui components only)
 - `.label`: the uppercase tracked label style.
 - `.dot-list`: inline list with middle dots between items ("SERVES 4 · 30 MIN"); the dot trails each item so no line
   starts with an orphan dot.
@@ -57,19 +71,37 @@ border-strong → rule-strong, accent-ink → accent.
 - `.rule-double`: thick-over-thin rule (masthead, ingredient sidebar).
 - `.link`: accent underlined text link.
 
-## Components (`src/components`)
+## Components (`src/components/ui`)
+Text and structure:
+- `Text`: every run of text. `variant`: `body` (19px), `deck` (italic standfirst), `small`, `aside` (small italic,
+  e.g. "Source: …" in a byline), `note` (italic body, e.g. recipe notes, "No steps listed."), `meta` (uppercase
+  muted label), `strong` (upright semibold inside italic copy). `as` picks the element; `preserveLines` keeps typed
+  line breaks. Variants reset case and tracking, so they nest inside labels.
+- `Heading`: `level` 1–3 and `size`: `title`, `title-sm`, `label`, `kicker` (accent label), `group` (italic
+  semibold list group). `ruled` runs a hairline to the column edge ("Method ———").
+- `DotList`: items separated by middle dots; `as="ul"` (children `<li>`) or `as="p"` (children `<span>`),
+  `align="center"`, `tone="meta"`.
+- `Rule`: `hair` or `double` (thick-over-thin). `ExternalLink`: accent link to another site, new tab.
+- `Logo` (`size="lg"` on auth), `Masthead` + `NavLink` + `NavButton` (the app header), `SkipLink`.
+- `Contents` + `ContentsEntry`: the two-column contents listing and one entry (kicker, title link, deck, meta,
+  thumbnail); the whole entry is clickable and the focus ring wraps it.
+- `Article.tsx`: the recipe article pieces: `MetaStrip`, `LeadPhoto`, `Lede` (drop cap), `SidebarLayout`, `Sidebar`
+  (tinted, double rule), `RuledList`, `StepList` (accent numerals), `EndNote`.
+
+Controls and states:
 - `ui/Button` / `ButtonLink`: `primary` ink fill (hover turns accent), `secondary` ink outline, `ghost` underlined,
   `danger` accent fill. Labels are `.label`. 44px tall.
 - `ui/PageHeader`: `kicker`, `title` (display headline), `description` (italic deck), `byline`, `actions`,
   `align="start" | "center"`; ends with a hairline.
 - `ui/Card`: hairline frame, square, no shadow (auth forms).
-- `ui/Chip`: tag filter set like a magazine index; selected gets an accent underline. `Badge`: accent label for tags.
+- `ui/Chip`: tag filter set like a magazine index; selected gets an accent underline; `count` shows muted after the
+  name. `Badge`: accent label for tags.
 - `ui/Field`, `ui/Label`, `ui/Input`: uppercase label, square input with a 3:1 border, italic hint.
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
-- `AppHeader`: masthead (wordmark left, section links right, double rule). `Logo`: the wordmark (`size="lg"` on auth).
-- `RecipeCard`: one contents entry: tag kicker, display title, italic deck (description), uppercase metadata,
-  optional thumbnail on the right. The whole entry is clickable; the focus ring wraps the entry.
+App components (`src/components/*.tsx`, no styling of their own):
+- `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `ContentsEntry`.
+- `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 
 ## Page patterns
 - **Home**: article head ("The collection", Recipes, count deck, actions) then search and the tag index, then a
@@ -95,3 +127,4 @@ border-strong → rule-strong, accent-ink → accent.
 - No rounded cards, drop shadows, gradients, pill chips, emoji icons, or large accent fills.
 - No em dashes in UI copy; use a colon, comma or full stop.
 - No hard-coded hex or font names in components: use tokens.
+- No colour, type or border classes in pages: use or extend a ui component.
