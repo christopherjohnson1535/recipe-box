@@ -119,7 +119,12 @@ type Image = { id: string; url: string; width: number; height: number };
 ### Users (admin)
 - `GET /api/users` → `User[]`; `POST /api/users` `{ username, displayName, password, role }` → `201 User`;
   `DELETE /api/users/:id` → `204` (not yourself; not the last admin);
-  `PUT /api/users/:id/password` `{ password }` → `204` (admin, or the user themself).
+  `PUT /api/users/:id/password` `{ password, currentPassword? }` → `204` (admin, or the user themself).
+  Changing **your own** password requires `currentPassword` (401 `unauthenticated` if wrong, same message as a bad
+  login); an admin resetting **someone else's** doesn't. Password ≥ 10 chars. Ends that user's other sessions (the
+  caller's current session stays when it is their own password). `DELETE` ends the deleted user's sessions.
+  Errors: 403 `forbidden` (member on admin routes, or a member changing another user's password; deleting yourself;
+  deleting the last admin), 404 `not_found`, 409 `conflict` (username taken), 400 `validation`.
 
 ### Export (admin)
 - `GET /api/export` → `application/zip` with `recipes.json` + `media/*`.

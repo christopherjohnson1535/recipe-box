@@ -98,7 +98,19 @@ impl From<JsonRejection> for AppError {
     fn from(r: JsonRejection) -> Self {
         match r.status() {
             StatusCode::PAYLOAD_TOO_LARGE => Self::TooLarge,
-            _ => Self::Validation(r.body_text()),
+            _ => {
+                // serde messages can echo the submitted value; keep only a field name, if there is one.
+                let text = r.body_text();
+                let field = text
+                    .split_once("target type: ")
+                    .and_then(|(_, rest)| rest.split_once(": "))
+                    .map(|(f, _)| f)
+                    .filter(|f| {
+                        !f.is_empty() && f.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                    })
+                    .unwrap_or("body");
+                Self::Validation(format!("{field}: invalid JSON or wrong field type"))
+            }
         }
     }
 }

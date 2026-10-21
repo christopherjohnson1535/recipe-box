@@ -72,3 +72,12 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #7 I-06, I-07, I-09 skipped — more than a one-liner / behaviour change; harmless (duplicate Alert protects ?url=, dead error prop only).
 #7 I-10 skipped — --progress-fg kept: folding it needs an Alert-with-bar variant, a bigger change than the gain.
 #7 I-11 skipped — accepted trade-off (a stash cannot help: the form is not mounted after reload).
+#8 H-01 fixed — test holds a lock on an admin row from the test; the delete must wait (fails without `for update`)
+#8 H-02 fixed — test with a second admin present: self-delete is 403 "You can't remove yourself." (fails without the guard)
+#8 H-03 fixed — admin reset with 5 and 1025 chars is 400 (fails if only own change validates)
+#8 H-04 fixed — tests for member PUT unknown id (403), malformed ids (400), admin own-password change
+#8 H-05 deferred — throttling belongs with login throttling; new issue filed by the orchestrator.
+#8 H-06 fixed — JSON rejections now say "<field|body>: invalid JSON or wrong field type", never the value (test)
+#8 H-07 fixed — own-password 401 checks /api/auth/me; if the session is gone shows "You've been signed out" + Sign in link (new ui/TextLink)
+#8 H-08 fixed — failed remove with 404 drops the row, router.refresh() and shows the message
+#8 H-09 fixed — Remove aria-describedby its reason; hidden username field on own-password form; notices cleared on next action; client length checks use code points (backend counts chars)
