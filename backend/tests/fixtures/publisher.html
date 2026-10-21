@@ -1,0 +1,18 @@
+<!-- FIXTURE (reproduction): the structure of a large news/food publisher page: a top-level JSON-LD ARRAY with a
+     WebPage and a node typed ["Recipe","NewsArticle"], ImageObject image, an author array, yield as free text, a
+     P0DT..H..M duration, and instructions as one newline-separated string. Written from memory of that markup (no
+     live download was possible in the build sandbox); names, text and URLs are invented. -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Slow-Roasted Tomato Soup - The Daily Table</title>
+<meta property="og:site_name" content="The Daily Table">
+<script type="application/ld+json">[
+{"@context":"http://schema.org","@type":"WebPage","name":"Slow-Roasted Tomato Soup","url":"https://dailytable.example/recipes/tomato-soup"},
+{"@context":"http://schema.org","@type":["Recipe","NewsArticle"],"headline":"Slow-Roasted Tomato Soup","name":"Slow-Roasted Tomato Soup",
+ "image":{"@type":"ImageObject","url":"/images/2025/tomato-soup-superJumbo.jpg","height":2048,"width":2048},
+ "author":[{"@type":"Person","name":"Sam Reyes"},{"@type":"Person","name":"Lee Park"}],
+ "publisher":{"@type":"Organization","name":"The Daily Table"},
+ "recipeYield":"Serves 6","prepTime":"PT20M","cookTime":"P0DT1H30M","totalTime":"PT1H50M",
+ "recipeIngredient":["3 pounds ripe tomatoes, halved","1 head garlic","1/4 cup olive oil","2 cups vegetable stock","Kosher salt"],
+ "recipeInstructions":"Heat the oven to 300 degrees.\nRoast the tomatoes and garlic for 90 minutes.\nBlend with the stock until smooth and season well.",
+ "keywords":["soup","Tomato","vegetarian"],"recipeCategory":"Soups"}
+]</script></head><body><h1>Slow-Roasted Tomato Soup</h1></body></html>

@@ -1,0 +1,21 @@
+<!-- FIXTURE (reproduction): the structure of a recipe blog whose method is split into HowToSection groups, with
+     numeric recipeYield and a plain-string ingredient list. Written from memory of that markup (no live download was
+     possible in the build sandbox); names, text and URLs are invented. -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Cinnamon Rolls | Flour &amp; Fork</title>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Recipe","name":"Weekend Cinnamon Rolls",
+ "author":"Flour &amp; Fork","image":"//cdn.flourandfork.example/rolls.webp","recipeYield":8,
+ "prepTime":"PT1H","cookTime":"PT25M","totalTime":"PT3H",
+ "recipeIngredient":["4 cups flour","1 packet yeast","1 cup milk, warmed","1/2 cup butter","1 cup brown sugar","2 tbsp cinnamon","4 oz cream cheese","2 cups powdered sugar"],
+ "recipeInstructions":[
+  {"@type":"HowToSection","name":"Make the dough","itemListElement":[
+    {"@type":"HowToStep","text":"Whisk the yeast into the warm milk and let it foam."},
+    {"@type":"HowToStep","text":"Mix in flour and butter, then knead 8 minutes. Let rise 1 hour."}]},
+  {"@type":"HowToSection","name":"Fill and bake","itemListElement":[
+    {"@type":"HowToStep","text":"Roll out, spread with butter, sugar and cinnamon, then roll up and slice."},
+    {"@type":"HowToStep","text":"Bake at 350&deg;F for 25 minutes."}]},
+  {"@type":"HowToSection","name":"Frost","itemListElement":["Beat the cream cheese with the powdered sugar and spread over the warm rolls."]}
+ ],
+ "keywords":["Baking","breakfast"," Brunch "]}
+</script></head><body><h1>Weekend Cinnamon Rolls</h1></body></html>
