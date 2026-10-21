@@ -7,6 +7,15 @@ export function Badge({ children }: { children: ReactNode }) {
   return <span className="label text-(--kicker-fg)">{children}</span>;
 }
 
+/** The tag index: chips wrap onto further lines instead of scrolling. Children are `<li><Chip/></li>`. */
+export function ChipRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <nav aria-label={label}>
+      <ul className="flex flex-wrap gap-x-4">{children}</ul>
+    </nav>
+  );
+}
+
 /** Filter link set like a section in a magazine index; `selected` underlines it in the accent. */
 export function Chip({
   href,

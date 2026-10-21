@@ -92,10 +92,12 @@ Controls and states:
 - `ui/Button` / `ButtonLink`: `primary` ink fill (hover turns accent), `secondary` ink outline, `ghost` underlined,
   `danger` accent fill. Labels are `.label`. 44px tall.
 - `ui/PageHeader`: `kicker`, `title` (display headline), `description` (italic deck), `byline`, `actions`,
-  `align="start" | "center"`; ends with a hairline.
+  `align="start" | "center"`, `reserveDeck` (keeps the deck's height when there is no description); ends with a
+  hairline.
 - `ui/Card`: hairline frame, square, no shadow (auth forms).
 - `ui/Chip`: tag filter set like a magazine index; selected gets an accent underline; `count` shows muted after the
-  name. `Badge`: accent label for tags.
+  name. `ChipRow` wraps the chips onto further lines (never a scroller). `Badge`: accent label for tags.
+- Photos (lead photo, listing thumbnails) read `--photo-filter`: none by day, slightly dimmed in the evening theme.
 - `ui/Field`, `ui/Label`, `ui/Input`: uppercase label, square input with a 3:1 border, italic hint.
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.

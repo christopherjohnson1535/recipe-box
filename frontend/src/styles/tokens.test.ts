@@ -16,11 +16,12 @@ const themeFiles = readdirSync(join(dir, "themes")).filter((f) => f.endsWith(".c
 const themes = Object.fromEntries(
   themeFiles.map((f) => {
     const all = decls(read(`themes/${f}`));
-    delete all["--color-*"]; // Tailwind's palette reset in day.css
     return [f.replace(".css", ""), all];
   }),
 );
 const components = decls(read("components.css"));
+// Component tokens that are not colours, so they don't point at a semantic token.
+const NON_COLOUR = ["--photo-filter"];
 const semanticNames = Object.keys(themes.day).sort();
 
 /** Resolves a semantic or component token to a hex colour in one theme. */
@@ -71,6 +72,10 @@ const TEXT: [string, string][] = [
   ["--input-placeholder", "--input-bg"],
   ["--chip-fg", "--color-paper"],
   ["--chip-fg-selected", "--color-paper"],
+  ["--chip-fg-hover", "--color-paper"],
+  ["--drop-cap-fg", "--color-paper"],
+  ["--color-ink", "--panel-bg"],
+  ["--color-ink-muted", "--panel-bg"],
   ["--nav-fg", "--color-paper"],
   ["--nav-fg-active", "--color-paper"],
   ["--alert-fg", "--alert-bg"],
@@ -89,6 +94,10 @@ const UI: [string, string][] = [
   ["--color-rule-strong", "--color-paper-deep"],
   ["--input-border", "--input-bg"],
   ["--input-border-invalid", "--input-bg"],
+  ["--input-border-hover", "--input-bg"],
+  ["--chip-underline-hover", "--color-paper"],
+  ["--alert-rule", "--alert-bg"],
+  ["--button-ghost-underline", "--color-paper"],
   ["--button-secondary-border", "--color-paper"],
   ["--chip-underline-selected", "--color-paper"],
   ["--nav-underline-active", "--color-paper"],
@@ -111,13 +120,57 @@ describe("design tokens", () => {
   });
 
   it("component tokens all point at semantic tokens", () => {
-    for (const [name, value] of Object.entries(components)) {
+    for (const [name, value] of Object.entries(components).filter(([n]) => !NON_COLOUR.includes(n))) {
       expect(semanticNames, `${name}: ${value}`).toContain(ref(value));
     }
   });
 
   it("every pairing in the contract has a test entry for real tokens", () => {
     for (const [fg, bg] of [...TEXT, ...UI]) for (const t of [fg, bg]) expect(() => hex("day", t)).not.toThrow();
+  });
+
+  it("each theme file keeps its scope", () => {
+    const day = read("themes/day.css");
+    const evening = read("themes/evening.css");
+    expect(day).toContain("@theme static");
+    expect(day).not.toContain("@media");
+    expect(evening).toMatch(/@media \(prefers-color-scheme: dark\)/);
+    expect(evening).toMatch(/color-scheme:\s*dark/);
+    expect(evening).not.toContain("@theme");
+  });
+
+  it("every fg/bg component token has a contrast pairing", () => {
+    const paired = new Set([...TEXT, ...UI].flat());
+    const unpaired = Object.keys(components).filter((n) => /-(fg|bg)(-[a-z]+)?$/.test(n) && !paired.has(n));
+    expect(unpaired).toEqual([]);
+  });
+
+  it("themeColor and the manifest match the paper colour of each theme", () => {
+    const layout = readFileSync(join(dir, "../app/layout.tsx"), "utf8");
+    const themeColor = (scheme: string) =>
+      layout.match(new RegExp(`prefers-color-scheme: ${scheme}\\)",\\s*color: "(#[0-9a-f]{6})"`))?.[1];
+    expect(themeColor("light")).toBe(hex("day", "--color-paper"));
+    expect(themeColor("dark")).toBe(hex("evening", "--color-paper"));
+    const manifest = JSON.parse(readFileSync(join(dir, "../../public/manifest.webmanifest"), "utf8"));
+    expect(manifest.background_color).toBe(hex("day", "--color-paper"));
+    expect(manifest.theme_color).toBe(hex("day", "--color-paper"));
+  });
+
+  it("every custom property the ui reads is defined, and every component token is read", () => {
+    const uiDir = join(dir, "../components/ui");
+    const sources = readdirSync(uiDir)
+      .filter((f) => f.endsWith(".tsx") && !f.includes(".test."))
+      .map((f) => readFileSync(join(uiDir, f), "utf8"));
+    const globals = read("../app/globals.css");
+    const used = new Set<string>();
+    for (const code of [...sources, globals]) {
+      for (const m of code.matchAll(/(?:\(|var\()(--[a-z0-9-]+)\)?/g)) used.add(m[1]);
+    }
+    const defined = new Set([...Object.keys(components), ...semanticNames, ...Object.keys(decls(globals))]);
+    // Tailwind's own variables (--tw-*) are generated, not declared by us.
+    const undefinedTokens = [...used].filter((n) => !defined.has(n) && !n.startsWith("--tw-"));
+    expect(undefinedTokens).toEqual([]);
+    expect(Object.keys(components).filter((n) => !used.has(n))).toEqual([]);
   });
 
   it("the contrast helper matches WCAG", () => {

@@ -61,10 +61,17 @@ primitive, under a selector. Example, a high-contrast "large print" theme:
 ## Guard tests (`frontend/src/styles/*.test.ts`, run by `npx vitest run`)
 - `tokens.test.ts`
   - every theme file defines exactly the semantic tokens in `day.css`, each from a primitive hex;
-  - every component token points at a semantic token;
+  - every component token points at a semantic token (non-colour tokens such as `--photo-filter` are listed as
+    exceptions and set per scheme in `components.css`);
+  - every theme file has its scope: `day.css` is `@theme static` with no media query, `evening.css` is inside
+    `prefers-color-scheme: dark` and sets `color-scheme: dark`;
+  - every `(--x)` / `var(--x)` read by `components/ui` and `globals.css` is defined, and every component token is read;
+  - every `-fg` / `-bg` component token has a contrast pairing below;
+  - `themeColor` in `app/layout.tsx` and the manifest colours equal the resolved `--color-paper` of day and evening;
   - in every theme, each text pairing in the contract is at least 4.5:1 and each control pairing (borders that
     show a control, focus rings, state underlines) at least 3:1. The contract lists the style-lock pairs plus each
     component token pair (button label on button fill, input text on input, chip text on paper...). When you add a
     component token that carries text or state, add its pairing there.
-- `page-styling.test.ts`: every `.tsx` outside `src/components/ui/` may use only layout classes, no `style={…}`
-  and no `ui/cx`. If it fails, move the styling into a ui component (or add a variant) and use that.
+- `page-styling.test.ts`: every `.ts`/`.tsx` in `app`, `components` and `lib` outside `src/components/ui/` (that
+  exact path) may use only a literal `className="…"` of layout classes: no `className={…}`, single quotes, template
+  literals, spreads carrying className, `*Class` props or helpers, no `style={…}` and no `ui/cx`. If it fails, move the styling into a ui component (or add a variant) and use that.

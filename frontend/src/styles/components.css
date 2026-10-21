@@ -14,7 +14,7 @@
   --button-secondary-fg: var(--color-ink);
   --button-secondary-hover: var(--color-accent);
   --button-ghost-fg: var(--color-ink);
-  --button-ghost-underline: var(--color-rule);
+  --button-ghost-underline: var(--color-rule-strong);
   --button-ghost-hover: var(--color-accent);
   --button-danger-bg: var(--color-accent);
   --button-danger-fg: var(--color-on-accent);
@@ -61,4 +61,14 @@
   --focus-ring: var(--color-focus);
   --selection-bg: var(--color-accent);
   --selection-fg: var(--color-on-accent);
+}
+
+/* Not a colour, so it is set per scheme here rather than in a theme file: photos sit a touch dimmer in the evening. */
+:root {
+  --photo-filter: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --photo-filter: brightness(0.9) contrast(1.02);
+  }
 }

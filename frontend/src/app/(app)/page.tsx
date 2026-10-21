@@ -1,5 +1,5 @@
 import { ButtonLink, Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
+import { Chip, ChipRow } from "@/components/ui/Chip";
 import { Contents } from "@/components/ui/Contents";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
@@ -26,6 +26,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     <PageHeader
       kicker="The collection"
       title="Recipes"
+      reserveDeck
       description={
         count === undefined ? undefined : `${count} ${count === 1 ? "recipe" : "recipes"} in your household’s box.`
       }
@@ -94,26 +95,24 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         </form>
 
         {tags.length > 0 && (
-          <nav aria-label="Filter by tag" className="-mx-gutter overflow-x-auto px-gutter">
-            <ul className="flex gap-4">
-              <li>
-                <Chip href={homeHref(q)} selected={!tag}>
-                  All
+          <ChipRow label="Filter by tag">
+            <li>
+              <Chip href={homeHref(q)} selected={!tag}>
+                All
+              </Chip>
+            </li>
+            {tags.map((t) => (
+              <li key={t.name}>
+                <Chip
+                  href={homeHref(q, t.name === tag ? undefined : t.name)}
+                  selected={t.name === tag}
+                  count={t.count}
+                >
+                  {t.name}
                 </Chip>
               </li>
-              {tags.map((t) => (
-                <li key={t.name}>
-                  <Chip
-                    href={homeHref(q, t.name === tag ? undefined : t.name)}
-                    selected={t.name === tag}
-                    count={t.count}
-                  >
-                    {t.name}
-                  </Chip>
-                </li>
-              ))}
-            </ul>
-          </nav>
+            ))}
+          </ChipRow>
         )}
       </div>
 
@@ -135,7 +134,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
               {total} {total === 1 ? "match" : "matches"}
             </Text>
           )}
-          <Contents label="Recipes">
+          <Contents>
             {items.map((r) => (
               <RecipeCard key={r.id} recipe={r} />
             ))}

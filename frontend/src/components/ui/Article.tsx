@@ -28,7 +28,7 @@ export function LeadPhoto({ src, alt }: { src: string; alt: string }) {
         width={1200}
         height={800}
         fetchPriority="high"
-        className="aspect-[3/2] h-auto max-h-[36rem] w-full object-cover"
+        className="aspect-[3/2] h-auto max-h-[36rem] w-full object-cover [filter:var(--photo-filter)]"
       />
     </figure>
   );

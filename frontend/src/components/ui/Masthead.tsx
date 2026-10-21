@@ -11,7 +11,7 @@ export function Masthead({ children }: { children: ReactNode }) {
         <Link href="/" className="inline-flex min-h-control items-center" aria-label="Recipe Box home">
           <Logo />
         </Link>
-        <nav aria-label="Main" className="-mx-2 flex max-w-full items-center overflow-x-auto sm:mx-0">
+        <nav aria-label="Main" className="flex max-w-full items-center overflow-x-auto">
           {children}
         </nav>
       </div>
@@ -21,7 +21,7 @@ export function Masthead({ children }: { children: ReactNode }) {
 }
 
 const navItem =
-  "label inline-flex min-h-control items-center whitespace-nowrap border-b-2 px-2 max-sm:text-[0.8125rem] max-sm:tracking-[0.07em] sm:px-2.5 transition-[border-color,color] duration-150 ease-out";
+  "label inline-flex min-h-control items-center whitespace-nowrap border-b-2 max-sm:ps-0 max-sm:pe-3 max-sm:text-[0.8125rem] max-sm:tracking-[0.07em] sm:px-2.5 transition-[border-color,color] duration-150 ease-out";
 const idle = "border-transparent text-(--nav-fg) hover:text-(--nav-fg-active)";
 
 /** A section link in the masthead; `active` marks the current section. */
