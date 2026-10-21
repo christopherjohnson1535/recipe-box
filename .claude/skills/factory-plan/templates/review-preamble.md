@@ -4,7 +4,7 @@ You REVIEW; you do not change code. The only file you write is your findings fil
 
 ## Where things are
 - Code: `<CODE_DIR>` via `<SHELL_TOOL>`. Plan: `docs/SPEC.md`; requirement IDs in `docs/REQUIREMENTS.md`.
-- Expected load: <e.g. one person on one PC, shoots of a few thousand photos>. Judge scale against that.
+- Expected load: <e.g. one household, a few users, up to ~2,000 recipes>. Judge scale against that.
 - Don't run `npm install`, `npm run build` or `next dev` unless your brief says so (other reviewers run too).
 
 ## Method

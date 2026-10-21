@@ -1,35 +1,42 @@
-# Screenshot every page in every theme at desktop and phone size. Usage: python3 shoot.py <base-url> <out-dir> [themes...]
-import sys, json, os, urllib.request
+# Screenshot every page in light and dark at desktop, iPad and phone size, signed in.
+# Usage: SHOOT_USER=chris SHOOT_PASSWORD=... python3 scripts/factory/shoot.py <base-url> <out-dir> <recipe-id>
+# Prints WARN lines for pages scrolled on load or overflowing horizontally.
+import os
+import sys
+
 from playwright.sync_api import sync_playwright
-base, out = sys.argv[1], sys.argv[2]
-themes = sys.argv[3:] or ["material", "claude", "cupertino"]
-pages = {"library": "/", "import": "/import", "settings": "/settings",
-         "shoot": "/shoots/2026/Red%20Rocks", "cull": "/shoots/2026/Red%20Rocks/cull",
-         "finished": "/shoots/2026/Red%20Rocks/finished", "notfound": "/shoots/2026/Nope"}
-sizes = {"desktop": (1440, 900), "phone": (390, 844)}
+
+base, out, rid = sys.argv[1], sys.argv[2], sys.argv[3]
+user, password = os.environ.get("SHOOT_USER", "chris"), os.environ["SHOOT_PASSWORD"]
+pages = {"home": "/", "recipe": f"/recipes/{rid}", "new": "/recipes/new", "edit": f"/recipes/{rid}/edit",
+         "cook": f"/recipes/{rid}/cook", "import": "/import", "settings": "/settings",
+         "notfound": "/recipes/00000000-0000-0000-0000-000000000000"}
+sizes = {"desktop": (1440, 900), "ipad": (820, 1180), "phone": (390, 844)}
 os.makedirs(out, exist_ok=True)
-def put_theme(t):
-    req = urllib.request.Request(base + "/api/settings", data=json.dumps({"theme": t}).encode(), method="PUT", headers={"Content-Type": "application/json", "Origin": base})
-    urllib.request.urlopen(req).read()
+
 with sync_playwright() as p:
-    b = p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or None)
-    for t in themes:
-        put_theme(t)
-        for sname, (w, h) in sizes.items():
-            pg = b.new_page(viewport={"width": w, "height": h})
+    browser = p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or None)
+    for scheme in ("light", "dark"):
+        ctx = browser.new_context(color_scheme=scheme)
+        pg = ctx.new_page()
+        pg.set_viewport_size({"width": 820, "height": 1180})
+        pg.goto(base + "/login")
+        pg.wait_for_timeout(500)
+        pg.screenshot(path=f"{out}/{scheme}-login-ipad.png")
+        pg.get_by_label("Username").fill(user)
+        pg.get_by_label("Password").fill(password)
+        pg.keyboard.press("Enter")
+        pg.wait_for_url(lambda u: "/login" not in u, timeout=10000)
+        for size, (w, h) in sizes.items():
+            pg.set_viewport_size({"width": w, "height": h})
             for name, path in pages.items():
                 pg.goto(base + path, wait_until="networkidle")
-                pg.wait_for_timeout(700)
-                pg.screenshot(path=f"{out}/{t}-{name}-{sname}.png", full_page=(sname == "desktop"))
-            # interaction states on desktop: loupe open + hover/focus on first card
-            if sname == "desktop":
-                pg.goto(base + pages["shoot"], wait_until="networkidle"); pg.wait_for_timeout(500)
-                pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); pg.keyboard.press("Tab")
-                pg.screenshot(path=f"{out}/{t}-shoot-focus-desktop.png")
-                tiles = pg.locator("main img")
-                if tiles.count():
-                    tiles.first.click(); pg.wait_for_timeout(800)
-                    pg.screenshot(path=f"{out}/{t}-loupe-desktop.png")
-            pg.close()
-    b.close()
+                pg.wait_for_timeout(300)
+                sy = pg.evaluate("window.scrollY")
+                ov = pg.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+                if sy or ov:
+                    print("WARN", scheme, size, name, "scrollY", sy, "overflow", ov)
+                pg.screenshot(path=f"{out}/{scheme}-{name}-{size}.png", full_page=True)
+        ctx.close()
+    browser.close()
 print("done", out)

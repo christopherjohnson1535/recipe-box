@@ -112,6 +112,7 @@ Priority: **Must** = first usable version, **Should** = next, **Could** = nice t
 | Network safety | Link import fetches only public addresses (no internal network access); timeouts and size caps |
 | Platforms | iPadOS/iOS Safari 18+, current Chrome/Edge/Firefox/Safari on desktop; Windows PC for development |
 | Performance | Home list and search usable within 1 s on the iPad over home Wi‑Fi for 2,000 recipes; link import < 10 s typical; photo import < 30 s |
+| Visual style | Editorial magazine look in the tradition of literary weeklies such as The New Yorker: display and text serifs, generous white space, narrow measure, small-caps kickers, italic decks, hairline rules, near-monochrome palette with one sparing accent; an "evening edition" dark mode. Original design — no publication's name, logo, mascot or proprietary typeface. Details in `docs/UI.md` |
 | Accessibility | Keyboard reachable, visible focus, labels on all inputs, contrast ≥ 4.5:1, works with Dynamic Type / zoom to 200% |
 | Reliability | Containers restart on failure; a failed import never creates a half-saved recipe |
 | Portability | No host-specific code; same images run on a PC, a Pi and a cloud VM |

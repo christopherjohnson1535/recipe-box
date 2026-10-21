@@ -25,7 +25,7 @@ The browser only talks to the web container; the web container proxies `/api/*` 
 runtime (`API_INTERNAL_URL`). Session cookie `rb_session`.
 
 ## How to work on an issue (the software factory)
-This repo is built with the software factory skills in `.claude/skills/` (from the owner's photoflow project).
+This repo is built with the software factory skills in `.claude/skills/`.
 For an issue:
 1. Read the issue, then the requirement IDs it cites in `docs/REQUIREMENTS.md`, the SPEC section it names, and
    `docs/API.md` for any endpoint it touches.

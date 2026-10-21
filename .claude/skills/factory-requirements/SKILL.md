@@ -9,27 +9,28 @@ Goal: a short, numbered requirements document the owner can read in five minutes
 
 ## Steps
 
-1. **Restate the current workflow** as numbered steps in the owner's words (e.g. "plug in card → copy to
-   `D:\2026\Denver` → edit in Lightroom → export to Finished → sometimes border → sometimes upload").
+1. **Restate the current workflow** as numbered steps in the owner's words (e.g. "find a recipe on a blog →
+   bookmark it → open it on the iPad while cooking → screen locks → scroll past ads again").
    List the pain points each step implies. That list is where requirements come from.
 2. **Look up anything external that could block a requirement** before writing it: third-party API rules,
-   platform limits, licences. (Example: since 31 Mar 2025 the Google Photos Library API only lets an app add to
-   albums it created — that changed GPH-3.) Cite the source in the doc.
-3. **Write `docs/REQUIREMENTS.md`** with these sections:
-   - Overview, goals (3–6 outcomes), non-goals (what stays in other tools).
+   platform limits, licences. (Example: iOS has no web Share Target, so "save from the share sheet" became an
+   Apple Shortcut — LNK-6.) Cite the source in the doc.
+3. **Write or extend `docs/REQUIREMENTS.md`** with these sections:
+   - Overview, goals (3–6 outcomes), non-goals (what stays out of scope).
    - Current workflow and pain points.
    - Functional requirements: one table per area, columns `ID | Requirement | Priority`. IDs are short prefixes
-     per area (IMP-, BRW-, CUL-, BRD-, GPH-, SET-). Priority = Must / Should / Could. Each row is testable
-     ("Skip files already imported (name + size + capture time) and say how many were skipped").
-   - Non-functional requirements table: safety of originals, runs where, platform, performance numbers, formats,
-     privacy, reliability, usability, maintainability.
+     per area (REC-, FND-, LNK-, PHO-, KIT-, ACC-, OPS-). Priority = Must / Should / Could. Each row is testable
+     ("Warn when the same source URL was already saved and link to it").
+   - Non-functional requirements table: data safety, privacy/security, network safety, platforms, performance
+     numbers, accessibility, reliability, portability, maintainability.
    - Phased roadmap: phases that are each useful alone, with a "done when" sentence.
    - Open questions as a checklist (`- [ ]`), each answerable in one line.
 4. **Ask the owner** only the open questions whose answer changes what gets built (AskUserQuestion, max 4).
    Default the rest and say which default you took.
-5. If the owner keeps docs in Claude Docs, mirror the doc there; the repo copy is the one agents read.
+5. **Turn new requirements into issues:** add entries to `scripts/github/backlog.py` and run
+   `python3 scripts/github/sync_backlog.py <owner/repo>`.
 
 ## Rules
 - Requirements describe outcomes, not implementation. Stack choices belong in the plan.
-- Never cut: data safety (originals never modified), privacy of credentials, accessibility.
-- Every later artifact (spec, reviews, fixes) references these IDs.
+- Never cut: data safety (no half-saved recipes, restorable backups), privacy of credentials, accessibility.
+- Every later artifact (spec, issues, reviews, fixes) references these IDs.

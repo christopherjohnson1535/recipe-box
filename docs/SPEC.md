@@ -42,8 +42,9 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
   Read `frontend/node_modules/next/dist/docs/` before using an API you're unsure of — this Next version differs
   from training data (async `params`, etc.). Self-hosted fonts only (`@fontsource-variable/*`).
   `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build` must pass.
-- UI: tastemaker rules + the design system (`docs/UI.md`, `docs/THEMING.md` once written). Pages compose
-  `src/components/ui/*` only.
+- UI: editorial magazine style (requirements → Visual style), defined in `docs/UI.md` and
+  `.tastemaker/style-lock.md`; tastemaker rules apply. Pages compose `src/components/ui/*` only. Open-licensed,
+  self-hosted fonts only; never imitate a specific publication's logo, masthead or proprietary typeface.
 - Every API route except `GET /api/health`, `GET /api/setup`, `POST /api/setup`, `POST /api/auth/login` requires a
   session. Admin-only routes check `role = 'admin'`.
 - Link import fetches go through `safe_fetch` only (public IPs, re-checked on every redirect, 15 s timeout, 5 MB cap).

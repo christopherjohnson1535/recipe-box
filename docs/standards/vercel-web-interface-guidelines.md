@@ -1,7 +1,7 @@
 # Web Interface Guidelines (Vercel) — checklist summary
 
 Source: https://vercel.com/design/guidelines (fetched 2026-10-17). This is a condensed summary for audits; read the
-source for the full text. The "Copywriting (Vercel-specific)" items are Vercel's house style and advisory for PhotoFlow.
+source for the full text. The "Copywriting (Vercel-specific)" items are Vercel's house style and advisory for Recipe Box.
 
 ## Interactions
 - Every flow keyboard-operable (WAI-ARIA patterns). Visible focus via :focus-visible / :focus-within; sticky UI never covers focus.
@@ -61,4 +61,4 @@ source for the full text. The "Copywriting (Vercel-specific)" items are Vercel's
 ## Copywriting (Vercel-specific — advisory)
 - Active voice, second person, concise, action-oriented, consistent terms, numerals for counts, space between number and unit.
 - Errors framed positively and explain the fix. Specific labels, not "Continue".
-- (Vercel uses Title Case and "&"; PhotoFlow keeps sentence case and "and".)
+- (Vercel uses Title Case and "&"; Recipe Box keeps sentence case and "and".)

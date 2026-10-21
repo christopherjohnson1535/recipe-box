@@ -6,7 +6,7 @@ First read the builder preamble (`agent-preamble.md`) and follow it — except t
 - Findings are in `docs/review/*.md`. Read the ones named in your brief in full, plus the code they cite.
 - Fix every Must and Should assigned to you. Nice only when it deletes code or is a one-liner.
 - Re-read the cited lines and confirm the failing case first. If a finding is wrong, skip it and say why.
-- Smallest fix that works. Every data-safety fix (copy, move, delete, sidecar write, upload record) gets a test
+- Smallest fix that works. Every data-safety fix (save, delete/restore, import, backup/restore) gets a test
   that fails without the fix.
 - After fixing: your paths clean in tsc and eslint; full `npx vitest run` passes (note other agents' failures,
   don't fix them).

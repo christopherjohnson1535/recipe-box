@@ -11,7 +11,7 @@ and finish it.
 5. PR with `Closes #<n>`; CI must be green.
 
 ## The software factory
-Built with the factory process from the photoflow project: requirements → plan → build (agent waves) → verify
+Built with the software factory process: requirements → plan → build (agent waves) → verify
 (independent reviewers, fix waves, `docs/review/FIXES.md`) → test (smoke + screenshots) → design QA → ship.
 Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
 

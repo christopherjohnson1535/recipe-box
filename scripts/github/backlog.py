@@ -72,13 +72,15 @@ ISSUES = [
     issue(
         "Design system: tokens, UI components, light/dark, docs/UI.md", M1,
         ["area:frontend", "phase:1", "priority:must"],
-        "A calm, warm, food-friendly look that reads well on an iPad in a kitchen, built from tokens so later themes are one file.",
+        "An editorial magazine look (in the tradition of The New Yorker — original, no trademarks) that reads well on an iPad in a kitchen, built from tokens so later themes are one file.",
         "KIT-1",
-        "Factory build wave 2 (`.claude/skills/factory-build`). Use tastemaker (`.factory/vendor/tastemaker`) to write "
-        "`.tastemaker/style-lock.md`, then three token layers (primitives → semantic → component) per the photoflow "
-        "`docs/THEMING.md` approach; `src/components/ui/*` are the only readers of component tokens. Light + dark via "
+        "Factory build wave 2 (`.claude/skills/factory-build`). The editorial direction, fonts and base tokens were set "
+        "during the scaffold (`docs/UI.md`, `.tastemaker/style-lock.md`) — keep them and build on them: "
+        "three token layers (primitives → semantic → component) as described in `.claude/skills/factory-plan/SKILL.md` §2; "
+        "`src/components/ui/*` are the only readers of component tokens. Light + 'evening edition' dark via "
         "`prefers-color-scheme`. Add guard tests: every theme defines every token, contrast ≥ 4.5:1, pages don't style "
-        "themselves. Write `docs/UI.md` and `docs/THEMING.md`.",
+        "themselves. Extend `docs/UI.md`; write `docs/THEMING.md`. Never use a publication's name, logo, mascot or "
+        "proprietary typeface.",
         "`frontend/src/app/globals.css`, `frontend/src/styles/**`, `frontend/src/components/ui/**`, `frontend/src/app/layout.tsx`, `docs/UI.md`, `docs/THEMING.md`, `.tastemaker/**`",
         ["Every scaffold page uses only ui components + layout utilities", "Guard tests pass", "Screenshots at iPad portrait, landscape, phone, desktop in light and dark reviewed"],
     ),

@@ -24,3 +24,6 @@ frontend/coverage/
 .DS_Store
 Thumbs.db
 *.log
+
+# python
+__pycache__/

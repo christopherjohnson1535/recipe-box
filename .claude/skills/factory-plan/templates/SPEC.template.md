@@ -13,7 +13,7 @@ This file is the plan. Agents do not change it; if something here is wrong, say 
 - UI: tastemaker rules + the design system (`docs/UI.md`, `docs/THEMING.md`). Pages use `src/components/ui` only.
 - TypeScript strict. <Framework conventions, e.g. Next.js App Router, async params, route handlers.>
 - Platform: <e.g. Windows first — path.join/resolve only; must also run on Linux for tests>.
-- <Data-safety invariant, e.g. originals are never modified or deleted.>
+- <Data-safety invariant, e.g. imports never half-save a recipe; deletes are soft and restorable.>
 - <Validation invariant, e.g. every route taking a path calls assertAllowedPath() first.>
 
 ## Dependencies (allowed list)
