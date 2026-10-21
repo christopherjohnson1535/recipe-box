@@ -55,6 +55,22 @@ pub async fn end(pool: &PgPool, jar: CookieJar) -> AppResult<CookieJar> {
     Ok(jar.remove(Cookie::build(COOKIE_NAME).path("/")))
 }
 
+/// Ends every session of `user_id`, except the one with `keep` (a token hash) when given.
+pub async fn end_for_user(
+    conn: &mut sqlx::PgConnection,
+    user_id: Uuid,
+    keep: Option<Vec<u8>>,
+) -> AppResult<()> {
+    sqlx::query(
+        "delete from sessions where user_id = $1 and ($2::bytea is null or token_hash <> $2)",
+    )
+    .bind(user_id)
+    .bind(keep)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

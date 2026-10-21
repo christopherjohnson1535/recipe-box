@@ -635,14 +635,9 @@ async fn capabilities_and_stubs() {
         .await;
     assert_eq!(caps.json, json!({ "ai": false, "provider": "none" }));
 
-    let uid = Uuid::new_v4();
     let stubs = [
         (Method::POST, "/api/import/text".to_string()),
         (Method::POST, "/api/import/photo".to_string()),
-        (Method::GET, "/api/users".to_string()),
-        (Method::POST, "/api/users".to_string()),
-        (Method::DELETE, format!("/api/users/{uid}")),
-        (Method::PUT, format!("/api/users/{uid}/password")),
         (Method::GET, "/api/export".to_string()),
         (Method::POST, "/api/import/export".to_string()),
     ];
