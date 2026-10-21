@@ -83,7 +83,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       {header(filtered ? undefined : total)}
 
       <div className="flex flex-col gap-3">
-        <form role="search" action="/" className="flex max-w-xl gap-2">
+        <form role="search" method="get" action="/" className="flex max-w-xl gap-2">
           <label htmlFor="q" className="sr-only">
             Search recipes
           </label>

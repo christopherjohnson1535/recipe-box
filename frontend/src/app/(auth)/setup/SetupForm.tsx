@@ -37,7 +37,7 @@ export function SetupForm() {
   }
 
   return (
-    <form method="post" action="/setup" onSubmit={onSubmit} className="flex flex-col gap-5">
+    <form method="post" onSubmit={onSubmit} className="flex flex-col gap-5">
       {error && <Alert tone="error">{error}</Alert>}
       <Field label="Your name" htmlFor="displayName" hint="Shown on recipes you add, e.g. “Chris”.">
         <Input id="displayName" name="displayName" autoComplete="name" required aria-describedby="displayName-msg" />
