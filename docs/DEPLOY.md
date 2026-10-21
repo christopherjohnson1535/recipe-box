@@ -52,3 +52,6 @@ tested (issue: deploy guides).
 - `GET /api/health` through the web port → `{"status":"ok","db":"ok"}`.
 - `docker compose ps` shows `healthy` for `db` and `api`.
 - Logs: `docker compose logs -f api web`.
+- End-to-end check: `SMOKE_USER=<you> SMOKE_PASSWORD=<pw> sh scripts/smoke.sh` logs in through the web port, uploads a
+  small test image, restarts the stack and confirms the image survived (`SMOKE_RESTART=0` skips the restart). CI runs
+  the same script on a fresh stack with `SMOKE_SETUP=1`. On Windows run it from Git Bash.
