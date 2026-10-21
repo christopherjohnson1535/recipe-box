@@ -17,4 +17,6 @@ A household recipe website: save recipes from links and photos, find them fast, 
 - [[Development]] — how work is picked up issue by issue with the software factory
 - [[Roadmap]] — phases and milestones
 
+> This wiki is generated from `docs/wiki/` in the repo — edit pages there, not here.
+
 > Status: scaffold. Features land phase by phase — see [[Roadmap]] and the repo's Issues tab.
