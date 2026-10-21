@@ -59,3 +59,16 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #29 A-03 skipped — a no-JS submit is rare and harmless now.
 #29 A-04 skipped — acceptable.
 #29 A-05 fixed — stray `export` of the old scanner dropped (new scanner functions are test-local; `export` kept off).
+#7 I-01 fixed — unknown/500/502 and network errors offer "Try again" (re-runs the import) and "Type it in".
+#7 I-02 fixed — unauthenticated offers a Sign in link to /login?next=/import?mode=<mode>.
+#7 I-03 fixed — validation errors carry fieldId (url->import-url, sourceUrl->import-source, else text); shown under and focus that field.
+#7 I-04 fixed — PhotoGallery `strip`: below lg a horizontal thumbnail row ("Your photos (n)"), full column at lg.
+#7 I-05 fixed — Pending/Stop shown whenever busy (message from busy), all panels pending while busy; Review stores `from` for "Start over with a different <origin>".
+#7 P1-1, P1-2, WARN fixed — ui Button wraps and centres long labels below sm (min-h 44px kept); review heading focus uses preventScroll and scrolls only when out of view.
+#7 P2-1, P2-2 fixed — Start over aligned with the form column (-ml-2); url/sourceUrl URL errors read "Enter a full web address starting with https://".
+#7 P2-5 skipped — tabs add no extra focus treatment; the box is the global 2px focus ring, kept.
+#7 P2-3 skipped — by design (text tab explains AI is needed); covered by unit tests.
+#7 I-08 fixed (one-liner) — Stop waiting refocuses the input. Go back / Start over skipped (whole screen swaps).
+#7 I-06, I-07, I-09 skipped — more than a one-liner / behaviour change; harmless (duplicate Alert protects ?url=, dead error prop only).
+#7 I-10 skipped — --progress-fg kept: folding it needs an Alert-with-bar variant, a bigger change than the gain.
+#7 I-11 skipped — accepted trade-off (a stash cannot help: the form is not mounted after reload).

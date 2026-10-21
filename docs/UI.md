@@ -90,7 +90,7 @@ Text and structure:
 
 Controls and states:
 - `ui/Button` / `ButtonLink`: `primary` ink fill (hover turns accent), `secondary` ink outline, `ghost` underlined,
-  `danger` accent fill. Labels are `.label`. 44px tall.
+  `danger` accent fill. Labels are `.label`. At least 44px tall; below `sm` long labels wrap (centred) instead of overflowing.
 - `ui/PageHeader`: `kicker`, `title` (display headline), `description` (italic deck), `byline`, `actions`,
   `align="start" | "center"`, `reserveDeck` (keeps the deck's height when there is no description); ends with a
   hairline.
@@ -104,6 +104,11 @@ Controls and states:
   `quiet` drops the outline), `ui/ListEditor` (`EditorList` + `EditorItem`: optional accent numeral, section heading
   slot with a left rule, row controls), `ui/TagList` (removable tags), `ui/PhotoField` (file picker with preview,
   Remove, busy and error states). These make up the recipe editor.
+- Import screen: `ui/Tabs` (tablist styled like the tag index, arrow keys; panel id `${idPrefix}-panel`),
+  `ui/PhotoPicker` (several photos with previews and remove; `accept="image/*"` so iPadOS offers camera and library)
+  and `PhotoGallery` (stored photos, each linking to full size), `ui/ChoiceGroup` (radios with italic hints),
+  `ui/Pending` (status note with a quiet bar and a way out; token `--progress-fg`). `Heading` takes `ref` and
+  `tabIndex` so a page can move focus to a result.
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
 App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
@@ -111,7 +116,10 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   (`RecipeInput`, `RecipeDraft` or `Recipe`; draft `warnings` are shown), `submitLabel`, `onSubmit(input)` (saves and
   navigates; throw an `ApiError` to show it), `cancelHref`, `draftKey` (recipe id or "new": names the
   sessionStorage draft that `recipe-form/draft-stash.ts` keeps while the form is dirty and offers back with
-  Restore/Discard). `recipe-form/list-model.ts` holds the pure list logic.
+  Restore/Discard; `null` keeps none), `startDirty` (the starting values count as unsaved, for an import draft). `recipe-form/list-model.ts` holds the pure list logic.
+- `import/ImportScreen` (+ `ImportPanels`, `import-errors.ts`): `/import` with Link, Photo and Text modes (mode in
+  `?mode=`, `?url=` starts a link import), loading and error notes, review in `RecipeForm` with the original photos
+  beside it. `explainImportError` maps every API error code to a title, message and next steps (Try again, Type it in, Sign in, Paste the text instead). Below `lg` the original photos are a horizontal strip above the form.
 - `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `ContentsEntry`.
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 

@@ -102,6 +102,7 @@ const UI: [string, string][] = [
   ["--chip-underline-selected", "--color-paper"],
   ["--nav-underline-active", "--color-paper"],
   ["--alert-rule-error", "--alert-bg"],
+  ["--progress-fg", "--alert-bg"],
   ["--focus-ring", "--color-paper"],
   ["--focus-ring", "--color-paper-deep"],
 ];

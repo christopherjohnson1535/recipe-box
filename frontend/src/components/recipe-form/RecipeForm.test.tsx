@@ -243,4 +243,13 @@ describe("RecipeForm", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     await waitFor(() => expect(sessionStorage.getItem("rb-draft:new")).toBeNull());
   });
+
+  it("startDirty warns on leave before any edit, and draftKey null keeps no stash", () => {
+    setup({ initial: { title: "Draft" }, startDirty: true, draftKey: null });
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    type("Title", "Changed");
+    expect(Object.keys(sessionStorage)).toEqual([]);
+  });
 });
