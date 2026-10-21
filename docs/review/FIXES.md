@@ -78,3 +78,6 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #8 H-04 fixed — tests for member PUT unknown id (403), malformed ids (400), admin own-password change
 #8 H-05 deferred — throttling belongs with login throttling; new issue filed by the orchestrator.
 #8 H-06 fixed — JSON rejections now say "<field|body>: invalid JSON or wrong field type", never the value (test)
+#8 H-07 fixed — own-password 401 checks /api/auth/me; if the session is gone shows "You've been signed out" + Sign in link (new ui/TextLink)
+#8 H-08 fixed — failed remove with 404 drops the row, router.refresh() and shows the message
+#8 H-09 fixed — Remove aria-describedby its reason; hidden username field on own-password form; notices cleared on next action; client length checks use code points (backend counts chars)

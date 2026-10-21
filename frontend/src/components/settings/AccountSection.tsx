@@ -20,7 +20,7 @@ export function AccountSection({ user }: { user: User }) {
         <Heading level={3} size="label">
           Change your password
         </Heading>
-        <PasswordForm userId={user.id} askCurrent submitLabel="Change password" idPrefix="own" />
+        <PasswordForm userId={user.id} username={user.username} askCurrent submitLabel="Change password" idPrefix="own" />
       </div>
     </section>
   );

@@ -5,7 +5,13 @@ import { HouseholdSection } from "./HouseholdSection";
 import { PasswordForm } from "./PasswordForm";
 import { SettingsView } from "./SettingsView";
 
-afterEach(cleanup);
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+
+afterEach(() => {
+  cleanup();
+  refresh.mockClear();
+});
 
 const user = (id: string, displayName: string, role: User["role"] = "member"): User => ({
   id,
@@ -17,10 +23,11 @@ const user = (id: string, displayName: string, role: User["role"] = "member"): U
 const chris = user("u1", "Chris", "admin");
 const sam = user("u2", "Sam");
 
-const fakeApi = (over: Partial<Record<"createUser" | "deleteUser" | "setPassword", ReturnType<typeof vi.fn>>> = {}) => ({
+const fakeApi = (over: Partial<Record<"createUser" | "deleteUser" | "setPassword" | "me", ReturnType<typeof vi.fn>>> = {}) => ({
   createUser: vi.fn(),
   deleteUser: vi.fn().mockResolvedValue(undefined),
   setPassword: vi.fn().mockResolvedValue(undefined),
+  me: vi.fn().mockResolvedValue(chris),
   ...over,
 });
 type FakeApi = ReturnType<typeof fakeApi>;
@@ -114,9 +121,28 @@ describe("HouseholdSection", () => {
   });
 });
 
+describe("HouseholdSection edge cases", () => {
+  it("drops the row and refreshes when the member is already gone", async () => {
+    const api = fakeApi({ deleteUser: vi.fn().mockRejectedValue(new ApiError(404, "not_found", "No such user.")) });
+    render(<HouseholdSection currentUserId="u1" initialUsers={[chris, sam]} api={asApi(api)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Sam" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove Sam" })[1]);
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("No such user."));
+    expect(screen.queryByText("Sam")).toBeNull();
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("ties the disabled Remove to its reason", () => {
+    render(<HouseholdSection currentUserId="u1" initialUsers={[chris]} api={asApi(fakeApi())} />);
+    const remove = screen.getByRole("button", { name: "Remove Chris" });
+    expect(remove.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(remove.getAttribute("aria-describedby")!)?.textContent).toContain("yourself");
+  });
+});
+
 describe("PasswordForm (own password)", () => {
-  const setup = (setPassword = vi.fn().mockResolvedValue(undefined)) => {
-    render(<PasswordForm userId="u1" askCurrent submitLabel="Change password" idPrefix="own" api={{ setPassword }} />);
+  const setup = (setPassword = vi.fn().mockResolvedValue(undefined), me = vi.fn().mockResolvedValue(chris)) => {
+    render(<PasswordForm userId="u1" username="chris" askCurrent submitLabel="Change password" idPrefix="own" api={{ setPassword, me }} />);
     return setPassword;
   };
   const fill = (current: string, next: string, confirm: string) => {
@@ -145,6 +171,22 @@ describe("PasswordForm (own password)", () => {
     fill("wrong-password", "new-password-1", "new-password-1");
     await waitFor(() => expect(document.getElementById("own-current-msg")?.textContent).toContain("current password"));
     expect(screen.getByLabelText("Current password").getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("says you were signed out when the 401 is an expired session", async () => {
+    setup(
+      vi.fn().mockRejectedValue(new ApiError(401, "unauthenticated", "Wrong username or password.")),
+      vi.fn().mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in.")),
+    );
+    fill("old-password", "new-password-1", "new-password-1");
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("signed out"));
+    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/login");
+    expect(document.getElementById("own-current-msg")).toBeNull();
+  });
+
+  it("has a username field for password managers", () => {
+    setup();
+    expect((document.querySelector("input[autocomplete=username]") as HTMLInputElement).value).toBe("chris");
   });
 
   it("confirms success and sends the current password", async () => {

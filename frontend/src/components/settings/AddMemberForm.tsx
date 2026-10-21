@@ -39,7 +39,7 @@ export function AddMemberForm({ onAdded, api = browserApi }: Props) {
     const next: Errors = {};
     if (!displayName) next.displayName = "Enter a name.";
     if (!USERNAME.test(username)) next.username = "Use 3–40 characters: lowercase letters, numbers, . _ -";
-    if (password.length < MIN_PASSWORD) next.password = `Use at least ${MIN_PASSWORD} characters.`;
+    if ([...password].length < MIN_PASSWORD) next.password = `Use at least ${MIN_PASSWORD} characters.`;
     if (Object.keys(next).length > 0) return fail(next);
 
     setPending(true);

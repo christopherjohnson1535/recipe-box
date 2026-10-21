@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +15,7 @@ import { PasswordForm } from "./PasswordForm";
 type Props = {
   currentUserId: string;
   initialUsers: User[];
-  api?: Pick<Api, "createUser" | "deleteUser" | "setPassword">;
+  api?: Pick<Api, "createUser" | "deleteUser" | "setPassword" | "me">;
 };
 
 type Open = { id: string; kind: "reset" | "remove" } | null;
@@ -25,6 +26,7 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const [removing, setRemoving] = useState(false);
+  const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
   const resetButtons = useRef(new Map<string, HTMLButtonElement>());
 
@@ -32,11 +34,17 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
 
   async function remove(user: User) {
     setRemoving(true);
+    setNotice(null);
     try {
       await api.deleteUser(user.id);
       setUsers((list) => list.filter((u) => u.id !== user.id));
       setNotice({ tone: "info", text: `${user.displayName} was removed and signed out everywhere.` });
     } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        // Already gone (another admin removed them): drop the stale row and reload.
+        setUsers((list) => list.filter((u) => u.id !== user.id));
+        router.refresh();
+      }
       setNotice({ tone: "error", text: e instanceof ApiError ? e.message : `Couldn’t remove ${user.displayName}. Try again.` });
     } finally {
       setOpen(null);
@@ -47,6 +55,7 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
 
   function closeReset(user: User, done: boolean) {
     setOpen(null);
+    setNotice(null);
     if (done) setNotice({ tone: "info", text: `${user.displayName}’s password was changed and they were signed out.` });
     requestAnimationFrame(() => resetButtons.current.get(user.id)?.focus());
   }
@@ -80,7 +89,10 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
                       }}
                       aria-label={`Reset password for ${u.displayName}`}
                       aria-expanded={mine === "reset"}
-                      onClick={() => setOpen(mine === "reset" ? null : { id: u.id, kind: "reset" })}
+                      onClick={() => {
+                        setNotice(null);
+                        setOpen(mine === "reset" ? null : { id: u.id, kind: "reset" });
+                      }}
                     >
                       Reset password
                     </Button>
@@ -89,13 +101,18 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
                     variant="ghost"
                     aria-label={`Remove ${u.displayName}`}
                     disabled={blocked !== null}
-                    onClick={() => setOpen({ id: u.id, kind: "remove" })}
+                    aria-describedby={blocked ? `remove-note-${u.id}` : undefined}
+                    onClick={() => {
+                      setNotice(null);
+                      setOpen({ id: u.id, kind: "remove" });
+                    }}
                   >
                     Remove
                   </Button>
                 </>
               }
               note={blocked}
+              noteId={`remove-note-${u.id}`}
               panel={
                 mine === "reset" ? (
                   <Panel label={`Reset password for ${u.displayName}`}>

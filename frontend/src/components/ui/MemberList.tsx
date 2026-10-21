@@ -19,11 +19,13 @@ type MemberItemProps = {
   actions?: ReactNode;
   /** An explanation under the row, such as why Remove is off. */
   note?: ReactNode;
+  /** Id for the note, so a button can point at it with aria-describedby. */
+  noteId?: string;
   /** A panel opened from the row (reset password, confirm removal). */
   panel?: ReactNode;
 };
 
-export function MemberItem({ name, detail, marker, actions, note, panel }: MemberItemProps) {
+export function MemberItem({ name, detail, marker, actions, note, noteId, panel }: MemberItemProps) {
   return (
     <li className="flex flex-col gap-3 border-b border-(--rule-hair) py-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -36,7 +38,7 @@ export function MemberItem({ name, detail, marker, actions, note, panel }: Membe
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>
-      {note && <p className="text-small text-ink-muted italic">{note}</p>}
+      {note && <p id={noteId} className="text-small text-ink-muted italic">{note}</p>}
       {panel}
     </li>
   );

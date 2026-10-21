@@ -5,12 +5,15 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
+import { TextLink } from "@/components/ui/TextLink";
 import { api as browserApi, ApiError, type Api } from "@/lib/api";
 
 export const MIN_PASSWORD = 10;
 
 type Props = {
   userId: string;
+  /** Your username, as a hidden field so password managers save the new password against the right account. */
+  username?: string;
   /** Your own password: asks for the current one. An admin resetting someone else's leaves it out. */
   askCurrent: boolean;
   submitLabel: string;
@@ -20,16 +23,17 @@ type Props = {
   onCancel?: () => void;
   /** Prefix for element ids, so several forms can sit on one page. */
   idPrefix: string;
-  api?: Pick<Api, "setPassword">;
+  api?: Pick<Api, "setPassword" | "me">;
 };
 
 type Errors = { current?: string; password?: string; confirm?: string; form?: string };
 
 /** Change a password: current (own only), new, confirm. Errors sit on the field they belong to. */
-export function PasswordForm({ userId, askCurrent, submitLabel, onDone, onCancel, idPrefix, api = browserApi }: Props) {
+export function PasswordForm({ userId, username, askCurrent, submitLabel, onDone, onCancel, idPrefix, api = browserApi }: Props) {
   const [errors, setErrors] = useState<Errors>({});
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const id = (name: string) => `${idPrefix}-${name}`;
 
@@ -47,9 +51,10 @@ export function PasswordForm({ userId, askCurrent, submitLabel, onDone, onCancel
     const confirm = String(data.get("confirm") ?? "");
     const next: Errors = {};
     if (askCurrent && !current) next.current = "Enter your current password.";
-    if (password.length < MIN_PASSWORD) next.password = `Use at least ${MIN_PASSWORD} characters.`;
+    if ([...password].length < MIN_PASSWORD) next.password = `Use at least ${MIN_PASSWORD} characters.`;
     else if (confirm !== password) next.confirm = "The two passwords don’t match.";
     setDone(false);
+    setSignedOut(false);
     setErrors(next);
     if (Object.keys(next).length > 0) return focusFirst(next);
 
@@ -61,8 +66,19 @@ export function PasswordForm({ userId, askCurrent, submitLabel, onDone, onCancel
       onDone?.();
     } catch (e) {
       let failed: Errors;
-      if (e instanceof ApiError && e.status === 401 && askCurrent) failed = { current: "That isn’t your current password." };
-      else if (e instanceof ApiError && e.code === "validation") failed = { password: e.message.replace(/^\w+: /, "") };
+      if (e instanceof ApiError && e.status === 401 && askCurrent) {
+        // A 401 means a wrong current password only while the session is still valid.
+        const valid = await api.me().then(
+          () => true,
+          () => false,
+        );
+        if (!valid) {
+          setSignedOut(true);
+          setErrors({});
+          return;
+        }
+        failed = { current: "That isn’t your current password." };
+      } else if (e instanceof ApiError && e.code === "validation") failed = { password: e.message.replace(/^\w+: /, "") };
       else failed = { form: e instanceof ApiError ? e.message : "Couldn’t change the password. Try again." };
       setErrors(failed);
       focusFirst(failed);
@@ -74,6 +90,14 @@ export function PasswordForm({ userId, askCurrent, submitLabel, onDone, onCancel
   return (
     <form ref={formRef} method="post" onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
       {errors.form && <Alert tone="error">{errors.form}</Alert>}
+      {signedOut && (
+        <Alert tone="error">
+          You’ve been signed out. <TextLink href="/login">Sign in</TextLink> to try again.
+        </Alert>
+      )}
+      {askCurrent && username && (
+        <input type="text" name="username" autoComplete="username" value={username} readOnly tabIndex={-1} aria-hidden="true" className="sr-only" />
+      )}
       {done && <Alert>Password changed.{askCurrent ? " Your other devices were signed out." : ""}</Alert>}
       {askCurrent && (
         <Field label="Current password" htmlFor={id("current")} error={errors.current}>
