@@ -1,0 +1,26 @@
+# secrets / local data
+.env
+.env.*
+!.env.example
+data/
+backups/
+
+# factory vendor skills (fetched by scripts/factory/fetch-skills.sh)
+.factory/vendor/
+shots/
+
+# backend
+backend/target/
+
+# frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
+frontend/coverage/
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
