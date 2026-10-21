@@ -1,6 +1,8 @@
 //! Import routes. Capabilities is real; the rest are 501 stubs until the import issues land
 //! (see `crate::import` for what each must do).
 
+use std::time::Instant;
+
 use axum::{Json, extract::State};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -41,15 +43,29 @@ pub async fn from_url(
         .ok_or_else(|| {
             AppError::validation("url: enter a full web address starting with http:// or https://.")
         })?;
+    let started = Instant::now();
     let page = safe_fetch::fetch(&state.fetch_policy, &requested, PAGE_MAX_BYTES).await?;
-    // shortcut: pages are decoded as UTF-8 (lossy); honour <meta charset> if a non-UTF-8 site turns up.
-    let html = String::from_utf8_lossy(&page.body);
-    let mut draft = jsonld::extract(&html, &page.final_url).ok_or_else(|| {
+    // Parsing is CPU-bound: off the async workers, and inside what is left of the page's time budget. On a
+    // timeout the blocking thread is abandoned (the pre-checks in `extract` bound how long it can run).
+    let left = state
+        .fetch_policy
+        .total_timeout()
+        .saturating_sub(started.elapsed());
+    let final_url = page.final_url.clone();
+    let parse = tokio::task::spawn_blocking(move || {
+        // shortcut: pages are decoded as UTF-8 (lossy); honour <meta charset> if a non-UTF-8 site turns up.
+        jsonld::extract(&String::from_utf8_lossy(&page.body), &page.final_url)
+    });
+    let extracted = tokio::time::timeout(left, parse)
+        .await
+        .map_err(|_| AppError::FetchFailed("That page took too long to read.".into()))?
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let mut draft = extracted.ok_or_else(|| {
         AppError::NoRecipeFound(
             "We couldn't find a recipe on that page. You can paste the recipe text instead.".into(),
         )
     })?;
-    draft.duplicate_of = duplicate_of(&state.pool, &[&requested, &page.final_url]).await?;
+    draft.duplicate_of = duplicate_of(&state.pool, &[&requested, &final_url]).await?;
     attach_image(&state, user.id, &mut draft).await;
     Ok(Json(draft))
 }

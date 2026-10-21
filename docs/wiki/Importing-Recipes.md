@@ -14,7 +14,9 @@ Every import gives you a **draft** to check and fix before it is saved.
 - *"We couldn't find a recipe on that page"*: the page has no machine-readable recipe. Paste the recipe text instead.
 - *"That site does not let us read its pages"*: the site blocks servers (login wall, bot check). Paste the text instead.
 - *"That address is not allowed"*: only public web addresses (http or https) can be imported, never ones inside your home network.
-- If the recipe's photo cannot be downloaded you still get the draft, with a note; add a photo yourself.
+- If the recipe's photo cannot be downloaded you still get the draft, with a note; add a photo yourself. The same goes for photos that are too big (over 10,000 px a side or 40 megapixels).
+- Very long lists or text on a page are cut short (500 items, 10,000 characters per field) and the draft says so; cooking times over a week are left blank.
+- Pages that take too long to read, or are built in an unreadable way, are treated as failed or recipe-less; use "paste the recipe text" instead.
 
 Already saved that link? You'll get a link to the existing recipe instead of a duplicate.
 

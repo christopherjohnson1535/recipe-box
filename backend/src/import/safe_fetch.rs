@@ -16,7 +16,7 @@ use url::{Host, Url};
 
 use crate::error::{AppError, AppResult};
 
-const TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
+pub const TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;
 /// Page cap (5 MB).
 pub const PAGE_MAX_BYTES: usize = 5 * 1024 * 1024;
@@ -39,6 +39,7 @@ const BOT_MARKERS: &[&str] = &[
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FetchPolicy {
     loopback_port: Option<u16>,
+    timeout: Option<Duration>,
 }
 
 impl FetchPolicy {
@@ -47,7 +48,20 @@ impl FetchPolicy {
     pub fn allow_loopback_port_for_tests(port: u16) -> Self {
         Self {
             loopback_port: Some(port),
+            timeout: None,
         }
+    }
+
+    /// Tests only: a shorter overall budget so timeout tests stay quick.
+    #[doc(hidden)]
+    pub fn with_timeout_for_tests(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    /// The overall budget for one import request's fetching and page parsing.
+    pub fn total_timeout(&self) -> Duration {
+        self.timeout.unwrap_or(TOTAL_TIMEOUT)
     }
 
     fn allows(&self, addr: SocketAddr) -> bool {
@@ -65,13 +79,16 @@ pub struct Fetched {
 
 /// Fetches `url` under the rules above; the body is at most `max_bytes`.
 pub async fn fetch(policy: &FetchPolicy, url: &Url, max_bytes: usize) -> AppResult<Fetched> {
-    tokio::time::timeout(TOTAL_TIMEOUT, follow(policy, url.clone(), max_bytes))
-        .await
-        .unwrap_or_else(|_| {
-            Err(AppError::FetchFailed(
-                "The site took too long to answer.".into(),
-            ))
-        })
+    tokio::time::timeout(
+        policy.total_timeout(),
+        follow(policy, url.clone(), max_bytes),
+    )
+    .await
+    .unwrap_or_else(|_| {
+        Err(AppError::FetchFailed(
+            "The site took too long to answer.".into(),
+        ))
+    })
 }
 
 async fn follow(policy: &FetchPolicy, mut url: Url, max_bytes: usize) -> AppResult<Fetched> {

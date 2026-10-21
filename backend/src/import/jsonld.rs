@@ -13,41 +13,231 @@ use crate::{
 
 const MAX_TAGS: usize = 15;
 const MAX_TAG_CHARS: usize = 40;
+/// Work caps on parsed fields (S-03): items per list, characters per text field (before cleanup).
+const MAX_ITEMS: usize = 500;
+const MAX_TEXT_CHARS: usize = 10_000;
+/// Durations above a week are nonsense for a recipe (S-04).
+const MAX_MINUTES: f64 = 7.0 * 24.0 * 60.0;
+/// The full DOM is only built for the microdata fallback, and refused above these (S-02): html5ever is
+/// quadratic in nesting depth.
+const MAX_DOM_TAGS: usize = 60_000;
+const MAX_DOM_DEPTH: usize = 400;
+const MAX_LD_BLOCKS: usize = 50;
+const MAX_META_TAGS: usize = 1_000;
+/// Longest opening tag the cheap scans will look at.
+const TAG_WINDOW: usize = 4_000;
+
+thread_local! {
+    /// Warnings raised while extracting on this thread; drained into the draft by [`extract`].
+    static NOTES: std::cell::RefCell<Vec<&'static str>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn note(msg: &'static str) {
+    NOTES.with(|n| {
+        let mut n = n.borrow_mut();
+        if !n.contains(&msg) {
+            n.push(msg);
+        }
+    });
+}
 
 /// Extracts a draft from `html`; `page_url` resolves relative image URLs and becomes `source_url`.
 /// `image_url` holds the absolute remote photo URL; the route downloads it and swaps in the stored one.
+/// CPU-bound: call from `spawn_blocking`. JSON-LD is found by a cheap scan; the DOM is built only for the
+/// microdata fallback and only for pages that are not pathologically deep or dense.
 pub fn extract(html: &str, page_url: &Url) -> Option<RecipeDraft> {
-    let doc = Html::parse_document(html);
+    NOTES.with(|n| n.borrow_mut().clear());
     let has_content = |d: &RecipeDraft| !d.ingredients.is_empty() || !d.steps.is_empty();
-    let mut draft = from_json_ld(&doc)
-        .filter(has_content)
-        .or_else(|| from_microdata(&doc).filter(has_content))?;
+    let mut draft = from_json_ld(&ld_json_blocks(html)).filter(has_content);
+    if draft.is_none() {
+        if too_complex(html) {
+            note("This page is too complex to read for a recipe.");
+        } else {
+            draft = from_microdata(&Html::parse_document(html)).filter(has_content);
+        }
+    }
+    let mut draft = draft?;
 
     draft.image_url = draft
         .image_url
         .and_then(|u| page_url.join(&u).ok())
         .map(String::from);
     if draft.title.is_empty() {
-        draft.title = meta(&doc, "og:title")
-            .or_else(|| text_of(&doc, "title"))
+        draft.title = meta(html, "og:title")
+            .or_else(|| title_tag(html))
             .unwrap_or_default();
     }
     if draft.source_name.is_none() {
-        draft.source_name = meta(&doc, "og:site_name").or_else(|| {
+        draft.source_name = meta(html, "og:site_name").or_else(|| {
             page_url
                 .host_str()
                 .map(|h| h.trim_start_matches("www.").to_string())
         });
     }
-    draft.source_url = Some(page_url.to_string());
+    let mut shown = page_url.clone(); // no credentials or fragment in the stored link
+    let _ = shown.set_username("");
+    let _ = shown.set_password(None);
+    shown.set_fragment(None);
+    draft.source_url = Some(shown.to_string());
     draft.source_type = SourceType::Link;
+    draft.warnings.extend(NOTES.with(|n| {
+        n.borrow_mut()
+            .drain(..)
+            .map(String::from)
+            .collect::<Vec<_>>()
+    }));
     Some(draft)
+}
+
+// ---------- cheap scans (no DOM) ----------
+
+/// Text of every `<script type="...ld+json">` (raw-text elements: no entity decoding applies).
+fn ld_json_blocks(html: &str) -> Vec<&str> {
+    let lower = html.to_ascii_lowercase();
+    let mut out = Vec::new();
+    for (start, _) in lower.match_indices("<script") {
+        let Some(gt) = tag_end(html, start) else {
+            continue;
+        };
+        if !lower[start..gt].contains("ld+json") || lower[..gt].ends_with('/') {
+            continue;
+        }
+        if out.len() >= MAX_LD_BLOCKS {
+            note("Some of the page's structured data was skipped.");
+            break;
+        }
+        let Some(len) = lower[gt + 1..].find("</script") else {
+            break;
+        };
+        out.push(&html[gt + 1..gt + 1 + len]);
+    }
+    out
+}
+
+/// Index of the `>` closing the tag that opens at `start`, looking at most [`TAG_WINDOW`] bytes ahead.
+fn tag_end(html: &str, start: usize) -> Option<usize> {
+    let end = (start + TAG_WINDOW).min(html.len());
+    html.as_bytes()[start..end]
+        .iter()
+        .position(|&b| b == b'>')
+        .map(|i| start + i)
+}
+
+/// `name="value"` pairs of an opening tag (names lower-cased, values not yet entity-decoded).
+fn attrs(tag: &str) -> Vec<(String, &str)> {
+    let b = tag.as_bytes();
+    let (mut i, mut out) = (tag.find(char::is_whitespace).unwrap_or(b.len()), Vec::new());
+    while i < b.len() {
+        while i < b.len() && (b[i].is_ascii_whitespace() || b[i] == b'/') {
+            i += 1;
+        }
+        let name_start = i;
+        while i < b.len() && !b[i].is_ascii_whitespace() && !matches!(b[i], b'=' | b'/') {
+            i += 1;
+        }
+        let name = tag[name_start..i].to_ascii_lowercase();
+        while i < b.len() && b[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= b.len() || b[i] != b'=' {
+            continue;
+        }
+        i += 1;
+        while i < b.len() && b[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let (v_start, v_end);
+        if i < b.len() && matches!(b[i], b'"' | b'\'') {
+            let q = b[i];
+            v_start = i + 1;
+            v_end = b[v_start..]
+                .iter()
+                .position(|&c| c == q)
+                .map_or(b.len(), |p| v_start + p);
+            i = (v_end + 1).min(b.len());
+        } else {
+            v_start = i;
+            while i < b.len() && !b[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            v_end = i;
+        }
+        out.push((name, &tag[v_start..v_end]));
+    }
+    out
+}
+
+/// `content` of `<meta property="{property}" content="...">`.
+fn meta(html: &str, property: &str) -> Option<String> {
+    let lower = html.to_ascii_lowercase();
+    for (start, _) in lower.match_indices("<meta").take(MAX_META_TAGS) {
+        let Some(gt) = tag_end(html, start) else {
+            continue;
+        };
+        let a = attrs(&html[start..gt]);
+        let get = |k: &str| a.iter().find(|(n, _)| n == k).map(|(_, v)| *v);
+        if get("property").is_some_and(|p| p.eq_ignore_ascii_case(property)) {
+            return get("content").map(clean).filter(|s| !s.is_empty());
+        }
+    }
+    None
+}
+
+fn title_tag(html: &str) -> Option<String> {
+    let lower = html.to_ascii_lowercase();
+    let start = lower.find("<title")?;
+    let gt = tag_end(html, start)?;
+    let len = lower[gt + 1..].find("</title")?;
+    Some(clean(&html[gt + 1..gt + 1 + len])).filter(|s| !s.is_empty())
+}
+
+/// Rough tag count and nesting depth from a tag scan (void elements ignored), to refuse DOM-building for pages
+/// that would make the parser quadratic.
+fn too_complex(html: &str) -> bool {
+    const VOID: &[&str] = &[
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
+        "track", "wbr", "param",
+    ];
+    let (mut tags, mut depth) = (0usize, 0usize);
+    for part in html.split('<').skip(1) {
+        tags += 1;
+        if tags > MAX_DOM_TAGS {
+            return true;
+        }
+        if part.starts_with('/') {
+            depth = depth.saturating_sub(1);
+        } else if part.starts_with(|c: char| c.is_ascii_alphabetic()) {
+            let name_end = part
+                .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+                .unwrap_or(part.len());
+            let self_closed = part[..part.find('>').unwrap_or(part.len())].ends_with('/');
+            if !self_closed && !VOID.contains(&part[..name_end].to_ascii_lowercase().as_str()) {
+                depth += 1;
+                if depth > MAX_DOM_DEPTH {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 // ---------- text helpers ----------
 
+/// `s` cut to [`MAX_TEXT_CHARS`] characters, noting when something was lost.
+fn capped(s: &str) -> &str {
+    match s.char_indices().nth(MAX_TEXT_CHARS) {
+        Some((i, _)) => {
+            note("Some very long text on the page was cut short.");
+            &s[..i]
+        }
+        None => s,
+    }
+}
+
 /// Entities decoded, tags dropped; `<br>`, `<p>`, `<li>` and `<div>` become line breaks.
 fn plain(s: &str) -> String {
+    let s = capped(s);
     if !s.contains(['<', '&']) {
         return s.to_string();
     }
@@ -79,17 +269,6 @@ fn lines(s: &str) -> Vec<String> {
         .collect()
 }
 
-fn meta(doc: &Html, property: &str) -> Option<String> {
-    let sel = Selector::parse(&format!(r#"meta[property="{property}"]"#)).ok()?;
-    let content = doc.select(&sel).next()?.value().attr("content")?;
-    Some(clean(content)).filter(|s| !s.is_empty())
-}
-
-fn text_of(doc: &Html, selector: &str) -> Option<String> {
-    let el = doc.select(&Selector::parse(selector).ok()?).next()?;
-    Some(clean(&el.text().collect::<String>())).filter(|s| !s.is_empty())
-}
-
 /// Splits keyword-like values on commas, then trims/lower-cases/dedupes and drops essay-length "tags".
 fn tags(raw: Vec<String>) -> Vec<String> {
     let parts: Vec<String> = raw
@@ -105,12 +284,17 @@ fn tags(raw: Vec<String>) -> Vec<String> {
 }
 
 /// ISO 8601 duration (`PT1H30M`, `P0DT45M`, `P1DT2H`) → whole minutes. Years/months are ambiguous: `None`.
+/// Above a week: `None` with a warning.
 fn parse_minutes(s: &str) -> Option<i32> {
     let s = s.trim().to_ascii_uppercase();
     let rest = s.strip_prefix('P')?;
     let (date, time) = rest.split_once('T').unwrap_or((rest, ""));
     let total = sum_units(date, &[('W', 10080.0), ('D', 1440.0)])?
         + sum_units(time, &[('H', 60.0), ('M', 1.0), ('S', 1.0 / 60.0)])?;
+    if total > MAX_MINUTES {
+        note("A cooking time on the page was not believable and was left out.");
+        return None;
+    }
     let m = total.round() as i32;
     (m > 0).then_some(m)
 }
@@ -140,14 +324,12 @@ fn pick_servings(items: Vec<String>) -> Option<String> {
 
 // ---------- JSON-LD ----------
 
-fn from_json_ld(doc: &Html) -> Option<RecipeDraft> {
-    let sel = Selector::parse(r#"script[type*="ld+json"]"#).ok()?;
-    let blocks: Vec<Value> = doc
-        .select(&sel)
-        .filter_map(|s| {
-            let text: String = s.text().collect();
+fn from_json_ld(scripts: &[&str]) -> Option<RecipeDraft> {
+    let blocks: Vec<Value> = scripts
+        .iter()
+        .filter_map(|text| {
             // Raw newlines inside strings are invalid JSON but common; whitespace outside strings is harmless.
-            serde_json::from_str(&text)
+            serde_json::from_str(text)
                 .or_else(|_| serde_json::from_str(&text.replace(['\n', '\r', '\t'], " ")))
                 .ok()
         })
@@ -173,6 +355,7 @@ fn from_json_ld(doc: &Html) -> Option<RecipeDraft> {
             section: None,
         }));
     }
+    ingredients.truncate(MAX_ITEMS);
     let mut tag_src = Vec::new();
     for key in ["keywords", "recipeCategory", "recipeCuisine"] {
         if let Some(v) = r.get(key) {
@@ -256,6 +439,10 @@ fn deref<'a>(v: &'a Value, nodes: &[&'a Value]) -> &'a Value {
 
 /// Text values of a string / number / array / object with `name` or `text`.
 fn strings(v: &Value, out: &mut Vec<String>) {
+    if out.len() >= MAX_ITEMS {
+        note("A very long list on the page was cut short.");
+        return;
+    }
     match v {
         Value::String(s) => {
             let s = clean(s);
@@ -303,6 +490,10 @@ fn image_url(v: &Value, nodes: &[&Value]) -> Option<String> {
 
 /// `recipeInstructions`: text (one step per line), HowToStep, or HowToSection (its name becomes `section`).
 fn collect_steps(v: &Value, section: Option<&str>, out: &mut Vec<Ingredient>) {
+    if out.len() >= MAX_ITEMS {
+        note("A very long list on the page was cut short.");
+        return;
+    }
     let push = |text: String, out: &mut Vec<Ingredient>| {
         out.push(Ingredient {
             text,
@@ -310,7 +501,10 @@ fn collect_steps(v: &Value, section: Option<&str>, out: &mut Vec<Ingredient>) {
         })
     };
     match v {
-        Value::String(s) => lines(s).into_iter().for_each(|l| push(l, out)),
+        Value::String(s) => lines(s)
+            .into_iter()
+            .take(MAX_ITEMS.saturating_sub(out.len()))
+            .for_each(|l| push(l, out)),
         Value::Array(a) => a.iter().for_each(|x| collect_steps(x, section, out)),
         Value::Object(o) => {
             let nested = o.get("itemListElement");
@@ -388,6 +582,7 @@ fn from_microdata(doc: &Html) -> Option<RecipeDraft> {
             .flat_map(|n| props(root, n))
             .map(prop_value)
             .filter(|s| !s.is_empty())
+            .take(MAX_ITEMS)
             .collect()
     };
     let item_sel = Selector::parse("li").ok()?;
@@ -406,6 +601,7 @@ fn from_microdata(doc: &Html) -> Option<RecipeDraft> {
             .unwrap_or_else(|| lines(&e.text().collect::<String>()));
         steps.extend(items);
     }
+    steps.truncate(MAX_ITEMS);
     let mins = |name: &str| first_prop(root, name).and_then(|s| parse_minutes(&s));
     let step = |text: String| Ingredient {
         text,
@@ -652,5 +848,54 @@ mod tests {
         assert_eq!(d.title, "My Soup");
         assert_eq!(d.ingredients[0].text, "1 onion chopped");
         assert_eq!(d.source_name.as_deref(), Some("example.com"));
+    }
+
+    fn ld_page(recipe: &str) -> String {
+        format!(
+            r#"<html><head><script type="application/ld+json">{{"@type":"Recipe","name":"T",{recipe}}}</script></head></html>"#
+        )
+    }
+
+    #[test]
+    fn long_lists_and_fields_are_capped_with_warnings() {
+        let many = vec!["1 cup flour"; 2000].join("\",\"");
+        let long = "x".repeat(50_000);
+        let page = ld_page(&format!(
+            r#""recipeIngredient":["{many}"],"recipeInstructions":["{many}"],"description":"{long}""#
+        ));
+        let d = draft(&page, "https://e.example/r");
+        assert_eq!((d.ingredients.len(), d.steps.len()), (MAX_ITEMS, MAX_ITEMS));
+        assert_eq!(d.description.chars().count(), MAX_TEXT_CHARS);
+        assert_eq!(d.warnings.len(), 2, "{:?}", d.warnings);
+    }
+
+    #[test]
+    fn absurd_durations_are_dropped_with_a_warning() {
+        let page = ld_page(
+            r#""recipeIngredient":["a"],"prepTime":"P99999999999D","cookTime":"P7D","totalTime":"PT20M""#,
+        );
+        let d = draft(&page, "https://e.example/r");
+        assert_eq!(d.prep_minutes, None);
+        assert_eq!((d.cook_minutes, d.total_minutes), (Some(10080), Some(20)));
+        assert_eq!(d.warnings.len(), 1);
+    }
+
+    #[test]
+    fn deep_pages_are_refused_fast_and_ld_json_still_works() {
+        let deep = "<div>".repeat(100_000);
+        let t = std::time::Instant::now();
+        let url = Url::parse("https://e.example/r").unwrap();
+        assert!(extract(&format!("<html><body>{deep}</body></html>"), &url).is_none());
+        let page =
+            ld_page(r#""recipeIngredient":["a"]"#).replace("</html>", &format!("{deep}</html>"));
+        assert_eq!(extract(&page, &url).unwrap().ingredients.len(), 1);
+        assert!(t.elapsed().as_secs() < 2, "took {:?}", t.elapsed());
+    }
+
+    #[test]
+    fn source_url_drops_credentials_and_fragment() {
+        let page = ld_page(r#""recipeIngredient":["a"]"#);
+        let d = draft(&page, "https://user:pw@e.example/r#top");
+        assert_eq!(d.source_url.as_deref(), Some("https://e.example/r"));
     }
 }

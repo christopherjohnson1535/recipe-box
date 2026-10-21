@@ -1763,6 +1763,7 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "cookie",
+ "futures-util",
  "http-body-util",
  "image",
  "rand",

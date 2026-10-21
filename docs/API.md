@@ -17,7 +17,7 @@ Every non-2xx response:
 | 404 | `not_found` | |
 | 409 | `conflict` | username taken; restore window passed |
 | 413 | `too_large` | upload over `MAX_UPLOAD_MB` |
-| 415 | `unsupported_media` | not an image we can decode |
+| 415 | `unsupported_media` | not an image we can decode, or over 10,000 px a side / 40 megapixels |
 | 422 | `no_recipe_found` | page/photo had no recipe |
 | 422 | `ai_disabled` | AI needed but `AI_PROVIDER=none` |
 | 422 | `blocked_address` | URL resolves to a non-public IP |
@@ -96,7 +96,8 @@ type Image = { id: string; url: string; width: number; height: number };
 
 ### Media
 - `POST /api/media` multipart field `file` → `201 Image`. Accepts JPEG/PNG/WebP/GIF (HEIC: issue). Re-encoded to
-  JPEG q85, EXIF orientation applied, long edge ≤ 2400 px.
+  JPEG q85, EXIF orientation applied, long edge ≤ 2400 px. Images over 10,000 px a side or 40 megapixels are refused
+  (`415 unsupported_media`) before any pixels are decoded.
 - `GET /media/:fileName` → the image (`Cache-Control: private, max-age=31536000, immutable`). Requires session.
   `fileName` must match `^[0-9a-f-]{36}\.jpg$`.
 
@@ -105,7 +106,11 @@ type Image = { id: string; url: string; width: number; height: number };
 - `POST /api/import/url` `{ url }` → `200 RecipeDraft`. Errors: `blocked_address`, `site_blocked`, `fetch_failed`,
   `no_recipe_found`. A bad URL is `400 validation`. `sourceUrl` is the final URL after redirects, `duplicateOf` the id
   of a live recipe with the same normalised source URL, and `imageId`/`imageUrl` the stored copy of the main photo
-  (if it could not be fetched they are null and `warnings` says so).
+  (if it could not be fetched or decoded, or is over the size limits above, they are null and `warnings` says so).
+  The whole request (fetch plus reading the page) has a 15 s budget; if reading the page runs out of it the answer is
+  `502 fetch_failed` ("took too long to read"). Pages too deeply nested or tag-dense to read safely count as
+  `422 no_recipe_found` unless they carry JSON-LD. Lists are cut at 500 items and text fields at 10,000 characters,
+  durations over 7 days are dropped; each adds a `warnings` entry.
 - `POST /api/import/text` `{ text, sourceUrl? }` → `200 RecipeDraft` (AI; `ai_disabled` without it).
 - `POST /api/import/photo` multipart `files` (1–6) + `mode` (`recipe`|`dish`) → `200 RecipeDraft` with
   `photoImageIds` set. Without AI: 422 `ai_disabled` **after** storing the photos — the body's `error` also carries

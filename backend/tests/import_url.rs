@@ -11,6 +11,7 @@ use axum::{
     response::{Html, IntoResponse},
     routing::{MethodRouter, get},
 };
+use futures_util::StreamExt;
 use http_body_util::BodyExt;
 use recipe_box_api::{config::Config, import::safe_fetch::FetchPolicy, state::AppState};
 use serde_json::{Value, json};
@@ -49,6 +50,11 @@ impl Res {
 
 /// `loopback_port`: the test server's port to allow, or `None` for the production policy.
 async fn ctx(loopback_port: Option<u16>) -> Option<Ctx> {
+    ctx_with(loopback_port.map(FetchPolicy::allow_loopback_port_for_tests)).await
+}
+
+/// `policy`: the fetch policy to test with, or `None` for the production default.
+async fn ctx_with(policy: Option<FetchPolicy>) -> Option<Ctx> {
     let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
         eprintln!("note: TEST_DATABASE_URL not set, skipping integration test");
         return None;
@@ -96,8 +102,8 @@ async fn ctx(loopback_port: Option<u16>) -> Option<Ctx> {
         max_upload_mb: 2,
     };
     let mut state = AppState::new(pool.clone(), config).unwrap();
-    if let Some(port) = loopback_port {
-        state.fetch_policy = FetchPolicy::allow_loopback_port_for_tests(port);
+    if let Some(policy) = policy {
+        state.fetch_policy = policy;
     }
     let mut ctx = Ctx {
         app: recipe_box_api::router(state),
@@ -204,6 +210,42 @@ fn png() -> Vec<u8> {
     out
 }
 
+/// A PNG header (valid CRCs, no real pixels) claiming `w` x `h`.
+fn png_claiming(w: u32, h: u32) -> Vec<u8> {
+    fn chunk(out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
+        let mut body = kind.to_vec();
+        body.extend(data);
+        let mut crc = !0u32;
+        for &b in &body {
+            crc ^= u32::from(b);
+            for _ in 0..8 {
+                crc = if crc & 1 != 0 {
+                    0xEDB8_8320 ^ (crc >> 1)
+                } else {
+                    crc >> 1
+                };
+            }
+        }
+        out.extend((data.len() as u32).to_be_bytes());
+        out.extend(&body);
+        out.extend((!crc).to_be_bytes());
+    }
+    let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+    let mut ihdr = [w.to_be_bytes(), h.to_be_bytes()].concat();
+    ihdr.extend([8, 2, 0, 0, 0]);
+    chunk(&mut out, b"IHDR", &ihdr);
+    chunk(
+        &mut out,
+        b"IDAT",
+        &[0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01],
+    );
+    chunk(&mut out, b"IEND", &[]);
+    out
+}
+
+const PHOTO_URL: &str =
+    "https://saltandthyme.example/wp-content/uploads/2024/03/brown-butter-pasta.jpg";
+
 fn html_route(body: impl Into<String>) -> MethodRouter {
     let body = Arc::new(body.into());
     get(move || {
@@ -255,6 +297,39 @@ async fn site() -> (String, u16) {
         .route("/to-metadata", redirect("http://169.254.169.254/latest/meta-data/".into()))
         .route("/to-ipv6-loopback", redirect("http://[::1]:80/".into()))
         .route("/loop", redirect(format!("{base}/loop")))
+        .route("/to-ftp", redirect(format!("ftp://127.0.0.1:{port}/recipe")))
+        .route("/to-gopher", redirect(format!("gopher://127.0.0.1:{port}/recipe")))
+        // 6 MB in 64 KB chunks with no Content-Length: only the streaming cap can stop it.
+        .route(
+            "/huge-chunked",
+            get(|| async {
+                let chunks = futures_util::stream::iter(
+                    (0..96).map(|_| Ok::<_, std::io::Error>(vec![b'a'; 64 * 1024])),
+                );
+                ([(header::CONTENT_TYPE, "text/html")], Body::from_stream(chunks))
+            }),
+        )
+        // One chunk, then silence forever.
+        .route(
+            "/drip",
+            get(|| async {
+                let chunks = futures_util::stream::once(async { Ok::<_, std::io::Error>(vec![b'<']) })
+                    .chain(futures_util::stream::pending());
+                ([(header::CONTENT_TYPE, "text/html")], Body::from_stream(chunks))
+            }),
+        )
+        .route("/bomb.png", get(|| async { ([(header::CONTENT_TYPE, "image/png")], png_claiming(20_000, 20_000)) }))
+        .route("/not-image.jpg", get(|| async { ([(header::CONTENT_TYPE, "image/jpeg")], "<html>nope</html>") }))
+        .route("/img-js", html_route(RECIPE_HTML.replace(PHOTO_URL, "javascript:alert(1)")))
+        .route("/img-data", html_route(RECIPE_HTML.replace(PHOTO_URL, "data:image/png;base64,AAAA")))
+        .route("/img-internal", html_route(RECIPE_HTML.replace(PHOTO_URL, "http://10.0.0.1/x.jpg")))
+        .route("/img-bomb", html_route(RECIPE_HTML.replace(PHOTO_URL, &format!("{base}/bomb.png"))))
+        .route("/img-garbage", html_route(RECIPE_HTML.replace(PHOTO_URL, &format!("{base}/not-image.jpg"))))
+        .route("/nested", html_route(format!("<html><body>{}</body></html>", "<div>".repeat(100_000))))
+        .route(
+            "/nested-with-ld",
+            html_route(RECIPE_HTML.replace("</body>", &format!("{}</body>", "<div>".repeat(100_000)))),
+        )
         .route("/headers", get(|h: HeaderMap| async move {
             let ua = h.get(header::USER_AGENT).and_then(|v| v.to_str().ok()).unwrap_or("");
             let accept = h.get(header::ACCEPT).and_then(|v| v.to_str().ok()).unwrap_or("");
@@ -483,5 +558,161 @@ async fn already_saved_link_sets_duplicate_of() {
     assert_eq!(del.status, StatusCode::NO_CONTENT);
     let res = ctx.import(&format!("{base}/recipe")).await;
     assert!(res.json["duplicateOf"].is_null());
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn redirects_to_other_schemes_are_blocked() {
+    let (base, port) = site().await;
+    let Some(ctx) = ctx(Some(port)).await else {
+        return;
+    };
+    // Loopback is allowed on this port, so only the scheme check can refuse these.
+    for path in ["/to-ftp", "/to-gopher"] {
+        let res = ctx.import(&format!("{base}{path}")).await;
+        assert_eq!(
+            (res.status, res.code()),
+            (StatusCode::UNPROCESSABLE_ENTITY, "blocked_address"),
+            "{path}"
+        );
+    }
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn loopback_allowance_is_one_port_only() {
+    let (_, port) = site().await;
+    let (other_base, _) = site().await;
+    let Some(ctx) = ctx(Some(port)).await else {
+        return;
+    };
+    let res = ctx.import(&format!("{other_base}/recipe")).await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::UNPROCESSABLE_ENTITY, "blocked_address")
+    );
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn body_cap_applies_without_content_length() {
+    let (base, port) = site().await;
+    let Some(ctx) = ctx(Some(port)).await else {
+        return;
+    };
+    let res = ctx.import(&format!("{base}/huge-chunked")).await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::BAD_GATEWAY, "fetch_failed")
+    );
+    assert!(
+        res.json["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("too large"),
+        "{}",
+        res.json
+    );
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn slow_sites_time_out() {
+    let (base, port) = site().await;
+    let policy = FetchPolicy::allow_loopback_port_for_tests(port)
+        .with_timeout_for_tests(std::time::Duration::from_millis(700));
+    let Some(ctx) = ctx_with(Some(policy)).await else {
+        return;
+    };
+    let t = std::time::Instant::now();
+    let res = ctx.import(&format!("{base}/drip")).await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::BAD_GATEWAY, "fetch_failed")
+    );
+    assert!(
+        res.json["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("too long"),
+        "{}",
+        res.json
+    );
+    assert!(t.elapsed().as_secs() < 5);
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn bad_photos_are_warnings_not_failures() {
+    let (base, port) = site().await;
+    let Some(ctx) = ctx(Some(port)).await else {
+        return;
+    };
+    for path in [
+        "/img-js",
+        "/img-data",
+        "/img-internal",
+        "/img-bomb",
+        "/img-garbage",
+    ] {
+        let t = std::time::Instant::now();
+        let res = ctx.import(&format!("{base}{path}")).await;
+        assert_eq!(res.status, StatusCode::OK, "{path}: {}", res.json);
+        assert_eq!(res.json["warnings"].as_array().unwrap().len(), 1, "{path}");
+        assert!(
+            res.json["imageId"].is_null() && res.json["imageUrl"].is_null(),
+            "{path}"
+        );
+        assert_eq!(res.json["title"], "Brown Butter Pasta with Sage");
+        assert!(t.elapsed().as_secs() < 5, "{path} took {:?}", t.elapsed());
+    }
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn upload_of_a_huge_canvas_is_refused() {
+    let Some(ctx) = ctx(None).await else { return };
+    let boundary = "XBOUNDARYX";
+    let mut body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.png\"\r\nContent-Type: image/png\r\n\r\n"
+    )
+    .into_bytes();
+    body.extend(png_claiming(20_000, 20_000));
+    body.extend(format!("\r\n--{boundary}--\r\n").into_bytes());
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/api/media")
+        .header(header::COOKIE, &ctx.cookie)
+        .header(
+            header::CONTENT_TYPE,
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .body(Body::from(body))
+        .unwrap();
+    let t = std::time::Instant::now();
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    assert!(t.elapsed().as_secs() < 5);
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn pathological_pages_return_promptly() {
+    let (base, port) = site().await;
+    let Some(ctx) = ctx(Some(port)).await else {
+        return;
+    };
+    let t = std::time::Instant::now();
+    let res = ctx.import(&format!("{base}/nested")).await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::UNPROCESSABLE_ENTITY, "no_recipe_found")
+    );
+    assert!(t.elapsed().as_secs() < 2, "took {:?}", t.elapsed());
+    // JSON-LD pages never need the DOM, so a deep page with a recipe still imports.
+    let t = std::time::Instant::now();
+    let res = ctx.import(&format!("{base}/nested-with-ld")).await;
+    assert_eq!(res.status, StatusCode::OK, "{}", res.json);
+    assert!(t.elapsed().as_secs() < 2, "took {:?}", t.elapsed());
     ctx.cleanup().await;
 }
