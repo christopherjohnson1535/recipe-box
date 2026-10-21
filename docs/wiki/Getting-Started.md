@@ -20,3 +20,7 @@ see [[Deploying]] (Tailscale is the easiest way at home).
 ## Stopping and updating
 - Stop: `docker compose down` (your recipes stay in Docker volumes)
 - Update: `git pull && docker compose up -d --build`
+
+## Checking everything works
+`docker compose ps` should show `db`, `api` and `web` as **healthy**, and http://localhost:3000/api/health should say
+`"db":"ok"`. For a full check (login, photo upload, restart) see the Health section of [[Deploying]].

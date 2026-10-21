@@ -12,3 +12,9 @@ Prebuilt images: `ghcr.io/christopherjohnson1535/recipe-box-api` and `recipe-box
 Use them with `docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d`.
 
 Why HTTPS matters: iPad Home Screen install, offline, the camera and keep-screen-awake only work on secure origins.
+
+## Health
+- http://localhost:3000/api/health (or your HTTPS address) should show `"db":"ok"`.
+- `docker compose ps` shows `db`, `api` and `web` as **healthy**. Logs: `docker compose logs -f api web`.
+- Full check: `SMOKE_USER=<you> SMOKE_PASSWORD=<your password> sh scripts/smoke.sh` logs in, uploads a small test image,
+  restarts the stack and confirms the image survived. On Windows, run it from Git Bash.
