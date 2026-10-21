@@ -24,3 +24,7 @@ Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
 ## Adding work
 Add an entry to `scripts/github/backlog.py` and run `python3 scripts/github/sync_backlog.py christopherjohnson1535/recipe-box`,
 or open an issue with the "Feature slice" template.
+
+## Editing the wiki
+The wiki is generated: edit the pages in `docs/wiki/` and push to `main`; the "Publish wiki" workflow mirrors them.
+Edits made directly on the wiki website are overwritten on the next sync.
