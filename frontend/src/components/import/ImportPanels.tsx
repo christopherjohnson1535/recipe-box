@@ -18,7 +18,7 @@ const submitting = (onSubmit: () => void) => (e: FormEvent) => {
 
 export function LinkPanel({ url, onUrl, error, busy, onSubmit, aiOff }: Common & { url: string; onUrl: (v: string) => void; error?: string; aiOff: boolean }) {
   return (
-    <form noValidate onSubmit={submitting(onSubmit)} className="flex max-w-measure flex-col gap-5">
+    <form method="post" noValidate onSubmit={submitting(onSubmit)} className="flex max-w-measure flex-col gap-5">
       <Field
         label="Recipe link"
         htmlFor="import-url"
@@ -61,7 +61,7 @@ export function TextPanel({
   autoFocus,
 }: Common & { text: string; onText: (v: string) => void; source: string; onSource: (v: string) => void; error?: string; aiOff: boolean; autoFocus: boolean }) {
   return (
-    <form noValidate onSubmit={submitting(onSubmit)} className="flex max-w-measure flex-col gap-5">
+    <form method="post" noValidate onSubmit={submitting(onSubmit)} className="flex max-w-measure flex-col gap-5">
       {aiOff && (
         <Text variant="small">
           Reading pasted text needs AI, and AI is off here, so this cannot be done yet. You can type the recipe in yourself.
@@ -128,7 +128,7 @@ export function PhotoPanel({
   aiOff: boolean;
 }) {
   return (
-    <form noValidate onSubmit={submitting(onSubmit)} className="flex max-w-measure flex-col gap-5">
+    <form method="post" noValidate onSubmit={submitting(onSubmit)} className="flex max-w-measure flex-col gap-5">
       {aiOff && (
         <Text variant="small">
           AI is off, so the photos cannot be read automatically. They are kept and shown beside an empty recipe so you can type it in.
