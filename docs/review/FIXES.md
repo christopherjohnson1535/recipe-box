@@ -37,3 +37,8 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #3 E-09 fixed (partial) — removing a tag focuses the next tag's remove button, else the previous, else the tag input. Alt+Up/Down for tab stops skipped (optional).
 #3 E-10 fixed (partial) — IconButton uses `size-control`. PhotoField button restyle skipped — the `file:` pseudo-element cannot take `buttonClass`; an sr-only input plus label is a bigger change. Double-announce of title+aria-label skipped.
 #3 reuse notes (start dirty, original-photos slot) deferred to #7.
+#3 ORCH-01 fixed — the bare "H" icon is now a ghost "Section" text button (aria-label still "Start a section at ingredient N"); unused heading icon removed.
+#3 P2-1 fixed — PhotoField input is sr-only inside a label styled with buttonClass("secondary") ("Choose photo" / "Replace photo"), focus ring via has-[:focus-visible].
+#3 P2-3 fixed — disabled IconButtons use text-ink-muted with a dotted border instead of opacity-55.
+#3 P2-6 fixed — wiki says section headings stay put when moving items; use the arrows to move items between sections.
+#3 P2-2, P2-4, P2-5 skipped — cosmetic / deliberate measure / "" matches the API default

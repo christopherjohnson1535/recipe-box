@@ -118,11 +118,13 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
               controls={
                 <>
                   {row.heading === null && (
-                    <IconButton
-                      icon="heading"
-                      label={`Start a section at ${lower} ${i + 1}`}
+                    <Button
+                      variant="ghost"
+                      aria-label={`Start a section at ${lower} ${i + 1}`}
                       onClick={() => change(setHeading(rows, i, ""), id(row.key, "heading"))}
-                    />
+                    >
+                      Section
+                    </Button>
                   )}
                   <IconButton
                     id={id(row.key, "up")}

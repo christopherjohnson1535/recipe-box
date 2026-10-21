@@ -14,8 +14,9 @@ imported draft.
 - **Paste a list**: paste several lines into a row and each line becomes its own row. Bullets and numbers
   ("1.", "-", "•") and blank lines are removed. Into a filled row, the lines are added after it.
 - **Move up / down** and **Remove** buttons sit under each row. They work with the keyboard (Tab, then Enter or Space).
-- **Sections**: the heading button starts a section at that row ("For the sauce"). The section runs until the next
-  heading. Moving rows keeps the headings where they are, so you can move an item from one section to another.
+- **Sections**: the **Section** button starts a section at that row ("For the sauce"). The section runs until the next
+  heading. Section headings stay put when you move items: use the up and down arrows to move an item into or out of a
+  section.
   A blank heading under a section reads "No heading: continues without a section" and ends that section; its
   remove button then says "Join … to the previous section".
 

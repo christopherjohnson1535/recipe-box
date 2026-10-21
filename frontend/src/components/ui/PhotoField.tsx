@@ -1,4 +1,4 @@
-import { Button } from "./Button";
+import { Button, buttonClass } from "./Button";
 import { Label } from "./Field";
 
 type PhotoFieldProps = {
@@ -27,20 +27,28 @@ export function PhotoField({ id, label, src, busy, error, onFile, onRemove }: Ph
         />
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          id={id}
-          type="file"
-          accept="image/*"
-          disabled={busy}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `${id}-msg` : undefined}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = ""; // choosing the same file again must still fire
-            if (file) onFile(file);
-          }}
-          className="min-h-control min-w-0 max-w-full text-small text-ink file:mr-4 file:min-h-control file:cursor-pointer file:rounded-control file:border file:border-(--button-secondary-border) file:bg-transparent file:px-5 file:text-label file:font-semibold file:tracking-[0.12em] file:text-(--button-secondary-fg) file:uppercase hover:file:border-(--button-secondary-hover) hover:file:text-(--button-secondary-hover) disabled:cursor-not-allowed disabled:opacity-55"
-        />
+        <label
+          className={buttonClass(
+            "secondary",
+            "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-(--focus-ring) has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55",
+          )}
+        >
+          {src ? "Replace photo" : "Choose photo"}
+          <input
+            id={id}
+            type="file"
+            accept="image/*"
+            disabled={busy}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${id}-msg` : undefined}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = ""; // choosing the same file again must still fire
+              if (file) onFile(file);
+            }}
+            className="sr-only"
+          />
+        </label>
         {src && (
           <Button variant="ghost" onClick={onRemove} disabled={busy}>
             Remove photo

@@ -110,6 +110,14 @@ describe("RecipeForm", () => {
     expect((screen.getByRole("button", { name: "Save recipe" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("labels the photo button and keeps the input keyboard-reachable", async () => {
+    setup({ initial: { title: "t" } });
+    expect(screen.getByText("Choose photo")).toBeTruthy();
+    const input = screen.getByLabelText("Recipe photo") as HTMLInputElement;
+    expect(input.accept).toBe("image/*");
+    expect(input.tabIndex).toBe(0);
+  });
+
   it("uploads a photo, previews it and sends its id", async () => {
     const { onSubmit, mock } = setup({ initial: { title: "Soup" } });
     const file = new File(["x"], "soup.jpg", { type: "image/jpeg" });
