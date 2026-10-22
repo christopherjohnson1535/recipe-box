@@ -1,0 +1,20 @@
+# Built-in GitHub release notes: Releases -> "Generate release notes" groups merged PRs by label.
+changelog:
+  exclude:
+    labels: [skip-changelog]
+    authors: [renovate, "renovate[bot]", dependabot, "dependabot[bot]"]
+  categories:
+    - title: Breaking changes
+      labels: [breaking-api, breaking]
+    - title: Features
+      labels: ["type:feature", enhancement]
+    - title: Fixes
+      labels: ["type:bug", bug]
+    - title: Security
+      labels: [security]
+    - title: Documentation
+      labels: [documentation, "area:docs"]
+    - title: Tests, CI and tooling
+      labels: ["type:quality", "area:ops"]
+    - title: Other changes
+      labels: ["*"]
