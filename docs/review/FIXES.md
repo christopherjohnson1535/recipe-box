@@ -106,3 +106,13 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #4 P1-1 fixed — PageHeader h1 gets min-w-0 + [overflow-wrap:anywhere] (shrinks min-content in the centred flex column); ruled Heading gets the same; globals h1–h3 and ContentsEntry left as is (block/min-w-0 parents already wrap)
 #4 P2-1 skipped — the undo toast is an overlay by design; it pauses on hover/focus and can be dismissed.
 #4 P1-1 follow-up (orchestrator, visual check) — the unlayered global h1–h3 rule out-ranked the PageHeader utility, so the 1024 px headline stayed clipped; moved the rule into `@layer base` so ui utilities win; long unbroken titles now wrap at 390 px (h1 358 px wide) and in print.
+#9 B-01 fixed — login/own-password check refuse > MAX_PASSWORD (1024) before argon2 with the same 401; setup/create/change already 400; test with a ~1 MB password (< 1 s)
+#9 B-02 fixed — 1 MB JSON body limit; MAX_UPLOAD_MB only on /api/media, /api/import/photo, /api/import/export; recipe caps (description 10k, notes 20k, lines 2k, 500 ingredients/steps, 50 tags) -> 400 naming the field; API.md; tests
+#9 B-03 fixed — main prints `recipe-box-api: can't listen on <addr>: address already in use` / `can't reach the database: ...` (no URL) and exits 1, no backtrace; unit test on the line format
+#9 B-04 fixed — method_not_allowed_fallback returns 405 `method_not_allowed` in the JSON shape; test
+#9 B-05 skipped — 415 already means "not a decodable image" and the frontend maps it that way; a wrong content type stays 400 `validation`, noted in API.md
+#9 B-06 fixed — logout takes no CurrentUser and always sends the expiring cookie (204, idempotent; jar.remove sends nothing for an absent cookie, so a removal cookie is added); test
+#9 B-07 skipped — SameSite=Lax already blocks cross-site cookies on POST/PUT/DELETE; an Origin check adds little for a household app; revisit with #33.
+#9 B-08 deferred — #33 (throttling)
+#9 S-1 fixed — one PathRejection mapping: any malformed :id gives 400 `validation` "id: not a valid id." (no parser text); test covers recipes get/delete/restore and users delete
+#9 S-3 fixed — already covered: tests/api.rs recipe_crud_list_delete_restore sets deleted_at to 11 minutes ago and expects 409 `conflict`; no change needed

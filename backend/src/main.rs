@@ -5,7 +5,15 @@ use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() {
+    if let Err(e) = run().await {
+        // One line, no backtrace (anyhow's Debug output would print one).
+        eprintln!("{}", recipe_box_api::startup_error_line(&e));
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
@@ -19,18 +27,39 @@ async fn main() -> anyhow::Result<()> {
         .max_connections(10)
         .acquire_timeout(Duration::from_secs(10))
         .connect(&config.database_url)
-        .await?;
+        .await
+        .map_err(|e| anyhow::anyhow!("can't reach the database: {}", db_reason(&e)))?;
     recipe_box_api::migrate(&pool).await?;
     recipe_box_api::spawn_purge_task(pool.clone());
 
     let bind_addr = config.bind_addr.clone();
     let app = recipe_box_api::router(AppState::new(pool, config)?);
-    let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
+        .await
+        .map_err(|e| anyhow::anyhow!("can't listen on {bind_addr}: {}", io_reason(&e)))?;
     tracing::info!(%bind_addr, "listening");
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
+}
+
+/// Lower-cased io error text without the "(os error N)" suffix.
+fn io_reason(e: &std::io::Error) -> String {
+    let t = e.to_string();
+    let t = t.split(" (os error").next().unwrap_or(&t);
+    t.to_lowercase()
+}
+
+/// The database error without the URL (it holds the password).
+fn db_reason(e: &sqlx::Error) -> String {
+    match e {
+        sqlx::Error::PoolTimedOut => "timed out waiting for a connection".into(),
+        sqlx::Error::Configuration(_) => "DATABASE_URL is not valid".into(),
+        sqlx::Error::Io(e) => io_reason(e),
+        sqlx::Error::Database(d) => d.message().to_string(),
+        _ => "connection failed".into(),
+    }
 }
 
 async fn shutdown_signal() {

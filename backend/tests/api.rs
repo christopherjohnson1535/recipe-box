@@ -676,3 +676,190 @@ async fn capabilities_and_stubs() {
     }
     ctx.cleanup().await;
 }
+
+#[tokio::test]
+async fn huge_passwords_are_refused_before_hashing() {
+    let Some(ctx) = ctx().await else { return };
+    let cookie = ctx.setup_admin().await;
+    let huge = "x".repeat(1024 * 1000);
+    let started = std::time::Instant::now();
+
+    let login = ctx
+        .call(
+            Method::POST,
+            "/api/auth/login",
+            None,
+            Some(json!({ "username": "admin", "password": huge })),
+        )
+        .await;
+    assert_eq!(
+        (login.status, login.code()),
+        (StatusCode::UNAUTHORIZED, "unauthenticated")
+    );
+    assert_eq!(
+        login.json["error"]["message"],
+        "Wrong username or password."
+    );
+    let setup = ctx
+        .call(
+            Method::POST,
+            "/api/setup",
+            None,
+            Some(json!({ "username": "a2", "displayName": "A", "password": huge })),
+        )
+        .await;
+    assert_eq!(setup.status, StatusCode::BAD_REQUEST);
+    let create = ctx
+        .call(
+            Method::POST,
+            "/api/users",
+            Some(&cookie),
+            Some(json!({ "username": "kid", "displayName": "K", "password": huge, "role": "member" })),
+        )
+        .await;
+    assert_eq!(
+        (create.status, create.code()),
+        (StatusCode::BAD_REQUEST, "validation")
+    );
+    let me = ctx
+        .call(Method::GET, "/api/auth/me", Some(&cookie), None)
+        .await;
+    let id = me.json["id"].as_str().unwrap().to_string();
+    let change = ctx
+        .call(
+            Method::PUT,
+            &format!("/api/users/{id}/password"),
+            Some(&cookie),
+            Some(json!({ "password": "a brand new password", "currentPassword": huge })),
+        )
+        .await;
+    assert_eq!(change.status, StatusCode::UNAUTHORIZED);
+    let change = ctx
+        .call(
+            Method::PUT,
+            &format!("/api/users/{id}/password"),
+            Some(&cookie),
+            Some(json!({ "password": huge, "currentPassword": "correct horse battery" })),
+        )
+        .await;
+    assert_eq!(change.status, StatusCode::BAD_REQUEST);
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(1),
+        "took {:?}",
+        started.elapsed()
+    );
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn body_limits_field_caps_and_error_shapes() {
+    let Some(ctx) = ctx().await else { return };
+    let c = &ctx.setup_admin().await;
+
+    // JSON routes stop at 1 MB; an unauthenticated login cannot buffer more.
+    let big = "x".repeat(2 * 1024 * 1024);
+    let res = ctx
+        .call(
+            Method::POST,
+            "/api/auth/login",
+            None,
+            Some(json!({ "username": "admin", "password": big })),
+        )
+        .await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::PAYLOAD_TOO_LARGE, "too_large")
+    );
+    let res = ctx
+        .call(
+            Method::POST,
+            "/api/recipes",
+            Some(c),
+            Some(json!({ "title": "t", "description": big })),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::PAYLOAD_TOO_LARGE);
+    // Multipart routes keep the larger limit (a 1.5 MB non-image reaches the decoder: 415, not 413).
+    let res = ctx
+        .upload("/api/media", c, "a.bin", &vec![0u8; 1536 * 1024])
+        .await;
+    assert_eq!(res.status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+    // Field caps name the field.
+    let long = "x".repeat(10_001);
+    for (body, field) in [
+        (json!({ "title": "t", "description": long }), "description"),
+        (
+            json!({ "title": "t", "notes": "x".repeat(20_001) }),
+            "notes",
+        ),
+        (
+            json!({ "title": "t", "ingredients": [{ "text": "x".repeat(2_001) }] }),
+            "ingredients",
+        ),
+        (
+            json!({ "title": "t", "steps": vec![json!({ "text": "s" }); 501] }),
+            "steps",
+        ),
+        (
+            json!({ "title": "t", "tags": (0..51).map(|i| format!("t{i}")).collect::<Vec<_>>() }),
+            "tags",
+        ),
+    ] {
+        let res = ctx
+            .call(Method::POST, "/api/recipes", Some(c), Some(body))
+            .await;
+        assert_eq!(
+            (res.status, res.code()),
+            (StatusCode::BAD_REQUEST, "validation")
+        );
+        assert!(
+            res.json["error"]["message"]
+                .as_str()
+                .unwrap()
+                .starts_with(&format!("{field}:")),
+            "{}",
+            res.json
+        );
+    }
+
+    // 405 uses the JSON shape.
+    let res = ctx
+        .call(Method::PATCH, "/api/recipes/x", Some(c), None)
+        .await;
+    assert_eq!(
+        (res.status, res.code()),
+        (StatusCode::METHOD_NOT_ALLOWED, "method_not_allowed")
+    );
+
+    // Malformed ids: our message, never the parser's.
+    for (m, path) in [
+        (Method::GET, "/api/recipes/not-a-uuid"),
+        (Method::DELETE, "/api/recipes/not-a-uuid"),
+        (Method::POST, "/api/recipes/not-a-uuid/restore"),
+        (Method::DELETE, "/api/users/not-a-uuid"),
+    ] {
+        let res = ctx.call(m, path, Some(c), None).await;
+        assert_eq!(
+            (res.status, res.code()),
+            (StatusCode::BAD_REQUEST, "validation"),
+            "{path}"
+        );
+        assert_eq!(res.json["error"]["message"], "id: not a valid id.");
+    }
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
+async fn logout_always_clears_the_cookie() {
+    let Some(ctx) = ctx().await else { return };
+    ctx.setup_admin().await;
+    for cookie in [None, Some("rb_session=expired-or-bogus")] {
+        let res = ctx
+            .call(Method::POST, "/api/auth/logout", cookie, None)
+            .await;
+        assert_eq!(res.status, StatusCode::NO_CONTENT);
+        assert!(res.cookie.unwrap().contains("rb_session="));
+    }
+    ctx.cleanup().await;
+}

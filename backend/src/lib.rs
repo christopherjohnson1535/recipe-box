@@ -15,6 +15,11 @@ use sqlx::PgPool;
 
 pub use routes::router;
 
+/// The single line printed when startup fails: `recipe-box-api: <message>`.
+pub fn startup_error_line(e: &anyhow::Error) -> String {
+    format!("recipe-box-api: {e}")
+}
+
 /// Runs the embedded migrations in `backend/migrations`.
 pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
     sqlx::migrate!("./migrations").run(pool).await
@@ -46,4 +51,16 @@ pub fn spawn_purge_task(pool: PgPool) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn startup_error_is_one_line() {
+        let e = anyhow::anyhow!("can't listen on 0.0.0.0:8080: address already in use");
+        assert_eq!(
+            super::startup_error_line(&e),
+            "recipe-box-api: can't listen on 0.0.0.0:8080: address already in use"
+        );
+    }
 }

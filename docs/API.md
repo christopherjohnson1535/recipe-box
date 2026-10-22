@@ -11,12 +11,13 @@ Every non-2xx response:
 ```
 | HTTP | code | when |
 |---|---|---|
-| 400 | `validation` | bad body/query; `message` says which field |
+| 400 | `validation` | bad body/query; `message` says which field. A malformed `:id` says `id: not a valid id.`; a wrong content type on a JSON route is also 400 |
 | 401 | `unauthenticated` | no/expired session |
 | 403 | `forbidden` | not admin; setup already done |
 | 404 | `not_found` | |
 | 409 | `conflict` | username taken; restore window passed |
-| 413 | `too_large` | upload over `MAX_UPLOAD_MB` |
+| 405 | `method_not_allowed` | known path, wrong method |
+| 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`, `/api/import/export`), or any other request body over 1 MB |
 | 415 | `unsupported_media` | not an image we can decode, or over 10,000 px a side / 40 megapixels |
 | 422 | `no_recipe_found` | page/photo had no recipe |
 | 422 | `ai_disabled` | AI needed but `AI_PROVIDER=none` |
@@ -27,6 +28,12 @@ Every non-2xx response:
 | 500 | `internal` | logged; message is generic |
 | 502 | `api_unreachable` | **frontend proxy only**: the web container can't reach the API |
 | 0 | `network` | **browser client only** (`ApiError`): the browser can't reach the web server |
+
+Limits on JSON routes: body 1 MB; passwords at most 1024 characters (a longer one on login or password change is
+refused with the usual 401 "Wrong username or password."; elsewhere 400); recipe `description` at most 10,000
+characters, `notes` 20,000, each ingredient/step line 2,000, at most 500 ingredients, 500 steps and 50 tags
+(400 `validation`, message starts with the field name). `POST /api/auth/logout` always returns 204 and clears the cookie,
+even with no or an expired session.
 
 ## Types
 ```ts
