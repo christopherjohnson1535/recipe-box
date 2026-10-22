@@ -31,9 +31,10 @@ imported draft.
 
 ## Deleting and undo
 - **Delete** on a recipe removes it straight away (there is no "are you sure") and takes you home.
-- A message at the bottom reads **Deleted "Name". Undo** and stays for 10 seconds. It pauses while you hover over it or
+- A message at the bottom reads **Deleted "Name". Undo** and stays for 10 seconds. Delete several recipes and each gets its own message (the three newest show). It pauses while you hover over it or
   have it selected. **Undo** puts the recipe back and opens it; the cross closes the message.
-- If the time has passed, the message says it is too late to undo.
+- If the time has passed, the message says it is too late to undo. If the recipe was already deleted elsewhere, you go home
+  and a short message says so.
 
 ## Printing
 Print a recipe from your browser (Ctrl/Cmd+P). The menu, buttons and messages are left out; you get black text on white

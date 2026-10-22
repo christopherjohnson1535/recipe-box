@@ -38,7 +38,7 @@ Priority: **Must** = first usable version, **Should** = next, **Could** = nice t
 | ID | Requirement | Priority |
 |---|---|---|
 | REC-1 | A recipe has title, photo, description, ingredients (list), steps (list), servings, prep/cook/total time, tags, notes, source link/credit | Must |
-| REC-2 | Create, edit and delete recipes; delete asks to confirm and can be undone for 10 s | Must |
+| REC-2 | Create, edit and delete recipes; delete with a 10-second Undo instead of a confirmation | Must |
 | REC-3 | Ingredient lists support section headings (e.g. "For the sauce") | Should |
 | REC-4 | Scale servings (×½, ×2, custom) and the ingredient amounts update | Should |
 | REC-5 | Mark favourites per household member | Could |

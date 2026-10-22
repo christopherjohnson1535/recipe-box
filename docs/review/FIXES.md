@@ -81,3 +81,14 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #8 H-07 fixed — own-password 401 checks /api/auth/me; if the session is gone shows "You've been signed out" + Sign in link (new ui/TextLink)
 #8 H-08 fixed — failed remove with 404 drops the row, router.refresh() and shows the message
 #8 H-09 fixed — Remove aria-describedby its reason; hidden username field on own-password form; notices cleared on next action; client length checks use code points (backend counts chars)
+#4 P-01 fixed — undo store holds a list; one toast per delete, newest on top, three shown (older keep their own timers); tests for two deletes, separate countdowns, cap
+#4 P-02 fixed — byline.ts returns data; new client LocalDate formats in the viewer's zone via useSyncExternalStore (empty `<time dateTime>` on server); tests with America/Denver and SSR
+#4 P-03 fixed — dismissUndo() on sign-out and when UndoToast (the (app) layout) unmounts; test
+#4 P-04 fixed — delete 404 = already gone: go home, "That recipe was already deleted." notice (no Undo); test
+#4 P-05 fixed — wiki says Undo appears for 10 seconds only; the 10-minute backend restore is not reachable in the UI so it is not promised (decision)
+#4 P-06 fixed — toast shadow replaced by a hairline border; UI.md notes it
+#4 P-07 fixed — REC-2 now "delete with a 10-second Undo instead of a confirmation" (owner to be told in the PR)
+#4 P-08 skipped — Escape dismiss is optional; left out
+#4 P-09 fixed — Math.max(0, remaining) on the timer
+#4 P-10 skipped — Button is already disabled while pending; no behaviour change
+#4 P-11 skipped — no change needed (reviewer: fine)
