@@ -88,7 +88,8 @@ type Image = { id: string; url: string; width: number; height: number };
   - `q` (blank = no filter): a recipe matches when the `websearch_to_tsquery('simple', q)` hits its title,
     description, notes or ingredients (`"exact phrase"`, `-exclude`, `or` work), **or** its title starts with `q`
     (`%`/`_` literal), **or** every word of `q` is a word prefix (`weeknight lasag` finds "Weeknight lasagne"; skipped
-    when `q` uses quotes, `-` or `or`). Tag names are not searched; filter them with `tag`.
+    when `q` uses quotes, `-` or `or`), **or** one of its tag names starts with `q` (case-insensitive, `dinner`/`din`
+    find recipes tagged dinner). NUL bytes in `q` and `tag` are ignored.
   - `tag`: exact tag name (case-insensitive), ANDed with `q`.
   - `sort`: `newest` (default), `title` (A–Z), `time` (total minutes ascending, unknown last, then title). With `q` and
     no `sort`, results are ranked: title-prefix hits, then `ts_rank`, then newest. An explicit `sort` always wins.

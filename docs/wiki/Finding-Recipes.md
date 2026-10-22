@@ -4,7 +4,7 @@ The home page searches as you type: pause for a moment and the list updates. Ent
 browser's Back button returns to your previous search.
 
 ## What search looks at
-Titles, descriptions, notes and **ingredients**, so "buttermilk" finds every recipe that uses it. A half-typed word
+Titles, descriptions, notes, **tags** and **ingredients**, so "dinner" finds recipes tagged dinner and "buttermilk" finds every recipe that uses it. A half-typed word
 works too: "lasag" finds "Weeknight lasagne". The line under the box says how many recipes match.
 
 ## Tricks

@@ -81,3 +81,14 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #8 H-07 fixed — own-password 401 checks /api/auth/me; if the session is gone shows "You've been signed out" + Sign in link (new ui/TextLink)
 #8 H-08 fixed — failed remove with 404 drops the row, router.refresh() and shows the message
 #8 H-09 fixed — Remove aria-describedby its reason; hidden username field on own-password form; notices cleared on next action; client length checks use code points (backend counts chars)
+#5 Q-01 fixed — NUL stripped from `q` and `tag` before binding (list); fuzz list + tag test cover it
+#5 Q-02 fixed — fourth OR term: a tag name starting with q (ILIKE, escaped $3); tests tag_names_are_searched; API.md and wiki updated
+#5 Q-03 fixed — error branch of the home page renders SearchControls in the same slot, so text and focus survive; ServerError (Retry) below
+#5 item4 fixed — NUL in recipe text did 500 on POST /api/recipes (confirmed); validate.rs `clean()` strips it from title, description, notes, lines, tags, servings, source name; api.rs test fails without it
+#5 Q-06 fixed — timing test now 2,000 rows with 10 ingredients, 300-char description, notes, 3 tags; 10 queries incl. tag name; all < 300 ms (slowest 11 ms)
+#5 Q-05 skipped — Nice; no action needed at this size
+#5 Q-07 skipped — Nice; test gaps are not one-liners
+#5 Q-08 skipped — Nice; rare race, needs a design change
+#5 Q-09 skipped — Nice; live region/pending cue is more than a one-liner
+#5 Q-10 skipped — Nice; acceptable per FND-3
+#5 Q-11 skipped — Nice; enterKeyHint left out (outside owned ui scope risk)

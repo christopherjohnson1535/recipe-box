@@ -44,6 +44,10 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     return (
       <div className="flex flex-col gap-8">
         {header()}
+        {/* Same position and shape as the success layout, so the input keeps its text and focus. */}
+        <div className="flex flex-col gap-3">
+          <SearchControls q={q} tag={tag} sort={sort} />
+        </div>
         <ServerError error={e} />
       </div>
     );
