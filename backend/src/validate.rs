@@ -6,6 +6,12 @@ use crate::{
 };
 
 pub const MAX_TITLE: usize = 300;
+pub const MAX_DESCRIPTION: usize = 10_000;
+pub const MAX_NOTES: usize = 20_000;
+/// Per ingredient or step line.
+pub const MAX_LINE: usize = 2_000;
+pub const MAX_LINES: usize = 500;
+pub const MAX_TAGS: usize = 50;
 pub const MIN_PASSWORD: usize = 10;
 /// Upper bound so argon2 is not fed megabytes.
 pub const MAX_PASSWORD: usize = 1024;
@@ -75,8 +81,18 @@ pub fn source_url(raw: Option<&str>) -> AppResult<Option<String>> {
     }
 }
 
-fn lines(items: Vec<Ingredient>) -> Vec<Ingredient> {
-    items
+fn lines(field: &str, items: Vec<Ingredient>) -> AppResult<Vec<Ingredient>> {
+    if items.len() > MAX_LINES {
+        return Err(AppError::validation(format!(
+            "{field}: at most {MAX_LINES} entries."
+        )));
+    }
+    if items.iter().any(|i| i.text.chars().count() > MAX_LINE) {
+        return Err(AppError::validation(format!(
+            "{field}: each entry at most {MAX_LINE} characters."
+        )));
+    }
+    Ok(items
         .into_iter()
         .filter_map(|i| {
             let text = clean(&i.text);
@@ -85,7 +101,16 @@ fn lines(items: Vec<Ingredient>) -> Vec<Ingredient> {
                 section: blank_to_none(i.section),
             })
         })
-        .collect()
+        .collect())
+}
+
+fn max_chars(field: &str, s: &str, max: usize) -> AppResult<()> {
+    if s.chars().count() > max {
+        return Err(AppError::validation(format!(
+            "{field}: at most {max} characters."
+        )));
+    }
+    Ok(())
 }
 
 fn blank_to_none(s: Option<String>) -> Option<String> {
@@ -107,11 +132,16 @@ pub fn recipe(input: RecipeInput) -> AppResult<RecipeInput> {
             "title: 1–{MAX_TITLE} characters."
         )));
     }
+    max_chars("description", &input.description, MAX_DESCRIPTION)?;
+    max_chars("notes", &input.notes, MAX_NOTES)?;
+    if input.tags.len() > MAX_TAGS {
+        return Err(AppError::validation(format!("tags: at most {MAX_TAGS}.")));
+    }
     Ok(RecipeInput {
         title,
         description: clean(&input.description),
-        ingredients: lines(input.ingredients),
-        steps: lines(input.steps),
+        ingredients: lines("ingredients", input.ingredients)?,
+        steps: lines("steps", input.steps)?,
         servings: blank_to_none(input.servings),
         prep_minutes: minutes("prepMinutes", input.prep_minutes)?,
         cook_minutes: minutes("cookMinutes", input.cook_minutes)?,
@@ -144,6 +174,41 @@ mod tests {
         assert!(password("123456789").is_err());
         assert!(password("1234567890").is_ok());
         assert!(password(&"x".repeat(MAX_PASSWORD + 1)).is_err());
+    }
+
+    #[test]
+    fn recipe_field_caps() {
+        let base = || RecipeInput {
+            title: "x".into(),
+            ..Default::default()
+        };
+        let line = |n: usize| Ingredient {
+            text: "x".repeat(n),
+            section: None,
+        };
+        let err = |r: AppResult<RecipeInput>| r.unwrap_err().to_string();
+        let mut r = base();
+        r.description = "x".repeat(MAX_DESCRIPTION + 1);
+        assert!(err(recipe(r)).starts_with("description:"));
+        let mut r = base();
+        r.description = "x".repeat(MAX_DESCRIPTION);
+        r.notes = "x".repeat(MAX_NOTES);
+        assert!(recipe(r).is_ok());
+        let mut r = base();
+        r.notes = "x".repeat(MAX_NOTES + 1);
+        assert!(err(recipe(r)).starts_with("notes:"));
+        let mut r = base();
+        r.ingredients = vec![line(MAX_LINE + 1)];
+        assert!(err(recipe(r)).starts_with("ingredients:"));
+        let mut r = base();
+        r.steps = (0..=MAX_LINES).map(|_| line(1)).collect();
+        assert!(err(recipe(r)).starts_with("steps:"));
+        let mut r = base();
+        r.steps = (0..MAX_LINES).map(|_| line(MAX_LINE)).collect();
+        assert!(recipe(r).is_ok());
+        let mut r = base();
+        r.tags = (0..=MAX_TAGS).map(|i| format!("t{i}")).collect();
+        assert!(err(recipe(r)).starts_with("tags:"));
     }
 
     #[test]

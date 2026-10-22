@@ -33,7 +33,7 @@ Libre Caslon Display has one weight. Never put `font-semibold`/`font-bold` on it
 | `text-deck` | 22px, set italic | standfirsts under titles, empty-state copy, ledes |
 | `text-title-sm` | 26px | listing titles on the home contents |
 | `text-title` | 36px | section titles ("Method"), empty states, auth headings |
-| `text-numeral` | 28px | method step numbers (display serif, accent) |
+| `text-numeral` | 32px | method step numbers (display serif, accent) |
 | `text-wordmark` / `text-wordmark-lg` | 30–34px / 44–64px | the Recipe Box wordmark in the masthead / on auth pages |
 | `text-headline` | clamp(40px, 72px) | page headline (`h1`) |
 
@@ -41,7 +41,7 @@ Libre Caslon Display has one weight. Never put `font-semibold`/`font-bold` on it
 Colour (`bg-*`, `text-*`, `border-*` utilities): `--color-paper`, `--color-paper-deep`, `--color-ink`,
 `--color-ink-muted`, `--color-rule` (decorative hairline only), `--color-rule-strong` (control borders),
 `--color-accent`, `--color-accent-hover`, `--color-on-accent`, `--color-danger`, `--color-focus`.
-Fonts: `--font-display`, `--font-text`. Layout: `--measure` (38rem, `max-w-measure`), `--measure-wide` (64rem,
+Fonts: `--font-display`, `--font-text`. Layout: `--measure` (38rem, `max-w-measure`), `--measure-form` (44rem, `max-w-form`: the editor, room for a field plus its row buttons), `--measure-wide` (64rem,
 `max-w-measure-wide`), `--page-width` (72rem, `max-w-page`), `--gutter` (`px-gutter`), `--control-height`
 (44px, `min-h-control`). Radius: `--radius-control` (2px).
 
@@ -65,6 +65,8 @@ border-strong → rule-strong, accent-ink → accent.
 
 ## Helper classes (`globals.css`, components layer; ui components only)
 - `.label`: the uppercase tracked label style.
+- `.label-quiet`: the lighter label voice (weight 500) for chips, nav and meta; `.label` (600) stays for buttons, field labels and kickers.
+- `.dot-list-stack` (via `DotList stackOnPhone`): below 640px the items sit one per line with no dots, so a wrapped line never starts or ends on a dot.
 - `.dot-list`: inline list with middle dots between items ("SERVES 4 · 30 MIN"); the dot trails each item so no line
   starts with an orphan dot.
 - `.drop-cap`: accent drop cap on a lede paragraph.

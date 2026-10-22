@@ -4,7 +4,7 @@ import { Badge } from "./ui/Chip";
 import { ContentsEntry } from "./ui/Contents";
 import { DotList } from "./ui/DotList";
 
-/** A recipe as one entry in the contents listing: up to three tags, title, description, total time, photo. */
+/** A recipe as one entry in the contents listing: up to two tags (a third would wrap the kicker on a phone), title, description, total time, photo. */
 export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
   return (
     <ContentsEntry
@@ -13,7 +13,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
       kicker={
         recipe.tags.length > 0 ? (
           <DotList label="Tags">
-            {recipe.tags.slice(0, 3).map((t) => (
+            {recipe.tags.slice(0, 2).map((t) => (
               <li key={t}>
                 <Badge>{t}</Badge>
               </li>

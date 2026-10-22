@@ -21,6 +21,8 @@ pub enum AppError {
     Forbidden(String),
     #[error("{0}")]
     NotFound(String),
+    #[error("That method is not allowed here.")]
+    MethodNotAllowed,
     #[error("{0}")]
     Conflict(String),
     #[error("Upload is too large.")]
@@ -56,6 +58,7 @@ impl AppError {
             Self::Unauthenticated(_) => (StatusCode::UNAUTHORIZED, "unauthenticated"),
             Self::Forbidden(_) => (StatusCode::FORBIDDEN, "forbidden"),
             Self::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
+            Self::MethodNotAllowed => (StatusCode::METHOD_NOT_ALLOWED, "method_not_allowed"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
             Self::TooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "too_large"),
             Self::UnsupportedMedia(_) => (StatusCode::UNSUPPORTED_MEDIA_TYPE, "unsupported_media"),
@@ -122,8 +125,9 @@ impl From<QueryRejection> for AppError {
 }
 
 impl From<PathRejection> for AppError {
-    fn from(r: PathRejection) -> Self {
-        Self::Validation(r.body_text())
+    fn from(_: PathRejection) -> Self {
+        // Never echo the parser's text; every path parameter in the API is an id.
+        Self::Validation("id: not a valid id.".into())
     }
 }
 

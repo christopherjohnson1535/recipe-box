@@ -32,7 +32,7 @@
   --text-title-sm--line-height: 1.2;
   --text-title: 2.25rem; /* section titles, empty states */
   --text-title--line-height: 1.15;
-  --text-numeral: 1.75rem; /* method step numbers */
+  --text-numeral: 2rem; /* method step numbers */
   --text-numeral--line-height: 1;
   --text-headline: clamp(2.5rem, 2rem + 3vw, 4.5rem); /* page headline */
   --text-headline--line-height: 1.05;
@@ -49,6 +49,7 @@
 
 :root {
   --measure: 38rem; /* ~68 characters of body text */
+  --measure-form: 44rem; /* the editor: room for a field and its row buttons side by side */
   --measure-wide: 64rem;
   --page-width: 72rem;
   --control-height: 2.75rem; /* 44px touch target */
@@ -65,6 +66,7 @@
 @theme inline {
   --container-measure: var(--measure);
   --container-measure-wide: var(--measure-wide);
+  --container-form: var(--measure-form);
   --container-page: var(--page-width);
   --spacing-control: var(--control-height);
   --spacing-gutter: var(--gutter);
@@ -117,11 +119,29 @@ body {
     font-variant-numeric: lining-nums tabular-nums;
   }
 
+  /* Quieter label voice for chips, nav and meta; buttons, field labels and kickers keep the 600 .label. */
+  .label-quiet {
+    font-family: var(--font-text);
+    font-size: var(--text-label);
+    line-height: var(--text-label--line-height);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 500;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
   /* Inline lists separated by a trailing middle dot (no orphan dot when a line wraps), e.g. SERVES 4 · 30 MIN. */
   .dot-list > :not(:last-child)::after {
     content: "·";
     margin-inline: 0.5em;
     color: var(--color-ink-muted);
+  }
+
+  /* The same list stacked on a phone: one item per line, no dots (see DotList `stackOnPhone`). */
+  @media (width < 40rem) {
+    .dot-list-stack > :not(:last-child)::after {
+      content: none;
+    }
   }
 
   /* Drop cap for a lede paragraph. */

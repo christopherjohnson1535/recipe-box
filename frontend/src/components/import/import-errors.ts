@@ -55,7 +55,7 @@ function rule(code: string, mode: ImportMode, serverMessage: string): Rule | und
       const web = "Enter a full web address starting with https://";
       return {
         title: "Check what you entered",
-        message: (name === "url" || name === "sourceUrl") && /url/i.test(rest) ? web : rest,
+        message: name === "url" || name === "sourceUrl" ? web : rest,
         field: mode !== "photo",
         fieldId: name === "sourceUrl" ? "import-source" : mode === "link" ? "import-url" : "import-text",
       };

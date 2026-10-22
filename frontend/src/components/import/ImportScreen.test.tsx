@@ -94,7 +94,7 @@ describe("ImportScreen", () => {
   it("puts a validation error under the address field", async () => {
     render(<ImportScreen api={mockApi({ importUrl: vi.fn().mockRejectedValue(fail(400, "validation", "url: That is not a web address.")) })} />);
     importLink("nope");
-    expect(await screen.findByText("That is not a web address.")).toBeTruthy();
+    expect(await screen.findByText("Enter a full web address starting with https://")).toBeTruthy();
     expect(screen.getByLabelText("Recipe link").getAttribute("aria-invalid")).toBe("true");
   });
 
@@ -157,15 +157,14 @@ describe("ImportScreen", () => {
   });
 
   it("shows the stored photos beside an empty form when AI is off, and saves them with the recipe", async () => {
+    // The server path (kept for when capabilities say AI is on but the server answers ai_disabled).
     const api = mockApi({
-      importCapabilities: vi.fn().mockResolvedValue({ ai: false, provider: "none" }),
       importPhoto: vi.fn().mockRejectedValue(fail(422, "ai_disabled", "off", { photoImageIds: ["aaa", "bbb"] })),
     });
     render(<ImportScreen api={api} initialMode="photo" />);
-    await screen.findByText(/AI is off, so the photos cannot be read/);
     const file = new File(["x"], "page.jpg", { type: "image/jpeg" });
     fireEvent.change(screen.getByLabelText("Photos"), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Keep photos and type it in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Read the photos" }));
 
     expect(await screen.findByRole("heading", { name: "Type it in" })).toBeTruthy();
     expect(screen.getAllByRole("img").map((i) => i.getAttribute("src"))).toEqual(["/media/aaa.jpg", "/media/bbb.jpg"]);
@@ -174,6 +173,48 @@ describe("ImportScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save recipe" }));
     await waitFor(() => expect(api.createRecipe).toHaveBeenCalled());
     expect(api.createRecipe).toHaveBeenCalledWith(expect.objectContaining({ title: "Gran’s cake", sourceType: "photo", photoImageIds: ["aaa", "bbb"] }));
+  });
+
+  describe("AI off: keeping photos through /api/media", () => {
+    const off = { importCapabilities: vi.fn().mockResolvedValue({ ai: false, provider: "none" }) };
+    const choose = (...names: string[]) =>
+      fireEvent.change(screen.getByLabelText("Photos"), { target: { files: names.map((n) => new File(["x"], n, { type: "image/jpeg" })) } });
+
+    it("uploads each photo, shows them and saves with photoImageIds and the first as the picture", async () => {
+      const uploadMedia = vi
+        .fn()
+        .mockResolvedValueOnce({ id: "m1", url: "/media/m1.jpg", width: 1, height: 1 })
+        .mockResolvedValueOnce({ id: "m2", url: "/media/m2.jpg", width: 1, height: 1 });
+      const api = mockApi({ ...off, uploadMedia });
+      render(<ImportScreen api={api} initialMode="photo" />);
+      await screen.findByText(/AI is off, so the photos cannot be read/);
+      choose("a.jpg", "b.jpg");
+      fireEvent.click(screen.getByRole("button", { name: "Keep photos and type it in" }));
+      expect(await screen.findByRole("heading", { name: "Type it in" })).toBeTruthy();
+      expect(api.importPhoto).not.toHaveBeenCalled();
+      expect(uploadMedia).toHaveBeenCalledTimes(2);
+      fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Gran’s cake" } });
+      fireEvent.click(screen.getByRole("button", { name: "Save recipe" }));
+      await waitFor(() => expect(api.createRecipe).toHaveBeenCalled());
+      expect(api.createRecipe).toHaveBeenCalledWith(expect.objectContaining({ imageId: "m1", photoImageIds: ["m1", "m2"], sourceType: "photo" }));
+    });
+
+    it("names the photo that failed and does not re-upload the one that worked on retry", async () => {
+      const uploadMedia = vi
+        .fn()
+        .mockResolvedValueOnce({ id: "m1", url: "/media/m1.jpg", width: 1, height: 1 })
+        .mockRejectedValueOnce(fail(415, "unsupported_media", "Use JPEG, PNG or WebP."))
+        .mockResolvedValueOnce({ id: "m2", url: "/media/m2.jpg", width: 1, height: 1 });
+      const api = mockApi({ ...off, uploadMedia });
+      render(<ImportScreen api={api} initialMode="photo" />);
+      await screen.findByText(/AI is off, so the photos cannot be read/);
+      choose("a.jpg", "b.gif");
+      fireEvent.click(screen.getByRole("button", { name: "Keep photos and type it in" }));
+      expect(await screen.findByText(/b\.gif: Use JPEG, PNG or WebP\./)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(await screen.findByRole("heading", { name: "Type it in" })).toBeTruthy();
+      expect(uploadMedia).toHaveBeenCalledTimes(3);
+    });
   });
 
   it("limits to six photos and lets one be removed", () => {

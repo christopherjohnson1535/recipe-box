@@ -52,7 +52,10 @@ pub async fn end(pool: &PgPool, jar: CookieJar) -> AppResult<CookieJar> {
             .execute(pool)
             .await?;
     }
-    Ok(jar.remove(Cookie::build(COOKIE_NAME).path("/")))
+    // `jar.remove` sends nothing for a cookie the request did not carry; always send the expiry.
+    let mut gone = Cookie::build(COOKIE_NAME).path("/").build();
+    gone.make_removal();
+    Ok(jar.add(gone))
 }
 
 /// Ends every session of `user_id`, except the one with `keep` (a token hash) when given.

@@ -50,7 +50,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
       <label htmlFor="q" className="sr-only">
         Search recipes
       </label>
-      <div className="flex min-w-60 max-w-xl flex-1 gap-2">
+      <div className="flex min-w-60 max-w-xl flex-1 gap-2 max-sm:basis-full">
         <Input
           ref={input}
           id="q"
@@ -74,6 +74,8 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
         Sort recipes
       </label>
       <Select
+        quietOnPhone
+        className="max-sm:ml-auto"
         id="sort"
         name="sort"
         value={sort === "newest" && !q ? "" : (sort ?? "")}

@@ -32,7 +32,7 @@ Every import gives you a **draft** to check and fix before it is saved. Open **I
 
 Already saved that link? You'll be told "You already have this recipe" with a link to it; **Import anyway** continues if you want a second copy.
 
-Photo and text import show **Coming soon** until they are released.
+With AI switched **on**, reading photos and pasted text shows **Coming soon** until that feature is released (Phase 2). With AI **off**, *Keep photos and type it in* already works: your photos are saved and shown beside an empty form.
 
 Imported recipes keep the source link and author credit. Recipes are for private household use.
 

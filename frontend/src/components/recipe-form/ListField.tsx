@@ -76,6 +76,7 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
           const endsSection = row.heading === "" && inSection;
           const common = {
             id: id(row.key, "text"),
+            maxLength: 2000, // backend MAX_LINE
             "aria-label": `${itemLabel} ${i + 1}`,
             placeholder,
             value: row.text,
@@ -117,9 +118,11 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
               }
               controls={
                 <>
+                  {row.heading !== null && <span className="w-20 max-sm:hidden" aria-hidden="true" />}
                   {row.heading === null && (
                     <Button
                       variant="ghost"
+                      className="sm:w-20"
                       aria-label={`Start a section at ${lower} ${i + 1}`}
                       onClick={() => change(setHeading(rows, i, ""), id(row.key, "heading"))}
                     >
@@ -167,6 +170,7 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
         <Button
           id={`${idPrefix}-add`}
           variant="secondary"
+          disabled={rows.length >= 500} // backend MAX_LINES
           onClick={() => {
             const row = newRow();
             change([...rows, row], id(row.key, "text"));

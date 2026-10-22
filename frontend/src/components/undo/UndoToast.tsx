@@ -65,12 +65,13 @@ function UndoBody({ offer, api }: { offer: UndoOffer; api: Api }) {
       await api.restoreRecipe(offer.id);
       dismissUndo(offer.seq);
       router.push(`/recipes/${offer.id}`);
+      router.refresh(); // the home list must pick the restored recipe up again
     } catch (e) {
       setBusy(false);
       setError(
         e instanceof ApiError && e.status === 409
-          ? { message: `Too late to undo: "${offer.title}" can no longer be restored.`, retry: false }
-          : { message: `Couldn't restore "${offer.title}". Try again.`, retry: true },
+          ? { message: `Too late to undo: “${offer.title}” can no longer be restored.`, retry: false }
+          : { message: `Couldn't restore “${offer.title}”. Try again.`, retry: true },
       );
     }
   }
@@ -92,7 +93,7 @@ function UndoBody({ offer, api }: { offer: UndoOffer; api: Api }) {
         </>
       }
     >
-      {offer.notice ?? (error ? error.message : `Deleted "${offer.title}".`)}
+      {offer.notice ?? (error ? error.message : `Deleted “${offer.title}”.`)}
     </Toast>
   );
 }

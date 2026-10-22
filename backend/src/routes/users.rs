@@ -137,6 +137,9 @@ pub async fn set_password(
     };
     if own {
         let given = body.current_password.unwrap_or_default();
+        if given.chars().count() > validate::MAX_PASSWORD {
+            return Err(AppError::Unauthenticated("Wrong username or password."));
+        }
         if !password::verify(given, Some(current)).await? {
             return Err(AppError::Unauthenticated("Wrong username or password."));
         }

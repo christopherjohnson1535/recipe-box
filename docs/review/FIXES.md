@@ -106,3 +106,65 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #4 P1-1 fixed — PageHeader h1 gets min-w-0 + [overflow-wrap:anywhere] (shrinks min-content in the centred flex column); ruled Heading gets the same; globals h1–h3 and ContentsEntry left as is (block/min-w-0 parents already wrap)
 #4 P2-1 skipped — the undo toast is an overlay by design; it pauses on hover/focus and can be dismissed.
 #4 P1-1 follow-up (orchestrator, visual check) — the unlayered global h1–h3 rule out-ranked the PageHeader utility, so the 1024 px headline stayed clipped; moved the rule into `@layer base` so ui utilities win; long unbroken titles now wrap at 390 px (h1 358 px wide) and in print.
+#9 B-01 fixed — login/own-password check refuse > MAX_PASSWORD (1024) before argon2 with the same 401; setup/create/change already 400; test with a ~1 MB password (< 1 s)
+#9 B-02 fixed — 1 MB JSON body limit; MAX_UPLOAD_MB only on /api/media, /api/import/photo, /api/import/export; recipe caps (description 10k, notes 20k, lines 2k, 500 ingredients/steps, 50 tags) -> 400 naming the field; API.md; tests
+#9 B-03 fixed — main prints `recipe-box-api: can't listen on <addr>: address already in use` / `can't reach the database: ...` (no URL) and exits 1, no backtrace; unit test on the line format
+#9 B-04 fixed — method_not_allowed_fallback returns 405 `method_not_allowed` in the JSON shape; test
+#9 B-05 skipped — 415 already means "not a decodable image" and the frontend maps it that way; a wrong content type stays 400 `validation`, noted in API.md
+#9 B-06 fixed — logout takes no CurrentUser and always sends the expiring cookie (204, idempotent; jar.remove sends nothing for an absent cookie, so a removal cookie is added); test
+#9 B-07 skipped — SameSite=Lax already blocks cross-site cookies on POST/PUT/DELETE; an Origin check adds little for a household app; revisit with #33.
+#9 B-08 deferred — #33 (throttling)
+#9 S-1 fixed — one PathRejection mapping: any malformed :id gives 400 `validation` "id: not a valid id." (no parser text); test covers recipes get/delete/restore and users delete
+#9 S-3 fixed — already covered: tests/api.rs recipe_crud_list_delete_restore sets deleted_at to 11 minutes ago and expects 409 `conflict`; no change needed
+#9 F-01 fixed — EmptyState `level` prop (default 2); NotFoundContent and ErrorContent pass level 1 (test)
+#9 F-02 fixed — url/sourceUrl validation messages always map to the friendly copy by field prefix; tests with the exact backend strings
+#9 F-03 fixed — app/(app)/loading.tsx renders the polite Pending note in the main column
+#9 F-04 fixed — Chip wraps (max-w-full, overflow-wrap:anywhere), count never shrinks, full name in title for long tags (test)
+#9 F-05 fixed — overflow-wrap:anywhere on MetaStrip items, Lede and the PageHeader deck; byline already wraps via DotList; Text already did
+#9 F-06 fixed — RouteFocus in the (app) layout moves focus to the h1 (else main) after client navigation, preventScroll; saving a recipe shows a “Recipe saved.”/“Saved.” toast (existing notice store)
+#9 F-07 skipped — Nice; autofocus on touch devices is unwanted, not a one-liner
+#9 F-08 fixed — curly quotes in the undo toast copy (tests updated)
+#9 F-09 fixed — titles for home (“Recipes”) and both not-found pages; edit page keeps “Edit recipe” (skipped: recipe name would cost a second fetch)
+#9 F-10 skipped — Nice; global-error needs its own html/body and styling, not a one-liner
+#9 F-11 skipped — copy/variant drift is taste; left for design QA
+#9 F-12 fixed — placeholder no longer ends in an ellipsis that reads as part of the URL
+#9 F-13 skipped — Nice; 24 px minimum met, left for design QA
+#9 F-14 skipped — Nice; consistent masthead on unmatched URLs is a layout decision
+#9 R5 S-2 fixed — AI off: “Keep photos and type it in” uploads each photo via POST /api/media (6-photo limit, per-photo errors, no re-upload on retry), then an empty form with photoImageIds and imageId = first; `shortcut:` comment for #11; AI path unchanged (tests)
+#9 R5 N-1/N-2/N-3 left for design QA — grid holes, count line gap, sort select and kicker wrapping
+#9 R5 N-4 skipped — the trailing “·” at a wrapped line end is the dot-list design (no line starts with a dot), not a bug
+#9 R5 N-5 skipped — a row with a heading shows its heading instead of the “Section” button by design; not a bug
+#9 B-fields fixed — RecipeForm: description/notes caps shown under their field, ingredients/steps/tags caps named in the top message; client maxLength (10,000/20,000/2,000 per line), Add disabled at 500 rows, tag count checked on save (tests)
+#9 B-413 fixed — too_large on save shows “That recipe is too large to save…” (test); import copy already handled it
+#9 B-405 fixed — unknown codes (method_not_allowed) already fall back to the server message in both mappers; no change
+#9 B-ids fixed — recipe and edit pages already treat 400 like 404 (notFound); verified, no change
+#9 B-logout fixed — nothing relied on a 401 from logout; no change
+#9 Q1-01 fixed — not reproducible (deleted recipe absent from home at 200/700/2000 ms, count correct, after both direct and card navigation); hardened anyway with router.refresh() after delete, 404 and Undo, tests added
+#9 Q1-02 fixed — Textarea grows with text ([field-sizing:content]) with a 3-row (4-row for notes) minimum, resize-y kept
+#9 Q1-03 skipped — CSS columns reorder reading/focus order (as D-05); instead entries keep source order, grid items-start, listing titles clamp to 2 lines so a long title no longer stretches its row
+#9 Q1-04 fixed — Heading with tabIndex -1 gets focus:outline-none; interactive focus rings unchanged
+#9 Q1-05 fixed — filtered home shows the live result count as the PageHeader deck (role=status); separate summary line and ResultSummary removed
+#9 Q1-06 fixed — below sm the tag chips sit behind a details disclosure (TAG: ALL +), sort select is a quiet underlined control on its own right-aligned row; chips open from sm
+#9 Q1-07 fixed — EditorItem puts row buttons beside the field from sm (gap-1), phone keeps them below; list gap 16/24
+#9 Q1-08 fixed — ghost button px-0 (min 44 wide) aligns Section with the arrows; heading rows use --editor-heading-rule and italic input; Section slot fixed width so field widths line up
+#9 Q1-09 fixed — --measure-form 44rem (max-w-form) for the editor; review heading wrapper uses the same width
+#9 Q1-10 skipped — orchestrator: Add recipe stays the primary action (as D-09)
+#9 Q1-11 fixed — --entry-kicker-fg (ink-muted) for listing kickers; Badge inherits colour; contrast pairing added
+#9 Q1-12 fixed — DotList stackOnPhone (byline) and MetaStrip 2x2 grid below sm, dots dropped; recipe-page kicker left wrapping (short tags)
+#9 Q1-13 fixed — RecipeCard kicker shows at most two tags; no orphan dot seen at 390 px
+#9 Q1-14 fixed — LeadPhoto and SidebarLayout use max-w-page (same edges as masthead and head rule)
+#9 Q1-15 fixed — step text max-w-[34rem] (the section was already 38rem, so the change is small)
+#9 Q1-16 fixed — Start cooking full width on phone; Edit and Delete share the next row
+#9 Q1-17 fixed — dark --rule-double is ink-muted
+#9 Q1-18 fixed — primary button px-4 (px-5 kept on secondary and danger)
+#9 Q1-19 fixed — DetailList items-baseline; ghost px-0 puts Remove on the rule edge
+#9 Q1-20 fixed — .label-quiet (500) for chips and nav, selected 600, chip count normal weight
+#9 Q1-21 skipped — P2, changes settings behaviour and focus rules; out of scope for a polish pass
+#9 Q1-22 fixed — --umber-900 (dark paper-deep) #211c17 to #241f19; style-lock numbers updated, matrix green
+#9 Q1-23 skipped — P2, the method subsection heading is the first child of its group, needs a new ui wrapper
+#9 Q1-24 fixed — --text-numeral 2rem
+#9 Q1-25 skipped — toast already has the safe-area bottom offset and max-w-measure
+#9 Q1-26 fixed — ghost buttons px-0 (start over aligns with fields; the -ml-2 wrapper removed), no centred wrap
+#9 Q1-27 fixed — auth layout top-aligned (pt-16, sm:pt-28); card padding was already p-10
+#9 Q1-28 skipped — Phase 2 placeholder page
+#9 Q1-29 fixed — home head groups with gap-10 between head, controls and list; search + chips stay 12 px apart

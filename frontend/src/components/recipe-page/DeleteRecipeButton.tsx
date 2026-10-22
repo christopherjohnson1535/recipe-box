@@ -31,6 +31,7 @@ export function DeleteRecipeButton({
         // Already deleted (another tab or device): nothing to undo from here.
         showNotice("That recipe was already deleted.");
         router.push("/");
+        router.refresh();
         return;
       }
       setPending(false);
@@ -39,6 +40,8 @@ export function DeleteRecipeButton({
     }
     showUndo({ id, title });
     router.push("/");
+    // Belt and braces: never let the client cache show the list with the recipe we just deleted (Q1-01).
+    router.refresh();
   }
 
   return (

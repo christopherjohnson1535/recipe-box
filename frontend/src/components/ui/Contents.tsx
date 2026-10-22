@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-/** The contents listing: entries between hairlines, two columns from 1024px. Children are `<ContentsEntry>`s. */
+/** The contents listing: entries between hairlines, two columns from 1024px. Entries keep source order
+ * (left to right, then down), so reading and focus order match what is seen. Children are `<ContentsEntry>`s. */
 export function Contents({ label, children }: { label?: string; children: ReactNode }) {
   return (
-    <ul aria-label={label} className="grid grid-cols-1 gap-x-14 border-b border-(--rule-hair) lg:grid-cols-2">
+    <ul aria-label={label} className="grid grid-cols-1 items-start gap-x-14 border-b border-(--rule-hair) lg:grid-cols-2">
       {children}
     </ul>
   );
@@ -27,11 +28,11 @@ type EntryProps = {
 export function ContentsEntry({ href, title, kicker, deck, meta, imageSrc }: EntryProps) {
   return (
     <li>
-      <article className="group relative flex h-full gap-5 border-t border-(--rule-hair) py-6 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-4 has-[a:focus-visible]:outline-(--focus-ring) sm:gap-6">
+      <article className="group relative flex gap-5 border-t border-(--rule-hair) py-6 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-4 has-[a:focus-visible]:outline-(--focus-ring) sm:gap-6">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
-          {kicker && <div className="label">{kicker}</div>}
+          {kicker && <div className="label text-(--entry-kicker-fg)">{kicker}</div>}
           <h2 className="font-display text-title-sm text-ink transition-[color] duration-150 ease-out group-hover:text-(--entry-title-hover)">
-            <Link href={href} className="line-clamp-3 after:absolute after:inset-0 focus-visible:outline-none">
+            <Link href={href} title={title} className="line-clamp-2 after:absolute after:inset-0 focus-visible:outline-none">
               {title}
             </Link>
           </h2>

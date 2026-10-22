@@ -26,8 +26,8 @@ describe("explainImportError", () => {
   });
 
   it("puts validation under the field, without the field prefix, except for photos", () => {
-    const p = explainImportError(err("validation", "url: That does not look like a web address."), "link");
-    expect(p).toMatchObject({ field: true, message: "That does not look like a web address." });
+    const p = explainImportError(err("validation", "text: Paste the recipe text first."), "text");
+    expect(p).toMatchObject({ field: true, message: "Paste the recipe text first." });
     expect(explainImportError(err("validation", "files: 1 to 6 photos."), "photo").field).toBe(false);
   });
 
@@ -45,6 +45,12 @@ describe("explainImportError", () => {
       message: "Enter a full web address starting with https://",
     });
     expect(explainImportError(err("validation", "text: required."), "text").fieldId).toBe("import-text");
+  });
+
+  it("catches the backend's own url messages by field prefix", () => {
+    const web = "Enter a full web address starting with https://";
+    expect(explainImportError(err("validation", "url: enter a full web address starting with http:// or https://."), "link").message).toBe(web);
+    expect(explainImportError(err("validation", "sourceUrl: must be an http(s) URL."), "text").message).toBe(web);
   });
 
   it("words too_large for photos and text differently", () => {

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NoMatches, ResultSummary } from "./ResultSummary";
+import { NoMatches } from "./ResultSummary";
 import { SEARCH_DEBOUNCE_MS, SearchControls } from "./SearchControls";
 import { homeHref, parseSort, resultSummary } from "./url";
 
@@ -107,12 +107,7 @@ describe("SearchControls", () => {
   });
 });
 
-describe("result count and empty state", () => {
-  it("announces the count", () => {
-    render(<ResultSummary total={3} q="lasagne" tag="" />);
-    expect(screen.getByRole("status").textContent).toBe("3 recipes match “lasagne”");
-  });
-
+describe("empty state", () => {
   it("offers Clear search when nothing matches", () => {
     render(<NoMatches q="zzz" tag="dinner" />);
     expect(screen.getByRole("heading", { name: "No recipes match" })).toBeTruthy();

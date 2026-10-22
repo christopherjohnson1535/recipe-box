@@ -7,7 +7,7 @@ use crate::{
     error::{AppError, AppJson, AppResult},
     models::User,
     state::AppState,
-    user_columns,
+    user_columns, validate,
 };
 
 #[derive(Deserialize)]
@@ -28,6 +28,10 @@ pub async fn login(
     jar: CookieJar,
     AppJson(body): AppJson<LoginBody>,
 ) -> AppResult<(CookieJar, Json<User>)> {
+    // A longer password can never have been set; refuse before any argon2 work.
+    if body.password.chars().count() > validate::MAX_PASSWORD {
+        return Err(AppError::Unauthenticated("Wrong username or password."));
+    }
     let found = sqlx::query_as::<_, UserWithHash>(concat!(
         "select ",
         user_columns!(),
@@ -51,7 +55,6 @@ pub async fn login(
 
 pub async fn logout(
     State(state): State<AppState>,
-    _user: CurrentUser,
     jar: CookieJar,
 ) -> AppResult<(StatusCode, CookieJar)> {
     let jar = session::end(&state.pool, jar).await?;

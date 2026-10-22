@@ -15,8 +15,8 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 - Button label: paper on ink (16.83:1); paper on accent (7.68:1)
 
 ## Dark mode: runtime via prefers-color-scheme ("evening edition")
-- Paper `#16130f` · Paper-deep `#211c17` · Ink `#efe8da` (15.19:1) · Ink-muted `#b3a999` (7.98:1 / 7.28:1)
-- Accent `#d98c7f` desaturated red (7.06:1 on paper, 6.44:1 on paper-deep) · Accent-hover/focus `#e6a497` (8.92:1)
+- Paper `#16130f` · Paper-deep `#241f19` (a step lighter so the sidebar reads) · Ink `#efe8da` (15.19:1 / 13.4:1) · Ink-muted `#b3a999` (7.98:1 / 7.04:1)
+- Accent `#d98c7f` desaturated red (7.06:1 on paper, 6.23:1 on paper-deep) · Accent-hover/focus `#e6a497` (8.92:1)
 - Rule `#463e33` decorative · Rule-strong `#7a7064` (3.82:1 on paper) · On-accent `#16130f`
 
 ## Color contract (check_contrast.py --matrix, both modes)

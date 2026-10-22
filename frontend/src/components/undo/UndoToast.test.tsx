@@ -5,7 +5,8 @@ import { UndoToast } from "./UndoToast";
 import { dismissUndo, showUndo } from "./undo-store";
 
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 
 type Props = NonNullable<Parameters<typeof UndoToast>[0]>;
 const setup = (restore = vi.fn().mockResolvedValue({})) => {
@@ -21,13 +22,14 @@ afterEach(() => {
   act(() => dismissUndo());
   cleanup();
   push.mockClear();
+  refresh.mockClear();
   vi.useRealTimers();
 });
 
 describe("UndoToast", () => {
   it("shows the message and goes away after 10 seconds", () => {
     setup();
-    expect(toastText()).toContain('Deleted "Soup".');
+    expect(toastText()).toContain('Deleted “Soup”.');
     tick(9_900);
     expect(toastText()).toContain("Deleted");
     tick(200);
@@ -57,6 +59,7 @@ describe("UndoToast", () => {
     await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Undo" })));
     expect(restore).toHaveBeenCalledWith("r1");
     expect(push).toHaveBeenCalledWith("/recipes/r1");
+    expect(refresh).toHaveBeenCalled();
     expect(toastText()).toBe("");
   });
 
@@ -101,7 +104,7 @@ describe("UndoToast", () => {
     tick(8_000);
     act(() => showUndo({ id: "r2", title: "Stew" }));
     tick(3_000);
-    expect(toastText()).toContain('Deleted "Stew".');
+    expect(toastText()).toContain('Deleted “Stew”.');
     expect(toastText()).not.toContain("Soup");
     tick(7_100);
     expect(toastText()).toBe("");

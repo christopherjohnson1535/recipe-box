@@ -101,6 +101,24 @@ describe("RecipeForm", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Prep (min)")));
   });
 
+  it("puts the description cap under the description, and a too-large body in friendly words", async () => {
+    const { onSubmit } = setup({ initial: { title: "Soup" } });
+    onSubmit.mockRejectedValueOnce(new ApiError(400, "validation", "description: at most 10000 characters."));
+    save();
+    expect(await screen.findByText("at most 10000 characters.")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Description")));
+    onSubmit.mockRejectedValueOnce(new ApiError(413, "too_large", "Request body too large."));
+    save();
+    expect(await screen.findByText(/That recipe is too large to save/)).toBeTruthy();
+  });
+
+  it("names a list in the top message when the server caps it", async () => {
+    const { onSubmit } = setup({ initial: { title: "Soup" } });
+    onSubmit.mockRejectedValue(new ApiError(400, "validation", "ingredients: at most 500 entries."));
+    save();
+    expect(await screen.findByText("Ingredients: at most 500 entries.")).toBeTruthy();
+  });
+
   it("shows other errors at the top and lets the user try again", async () => {
     const { onSubmit } = setup({ initial: { title: "Soup" } });
     onSubmit.mockRejectedValue(new ApiError(0, "network", "Can’t reach the Recipe Box server."));

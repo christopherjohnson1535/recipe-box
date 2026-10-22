@@ -21,7 +21,7 @@ export function Masthead({ children }: { children: ReactNode }) {
 }
 
 const navItem =
-  "label inline-flex min-h-control items-center whitespace-nowrap border-b-2 max-sm:ps-0 max-sm:pe-3 max-sm:text-[0.8125rem] max-sm:tracking-[0.07em] sm:px-2.5 transition-[border-color,color] duration-150 ease-out";
+  "label-quiet inline-flex min-h-control items-center whitespace-nowrap border-b-2 max-sm:ps-0 max-sm:pe-3 max-sm:text-[0.8125rem] max-sm:tracking-[0.07em] sm:px-2.5 transition-[border-color,color] duration-150 ease-out";
 const idle = "border-transparent text-(--nav-fg) hover:text-(--nav-fg-active)";
 
 /** A section link in the masthead; `active` marks the current section. */
@@ -30,7 +30,7 @@ export function NavLink({ href, active, children }: { href: string; active?: boo
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={cx(navItem, active ? "border-(--nav-underline-active) text-(--nav-fg-active)" : idle)}
+      className={cx(navItem, active ? "border-(--nav-underline-active) font-semibold text-(--nav-fg-active)" : idle)}
     >
       {children}
     </Link>

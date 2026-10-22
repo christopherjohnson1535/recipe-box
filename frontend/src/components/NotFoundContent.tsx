@@ -4,6 +4,7 @@ import { EmptyState } from "./ui/EmptyState";
 export function NotFoundContent() {
   return (
     <EmptyState
+      level={1}
       title="Page not found"
       actions={<ButtonLink href="/">Back to recipes</ButtonLink>}
     >

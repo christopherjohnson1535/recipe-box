@@ -13,7 +13,8 @@ works too: "lasag" finds "Weeknight lasagne". The line under the box says how ma
 - `soup or stew` finds either.
 
 ## Tags
-Tap a tag under the search box to show only those recipes; the number is how many recipes carry it. Tags and search
+Tap a tag under the search box to show only those recipes; the number is how many recipes carry it. On a phone the
+tags fold into one **Tag** row: tap it to open the list. Tags and search
 combine: search "pie" with the tag *dessert* to see dessert pies. Tap **All** to drop the tag, or **Clear search** on
 the empty-results page to start over.
 
