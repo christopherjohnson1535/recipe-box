@@ -1,7 +1,8 @@
-import { expect, test } from "../../support/fixtures.ts";
+import { expect, hydrated, test } from "../../support/fixtures.ts";
 
 test("sign in with the wrong password, then the right one, then sign out", async ({ page, member }) => {
   await page.goto("/login");
+  await hydrated(page.getByRole("button", { name: "Sign in" }));
   await page.getByLabel("Username").fill(member.user.username);
   await page.getByLabel("Password").fill("not-the-password");
   await page.getByRole("button", { name: "Sign in" }).click();

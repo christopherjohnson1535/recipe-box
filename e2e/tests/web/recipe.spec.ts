@@ -1,8 +1,9 @@
-import { expect, test, TEST_PNG, unique } from "../../support/fixtures.ts";
+import { expect, hydrated, test, TEST_PNG, unique } from "../../support/fixtures.ts";
 
 test("add a recipe with sections and a photo, then edit it", async ({ memberPage: page }) => {
   const title = unique("Lasagne ");
   await page.goto("/recipes/new");
+  await hydrated(page.getByLabel("Title", { exact: true }));
   await page.getByLabel("Title", { exact: true }).fill(title);
   await page.getByLabel("Description").fill("Layers of everything good.");
   await page.getByLabel("Servings").fill("6");
@@ -38,6 +39,7 @@ test("add a recipe with sections and a photo, then edit it", async ({ memberPage
   // edit: rename and drop the photo
   await page.getByRole("link", { name: "Edit" }).click();
   await page.getByLabel("Title", { exact: true }).fill(`${title} (v2)`);
+  await hydrated(page.getByRole("button", { name: "Remove photo" }));
   await page.getByRole("button", { name: "Remove photo" }).click();
   await page.getByRole("button", { name: /^Save/ }).click();
   await expect(page.getByRole("heading", { name: `${title} (v2)`, level: 1 })).toBeVisible();
@@ -47,6 +49,7 @@ test("add a recipe with sections and a photo, then edit it", async ({ memberPage
 
 test("a recipe needs a title", async ({ memberPage: page }) => {
   await page.goto("/recipes/new");
+  await hydrated(page.getByLabel("Title", { exact: true }));
   await page.getByRole("button", { name: "Save recipe" }).click();
   await expect(page.getByText("Give the recipe a title.")).toBeVisible();
   await expect(page).toHaveURL(/\/recipes\/new/);

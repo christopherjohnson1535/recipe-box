@@ -1,4 +1,4 @@
-import { expect, test, unique } from "../../support/fixtures.ts";
+import { expect, hydrated, test, unique } from "../../support/fixtures.ts";
 
 test("an admin adds a member who can sign in, then removes them", async ({ page, makeUser, admin }) => {
   const boss = await makeUser({ role: "admin" });
@@ -7,12 +7,14 @@ test("an admin adds a member who can sign in, then removes them", async ({ page,
   const password = `pw-${unique()}`;
 
   await page.goto("/login");
+  await hydrated(page.getByRole("button", { name: "Sign in" }));
   await page.getByLabel("Username").fill(boss.user.username);
   await page.getByLabel("Password").fill(boss.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
 
   await page.goto("/settings");
+  await hydrated(page.getByRole("button", { name: "Add member" }));
   await page.getByLabel("Name", { exact: true }).fill(display);
   await page.getByLabel("Username").fill(name);
   await page.getByLabel("Temporary password").fill(password);

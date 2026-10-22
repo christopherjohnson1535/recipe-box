@@ -1,10 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { test as base, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { test as base, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { ApiClient, type NewUser, type User } from "./api-client.ts";
 import { ADMIN, BASE_URL, FIXTURE_ORIGIN } from "./env.ts";
 
 export { expect };
 export { TEST_PNG } from "./fixture-server.ts";
+/**
+ * Waits until React has hydrated this element (it attaches its props to the DOM node). Acting on server-rendered
+ * markup before that does nothing: the onChange/onClick handlers are not there yet.
+ */
+export async function hydrated(locator: Locator) {
+  await expect
+    .poll(() => locator.evaluate((el) => Object.keys(el).some((k) => k.startsWith("__reactProps$"))), { message: "waiting for hydration" })
+    .toBe(true);
+}
+
 /** On a phone the tag filter sits in a collapsed "Tag:" disclosure; on wider screens it is already showing. */
 export async function openTagFilter(page: Page) {
   const summary = page.getByText("Tag:", { exact: false }).locator("xpath=ancestor-or-self::summary");

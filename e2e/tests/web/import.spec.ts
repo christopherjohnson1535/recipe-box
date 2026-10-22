@@ -1,9 +1,10 @@
-import { expect, fixtureUrl, test, unique } from "../../support/fixtures.ts";
+import { expect, hydrated, fixtureUrl, test, unique } from "../../support/fixtures.ts";
 
 test("import from a link, review, save", async ({ memberPage: page, member }) => {
   await page.goto("/import");
   // a unique query string: the same page imported by another test would otherwise be flagged as a duplicate
   const link = `${fixtureUrl("publisher.html")}?run=${unique()}`;
+  await hydrated(page.getByLabel("Recipe link"));
   await page.getByLabel("Recipe link").fill(link);
   await page.getByRole("button", { name: "Import recipe" }).click();
 
@@ -29,6 +30,7 @@ test("import from a link, review, save", async ({ memberPage: page, member }) =>
 
 test("a page with no recipe says so", async ({ memberPage: page }) => {
   await page.goto("/import");
+  await hydrated(page.getByLabel("Recipe link"));
   await page.getByLabel("Recipe link").fill(fixtureUrl("no-recipe.html"));
   await page.getByRole("button", { name: "Import recipe" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "No recipe found" })).toBeVisible();

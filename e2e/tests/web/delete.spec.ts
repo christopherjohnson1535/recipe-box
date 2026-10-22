@@ -1,8 +1,9 @@
-import { expect, test, unique } from "../../support/fixtures.ts";
+import { expect, hydrated, test, unique } from "../../support/fixtures.ts";
 
 test("delete a recipe and undo it", async ({ memberPage: page, member }) => {
   const recipe = await member.client.createRecipe({ title: unique("Soup ") });
   await page.goto(`/recipes/${recipe.id}`);
+  await hydrated(page.getByRole("button", { name: "Delete" }));
   await page.getByRole("button", { name: "Delete" }).click();
 
   await expect(page).toHaveURL("/");
@@ -19,6 +20,7 @@ test("delete a recipe and undo it", async ({ memberPage: page, member }) => {
 test("the Undo offer expires after ten seconds", async ({ memberPage: page, member }) => {
   const recipe = await member.client.createRecipe({ title: unique("Stew ") });
   await page.goto(`/recipes/${recipe.id}`);
+  await hydrated(page.getByRole("button", { name: "Delete" }));
   await page.getByRole("button", { name: "Delete" }).click();
   const toast = page.getByText(`Deleted “${recipe.title}”.`);
   await expect(toast).toBeVisible();

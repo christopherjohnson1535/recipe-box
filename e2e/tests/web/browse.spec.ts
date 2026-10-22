@@ -1,4 +1,4 @@
-import { expect, openTagFilter, test, unique } from "../../support/fixtures.ts";
+import { expect, hydrated, openTagFilter, test, unique } from "../../support/fixtures.ts";
 
 test("search, tag filter and sort", async ({ memberPage: page, member }) => {
   const c = member.client;
@@ -13,10 +13,13 @@ test("search, tag filter and sort", async ({ memberPage: page, member }) => {
   await page.goto("/");
 
   // search
-  await page.getByRole("searchbox", { name: "Search recipes" }).fill(word);
+  const search = page.getByRole("searchbox", { name: "Search recipes" });
+  const sort = page.getByLabel("Sort recipes");
+  await hydrated(search);
+  await search.fill(word);
   await expect(page).toHaveURL(new RegExp(`q=${word}`));
   await expect(titles).toHaveCount(4);
-  await page.getByRole("searchbox", { name: "Search recipes" }).fill(`nothing-${word}`);
+  await search.fill(`nothing-${word}`);
   await expect(page.getByText("No recipes match")).toBeVisible();
   await page.getByRole("link", { name: "Clear search" }).click();
 
@@ -29,12 +32,13 @@ test("search, tag filter and sort", async ({ memberPage: page, member }) => {
   await expect(page.getByText(`Delta ${word}`)).toHaveCount(0);
 
   // sort
-  await page.getByLabel("Sort recipes").selectOption({ label: "A–Z" });
+  await hydrated(sort);
+  await sort.selectOption({ label: "A–Z" });
   await expect(page).toHaveURL(/sort=title/);
   await expect(titles.first()).toContainText(`Alpha ${word}`);
   await expect(titles.last()).toContainText(`Charlie ${word}`);
 
-  await page.getByLabel("Sort recipes").selectOption({ label: "Quickest" });
+  await sort.selectOption({ label: "Quickest" });
   await expect(page).toHaveURL(/sort=time/);
   await expect(titles.first()).toContainText(`Bravo ${word}`);
   await expect(titles.last()).toContainText(`Charlie ${word}`); // unknown time last
