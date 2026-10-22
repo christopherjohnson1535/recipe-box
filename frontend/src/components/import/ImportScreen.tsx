@@ -243,9 +243,11 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
     );
     return (
       <div className="flex flex-col gap-8">
-        <Heading level={2} ref={heading} tabIndex={-1} ruled>
-          {review.byHand ? "Type it in" : "Check the recipe"}
-        </Heading>
+        <div className="max-w-form">
+          <Heading level={2} ref={heading} tabIndex={-1} ruled>
+            {review.byHand ? "Type it in" : "Check the recipe"}
+          </Heading>
+        </div>
         {duplicate ? (
           <Alert title="You already have this recipe">
             <div className="flex flex-col gap-4">
@@ -281,7 +283,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
             ) : (
               form
             )}
-            <div className="-ml-2">
+            <div>
               <Button variant="ghost" onClick={backToInput}>
                 Start over with a different {review.from === "link" ? "link" : review.from === "photo" ? "photo" : "text"}
               </Button>

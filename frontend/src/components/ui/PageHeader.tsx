@@ -13,16 +13,18 @@ type PageHeaderProps = {
   align?: "start" | "center";
   /** Keep the deck's height when there is no description, so the head doesn't jump between page states. */
   reserveDeck?: boolean;
+  /** Announce the description politely when it changes (a live result count). */
+  liveDescription?: boolean;
 };
 
 /** Article-style page head: kicker, display headline, italic deck, byline, then a hairline. */
-export function PageHeader({ title, kicker, description, byline, actions, align = "start", reserveDeck }: PageHeaderProps) {
+export function PageHeader({ title, kicker, description, byline, actions, align = "start", reserveDeck, liveDescription }: PageHeaderProps) {
   const centered = align === "center";
   return (
     <header className={cx("flex flex-col gap-4 border-b border-(--rule-hair) pb-8", centered && "items-center text-center")}>
       {kicker && <div className="label text-(--kicker-fg)">{kicker}</div>}
       <h1 className="min-w-0 max-w-measure-wide font-display text-headline text-ink [overflow-wrap:anywhere]">{title}</h1>
-      {description && <p className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{description}</p>}
+      {description && <p role={liveDescription ? "status" : undefined} className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{description}</p>}
       {!description && reserveDeck && (
         <p className="text-deck" aria-hidden="true">
           &nbsp;

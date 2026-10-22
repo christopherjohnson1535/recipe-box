@@ -6,12 +6,14 @@ import { dismissUndo } from "@/components/undo/undo-store";
 import { DeleteRecipeButton } from "./DeleteRecipeButton";
 
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 
 afterEach(() => {
   act(() => dismissUndo());
   cleanup();
   push.mockClear();
+  refresh.mockClear();
 });
 
 const asApi = (f: ReturnType<typeof vi.fn>) => ({ deleteRecipe: f }) as unknown as Parameters<typeof DeleteRecipeButton>[0]["api"];
@@ -28,6 +30,8 @@ describe("DeleteRecipeButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
     expect(del).toHaveBeenCalledWith("r1");
+    // Q1-01: the home list is refreshed so the deleted recipe is not shown while the Undo toast is up.
+    expect(refresh).toHaveBeenCalled();
     expect(screen.getByRole("status").textContent).toContain('Deleted “Soup”.');
   });
 

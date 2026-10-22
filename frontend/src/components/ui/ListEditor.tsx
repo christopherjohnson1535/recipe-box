@@ -3,7 +3,7 @@ import { cx } from "./cx";
 
 /** The rows of a list being edited (ingredients, steps). Children are `EditorItem`s. */
 export function EditorList({ children }: { children: ReactNode }) {
-  return <ul className="flex flex-col gap-6">{children}</ul>;
+  return <ul className="flex flex-col gap-4 sm:gap-6">{children}</ul>;
 }
 
 type EditorItemProps = {
@@ -11,7 +11,7 @@ type EditorItemProps = {
   number?: number;
   /** A section heading control set above this row, marked by a left rule. */
   heading?: ReactNode;
-  /** The row's buttons (move, remove), laid out under the control. */
+  /** The row's buttons (move, remove): under the control on a phone, beside it from 640px. */
   controls: ReactNode;
   children: ReactNode;
 };
@@ -20,7 +20,7 @@ type EditorItemProps = {
 export function EditorItem({ number, heading, controls, children }: EditorItemProps) {
   return (
     <li className="flex flex-col gap-3">
-      {heading && <div className="flex flex-col gap-2 border-l-[3px] border-(--rule-hair) pl-3">{heading}</div>}
+      {heading && <div className="flex flex-col gap-2 border-l-[3px] border-(--editor-heading-rule) pl-3 [&_input]:italic">{heading}</div>}
       <div
         className={cx(
           number !== undefined && "grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.75rem_minmax(0,1fr)]",
@@ -31,9 +31,9 @@ export function EditorItem({ number, heading, controls, children }: EditorItemPr
             {number}
           </span>
         )}
-        <div className="flex min-w-0 flex-col gap-2">
-          {children}
-          <div className="flex flex-wrap gap-2">{controls}</div>
+        <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
+          <div className="min-w-0 flex-1">{children}</div>
+          <div className="flex flex-wrap gap-1 sm:shrink-0 sm:flex-nowrap">{controls}</div>
         </div>
       </div>
     </li>

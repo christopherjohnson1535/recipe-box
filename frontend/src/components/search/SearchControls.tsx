@@ -74,6 +74,8 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
         Sort recipes
       </label>
       <Select
+        quietOnPhone
+        className="max-sm:ml-auto"
         id="sort"
         name="sort"
         value={sort === "newest" && !q ? "" : (sort ?? "")}

@@ -7,7 +7,7 @@ import { Heading } from "./Heading";
 export function MetaStrip({ items }: { items: { label: string; value: ReactNode }[] }) {
   if (items.length === 0) return null;
   return (
-    <dl className="label dot-list -mt-4 flex flex-wrap justify-center gap-y-2 text-ink [&>*]:[overflow-wrap:anywhere]">
+    <dl className="label dot-list dot-list-stack -mt-4 flex flex-wrap justify-center gap-y-2 text-ink max-sm:grid max-sm:grid-cols-[repeat(2,auto)] max-sm:justify-center max-sm:gap-x-8 [&>*]:[overflow-wrap:anywhere]">
       {items.map((m) => (
         <div key={m.label}>
           <dt className="inline text-ink-muted">{m.label}</dt> <dd className="inline">{m.value}</dd>
@@ -20,7 +20,7 @@ export function MetaStrip({ items }: { items: { label: string; value: ReactNode 
 /** The lead photo, wide column, 3:2. */
 export function LeadPhoto({ src, alt }: { src: string; alt: string }) {
   return (
-    <figure className="mx-auto w-full max-w-measure-wide">
+    <figure className="mx-auto w-full max-w-page">
       {/* Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send. */}
       <img
         src={src}
@@ -39,10 +39,10 @@ export function Lede({ children }: { children: ReactNode }) {
   return <p className="drop-cap mx-auto max-w-measure text-deck text-ink [overflow-wrap:anywhere]">{children}</p>;
 }
 
-/** Two columns from 768px: a narrow sidebar beside the main text. Stacks on phones and iPad portrait. */
+/** Two columns from 768px: a narrow sidebar beside the main text, on the same edges as the masthead and photo. Stacks on phones. */
 export function SidebarLayout({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   return (
-    <div className="mx-auto grid w-full max-w-measure-wide grid-cols-1 gap-12 md:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] md:gap-14">
+    <div className="mx-auto grid w-full max-w-page grid-cols-1 gap-12 md:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] md:gap-14">
       {sidebar}
       {children}
     </div>
@@ -86,7 +86,7 @@ export function StepList({ steps }: { steps: string[] }) {
           <span className="font-display text-numeral text-(--numeral-fg) tabular-nums">
             {i + 1}
           </span>
-          <p className="text-body [overflow-wrap:anywhere]">{text}</p>
+          <p className="max-w-[34rem] text-body [overflow-wrap:anywhere]">{text}</p>
         </li>
       ))}
     </ol>

@@ -5,9 +5,9 @@ import { Contents } from "@/components/ui/Contents";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RecipeCard } from "@/components/RecipeCard";
-import { NoMatches, ResultSummary } from "@/components/search/ResultSummary";
+import { NoMatches } from "@/components/search/ResultSummary";
 import { SearchControls } from "@/components/search/SearchControls";
-import { homeHref, parseSort } from "@/components/search/url";
+import { homeHref, parseSort, resultSummary } from "@/components/search/url";
 import { ServerError } from "@/components/ServerError";
 import { firstParam, type SearchParams } from "@/lib/nav";
 import { serverApi } from "@/lib/server-api";
@@ -19,14 +19,14 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const q = firstParam(sp.q)?.trim() ?? "";
   const tag = firstParam(sp.tag) ?? "";
   const sort = parseSort(firstParam(sp.sort));
-  const header = (count?: number) => (
+  // The deck is the household count, or, while filtering, the live result count (Q1-05: no separate summary line).
+  const header = (description?: string, filtered = false) => (
     <PageHeader
       kicker="The collection"
       title="Recipes"
-      reserveDeck
-      description={
-        count === undefined ? undefined : `${count} ${count === 1 ? "recipe" : "recipes"} in your household’s box.`
-      }
+      reserveDeck={!filtered}
+      liveDescription={filtered}
+      description={description}
       actions={
         <>
           <ButtonLink href="/recipes/new">Add recipe</ButtonLink>
@@ -46,7 +46,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   } catch (e) {
     return (
       <div className="flex flex-col gap-8">
-        {header()}
+        {header(undefined, Boolean(q || tag))}
         {/* Same position and shape as the success layout, so the input keeps its text and focus. */}
         <div className="flex flex-col gap-3">
           <SearchControls q={q} tag={tag} sort={sort} />
@@ -80,14 +80,21 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {header(filtered ? undefined : total)}
+    <div className="flex flex-col gap-10">
+      {header(
+        filtered
+          ? total > 0
+            ? resultSummary(total, q, tag)
+            : undefined
+          : `${total} ${total === 1 ? "recipe" : "recipes"} in your household’s box.`,
+        filtered,
+      )}
 
       <div className="flex flex-col gap-3">
         <SearchControls q={q} tag={tag} sort={sort} />
 
         {tags.length > 0 && (
-          <ChipRow label="Filter by tag">
+          <ChipRow key={tag} label="Filter by tag" current={tag ? `${tag} ${tags.find((t) => t.name === tag)?.count ?? ""}`.trim() : "All"}>
             <li>
               <Chip href={homeHref({ q, sort })} selected={!tag}>
                 All
@@ -116,7 +123,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         <NoMatches q={q} tag={tag} />
       ) : (
         <section aria-label={filtered ? `${total} matching recipes` : "All recipes"} className="flex flex-col gap-2">
-          {filtered && <ResultSummary total={total} q={q} tag={tag} />}
           <Contents>
             {items.map((r) => (
               <RecipeCard key={r.id} recipe={r} />

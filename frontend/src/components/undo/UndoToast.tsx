@@ -65,6 +65,7 @@ function UndoBody({ offer, api }: { offer: UndoOffer; api: Api }) {
       await api.restoreRecipe(offer.id);
       dismissUndo(offer.seq);
       router.push(`/recipes/${offer.id}`);
+      router.refresh(); // the home list must pick the restored recipe up again
     } catch (e) {
       setBusy(false);
       setError(

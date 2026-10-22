@@ -259,7 +259,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
   const described = (id: string, key: string) => (errors[key] ? `${id}-msg` : undefined);
 
   return (
-    <form ref={formRef} method="post" noValidate onSubmit={submit} className="flex max-w-measure flex-col gap-10">
+    <form ref={formRef} method="post" noValidate onSubmit={submit} className="flex max-w-form flex-col gap-10">
       {initial?.warnings && initial.warnings.length > 0 && (
         <Alert title="Check these before saving">
           <ul className="flex flex-col gap-1">

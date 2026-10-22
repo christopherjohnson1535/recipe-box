@@ -5,7 +5,8 @@ import { UndoToast } from "./UndoToast";
 import { dismissUndo, showUndo } from "./undo-store";
 
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 
 type Props = NonNullable<Parameters<typeof UndoToast>[0]>;
 const setup = (restore = vi.fn().mockResolvedValue({})) => {
@@ -21,6 +22,7 @@ afterEach(() => {
   act(() => dismissUndo());
   cleanup();
   push.mockClear();
+  refresh.mockClear();
   vi.useRealTimers();
 });
 
@@ -57,6 +59,7 @@ describe("UndoToast", () => {
     await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Undo" })));
     expect(restore).toHaveBeenCalledWith("r1");
     expect(push).toHaveBeenCalledWith("/recipes/r1");
+    expect(refresh).toHaveBeenCalled();
     expect(toastText()).toBe("");
   });
 

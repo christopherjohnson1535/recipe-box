@@ -60,6 +60,8 @@
   --rule-hair: var(--color-rule);
   --rule-double: var(--color-ink);
   --entry-title-hover: var(--color-accent);
+  --entry-kicker-fg: var(--color-ink-muted);
+  --editor-heading-rule: var(--color-rule-strong);
 
   /* Editorial accents */
   --kicker-fg: var(--color-accent);
@@ -79,5 +81,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --photo-filter: brightness(0.9) contrast(1.02);
+    /* Full cream was the brightest object on the page; the muted ink still reads as a rule. */
+    --rule-double: var(--color-ink-muted);
   }
 }

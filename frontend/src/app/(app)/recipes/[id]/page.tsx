@@ -82,7 +82,7 @@ export default async function RecipePage({ params }: Params) {
         description={deck}
         byline={
           by.length > 0 || source ? (
-            <DotList as="p" align="center">
+            <DotList as="p" align="center" stackOnPhone>
               {by.map((line) => (
                 <span key={line.verb}>
                   {line.verb}
@@ -100,7 +100,7 @@ export default async function RecipePage({ params }: Params) {
         }
         actions={
           <>
-            <ButtonLink href={`/recipes/${id}/cook`}>Start cooking</ButtonLink>
+            <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">Start cooking</ButtonLink>
             <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
               Edit
             </ButtonLink>

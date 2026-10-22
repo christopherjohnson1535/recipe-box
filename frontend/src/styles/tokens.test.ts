@@ -88,6 +88,7 @@ const TEXT: [string, string][] = [
   ["--link-fg", "--color-paper"],
   ["--link-fg-hover", "--color-paper"],
   ["--entry-title-hover", "--color-paper"],
+  ["--entry-kicker-fg", "--color-paper"],
   ["--selection-fg", "--selection-bg"],
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
@@ -106,6 +107,7 @@ const UI: [string, string][] = [
   ["--nav-underline-active", "--color-paper"],
   ["--alert-rule-error", "--alert-bg"],
   ["--progress-fg", "--alert-bg"],
+  ["--editor-heading-rule", "--color-paper"],
   ["--focus-ring", "--color-paper"],
   ["--focus-ring", "--color-paper-deep"],
 ];
