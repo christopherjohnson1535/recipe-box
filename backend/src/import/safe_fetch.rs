@@ -36,19 +36,45 @@ const BOT_MARKERS: &[&str] = &[
 
 /// Which addresses may be fetched. The default allows public addresses only; there is no env var or request
 /// field that changes it.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FetchPolicy {
     loopback_port: Option<u16>,
     timeout: Option<Duration>,
+    /// Operator opt-in (`IMPORT_ALLOW_HOST`, for end-to-end test stacks): this one host and port is fetched even
+    /// though it is not public. Matched on the URL's host text, so it is re-checked on every redirect hop.
+    allowed_host: Option<(String, u16)>,
 }
 
 impl FetchPolicy {
+    /// Parses `host:port` (as in `IMPORT_ALLOW_HOST`). `None` for an empty value; `Err` if it is not `host:port`.
+    pub fn with_allowed_host(mut self, value: &str) -> Result<Self, String> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(self);
+        }
+        let bad = || format!("IMPORT_ALLOW_HOST must be host:port, got `{value}`");
+        let (host, port) = value.rsplit_once(':').ok_or_else(bad)?;
+        let port: u16 = port.parse().map_err(|_| bad())?;
+        if host.is_empty() || host.contains(['/', '@', '[', ']', ':']) {
+            return Err(bad());
+        }
+        self.allowed_host = Some((host.to_ascii_lowercase(), port));
+        Ok(self)
+    }
+
+    fn exempts(&self, url: &Url, port: u16) -> bool {
+        self.allowed_host.as_ref().is_some_and(|(h, p)| {
+            *p == port && url.host_str().is_some_and(|u| u.eq_ignore_ascii_case(h))
+        })
+    }
+
     /// Tests only: additionally allows loopback on this one port (the local test server).
     #[doc(hidden)]
     pub fn allow_loopback_port_for_tests(port: u16) -> Self {
         Self {
             loopback_port: Some(port),
             timeout: None,
+            allowed_host: None,
         }
     }
 
@@ -186,7 +212,7 @@ async fn send(policy: &FetchPolicy, url: &Url) -> AppResult<reqwest::Response> {
             "That address could not be found.".into(),
         ));
     }
-    if addrs.iter().any(|a| !policy.allows(*a)) {
+    if !policy.exempts(url, port) && addrs.iter().any(|a| !policy.allows(*a)) {
         return Err(AppError::BlockedAddress);
     }
     let mut headers = header::HeaderMap::new();
@@ -381,6 +407,57 @@ mod tests {
                 .err()
                 .unwrap_or_else(|| panic!("{u} was fetched"));
             assert!(matches!(err, AppError::BlockedAddress), "{u}: {err:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn allowed_host_opens_exactly_one_host_and_port() {
+        let policy = FetchPolicy::default()
+            .with_allowed_host("127.0.0.1:9")
+            .unwrap();
+        // The allowed host and port is attempted (nothing listens, so it fails to connect, not as blocked)...
+        let err = fetch(&policy, &Url::parse("http://127.0.0.1:9/").unwrap(), 1000)
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(err, AppError::FetchFailed(_)), "{err:?}");
+        // ...and every other internal address stays blocked, including the same host on another port.
+        for u in [
+            "http://127.0.0.1:10/",
+            "http://127.0.0.1/",
+            "http://localhost:9/",
+            "http://10.0.0.1:9/",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[::1]:9/",
+        ] {
+            let err = fetch(&policy, &Url::parse(u).unwrap(), 1000)
+                .await
+                .err()
+                .unwrap_or_else(|| panic!("{u} was fetched"));
+            assert!(matches!(err, AppError::BlockedAddress), "{u}: {err:?}");
+        }
+    }
+
+    #[test]
+    fn allowed_host_parsing() {
+        assert!(FetchPolicy::default().with_allowed_host("").is_ok());
+        assert!(
+            FetchPolicy::default()
+                .with_allowed_host("fixture:4010")
+                .is_ok()
+        );
+        for bad in [
+            "fixture",
+            "fixture:x",
+            ":80",
+            "a/b:80",
+            "[::1]:80",
+            "u@h:80",
+        ] {
+            assert!(
+                FetchPolicy::default().with_allowed_host(bad).is_err(),
+                "{bad}"
+            );
         }
     }
 
