@@ -57,15 +57,28 @@ fixers, then runs tests and looks at screenshots, before opening the PR. Each st
 do not need to use the factory to contribute by hand, but your PR gets the same checks.
 
 ## Branch protection and required checks
-`main` is protected: changes arrive by pull request, with the required checks green and the owner's review
-(see [.github/CODEOWNERS](.github/CODEOWNERS)). Required status checks:
+`main` should be protected: changes arrive by pull request, with the required checks green, branches up to date,
+force pushes blocked and no bypass. **This is not yet configured; the owner needs to enable it** in the repository
+settings. Until then these are the rules by convention. [.github/CODEOWNERS](.github/CODEOWNERS) only requests the
+owner's review once protection requires code owner review.
 
-<!-- placeholder until #49 supplies the exact job names -->
+Required status checks to configure:
 - `PR title`
-- backend checks
-- frontend checks
-- end-to-end tests
-- container build
+- `backend`
+- `frontend`
+- `compose`
+- `cargo-deny`
+- `npm-audit`
+- `analyze (javascript-typescript)`
+- `analyze (rust)`
+- `trivy (api)`
+- `trivy (web)`
+- `zizmor`
+
+<!-- verify after #49 merges: job names from PR #54; add e2e, contract and coverage checks when #46-#48 land -->
+The `images` job is optional. Renovate automerge only works if these checks are required. CI, Security, CodeQL and
+the image scan also run weekly (Mondays, UTC). Run the security checks locally with `cargo deny check` in
+`backend/`, `npm audit --omit=dev --audit-level=high` in `frontend/`, and `zizmor .github/workflows`.
 
 ## Reporting security problems
 Do not open a public issue. See [SECURITY.md](SECURITY.md).

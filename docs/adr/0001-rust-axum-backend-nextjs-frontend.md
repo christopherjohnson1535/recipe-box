@@ -3,7 +3,7 @@
 Status: Accepted · Date: 2026-10-22 (recorded after the fact; the decision predates this record)
 
 ## Context
-Recipe Box is a household app used from a browser and an iPad PWA, self-hosted with Docker on a home server (including arm64). It needs a small memory footprint, one place that touches the database, the media volume, outside websites and the AI provider, and a modern installable frontend. See docs/SPEC.md.
+Recipe Box is a household app used from a browser and an iPad PWA, self-hosted with Docker on a home server (including arm64). It needs one place that touches the database, the media volume, outside websites and the AI provider, and a modern installable frontend. See docs/SPEC.md.
 
 ## Decision
 The API is Rust (axum 0.8, tokio, sqlx 0.9 with runtime queries, edition 2024). The web app is Next.js 16 (App Router, React 19, strict TypeScript, Tailwind 4, standalone output). They run as separate containers beside Postgres. The browser talks only to the web container, which proxies `/api/*` and `/media/*` to the API at runtime (`API_INTERNAL_URL`), so there is one origin and the session cookie just works.

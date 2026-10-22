@@ -1,15 +1,20 @@
 # Security policy
 
 ## Reporting a vulnerability
-Please report privately, not in a public issue.
+Please report privately, not in a public issue with details.
+
+<!-- Owner: enable Settings → Code security → Private vulnerability reporting -->
+GitHub private vulnerability reporting is the intended channel. If the **Report a vulnerability** button is not
+shown yet, use the interim channel below.
 
 1. Go to the repository's **Security** tab and choose **Report a vulnerability** (GitHub private vulnerability
    reporting).
 2. Describe what you found, how to reproduce it, and what an attacker could do. A failing request or a short
    proof of concept is ideal.
 
-If you cannot use that button, open a public issue that says only "I have a security report" with no details,
-and the owner will arrange a private channel.
+Interim channel, until private reporting is enabled (or if you cannot use the button): open a minimal public issue
+that says only "I have a security report, please contact me privately", with no details about the problem, and the
+owner will arrange a private channel.
 
 ## What to expect
 Recipe Box is maintained by one person in spare time, so these are intentions, not guarantees:

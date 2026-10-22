@@ -7,7 +7,7 @@ screenshots — even a picture of the dish), find them by search and tags, and c
 screen-stays-on cooking mode that also works offline.
 
 > **Status:** Phase 1 (recipe box: accounts, editor, search, link import, household members) is done. Phase 2
-> (photos and AI import, plus the October 2026 redesign) is in progress; cooking mode and the PWA follow in Phase 3.
+> (photos and AI import, plus the October 2026 redesign) is starting; cooking mode and the PWA follow in Phase 3.
 > Work is tracked as [issues](../../issues) by phase ([milestones](../../milestones)). See the [changelog](CHANGELOG.md).
 
 | | |

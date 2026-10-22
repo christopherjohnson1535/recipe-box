@@ -1,8 +1,10 @@
 # Testing guide
 
 How Recipe Box is tested, how to add a test at each layer, and how to debug a failure from CI.
-This describes the target state of the repository-quality work (tracked in #52). Where a command or name is not
-settled yet it is marked with a `verify` comment for the maintainer to reconcile when the slice merges.
+This describes the target state of the repository-quality work (tracked in #52). Much of the tooling below does not
+exist on `main` yet: every statement about planned tooling is followed by a `verify after #NN merges` comment, which
+the maintainer reconciles when that issue merges. Today the backend has per-file integration tests in
+`backend/tests/` run with `cargo test`, and the frontend has Vitest tests.
 
 ## The pyramid
 Cheap, fast tests at the bottom; a few slow, realistic ones at the top. A behaviour is tested at the lowest layer
@@ -16,7 +18,10 @@ that can show it.
 | 3. Contract | generated OpenAPI spec plus generated TS types, `oasdiff` | `docs/openapi.json`, `frontend/src/lib/api-types.ts` | nothing | seconds |
 | 4. End to end | Playwright, TypeScript: `api` and `web` projects | `e2e/` | the Compose stack | minutes |
 
-<!-- verify after #45, #46, #47, #48 merge: paths and names above -->
+<!-- verify after #45 merges: Rust layers 1-2 (nextest, TestApp, testcontainers) -->
+<!-- verify after #48 merges: Vitest, Testing Library, MSW -->
+<!-- verify after #47 merges: contract layer (OpenAPI, oasdiff, generated types) -->
+<!-- verify after #46 merges: Playwright e2e layer -->
 
 Guard tests in `frontend/src/styles/` (no page-level styling, every theme has every token, contrast of at least 4.5:1)
 are unit tests too; see [UI.md](UI.md) and [THEMING.md](THEMING.md).
@@ -25,43 +30,63 @@ are unit tests too; see [UI.md](UI.md) and [THEMING.md](THEMING.md).
 These apply to every test at every layer. A flaky test is a bug, not something to retry.
 
 1. **No retries.** `retries = 0` in nextest and in Playwright; Playwright also sets `forbidOnly` in CI.
+   <!-- verify after #45 merges: nextest config -->
+   <!-- verify after #46 merges: Playwright config -->
 2. **Fixed clock, time zone and locale.** Rust tests inject a `FixedClock` that can be advanced; Vitest runs with a
    fixed `TZ`, locale and system time from `vitest.setup.ts`; Playwright sets `timezoneId: 'America/Denver'`,
    `locale: 'en-US'` and installs `page.clock` at a fixed instant. Never read the wall clock inside a test, and
    never rewrite database rows to fake time.
+   <!-- verify after #45 merges: FixedClock -->
+   <!-- verify after #48 merges: vitest.setup.ts -->
+   <!-- verify after #46 merges: Playwright timezone, locale and page.clock -->
 3. **No real network.** Tests talk only to local fixture servers (the one in `backend/tests/fixtures/`, the
    fixture-site container in the e2e stack, MSW in Vitest). Requests to anything else are blocked or fail the test.
+   <!-- verify after #45 merges: Rust fixture server -->
+   <!-- verify after #46 merges: fixture-site container -->
+   <!-- verify after #48 merges: MSW -->
 4. **Every test creates its own data** (its own schema, user and recipes) and passes in any order and in parallel.
    Shared fixtures are read-only.
 5. **No sleeps.** Wait on a condition: a web-first Playwright assertion (`expect(locator).toBeVisible()`), a
    polled query with a deadline, `await` on the event. `waitForTimeout` and `sleep` are lint errors or review
    rejects.
+   <!-- verify after #46 merges: lint rule against waitForTimeout; #45 for Rust sleeps -->
 6. **No silent skips.** A missing prerequisite (no Postgres, no Docker) fails loudly with an explanation. A test
-   that cannot run must not report as passed.
+   that cannot run must not report as passed. (Today backend tests still skip silently without `TEST_DATABASE_URL`;
+   fixed in #45.) <!-- verify after #45 merges -->
 7. **Shuffled order in CI.** Suites run in random order (nextest and Vitest with a seed). A failure prints the seed;
    re-run with the same seed to reproduce.
+   <!-- verify after #45 merges: nextest shuffle and seed -->
+   <!-- verify after #48 merges: Vitest shuffle and seed -->
 
 ## Running tests
 ```sh
 just check          # everything CI runs
-just test-backend   # cargo nextest, all Rust unit + integration tests
-just test-frontend  # vitest, with coverage
+just check-backend  # cargo fmt, clippy, tests
+just check-frontend # lint, tsc, vitest, build
+just test-backend   # all Rust unit + integration tests
+just test-frontend  # vitest
+just fmt            # format both trees
 just e2e            # boots the e2e stack and runs both Playwright projects
 just openapi        # regenerate docs/openapi.json and the frontend types
+just up / down      # start and stop the Compose stack; `just logs` follows it
+just db             # open a psql shell on the dev database
+just setup          # install dependencies and git hooks
 ```
-<!-- verify after #50 merges -->
-`just` recipes are the single source of truth; CI calls the same ones, so local and CI cannot disagree.
+<!-- verify after #50 merges: recipe names and what each runs -->
+`just` recipes are intended to be the single source of truth; CI is meant to call the same ones, so local and CI
+cannot disagree. <!-- verify after #50 merges -->
 
 Backend integration tests find Postgres in this order: `TEST_DATABASE_URL` if set
-(e.g. `postgres://recipes:recipes@127.0.0.1:5432/recipes_test`), otherwise a Postgres 16 container started by
-testcontainers, otherwise the test run fails with a message. Running one test while iterating:
+(e.g. `postgres://recipes:recipes@127.0.0.1:5432/recipes_test`), otherwise (planned) a Postgres 16 container started by
+testcontainers, otherwise the test run fails with a message. Today only `TEST_DATABASE_URL` works and tests skip
+without it. <!-- verify after #45 merges --> Running one test while iterating:
 ```sh
-cd backend && cargo nextest run recipes::undo      # by name filter
-cd frontend && npx vitest run src/lib/ingredients  # by path
+cd backend && cargo nextest run ingredient_and_title_matches   # by name filter (cargo test <name> today)
+cd frontend && npx vitest run src/lib/recipe  # by path
 cd e2e && npx playwright test --project=web -g "delete and undo"
 ```
-<!-- verify after #45 merges -->
-<!-- verify after #46 merges -->
+<!-- verify after #45 merges: nextest -->
+<!-- verify after #46 merges: Playwright filter -->
 
 ## Adding a test
 
@@ -85,8 +110,8 @@ async fn deleted_recipe_can_be_undone_within_ten_seconds() {
 ```
 <!-- verify after #45 merges: helper names -->
 Rules: time-dependent behaviour is tested by advancing `app.clock`, not by editing rows; assert on JSON bodies
-and status codes through the helpers; the schema and media directory are removed by a drop guard even if the test
-panics. Auth, uploads, outbound fetches and deletion each need a test for the refusal path, not just the happy one.
+and status codes through the helpers; the schema and media directory are meant to be removed by a drop guard even if the
+test panics. Auth, uploads, outbound fetches and deletion each need a test for the refusal path, not just the happy one.
 
 ### Contract
 Change the Rust route or model annotations (`utoipa`), then `just openapi` to regenerate `docs/openapi.json` and
