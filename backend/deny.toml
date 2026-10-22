@@ -1,0 +1,40 @@
+# cargo-deny policy for the API. Run: `cargo deny check` in backend/ (CI: .github/workflows/security.yml).
+
+[graph]
+all-features = true
+
+[advisories]
+# RustSec advisories fail the check. To ignore one, add { id = "RUSTSEC-YYYY-NNNN", reason = "why, and expires
+# <date>" } below and re-evaluate before the expiry date. Currently none are ignored.
+ignore = []
+
+[licenses]
+confidence-threshold = 0.9
+# Permissive licences only; anything else (GPL, AGPL, ...) fails the check.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "CDLA-Permissive-2.0", # webpki-roots (TLS root certificates)
+    "ISC",
+    "MIT-0",
+    "MPL-2.0", # file-level copyleft; fine as an unmodified dependency
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[licenses.private]
+# recipe-box-api itself is `publish = false` and has no licence field (the repo is MIT, see ../LICENSE).
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -1,0 +1,6 @@
+rules:
+  cache-poisoning:
+    ignore:
+      # Dependency caches are only written by the check jobs, which publish nothing. Actions caches are scoped per
+      # branch/ref, so a PR run cannot write a cache that the main-branch publishing job (`images`) restores.
+      - ci.yml
