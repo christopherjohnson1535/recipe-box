@@ -118,9 +118,11 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
               }
               controls={
                 <>
+                  {row.heading !== null && <span className="w-20 max-sm:hidden" aria-hidden="true" />}
                   {row.heading === null && (
                     <Button
                       variant="ghost"
+                      className="sm:w-20"
                       aria-label={`Start a section at ${lower} ${i + 1}`}
                       onClick={() => change(setHeading(rows, i, ""), id(row.key, "heading"))}
                     >

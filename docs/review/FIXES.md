@@ -139,3 +139,32 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #9 B-405 fixed — unknown codes (method_not_allowed) already fall back to the server message in both mappers; no change
 #9 B-ids fixed — recipe and edit pages already treat 400 like 404 (notFound); verified, no change
 #9 B-logout fixed — nothing relied on a 401 from logout; no change
+#9 Q1-01 fixed — not reproducible (deleted recipe absent from home at 200/700/2000 ms, count correct, after both direct and card navigation); hardened anyway with router.refresh() after delete, 404 and Undo, tests added
+#9 Q1-02 fixed — Textarea grows with text ([field-sizing:content]) with a 3-row (4-row for notes) minimum, resize-y kept
+#9 Q1-03 skipped — CSS columns reorder reading/focus order (as D-05); instead entries keep source order, grid items-start, listing titles clamp to 2 lines so a long title no longer stretches its row
+#9 Q1-04 fixed — Heading with tabIndex -1 gets focus:outline-none; interactive focus rings unchanged
+#9 Q1-05 fixed — filtered home shows the live result count as the PageHeader deck (role=status); separate summary line and ResultSummary removed
+#9 Q1-06 fixed — below sm the tag chips sit behind a details disclosure (TAG: ALL +), sort select is a quiet underlined control on its own right-aligned row; chips open from sm
+#9 Q1-07 fixed — EditorItem puts row buttons beside the field from sm (gap-1), phone keeps them below; list gap 16/24
+#9 Q1-08 fixed — ghost button px-0 (min 44 wide) aligns Section with the arrows; heading rows use --editor-heading-rule and italic input; Section slot fixed width so field widths line up
+#9 Q1-09 fixed — --measure-form 44rem (max-w-form) for the editor; review heading wrapper uses the same width
+#9 Q1-10 skipped — orchestrator: Add recipe stays the primary action (as D-09)
+#9 Q1-11 fixed — --entry-kicker-fg (ink-muted) for listing kickers; Badge inherits colour; contrast pairing added
+#9 Q1-12 fixed — DotList stackOnPhone (byline) and MetaStrip 2x2 grid below sm, dots dropped; recipe-page kicker left wrapping (short tags)
+#9 Q1-13 fixed — RecipeCard kicker shows at most two tags; no orphan dot seen at 390 px
+#9 Q1-14 fixed — LeadPhoto and SidebarLayout use max-w-page (same edges as masthead and head rule)
+#9 Q1-15 fixed — step text max-w-[34rem] (the section was already 38rem, so the change is small)
+#9 Q1-16 fixed — Start cooking full width on phone; Edit and Delete share the next row
+#9 Q1-17 fixed — dark --rule-double is ink-muted
+#9 Q1-18 fixed — primary button px-4 (px-5 kept on secondary and danger)
+#9 Q1-19 fixed — DetailList items-baseline; ghost px-0 puts Remove on the rule edge
+#9 Q1-20 fixed — .label-quiet (500) for chips and nav, selected 600, chip count normal weight
+#9 Q1-21 skipped — P2, changes settings behaviour and focus rules; out of scope for a polish pass
+#9 Q1-22 fixed — --umber-900 (dark paper-deep) #211c17 to #241f19; style-lock numbers updated, matrix green
+#9 Q1-23 skipped — P2, the method subsection heading is the first child of its group, needs a new ui wrapper
+#9 Q1-24 fixed — --text-numeral 2rem
+#9 Q1-25 skipped — toast already has the safe-area bottom offset and max-w-measure
+#9 Q1-26 fixed — ghost buttons px-0 (start over aligns with fields; the -ml-2 wrapper removed), no centred wrap
+#9 Q1-27 fixed — auth layout top-aligned (pt-16, sm:pt-28); card padding was already p-10
+#9 Q1-28 skipped — Phase 2 placeholder page
+#9 Q1-29 fixed — home head groups with gap-10 between head, controls and list; search + chips stay 12 px apart
