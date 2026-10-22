@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", ":semanticCommits"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "UTC",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "rangeStrategy": "bump",
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
+  "vulnerabilityAlerts": { "labels": ["dependencies", "security"], "schedule": ["at any time"] },
+  "packageRules": [
+    {
+      "description": "Cargo: one weekly PR",
+      "matchManagers": ["cargo"],
+      "groupName": "cargo dependencies"
+    },
+    {
+      "description": "npm: one weekly PR for production deps, one for dev deps",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "groupName": "npm dependencies"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "npm dev dependencies"
+    },
+    {
+      "description": "Docker base images (Dockerfiles, compose, CI service containers)",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "groupName": "docker base images"
+    },
+    {
+      "description": "GitHub Actions, pinned by digest",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "pinDigests": true
+    },
+    {
+      "description": "Automerge patch and minor devDependency updates once required checks are green",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Keep Node and Postgres on the versions the project targets (major bumps are deliberate)",
+      "matchDepNames": ["node", "postgres"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
+}
