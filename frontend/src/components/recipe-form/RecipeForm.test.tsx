@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type RecipeInput } from "@/lib/api";
 import { RecipeForm, type RecipeFormProps } from "./RecipeForm";
@@ -7,7 +7,6 @@ const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 afterEach(() => {
-  cleanup();
   vi.restoreAllMocks();
   push.mockReset();
   sessionStorage.clear();

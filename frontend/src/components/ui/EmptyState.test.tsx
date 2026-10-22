@@ -1,10 +1,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { NotFoundContent } from "../NotFoundContent";
 import { Chip } from "./Chip";
 import { EmptyState } from "./EmptyState";
-
-afterEach(cleanup);
 
 describe("EmptyState and Chip", () => {
   it("is an h2 by default and an h1 on request; not-found renders the h1", () => {

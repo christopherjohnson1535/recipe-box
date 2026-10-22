@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
 import { UndoToast } from "./UndoToast";
@@ -20,10 +20,8 @@ const toastText = () => screen.getByRole("status").textContent ?? "";
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   act(() => dismissUndo());
-  cleanup();
   push.mockClear();
   refresh.mockClear();
-  vi.useRealTimers();
 });
 
 describe("UndoToast", () => {

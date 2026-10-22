@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type RecipeDraft } from "@/lib/api";
 import { ImportScreen, type ImportApi } from "./ImportScreen";
@@ -37,7 +37,6 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
 });
 afterEach(() => {
-  cleanup();
   push.mockReset();
   window.history.replaceState(null, "", "/");
 });
