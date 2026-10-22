@@ -58,7 +58,9 @@ const LIST_WHERE: &str = "
       and ($2::text is null
            or r.search @@ websearch_to_tsquery('simple', $2)
            or r.title ilike $3
-           or r.search @@ to_tsquery('simple', $4))";
+           or r.search @@ to_tsquery('simple', $4)
+           or exists (select 1 from recipe_tags rt join tags t on t.id = rt.tag_id
+                      where rt.recipe_id = r.id and t.name::text ilike $3))";
 
 /// `$3`: the query as an escaped `ilike` title prefix. `$4`: a prefix tsquery (`weeknight & lasag:*`) so a
 /// half-typed word finds "Weeknight lasagne"; none when the query uses websearch operators, which keep their
@@ -104,7 +106,10 @@ pub async fn list(
     if q.offset < 0 {
         return Err(AppError::validation("offset: must be 0 or more."));
     }
-    let search = q.q.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    // NUL bytes cannot be bound to Postgres text; drop them rather than answer 500.
+    let search =
+        q.q.map(|s| s.replace('\0', "").trim().to_string())
+            .filter(|s| !s.is_empty());
     // Ranked by relevance when searching and no sort was asked for.
     let order = match q.sort.as_deref() {
         None if search.is_some() => {
@@ -117,7 +122,7 @@ pub async fn list(
     };
     let tag = q
         .tag
-        .map(|t| t.trim().to_lowercase())
+        .map(|t| t.replace('\0', "").trim().to_lowercase())
         .filter(|t| !t.is_empty());
     let (like, prefix) = search.as_deref().map(search_terms).unzip();
     let prefix = prefix.flatten();

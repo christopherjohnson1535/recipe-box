@@ -274,6 +274,33 @@ async fn tag_and_query_combine() {
 }
 
 #[tokio::test]
+async fn tag_names_are_searched() {
+    let Some(ctx) = ctx().await else { return };
+    seed(&ctx).await;
+    let mut hits = ctx.search("dinner").await;
+    hits.sort();
+    assert_eq!(
+        hits,
+        ["Tomato soup", "Weeknight lasagne"],
+        "tag name, not in text"
+    );
+    let mut hits = ctx.search("DIN").await;
+    hits.sort();
+    assert_eq!(
+        hits,
+        ["Tomato soup", "Weeknight lasagne"],
+        "tag prefix, any case"
+    );
+    assert_eq!(
+        ctx.list("q=dinner&tag=pasta").await,
+        (vec!["Weeknight lasagne".to_string()], 1)
+    );
+    assert_eq!(ctx.list("q=dinner&tag=dessert").await, (vec![], 0));
+    assert_eq!(ctx.list("q=dinner").await.1, 2, "total counts tag hits");
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
 async fn sorts_and_total() {
     let Some(ctx) = ctx().await else { return };
     seed(&ctx).await;
@@ -370,9 +397,12 @@ async fn special_characters_are_literal_and_safe() {
         "'; drop table recipes; --",
         "é",
         "<->",
+        "a\u{0}b",
+        "\u{0}",
     ] {
         ctx.list(&format!("q={}", enc(q))).await; // must answer 200, not error
     }
+    assert_eq!(ctx.list("tag=a%00b").await.1, 0, "NUL in tag is not a 500");
     assert_eq!(ctx.list("").await.1, 8, "nothing was dropped");
     ctx.cleanup().await;
 }
@@ -380,43 +410,51 @@ async fn special_characters_are_literal_and_safe() {
 #[tokio::test]
 async fn two_thousand_recipes_search_fast() {
     let Some(ctx) = ctx().await else { return };
+    // Realistic rows: ~10 ingredients of 30-60 chars, a 300-char description, 3 tags.
     sqlx::query(
-        "insert into recipes (title, description, ingredients, total_minutes)
+        "insert into recipes (title, description, notes, ingredients, total_minutes)
          select 'Recipe ' || n || case when n % 7 = 0 then ' lasagne' else ' stew' end,
-                'Family favourite number ' || n,
-                jsonb_build_array(jsonb_build_object('text', n || ' g flour'),
-                                  jsonb_build_object('text', case when n % 5 = 0 then 'buttermilk' else 'water' end)),
+                left(repeat('Family favourite number ' || n || ' with a long note about the dish. ', 8), 300),
+                repeat('Rest before serving and keep the leftovers covered. ', 6),
+                (select jsonb_agg(jsonb_build_object('text',
+                     (1 + k) * 25 || ' g ' || (array['plain flour','caster sugar','unsalted butter','whole milk','chopped onion',
+                       'crushed garlic','tinned tomatoes','grated parmesan','olive oil','fresh basil leaves'])[k + 1]
+                       || ' sifted and ' || case when n % 5 = 0 and k = 3 then 'buttermilk' else 'divided' end))
+                 from generate_series(0, 9) k),
                 n % 120
          from generate_series(1, 2000) n",
     )
     .execute(&ctx.pool)
     .await
     .unwrap();
-    sqlx::query("insert into tags (name) values ('dinner')")
+    sqlx::query("insert into tags (name) values ('dinner'), ('weeknight'), ('family')")
         .execute(&ctx.pool)
         .await
         .unwrap();
-    sqlx::query("insert into recipe_tags select r.id, t.id from recipes r, tags t where r.title like '%lasagne'")
+    sqlx::query("insert into recipe_tags select r.id, t.id from recipes r, tags t where t.name <> 'dinner' or r.title like '%lasagne'")
         .execute(&ctx.pool)
         .await
         .unwrap();
     sqlx::query("analyze").execute(&ctx.pool).await.unwrap();
 
     ctx.search("buttermilk").await; // warm-up
-    for q in ["buttermilk", "lasag", "weeknight lasag", "recipe 12 stew"] {
-        let started = Instant::now();
-        let (items, total) = ctx.list(&format!("q={}&tag=dinner", enc(q))).await;
-        let ms = started.elapsed().as_millis();
-        eprintln!(
-            "search {q:?} + tag over 2000 recipes: {ms} ms ({total} hits, {} returned)",
-            items.len()
-        );
-        assert!(ms < 300, "{q}: {ms} ms");
-        let started = Instant::now();
-        let (_, total) = ctx.list(&format!("q={}", enc(q))).await;
-        let ms = started.elapsed().as_millis();
-        eprintln!("search {q:?} over 2000 recipes: {ms} ms ({total} hits)");
-        assert!(ms < 300, "{q}: {ms} ms");
+    let mut worst = 0;
+    for q in [
+        "buttermilk",
+        "lasag",
+        "weeknight lasag",
+        "recipe 12 stew",
+        "dinner",
+    ] {
+        for query in [format!("q={}&tag=dinner", enc(q)), format!("q={}", enc(q))] {
+            let started = Instant::now();
+            let (items, total) = ctx.list(&query).await;
+            let ms = started.elapsed().as_millis();
+            worst = worst.max(ms);
+            eprintln!("{query}: {ms} ms ({total} hits, {} returned)", items.len());
+            assert!(ms < 300, "{query}: {ms} ms");
+        }
     }
+    eprintln!("slowest search over 2000 realistic recipes: {worst} ms");
     ctx.cleanup().await;
 }
