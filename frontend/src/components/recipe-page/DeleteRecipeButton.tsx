@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
-import { showUndo } from "@/components/undo/undo-store";
-import { api as browserApi } from "@/lib/api";
+import { showNotice, showUndo } from "@/components/undo/undo-store";
+import { ApiError, api as browserApi } from "@/lib/api";
 
 /** Deletes at once (no dialog: the Undo toast is the safety net), then goes home where the toast is shown. */
 export function DeleteRecipeButton({
@@ -26,7 +26,13 @@ export function DeleteRecipeButton({
     setFailed(false);
     try {
       await api.deleteRecipe(id);
-    } catch {
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        // Already deleted (another tab or device): nothing to undo from here.
+        showNotice("That recipe was already deleted.");
+        router.push("/");
+        return;
+      }
       setPending(false);
       setFailed(true);
       return;

@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api";
 import { UndoToast } from "@/components/undo/UndoToast";
 import { dismissUndo } from "@/components/undo/undo-store";
 import { DeleteRecipeButton } from "./DeleteRecipeButton";
@@ -36,5 +37,18 @@ describe("DeleteRecipeButton", () => {
     await screen.findByText("Not deleted");
     expect(push).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
+  });
+
+  it("treats 404 as already deleted: goes home with a short notice and no Undo", async () => {
+    render(
+      <>
+        <DeleteRecipeButton id="r1" title="Soup" api={asApi(vi.fn().mockRejectedValue(new ApiError(404, "not_found", "gone")))} />
+        <UndoToast />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
+    expect(screen.getByRole("status").textContent).toContain("That recipe was already deleted.");
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
   });
 });

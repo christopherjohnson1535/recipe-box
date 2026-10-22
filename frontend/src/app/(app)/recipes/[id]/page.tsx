@@ -14,6 +14,7 @@ import { ApiError, type Recipe } from "@/lib/api";
 import { formatMinutes, groupBySection } from "@/lib/recipe";
 import { serverApi } from "@/lib/server-api";
 import { bylines } from "@/components/recipe-page/byline";
+import { LocalDate } from "@/components/recipe-page/LocalDate";
 import { DeleteRecipeButton } from "@/components/recipe-page/DeleteRecipeButton";
 
 type Params = { params: Promise<{ id: string }> };
@@ -83,7 +84,11 @@ export default async function RecipePage({ params }: Params) {
           by.length > 0 || source ? (
             <DotList as="p" align="center">
               {by.map((line) => (
-                <span key={line}>{line}</span>
+                <span key={line.verb}>
+                  {line.verb}
+                  {line.who ? ` by ${line.who}` : ""}
+                  <LocalDate iso={line.iso} />
+                </span>
               ))}
               {source && (
                 <Text as="span" variant="aside">
