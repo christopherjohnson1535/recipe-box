@@ -1,6 +1,9 @@
 rules:
   cache-poisoning:
     ignore:
-      # Dependency caches are only written by the check jobs, which publish nothing. Actions caches are scoped per
-      # branch/ref, so a PR run cannot write a cache that the main-branch publishing job (`images`) restores.
-      - ci.yml
+      # Only the two dependency-cache steps in the check jobs (`backend` and `frontend`), which publish nothing.
+      # Actions caches are scoped per ref, so a PR run cannot write a cache that the main-branch publishing job
+      # (`images`) restores. This relies on `images` never using Swatinem/rust-cache or setup-node caching: if it
+      # ever gains a cache step, zizmor will flag it, so do not widen this ignore.
+      - ci.yml:50:9
+      - ci.yml:68:9

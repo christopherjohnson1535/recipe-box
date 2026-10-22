@@ -26,7 +26,7 @@
       "groupName": "npm dev dependencies"
     },
     {
-      "description": "Docker base images (Dockerfiles, compose, CI service containers)",
+      "description": "Docker base images (Dockerfiles, compose); CI service containers fall under the github actions group",
       "matchManagers": ["dockerfile", "docker-compose"],
       "groupName": "docker base images"
     },
