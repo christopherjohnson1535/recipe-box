@@ -14,12 +14,23 @@ dish photos), search them, and cook from an iPad (installable PWA, cooking mode,
 - Work items: GitHub issues (labels `area:*`, `phase:*`, `priority:*`; milestones = phases)
 
 ## Stack
-| Part | Tech | Folder | Checks |
+| Part | Tech | Folder | Checks (`just` recipe) |
 |---|---|---|---|
-| API | Rust, axum 0.8, sqlx 0.9 (Postgres), tokio | `backend/` | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
-| Web | Next.js 16 App Router, React 19, TS strict, Tailwind 4 | `frontend/` | `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build` |
+| API | Rust, axum 0.8, sqlx 0.9 (Postgres), tokio | `backend/` | `just check-backend` |
+| Web | Next.js 16 App Router, React 19, TS strict, Tailwind 4 | `frontend/` | `just check-frontend` |
 | DB | Postgres 16 | container `db` | migrations in `backend/migrations/`, run on API start |
 | Containers | `docker-compose.yml` (db, api, web, optional caddy) | root, `deploy/` | CI `compose` job boots the stack |
+
+`just check` runs both trees (CI runs the same recipes); `just` lists everything else (`setup`, `fmt`, `up`, `down`,
+`logs`, `e2e`, `openapi`, `db`). Without `just`, run the raw commands:
+- API (`cd backend`): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
+- Web (`cd frontend`): `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`
+
+Toolchains are pinned: Rust in `rust-toolchain.toml` (rustup picks it up), Node in `.nvmrc` (22, same as the
+Dockerfile). Bump them in one place. Optional git hooks: `lefthook.yml` (format and lint staged files; `just setup`
+installs them when lefthook is present).
+
+End-to-end tests live in `e2e/` (TypeScript + Playwright); run with `just e2e`; scripts/smoke.sh is removed.
 
 The browser only talks to the web container; the web container proxies `/api/*` and `/media/*` to the API at
 runtime (`API_INTERNAL_URL`). Session cookie `rb_session`.
@@ -39,7 +50,7 @@ For an issue:
    `factory-build` (builder agents, split by owned files), `factory-verify` (independent reviewer agents, then
    separate fixer agents; always for auth, uploads, outbound fetches or data deletion), `factory-test` (all checks +
    a smoke run; UI changes get screenshots the orchestrator actually looks at), `factory-design-qa` for UI work.
-5. Run every check for the tree you touched (table above). Backend tests need Postgres:
+5. Run every check for the tree you touched (`just check-backend` / `just check-frontend`, table above). Backend tests need Postgres:
    `TEST_DATABASE_URL=postgres://recipes:recipes@127.0.0.1:5432/recipes_test`.
 6. Update docs: `docs/API.md` if a contract changed, the matching wiki page in `docs/wiki/`, and README if setup changed.
 7. Open a PR that says `Closes #<n>`, ticks the issue's acceptance checklist, and lists checks run.

@@ -7,6 +7,10 @@ Filled-in copy of `.claude/skills/factory-plan/templates/agent-preamble.md` for 
 - Backend: `backend/` (Rust, axum). Frontend: `frontend/` (Next.js 16). Containers: `docker-compose.yml`.
 - Postgres for tests: a local server is available in the sandbox; use `TEST_DATABASE_URL` from your brief.
 
+## Checks
+`just check-backend` / `just check-frontend` (or `just check` for both) run the checks CI runs; raw commands are in
+`CLAUDE.md`. Toolchains are pinned by `rust-toolchain.toml` and `.nvmrc`.
+
 ## Read first
 - `docs/SPEC.md` (plan + file ownership), `docs/API.md` (exact contract), `docs/REQUIREMENTS.md` (IDs).
 - Existing code in the tree you own — reuse helpers; never duplicate one.
