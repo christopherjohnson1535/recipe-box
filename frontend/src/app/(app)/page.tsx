@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ButtonLink } from "@/components/ui/Button";
 import { Chip, ChipRow } from "@/components/ui/Chip";
 import { Contents } from "@/components/ui/Contents";
@@ -10,6 +11,8 @@ import { homeHref, parseSort } from "@/components/search/url";
 import { ServerError } from "@/components/ServerError";
 import { firstParam, type SearchParams } from "@/lib/nav";
 import { serverApi } from "@/lib/server-api";
+
+export const metadata: Metadata = { title: "Recipes" };
 
 export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;

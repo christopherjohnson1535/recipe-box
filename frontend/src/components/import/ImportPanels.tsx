@@ -33,7 +33,7 @@ export function LinkPanel({ url, onUrl, error, busy, onSubmit, aiOff }: Common &
           autoComplete="off"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="https://example.com/best-pancakes…"
+          placeholder="https://example.com/best-pancakes"
           aria-invalid={error ? true : undefined}
           aria-describedby="import-url-msg"
           value={url}

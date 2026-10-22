@@ -33,8 +33,9 @@ export function Chip({
     <Link
       href={href}
       aria-current={selected ? "true" : undefined}
+      title={typeof children === "string" && children.length > 24 ? children : undefined}
       className={cx(
-        "label inline-flex min-h-control items-center gap-1.5 whitespace-nowrap border-b-2 px-1",
+        "label inline-flex min-h-control max-w-full items-center gap-1.5 border-b-2 px-1 [overflow-wrap:anywhere]",
         "transition-[border-color,color] duration-150 ease-out",
         selected
           ? "border-(--chip-underline-selected) text-(--chip-fg-selected)"
@@ -42,7 +43,7 @@ export function Chip({
       )}
     >
       {children}
-      {count !== undefined && <span className="text-(--chip-fg)">{count}</span>}
+      {count !== undefined && <span className="shrink-0 text-(--chip-fg)">{count}</span>}
     </Link>
   );
 }

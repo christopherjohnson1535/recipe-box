@@ -28,7 +28,7 @@ describe("DeleteRecipeButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
     expect(del).toHaveBeenCalledWith("r1");
-    expect(screen.getByRole("status").textContent).toContain('Deleted "Soup".');
+    expect(screen.getByRole("status").textContent).toContain('Deleted “Soup”.');
   });
 
   it("stays put and says so when the delete fails", async () => {

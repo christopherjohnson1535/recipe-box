@@ -116,3 +116,26 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #9 B-08 deferred — #33 (throttling)
 #9 S-1 fixed — one PathRejection mapping: any malformed :id gives 400 `validation` "id: not a valid id." (no parser text); test covers recipes get/delete/restore and users delete
 #9 S-3 fixed — already covered: tests/api.rs recipe_crud_list_delete_restore sets deleted_at to 11 minutes ago and expects 409 `conflict`; no change needed
+#9 F-01 fixed — EmptyState `level` prop (default 2); NotFoundContent and ErrorContent pass level 1 (test)
+#9 F-02 fixed — url/sourceUrl validation messages always map to the friendly copy by field prefix; tests with the exact backend strings
+#9 F-03 fixed — app/(app)/loading.tsx renders the polite Pending note in the main column
+#9 F-04 fixed — Chip wraps (max-w-full, overflow-wrap:anywhere), count never shrinks, full name in title for long tags (test)
+#9 F-05 fixed — overflow-wrap:anywhere on MetaStrip items, Lede and the PageHeader deck; byline already wraps via DotList; Text already did
+#9 F-06 fixed — RouteFocus in the (app) layout moves focus to the h1 (else main) after client navigation, preventScroll; saving a recipe shows a “Recipe saved.”/“Saved.” toast (existing notice store)
+#9 F-07 skipped — Nice; autofocus on touch devices is unwanted, not a one-liner
+#9 F-08 fixed — curly quotes in the undo toast copy (tests updated)
+#9 F-09 fixed — titles for home (“Recipes”) and both not-found pages; edit page keeps “Edit recipe” (skipped: recipe name would cost a second fetch)
+#9 F-10 skipped — Nice; global-error needs its own html/body and styling, not a one-liner
+#9 F-11 skipped — copy/variant drift is taste; left for design QA
+#9 F-12 fixed — placeholder no longer ends in an ellipsis that reads as part of the URL
+#9 F-13 skipped — Nice; 24 px minimum met, left for design QA
+#9 F-14 skipped — Nice; consistent masthead on unmatched URLs is a layout decision
+#9 R5 S-2 fixed — AI off: “Keep photos and type it in” uploads each photo via POST /api/media (6-photo limit, per-photo errors, no re-upload on retry), then an empty form with photoImageIds and imageId = first; `shortcut:` comment for #11; AI path unchanged (tests)
+#9 R5 N-1/N-2/N-3 left for design QA — grid holes, count line gap, sort select and kicker wrapping
+#9 R5 N-4 skipped — the trailing “·” at a wrapped line end is the dot-list design (no line starts with a dot), not a bug
+#9 R5 N-5 skipped — a row with a heading shows its heading instead of the “Section” button by design; not a bug
+#9 B-fields fixed — RecipeForm: description/notes caps shown under their field, ingredients/steps/tags caps named in the top message; client maxLength (10,000/20,000/2,000 per line), Add disabled at 500 rows, tag count checked on save (tests)
+#9 B-413 fixed — too_large on save shows “That recipe is too large to save…” (test); import copy already handled it
+#9 B-405 fixed — unknown codes (method_not_allowed) already fall back to the server message in both mappers; no change
+#9 B-ids fixed — recipe and edit pages already treat 400 like 404 (notFound); verified, no change
+#9 B-logout fixed — nothing relied on a 401 from logout; no change

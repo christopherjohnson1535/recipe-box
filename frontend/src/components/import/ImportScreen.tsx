@@ -10,7 +10,8 @@ import { Pending } from "@/components/ui/Pending";
 import { PhotoGallery } from "@/components/ui/PhotoPicker";
 import { Tabs } from "@/components/ui/Tabs";
 import { Text } from "@/components/ui/Text";
-import { ApiError, api as browserApi, type Api, type Capabilities, type RecipeDraft } from "@/lib/api";
+import { showNotice } from "@/components/undo/undo-store";
+import { ApiError, api as browserApi, type Api, type Capabilities, type Image, type RecipeDraft } from "@/lib/api";
 import { LinkPanel, MAX_PHOTOS, PhotoPanel, TextPanel, type PhotoKind } from "./ImportPanels";
 import { explainImportError, type ImportMode, type ImportProblem } from "./import-errors";
 
@@ -64,6 +65,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
   const heading = useRef<HTMLHeadingElement>(null);
   const reviewCount = useRef(0);
   const autoStarted = useRef(false);
+  const stored = useRef(new Map<File, Image>());
 
   useEffect(() => {
     let live = true;
@@ -158,7 +160,41 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
 
   async function importPhotos() {
     if (files.length === 0) return setProblem({ from: "photo", value: explainImportError(new ApiError(400, "validation", "Choose at least one photo."), "photo") });
+    if (aiOff) return keepPhotos();
     await start("photo", () => api.importPhoto(files, kind));
+  }
+
+  // shortcut: with AI off the photos are stored one by one through POST /api/media; issue #11 replaces this with the
+  // server-side photo import (POST /api/import/photo answering 422 `ai_disabled` with `photoImageIds`).
+  async function keepPhotos() {
+    const id = ++request.current;
+    setProblem(null);
+    setBusy("photo");
+    const failed: string[] = [];
+    for (const file of files) {
+      if (stored.current.has(file)) continue; // kept by an earlier try
+      try {
+        stored.current.set(file, await api.uploadMedia(file));
+      } catch (e) {
+        failed.push(`${file.name}: ${e instanceof ApiError ? e.message : "could not be uploaded."}`);
+      }
+    }
+    if (id !== request.current) return;
+    setBusy(null);
+    if (failed.length > 0) {
+      const message = failed.join(" ");
+      return setProblem({ from: "photo", value: { title: "Some photos could not be kept", message, tone: "error", offers: ["retry"], field: false, photoIds: [] } });
+    }
+    const images = files.map((file) => stored.current.get(file)!);
+    const ids = images.map((i) => i.id);
+    setReview({
+      id: ++reviewCount.current,
+      initial: { title: "", sourceType: "photo", imageId: ids[0], imageUrl: images[0].url, photoImageIds: ids },
+      duplicateOf: null,
+      photoIds: ids,
+      byHand: true,
+      from: "photo",
+    });
   }
 
   function stopWaiting() {
@@ -186,6 +222,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
 
   async function save(input: Parameters<ImportApi["createRecipe"]>[0]) {
     const saved = await api.createRecipe(input);
+    showNotice("Recipe saved.");
     router.push(`/recipes/${saved.id}`);
   }
 
@@ -298,7 +335,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
               </Button>
             }
           >
-            {WAITING[busy]}
+            {busy === "photo" && aiOff ? "Keeping the photos…" : WAITING[busy]}
           </Pending>
         )}
         {here && !here.field && (

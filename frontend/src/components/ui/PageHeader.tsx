@@ -22,7 +22,7 @@ export function PageHeader({ title, kicker, description, byline, actions, align 
     <header className={cx("flex flex-col gap-4 border-b border-(--rule-hair) pb-8", centered && "items-center text-center")}>
       {kicker && <div className="label text-(--kicker-fg)">{kicker}</div>}
       <h1 className="min-w-0 max-w-measure-wide font-display text-headline text-ink [overflow-wrap:anywhere]">{title}</h1>
-      {description && <p className="max-w-measure text-deck text-ink-muted italic">{description}</p>}
+      {description && <p className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{description}</p>}
       {!description && reserveDeck && (
         <p className="text-deck" aria-hidden="true">
           &nbsp;

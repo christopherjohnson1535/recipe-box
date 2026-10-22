@@ -27,7 +27,7 @@ afterEach(() => {
 describe("UndoToast", () => {
   it("shows the message and goes away after 10 seconds", () => {
     setup();
-    expect(toastText()).toContain('Deleted "Soup".');
+    expect(toastText()).toContain('Deleted “Soup”.');
     tick(9_900);
     expect(toastText()).toContain("Deleted");
     tick(200);
@@ -101,7 +101,7 @@ describe("UndoToast", () => {
     tick(8_000);
     act(() => showUndo({ id: "r2", title: "Stew" }));
     tick(3_000);
-    expect(toastText()).toContain('Deleted "Stew".');
+    expect(toastText()).toContain('Deleted “Stew”.');
     expect(toastText()).not.toContain("Soup");
     tick(7_100);
     expect(toastText()).toBe("");

@@ -104,12 +104,22 @@ const FIELD_KEYS: Record<string, string> = {
   cookMinutes: "cook",
   totalMinutes: "total",
   sourceUrl: "sourceUrl",
+  description: "description",
+  notes: "notes",
 };
+
+// Limits the API enforces (backend/src/validate.rs); checked here too so people see them before saving.
+export const LIMITS = { description: 10_000, notes: 20_000, line: 2_000, lines: 500, tags: 50 } as const;
+const LIST_NAMES: Record<string, string> = { ingredients: "Ingredients", steps: "Method", tags: "Tags" };
 
 function explain(error: unknown): { field?: string; message: string } {
   if (!(error instanceof ApiError)) return { message: "Something went wrong saving the recipe. Try again." };
+  if (error.code === "too_large") return { message: "That recipe is too large to save. Shorten the longest text or remove some entries, then try again." };
   const m = error.code === "validation" ? error.message.match(/^(\w+): (.+)$/) : null;
-  return m && FIELD_KEYS[m[1]] ? { field: FIELD_KEYS[m[1]], message: m[2] } : { message: error.message };
+  if (m && FIELD_KEYS[m[1]]) return { field: FIELD_KEYS[m[1]], message: m[2] };
+  // Lists have no single control to hang the message on: name the list in the note at the top.
+  if (m && LIST_NAMES[m[1]]) return { message: `${LIST_NAMES[m[1]]}: ${m[2]}` };
+  return { message: error.message };
 }
 
 /** The recipe editor used for new recipes, edits and import review. */
@@ -205,6 +215,10 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
       if (!validMinutes(state[key])) problems[key] = `Whole minutes, 0 to ${MAX_MINUTES.toLocaleString("en")}.`;
     }
     if (Object.keys(problems).length > 0) return fail(problems);
+    const filled = (rows: { text: string }[]) => rows.filter((r) => r.text.trim()).length;
+    if (filled(state.ingredients) > LIMITS.lines) return fail({}, `Ingredients: at most ${LIMITS.lines} entries.`);
+    if (filled(state.steps) > LIMITS.lines) return fail({}, `Method: at most ${LIMITS.lines} steps.`);
+    if ((input.tags ?? []).length > LIMITS.tags) return fail({}, `Tags: at most ${LIMITS.tags}.`);
     setErrors({});
     setFormError(null);
     setSaving(true);
@@ -289,10 +303,12 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
             onChange={(e) => set("title", e.target.value)}
           />
         </Field>
-        <Field label="Description" htmlFor="rf-description" hint="A line or two about the dish. Shown under the title.">
+        <Field label="Description" htmlFor="rf-description" error={errors.description} hint="A line or two about the dish. Shown under the title.">
           <Textarea
             id="rf-description"
             name="description"
+            maxLength={LIMITS.description}
+            aria-invalid={bad("description")}
             aria-describedby="rf-description-msg"
             value={state.description}
             onChange={(e) => set("description", e.target.value)}
@@ -403,10 +419,12 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
             onChange={(e) => set("sourceName", e.target.value)}
           />
         </Field>
-        <Field label="Notes" htmlFor="rf-notes" hint="Your own tips and changes.">
+        <Field label="Notes" htmlFor="rf-notes" error={errors.notes} hint="Your own tips and changes.">
           <Textarea
             id="rf-notes"
             name="notes"
+            maxLength={LIMITS.notes}
+            aria-invalid={bad("notes")}
             aria-describedby="rf-notes-msg"
             value={state.notes}
             onChange={(e) => set("notes", e.target.value)}

@@ -7,7 +7,7 @@ import { Heading } from "./Heading";
 export function MetaStrip({ items }: { items: { label: string; value: ReactNode }[] }) {
   if (items.length === 0) return null;
   return (
-    <dl className="label dot-list -mt-4 flex flex-wrap justify-center gap-y-2 text-ink">
+    <dl className="label dot-list -mt-4 flex flex-wrap justify-center gap-y-2 text-ink [&>*]:[overflow-wrap:anywhere]">
       {items.map((m) => (
         <div key={m.label}>
           <dt className="inline text-ink-muted">{m.label}</dt> <dd className="inline">{m.value}</dd>
@@ -36,7 +36,7 @@ export function LeadPhoto({ src, alt }: { src: string; alt: string }) {
 
 /** Opening paragraph with an accent drop cap. */
 export function Lede({ children }: { children: ReactNode }) {
-  return <p className="drop-cap mx-auto max-w-measure text-deck text-ink">{children}</p>;
+  return <p className="drop-cap mx-auto max-w-measure text-deck text-ink [overflow-wrap:anywhere]">{children}</p>;
 }
 
 /** Two columns from 768px: a narrow sidebar beside the main text. Stacks on phones and iPad portrait. */

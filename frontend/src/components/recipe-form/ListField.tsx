@@ -76,6 +76,7 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
           const endsSection = row.heading === "" && inSection;
           const common = {
             id: id(row.key, "text"),
+            maxLength: 2000, // backend MAX_LINE
             "aria-label": `${itemLabel} ${i + 1}`,
             placeholder,
             value: row.text,
@@ -167,6 +168,7 @@ export function ListField({ idPrefix, legend, hint, itemLabel, addLabel, placeho
         <Button
           id={`${idPrefix}-add`}
           variant="secondary"
+          disabled={rows.length >= 500} // backend MAX_LINES
           onClick={() => {
             const row = newRow();
             change([...rows, row], id(row.key, "text"));
