@@ -1,0 +1,622 @@
+<meta charset="utf-8">
+<title>Recipe Box Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/*FONTS*/
+/* Layout: a portfolio of five full-size screen proposals, each scaled into a frame with its brief beside it. */
+:root{
+  --paper:#fbf8f1; --paper-deep:#f3eee3; --ink:#1a1714; --muted:#5c554c; --rule:#cdc3b0; --claret:#9b1c1c;
+  --chrome-bg:#efe9dc; --chrome-fg:#1a1714; --chrome-muted:#5c554c; --chrome-rule:#cdc3b0; --chrome-accent:#9b1c1c;
+  --mustard:#d9a21b; --fern:#3f6b45; --tomato:#d2492a;
+  --display:"Libre Caslon Display","Iowan Old Style",Georgia,serif;
+  --text:"Newsreader Variable","Iowan Old Style",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--chrome-bg:#16130f;--chrome-fg:#efe8da;--chrome-muted:#b3a999;--chrome-rule:#463e33;--chrome-accent:#e6a497;color-scheme:dark}}
+:root[data-theme="dark"]{--chrome-bg:#16130f;--chrome-fg:#efe8da;--chrome-muted:#b3a999;--chrome-rule:#463e33;--chrome-accent:#e6a497;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0}
+body{background:var(--chrome-bg);color:var(--chrome-fg);font-family:var(--text);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 80px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:72px}
+.intro{display:grid;grid-template-columns:1.3fr 1fr;gap:40px;align-items:end;border-bottom:3px double var(--chrome-rule);padding-bottom:28px}
+.intro .k{font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:var(--chrome-accent)}
+.intro h1{font-family:var(--display);font-weight:400;font-size:clamp(44px,6vw,84px);line-height:1;margin:.15em 0 0;letter-spacing:-.015em;text-wrap:balance}
+.intro p{margin:0;color:var(--chrome-muted);font-style:italic;font-size:20px;max-width:34rem}
+.prop{display:grid;grid-template-columns:260px minmax(0,1fr);gap:36px;align-items:start}
+.brief{position:sticky;top:calc(env(safe-area-inset-top,0px) + 20px);display:flex;flex-direction:column;gap:12px}
+.brief .tag{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--chrome-accent)}
+.brief h2{font-family:var(--display);font-weight:400;font-size:34px;line-height:1.05;margin:0;text-wrap:balance}
+.brief p{margin:0;color:var(--chrome-muted);font-size:16px}
+.brief ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--chrome-rule);padding-top:12px}
+.brief li{font-size:15px;padding-left:16px;position:relative}
+.brief li::before{content:"";position:absolute;left:0;top:.62em;width:7px;height:1px;background:var(--chrome-accent)}
+.frame{position:relative;width:100%;overflow:hidden;border-radius:6px;box-shadow:0 1px 0 var(--chrome-rule),0 30px 60px -30px rgba(0,0,0,.35);background:var(--paper)}
+.screen{position:absolute;top:0;left:0;transform-origin:0 0;overflow:hidden;color:var(--ink);background:var(--paper)}
+@media (max-width:820px){.intro,.prop{grid-template-columns:1fr}.brief{position:static}}
+
+/* shot mode: one screen at native size */
+body.shot{padding:0;background:var(--paper)}
+body.shot .intro, body.shot .brief, body.shot .prop:not(.on){display:none}
+body.shot .wrap{max-width:none;gap:0}
+body.shot .prop{display:block}
+body.shot .frame{border-radius:0;box-shadow:none;height:auto!important;overflow:visible}
+body.shot .screen{position:relative;transform:none!important}
+
+/* ============ shared editorial pieces inside screens ============ */
+.lbl{font-family:var(--text);font-size:13px;letter-spacing:.13em;text-transform:uppercase;font-weight:600}
+.lblq{font-size:13px;letter-spacing:.1em;text-transform:uppercase;font-weight:500}
+.disp{font-family:var(--display);font-weight:400;letter-spacing:-.012em;font-synthesis:none}
+.mast{display:flex;align-items:flex-end;justify-content:space-between;padding:22px 56px 10px}
+.wordmark{font-family:var(--display);font-size:34px;line-height:1}
+.wordmark i{font-style:normal;color:var(--claret)}
+.nav{display:flex;gap:26px;color:var(--muted)}
+.nav span.on{color:var(--ink);border-bottom:2px solid var(--claret);padding-bottom:4px}
+.dbl{height:7px;border-top:3px solid var(--ink);border-bottom:1px solid var(--ink);margin:0 56px;transform-origin:left;animation:draw 1.1s var(--ease) both}
+@keyframes draw{from{transform:scaleX(0)}}
+.issue{display:flex;justify-content:space-between;margin:8px 56px 0;color:var(--muted);font-variant-numeric:lining-nums}
+.btn{display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 22px;background:var(--ink);color:var(--paper);border-radius:2px}
+.btn.sec{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.btn.cl{background:var(--claret)}
+canvas.plate{display:block;width:100%;height:100%}
+.rise{display:inline-block;animation:rise .9s var(--ease) both}
+@keyframes rise{from{transform:translateY(.45em);opacity:.0001}}
+.spin{animation:spin 140s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============ A. COVER ============ */
+.cov-hero{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:34px 56px 0;border-bottom:1px solid var(--rule);padding-bottom:44px}
+.cov-hero .txt{padding-right:48px;display:flex;flex-direction:column;justify-content:center;gap:22px}
+.cov-hero h1{font-size:92px;line-height:.95;margin:0}
+.cov-hero .deck{font-size:24px;font-style:italic;color:var(--muted);line-height:1.4;margin:0;max-width:30rem}
+.cov-hero .by{display:flex;gap:18px;color:var(--muted)}
+.cov-hero .art{position:relative;aspect-ratio:1;background:#2b211b;overflow:hidden}
+.cov-hero .art canvas{position:absolute;inset:-21%;width:142%;height:142%}
+.cov-hero .art .cap{position:absolute;left:18px;bottom:14px;font-style:italic;font-size:14px;color:#fff;mix-blend-mode:difference;opacity:.85}
+.cov-hero .sticker{position:absolute;right:26px;top:26px;width:116px;height:116px;border-radius:50%;background:var(--mustard);color:var(--ink);display:grid;place-items:center;text-align:center;transform:rotate(-12deg);animation:wobble 6s ease-in-out infinite}
+.sticker b{font-family:var(--display);font-weight:400;font-size:34px;line-height:1;display:block}
+@keyframes wobble{50%{transform:rotate(-4deg) scale(1.04)}}
+.ticker{overflow:hidden;border-bottom:1px solid var(--ink);margin:0 56px;white-space:nowrap;padding:12px 0}
+.ticker div{display:inline-flex;gap:38px;animation:tick 40s linear infinite}
+.ticker span{font-style:italic;font-size:19px}
+.ticker em{font-style:normal;color:var(--claret)}
+@keyframes tick{to{transform:translateX(-50%)}}
+.cov-grid{display:grid;grid-template-columns:2fr 1fr;gap:48px;margin:40px 56px 56px}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:40px 32px}
+.card{display:flex;flex-direction:column;gap:12px}
+.card .pic{aspect-ratio:4/3;background:var(--paper-deep);overflow:hidden;position:relative}
+.card .pic canvas{transition:transform .8s var(--ease)}
+.card:hover .pic canvas, .card.hov .pic canvas{transform:scale(1.08) rotate(10deg)}
+.card h3{font-size:30px;line-height:1.08;margin:0}
+.card h3 span{background:linear-gradient(var(--claret),var(--claret)) 0 100%/0 2px no-repeat;transition:background-size .5s var(--ease)}
+.card:hover h3 span,.card.hov h3 span{background-size:100% 2px}
+.card p{margin:0;color:var(--muted);font-size:17px}
+.card .meta{display:flex;justify-content:space-between;color:var(--muted)}
+.card .k{color:var(--claret)}
+.idx{border-top:3px solid var(--ink);padding-top:14px;display:flex;flex-direction:column;gap:0}
+.idx h4{margin:0 0 6px}
+.idx ol{list-style:none;margin:0;padding:0;counter-reset:n}
+.idx li{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:baseline;border-bottom:1px solid var(--rule);padding:14px 0;counter-increment:n}
+.idx li::before{content:counter(n);font-family:var(--display);font-size:30px;color:var(--claret);line-height:1}
+.idx li b{font-weight:500;font-size:19px;line-height:1.25}
+.idx li small{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.season{margin-top:28px;background:var(--ink);color:var(--paper);padding:22px;display:flex;flex-direction:column;gap:8px}
+.season .disp{font-size:30px;line-height:1.1}
+.season p{margin:0;opacity:.75;font-size:16px}
+.chips{display:flex;gap:10px;margin:28px 56px 0;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border:1px solid var(--rule);border-radius:999px;font-size:16px}
+.chip svg{width:18px;height:18px;stroke:var(--claret);fill:none;stroke-width:1.5}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip.on svg{stroke:var(--paper)}
+.chip small{color:var(--muted);font-variant-numeric:tabular-nums}
+.chip.on small{color:var(--rule)}
+.search{margin:24px 56px 0;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--ink);padding-bottom:10px}
+.search .q{font-family:var(--display);font-size:34px;color:var(--rule);flex:1}
+.search .q::after{content:"";display:inline-block;width:2px;height:30px;background:var(--claret);vertical-align:-4px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ============ B. RECIPE SPREAD ============ */
+.spr-hero{display:grid;grid-template-columns:1.05fr 1fr;min-height:720px;margin-top:22px}
+.spr-hero .l{padding:56px 56px 40px;display:flex;flex-direction:column;gap:22px;justify-content:flex-end;border-right:1px solid var(--rule)}
+.spr-hero h1{font-size:104px;line-height:.92;margin:0}
+.spr-hero h1 .w{display:inline-block;animation:rise 1s var(--ease) both}
+.spr-hero .deck{font-size:25px;font-style:italic;color:var(--muted);margin:0;line-height:1.4}
+.spr-hero .r{position:relative;background:#2b211b;overflow:hidden}
+.spr-hero .r canvas{position:absolute;left:50%;top:50%;width:900px;height:900px;margin:-450px}
+.spr-hero .r .badge{position:absolute;left:24px;bottom:24px;color:#fbf8f1;font-style:italic;font-size:15px}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);border-top:3px solid var(--ink);border-bottom:1px solid var(--ink);margin:0 56px}
+.nums div{padding:18px 20px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:2px}
+.nums div:last-child{border-right:0}
+.nums b{font-family:var(--display);font-weight:400;font-size:52px;line-height:1;font-variant-numeric:lining-nums}
+.nums b sup{font-size:.4em;vertical-align:.9em;margin-left:2px}
+.nums span{color:var(--muted)}
+.spr-body{display:grid;grid-template-columns:380px 1fr;gap:64px;margin:44px 56px 64px}
+.ing{background:var(--paper-deep);padding:26px 26px 30px;align-self:start;display:flex;flex-direction:column;gap:14px}
+.ing .top{display:flex;justify-content:space-between;align-items:center}
+.ing h3{font-size:30px;margin:0}
+.scale{display:flex;border:1px solid var(--ink);border-radius:999px;overflow:hidden}
+.scale button{all:unset;cursor:pointer;padding:6px 12px;font-size:15px;font-variant-numeric:tabular-nums}
+.scale button.on{background:var(--ink);color:var(--paper)}
+.ing ul{list-style:none;margin:0;padding:0}
+.ing li{display:grid;grid-template-columns:22px 70px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);align-items:baseline;cursor:pointer;position:relative}
+.ing li .bx{width:16px;height:16px;border:1.5px solid var(--rule-strong,#8c8377);border-radius:2px;align-self:center;display:grid;place-items:center}
+.ing li .q{font-variant-numeric:lining-nums tabular-nums;font-weight:600;color:var(--claret);transition:opacity .25s}
+.ing li .t{position:relative;justify-self:start}
+.ing li .t::after{content:"";position:absolute;left:-2px;right:-2px;top:55%;height:2px;background:var(--claret);transform:scaleX(0);transform-origin:left;transition:transform .45s var(--ease)}
+.ing li.done .t{color:var(--muted)}
+.ing li.done .t::after{transform:scaleX(1)}
+.ing li.done .bx{background:var(--ink);border-color:var(--ink)}
+.ing li.done .bx::after{content:"";width:8px;height:4px;border-left:2px solid var(--paper);border-bottom:2px solid var(--paper);transform:rotate(-45deg) translate(1px,-1px)}
+.ing .grp{font-style:italic;color:var(--muted);padding-top:10px}
+.method{display:flex;flex-direction:column;gap:30px;max-width:640px}
+.method .h{display:flex;justify-content:space-between;align-items:end;border-bottom:1px solid var(--ink);padding-bottom:10px}
+.method .h h3{font-size:40px;margin:0}
+.step{display:grid;grid-template-columns:76px 1fr;gap:14px}
+.step .n{font-family:var(--display);font-size:68px;line-height:.85;color:var(--claret)}
+.step p{margin:0;font-size:20px;line-height:1.6}
+.step p:first-of-type::first-letter{}
+.timer{display:inline-flex;align-items:center;gap:6px;padding:1px 10px 1px 6px;border-radius:999px;background:var(--ink);color:var(--paper);font-size:15px;font-variant-numeric:tabular-nums;vertical-align:2px;white-space:nowrap}
+.timer svg{width:14px;height:14px}
+.ingref{border-bottom:1px dotted var(--claret)}
+.note{margin:8px 0 0;display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:start;font-style:italic;color:var(--muted);font-size:17px;line-height:1.45}
+.note .av{width:36px;height:36px;border-radius:50%;background:var(--mustard);display:grid;place-items:center;font-style:normal;font-weight:600;color:var(--ink);font-size:14px}
+.pull{border-top:3px solid var(--ink);border-bottom:1px solid var(--ink);padding:18px 0;font-family:var(--display);font-size:34px;line-height:1.2;color:var(--ink)}
+.pull small{display:block;font-family:var(--text);font-size:14px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:8px}
+.stickybar{position:absolute;left:66%;bottom:24px;transform:translateX(-50%);display:flex;align-items:center;gap:20px;background:var(--ink);color:var(--paper);padding:10px 10px 10px 24px;border-radius:999px;box-shadow:0 20px 40px -12px rgba(26,23,20,.5);animation:barin 1s .6s var(--ease) both}
+.stickybar .btn{background:var(--claret);border-radius:999px}
+@keyframes barin{from{transform:translate(-50%,140%)}}
+
+/* ============ C. COOK MODE ============ */
+.cook{--paper:#16130f;--ink:#efe8da;--muted:#b3a999;--rule:#463e33;--claret:#e6a497;background:#16130f;color:#efe8da;height:820px;display:grid;grid-template-rows:auto 1fr auto}
+.cook .top{display:flex;justify-content:space-between;align-items:center;padding:22px 40px}
+.cook .top .t{font-family:var(--display);font-size:24px}
+.cook .prog{display:flex;gap:6px;padding:0 40px}
+.cook .prog i{flex:1;height:3px;background:#463e33;position:relative;overflow:hidden}
+.cook .prog i.d{background:#efe8da}
+.cook .prog i.c::after{content:"";position:absolute;inset:0;background:#e6a497;transform-origin:left;animation:fillp 6s linear infinite}
+@keyframes fillp{from{transform:scaleX(.3)}to{transform:scaleX(1)}}
+.cook .main{display:grid;grid-template-columns:300px 1fr 300px;gap:40px;padding:40px}
+.cook .side h5{margin:0 0 12px;color:var(--muted)}
+.cook .side ul{list-style:none;margin:0;padding:0}
+.cook .side li{padding:12px 0;border-bottom:1px solid #463e33;font-size:20px;display:flex;gap:12px}
+.cook .side li b{color:#e6a497;font-weight:600;min-width:58px}
+.cook .side li.lit{color:#efe8da}
+.cook .side li.dim{color:#7a7064}
+.cook .stepbig{display:flex;flex-direction:column;justify-content:center;gap:24px}
+.cook .stepbig .sn{color:#e6a497}
+.cook .stepbig p{font-size:40px;line-height:1.3;margin:0;font-weight:400;font-variation-settings:"opsz" 60}
+.cook .stepbig p mark{background:none;color:#e6a497;border-bottom:2px solid #e6a497}
+.ring{position:relative;width:240px;height:240px;margin:0 auto}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .tt{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .tt b{font-family:var(--display);font-weight:400;font-size:58px;line-height:1;font-variant-numeric:tabular-nums}
+.ring .tt span{color:#b3a999}
+.cook .timers{display:flex;flex-direction:column;gap:22px;align-items:center}
+.cook .mini{width:100%;display:flex;justify-content:space-between;border-top:1px solid #463e33;padding-top:14px;color:#b3a999}
+.cook .bot{display:flex;justify-content:space-between;align-items:center;padding:22px 40px;border-top:1px solid #463e33}
+.cook .next{color:#b3a999;font-size:20px;max-width:640px}
+.cook .next b{color:#efe8da;font-weight:500}
+.cook .pills{display:flex;gap:12px}
+.cook .pill{height:60px;padding:0 28px;border-radius:999px;border:1px solid #7a7064;display:flex;align-items:center;font-size:18px}
+.cook .pill.p{background:#efe8da;color:#16130f;border-color:#efe8da}
+.mic{display:inline-flex;align-items:center;gap:10px;color:#b3a999}
+.mic i{width:10px;height:10px;border-radius:50%;background:#e6a497;animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(230,164,151,.6)}100%{box-shadow:0 0 0 14px rgba(230,164,151,0)}}
+
+/* ============ D. IMPORT ============ */
+.imp{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin:36px 56px 56px}
+.imp h1{font-size:64px;margin:0 0 6px;line-height:1}
+.imp .deck{font-style:italic;color:var(--muted);font-size:21px;margin:0 0 26px}
+.shotbox{position:relative;height:560px;background:#3a302a;overflow:hidden;display:grid;place-items:center}
+.pagep{width:76%;height:88%;background:#f4ecdb;transform:rotate(-3deg);box-shadow:0 30px 50px -20px rgba(0,0,0,.6);padding:34px 30px;display:flex;flex-direction:column;gap:10px;filter:sepia(.15)}
+.pagep .ph{font-family:var(--display);font-size:28px;color:#2a2018;line-height:1.05}
+.pagep .ln{height:7px;background:#b9ab93;border-radius:2px}
+.pagep .cols{display:grid;grid-template-columns:1fr 1.6fr;gap:16px;margin-top:6px}
+.pagep .cols div{display:flex;flex-direction:column;gap:9px}
+.scanline{position:absolute;left:0;right:0;height:120px;top:0;background:linear-gradient(to bottom,transparent,rgba(217,162,27,.28) 85%,rgba(217,162,27,.95) 100%);animation:scan 3.4s var(--ease) infinite alternate;mix-blend-mode:screen}
+@keyframes scan{from{transform:translateY(-120px)}to{transform:translateY(560px)}}
+.boxes span{position:absolute;border:1.5px solid var(--mustard);border-radius:2px;animation:pop 3.4s infinite}
+@keyframes pop{0%,30%{opacity:0;transform:scale(1.06)}45%,100%{opacity:1;transform:none}}
+.shotbox .st{position:absolute;left:18px;bottom:16px;display:flex;gap:10px;align-items:center;color:#f4ecdb}
+.shotbox .st i{width:8px;height:8px;border-radius:50%;background:var(--mustard);animation:pulse 1.4s infinite}
+.draft{display:flex;flex-direction:column;gap:16px}
+.draft .k{color:var(--claret)}
+.draft h2{font-size:48px;margin:0;line-height:1}
+.typed{border-right:2px solid var(--claret);white-space:nowrap;overflow:hidden;display:inline-block;max-width:0;animation:type 2.4s steps(30) .3s forwards}
+@keyframes type{to{max-width:100%;border-color:transparent}}
+.drow{display:grid;grid-template-columns:24px 90px 1fr auto;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);align-items:baseline;animation:slide .7s var(--ease) both}
+.drow .ok{color:var(--fern)}
+.drow .q{font-weight:600;color:var(--claret)}
+.drow small{color:var(--muted);font-family:var(--mono);font-size:12px}
+.drow.warn{background:linear-gradient(90deg,rgba(217,162,27,.18),transparent)}
+.drow.warn .ok{color:var(--mustard)}
+@keyframes slide{from{opacity:.0001;transform:translateX(24px)}}
+.flag{display:flex;gap:12px;padding:14px 16px;background:var(--paper-deep);border-left:3px solid var(--mustard);font-size:17px}
+.srcs{display:flex;gap:10px}
+
+/* ============ E. MOTION SHEET ============ */
+.ms{padding:40px 56px 56px;display:flex;flex-direction:column;gap:30px}
+.ms h1{font-size:64px;margin:0;line-height:1}
+.ms .row{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.tile{border-top:3px solid var(--ink);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+.tile h4{margin:0;font-family:var(--display);font-weight:400;font-size:26px}
+.tile p{margin:0;color:var(--muted);font-size:16px}
+.tile .stage{height:250px;background:var(--paper-deep);position:relative;overflow:hidden}
+.film{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;height:100%;padding:12px}
+.film div{background:var(--paper);position:relative;overflow:hidden;box-shadow:0 0 0 1px var(--rule)}
+.film .ph{position:absolute;background:#2b211b;overflow:hidden}
+.film .ph canvas{width:100%;height:100%}
+.film .ln{position:absolute;left:10%;height:5px;background:var(--rule)}
+.film .tl{position:absolute;left:10%;height:10px;background:var(--ink)}
+.stamp{position:absolute;left:50%;top:50%;width:150px;height:150px;margin:-75px;border:3px solid var(--claret);border-radius:50%;display:grid;place-items:center;text-align:center;color:var(--claret);transform:rotate(-14deg);animation:stamp 3s var(--ease) infinite}
+.stamp b{font-family:var(--display);font-weight:400;font-size:28px;line-height:1;display:block}
+@keyframes stamp{0%{transform:rotate(-14deg) scale(2.2);opacity:0}18%{transform:rotate(-14deg) scale(.94);opacity:1}26%,85%{transform:rotate(-14deg) scale(1);opacity:1}100%{opacity:0}}
+.toast{position:absolute;left:16px;right:16px;bottom:16px;background:var(--ink);color:var(--paper);padding:12px 16px;display:flex;justify-content:space-between;animation:toast 3s var(--ease) infinite}
+.toast u{color:#e6a497;text-decoration:none}
+@keyframes toast{0%,20%{transform:translateY(140%)}30%,85%{transform:none}100%{transform:translateY(140%)}}
+.icons{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:18px;height:100%;align-content:center}
+.icons div{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.icons svg{width:44px;height:44px;stroke:var(--ink);fill:none;stroke-width:1.4}
+.icons svg .a{stroke:var(--claret)}
+.shimmer{padding:18px;display:flex;flex-direction:column;gap:12px}
+.shimmer i{display:block;height:14px;background:linear-gradient(90deg,var(--rule) 0,#e8e0cf 40%,var(--rule) 80%) 0 0/300% 100%;animation:sh 1.6s linear infinite}
+.shimmer i.big{height:120px}
+@keyframes sh{to{background-position:-300% 0}}
+.editions{display:grid;grid-template-columns:1fr 1fr;height:100%}
+.editions div{padding:16px;display:flex;flex-direction:column;gap:6px}
+.editions .d{background:#fbf8f1;color:#1a1714}.editions .e{background:#16130f;color:#efe8da}
+.editions .disp{font-size:24px;line-height:1.05}
+.editions small{opacity:.65}
+.reveal{padding:16px;display:flex;flex-direction:column;gap:10px}
+.reveal div{height:44px;background:var(--paper);box-shadow:0 0 0 1px var(--rule);animation:rv 3s var(--ease) infinite}
+.reveal div:nth-child(2){animation-delay:.12s}.reveal div:nth-child(3){animation-delay:.24s}.reveal div:nth-child(4){animation-delay:.36s}
+@keyframes rv{0%{transform:translateY(30px);opacity:.15}25%,100%{transform:none;opacity:1}}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <div>
+      <div class="k">Recipe Box · Design proposals</div>
+      <h1>The Autumn Issue</h1>
+    </div>
+    <p>Five proposals that keep the New Yorker restraint and add what it was missing: illustrated plates, a cover-story homepage, motion with a reason, and a cook mode built for the iPad on the counter.</p>
+  </header>
+
+  <!-- A -->
+  <section class="prop" id="a">
+    <aside class="brief">
+      <div class="tag">PROPOSAL A · HOME</div>
+      <h2>The homepage becomes a cover</h2>
+      <p>Your box reads like this week's magazine instead of a list.</p>
+      <ul>
+        <li>A cover story picked from what you cook most or haven't made in a while</li>
+        <li>Issue line and date in the masthead, renewed each season</li>
+        <li>Tag chips with drawn spot icons; a live "in season" ticker</li>
+        <li>Cards lift and turn their plate on hover; titles underline in claret</li>
+      </ul>
+    </aside>
+    <div class="frame" data-w="1280"><div class="screen" style="width:1280px">
+      <div class="mast"><div class="wordmark">Recipe <i>Box</i></div><div class="nav lblq"><span class="on">Recipes</span><span>Import</span><span>Settings</span><span>Sign out</span></div></div>
+      <div class="dbl"></div>
+      <div class="issue lblq"><span>Vol. II · No. 47</span><span>The Autumn Issue</span><span>Wednesday, October 21, 2026</span></div>
+      <div class="cov-hero">
+        <div class="txt">
+          <div class="lbl" style="color:var(--claret)">Cover story · Braise · Sunday</div>
+          <h1 class="disp"><span class="rise">Short</span> <span class="rise" style="animation-delay:.08s">Ribs,</span> <span class="rise" style="animation-delay:.16s">Slow</span> <span class="rise" style="animation-delay:.24s">&amp;</span> <span class="rise" style="animation-delay:.32s">Low</span></h1>
+          <p class="deck">Three hours in the oven, a sharp gremolata at the end. You last made it in March. It's time.</p>
+          <div class="by lblq"><span>By Chris</span><span>·</span><span>Serves 4</span><span>·</span><span>3 hr 20 min</span></div>
+          <div style="display:flex;gap:12px;margin-top:6px"><span class="btn cl">Start cooking</span><span class="btn sec">Read the recipe</span></div>
+        </div>
+        <div class="art"><canvas class="plate spin" data-dish="stew" data-bg="#2b211b" data-size="900"></canvas><div class="sticker"><div><b>12</b><span class="lblq" style="font-size:11px">times<br>cooked</span></div></div><div class="cap">Illustrated from your photo</div></div>
+      </div>
+      <div class="ticker"><div>
+        <span><em>In season ·</em> Delicata squash</span><span>Pears, Bosc and Comice</span><span>Chanterelles</span><span>Cranberries</span><span>Brussels sprouts</span><span>Concord grapes</span><span>Celeriac</span>
+        <span><em>In season ·</em> Delicata squash</span><span>Pears, Bosc and Comice</span><span>Chanterelles</span><span>Cranberries</span><span>Brussels sprouts</span><span>Concord grapes</span><span>Celeriac</span>
+      </div></div>
+      <div class="search"><span class="q">Search the box</span><span class="lblq" style="color:var(--muted)">Newest first ▾</span></div>
+      <div class="chips">
+        <span class="chip on"><svg viewBox="0 0 24 24"><path d="M4 12h16M6 12a6 6 0 0 0 12 0M12 6v3"/></svg>All <small>58</small></span>
+        <span class="chip"><svg viewBox="0 0 24 24"><path d="M3 12h18a9 9 0 0 1-18 0zM8 8c0-2 2-2 2-4M13 8c0-2 2-2 2-4"/></svg>Soups <small>11</small></span>
+        <span class="chip"><svg viewBox="0 0 24 24"><path d="M12 21c-5-3-7-8-5-13 4 0 9 3 5 13zM12 21V10"/></svg>Vegetarian <small>19</small></span>
+        <span class="chip"><svg viewBox="0 0 24 24"><path d="M12 3c3 4 6 6 6 11a6 6 0 0 1-12 0c0-3 2-4 3-6 1 2 2 2 3 1-1-2 0-4 0-6z"/></svg>Weeknight <small>23</small></span>
+        <span class="chip"><svg viewBox="0 0 24 24"><path d="M4 16h16l-2-6H6zM9 10V7h6v3"/></svg>Baking <small>9</small></span>
+        <span class="chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>Under 30 min <small>17</small></span>
+      </div>
+      <div class="cov-grid">
+        <div class="cards">
+          <article class="card hov"><div class="pic"><canvas class="plate" data-dish="risotto" data-bg="#e9e0cc" data-size="640"></canvas></div><div class="meta lblq"><span class="k">Rice · Weeknight</span><span>40 min</span></div><h3 class="disp"><span>Saffron Risotto with Brown Butter</span></h3><p>Stir, ladle, stir. Finish with more butter than feels right.</p></article>
+          <article class="card"><div class="pic"><canvas class="plate" data-dish="tart" data-bg="#3f6b45" data-size="640"></canvas></div><div class="meta lblq"><span class="k">Baking · Weekend</span><span>1 hr 30</span></div><h3 class="disp"><span>Pear Frangipane Tart</span></h3><p>Mom's, from the stained index card. Bosc pears hold their shape.</p></article>
+          <article class="card"><div class="pic"><canvas class="plate" data-dish="salad" data-bg="#efd9b8" data-size="640"></canvas></div><div class="meta lblq"><span class="k">Salad · Vegetarian</span><span>15 min</span></div><h3 class="disp"><span>Last Tomatoes with Peaches &amp; Basil</span></h3><p>Salt the tomatoes first and wait ten minutes. That's the trick.</p></article>
+          <article class="card"><div class="pic"><canvas class="plate" data-dish="soup" data-bg="#9b1c1c" data-size="640"></canvas></div><div class="meta lblq"><span class="k">Soup · Freezer</span><span>1 hr 10</span></div><h3 class="disp"><span>Mushroom &amp; Barley Soup</span></h3><p>Doubles well. Freeze in quart jars, leave an inch at the top.</p></article>
+        </div>
+        <aside>
+          <div class="idx"><h4 class="lbl">Also in this issue</h4><ol>
+            <li><b>Miso-Glazed Salmon</b><small>25 min</small></li>
+            <li><b>Grandpa's Buttermilk Biscuits</b><small>35 min</small></li>
+            <li><b>Charred Brussels with Dates</b><small>30 min</small></li>
+            <li><b>Weeknight Chicken Tinga</b><small>45 min</small></li>
+            <li><b>Cardamom Morning Buns</b><small>3 hr</small></li>
+          </ol></div>
+          <div class="season"><span class="lblq" style="opacity:.7">Haven't cooked in a while</span><div class="disp">Green Chile Stew</div><p>Last made 14 months ago, by Sam. Hatch chiles are in the freezer.</p></div>
+        </aside>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- B -->
+  <section class="prop" id="b">
+    <aside class="brief">
+      <div class="tag">PROPOSAL B · RECIPE</div>
+      <h2>Each recipe gets a feature spread</h2>
+      <p>Split-screen opener, giant numerals, and an ingredient list you can actually use.</p>
+      <ul>
+        <li>Headline words rise in; the plate turns as you scroll</li>
+        <li>½× 1× 2× scaling with numbers that roll to the new amount (works here, try it)</li>
+        <li>Tap an ingredient to strike it through with a drawn line</li>
+        <li>Times in the method become tappable timers</li>
+        <li>Household notes sit in the margin like letters to the editor</li>
+      </ul>
+    </aside>
+    <div class="frame" data-w="1280"><div class="screen" style="width:1280px">
+      <div class="mast"><div class="wordmark">Recipe <i>Box</i></div><div class="nav lblq"><span class="on">Recipes</span><span>Import</span><span>Settings</span><span>Sign out</span></div></div>
+      <div class="dbl"></div>
+      <div class="spr-hero">
+        <div class="l">
+          <div class="lbl" style="color:var(--claret)">Braise · Sunday · Make-ahead</div>
+          <h1 class="disp"><span class="w">Braised</span> <span class="w" style="animation-delay:.1s">Short</span> <span class="w" style="animation-delay:.2s">Ribs</span> <span class="w" style="animation-delay:.3s;font-style:italic;color:var(--claret)">with</span> <span class="w" style="animation-delay:.4s">Gremolata</span></h1>
+          <p class="deck">Deep, winey, falling off the bone, then woken up with lemon, parsley and raw garlic.</p>
+          <div class="lblq" style="color:var(--muted)">Added by Chris · Edited by Sam, Oct 2 · Source: <span style="text-decoration:underline">seriouseats.com</span></div>
+        </div>
+        <div class="r"><canvas class="plate spin" data-dish="stew" data-bg="#2b211b" data-size="900"></canvas><div class="badge">From Chris's photo, Mar 14</div></div>
+      </div>
+      <div class="nums">
+        <div><b id="srv">4</b><span class="lblq">Serves</span></div>
+        <div><b>20<sup>min</sup></b><span class="lblq">Prep</span></div>
+        <div><b>3<sup>hr</sup></b><span class="lblq">Cook</span></div>
+        <div><b>3:20</b><span class="lblq">Total</span></div>
+      </div>
+      <div class="spr-body" style="position:relative">
+        <aside class="ing">
+          <div class="top"><h3 class="disp">Ingredients</h3><div class="scale" id="scale"><button data-m=".5">½×</button><button data-m="1" class="on">1×</button><button data-m="2">2×</button></div></div>
+          <ul id="ings">
+            <li data-q="4" data-u="lb" class="done"><span class="bx"></span><span class="q"></span><span class="t">bone-in short ribs</span></li>
+            <li data-q="2" data-u="tsp" class="done"><span class="bx"></span><span class="q"></span><span class="t">kosher salt</span></li>
+            <li data-q="2" data-u="tbsp"><span class="bx"></span><span class="q"></span><span class="t">olive oil</span></li>
+            <li data-q="1" data-u=""><span class="bx"></span><span class="q"></span><span class="t">large onion, diced</span></li>
+            <li data-q="2" data-u=""><span class="bx"></span><span class="q"></span><span class="t">carrots, diced</span></li>
+            <li data-q="2" data-u="tbsp"><span class="bx"></span><span class="q"></span><span class="t">tomato paste</span></li>
+            <li data-q="2" data-u="cups"><span class="bx"></span><span class="q"></span><span class="t">dry red wine</span></li>
+            <li data-q="2" data-u="cups"><span class="bx"></span><span class="q"></span><span class="t">beef stock</span></li>
+            <li class="grp" style="display:block;border:0;cursor:default">For the gremolata</li>
+            <li data-q=".5" data-u="cup"><span class="bx"></span><span class="q"></span><span class="t">parsley, finely chopped</span></li>
+            <li data-q="1" data-u=""><span class="bx"></span><span class="q"></span><span class="t">lemon, zested</span></li>
+            <li data-q="1" data-u="clove"><span class="bx"></span><span class="q"></span><span class="t">garlic, grated</span></li>
+          </ul>
+        </aside>
+        <section class="method">
+          <div class="h"><h3 class="disp">Method</h3><span class="lblq" style="color:var(--muted)">6 steps</span></div>
+          <div class="step"><span class="n">1</span><div><p>Heat the oven to 300°F. Season the ribs all over with <span class="ingref">salt</span> and let them sit while the pot heats.</p></div></div>
+          <div class="step"><span class="n">2</span><div><p>Brown the ribs in <span class="ingref">olive oil</span> in batches, turning, until deeply browned on every side <span class="timer"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="9" r="5.5"/><path d="M8 6v3l2 1M6 2h4"/></svg>15 min</span>. Don't crowd the pot.</p>
+            <div class="note"><span class="av">S</span><span>"Our Dutch oven only fits four at a time. Do two rounds, it's worth it." — Sam, Oct 2</span></div></div></div>
+          <div class="step"><span class="n">3</span><div><p>Pour off all but a spoonful of fat. Add the <span class="ingref">onion</span> and <span class="ingref">carrots</span> and cook until soft <span class="timer"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="9" r="5.5"/><path d="M8 6v3l2 1M6 2h4"/></svg>12 min</span>, then stir in the <span class="ingref">tomato paste</span>.</p></div></div>
+          <div class="pull">"Let it rest overnight. It's better on Monday."<small>Chris's note on this recipe</small></div>
+        </section>
+        <div class="stickybar"><span class="lblq">Step 2 of 6 · 2 ingredients checked</span><span class="btn">Start cooking →</span></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- C -->
+  <section class="prop" id="c">
+    <aside class="brief">
+      <div class="tag">PROPOSAL C · IPAD COOK MODE</div>
+      <h2>The Evening Edition, on the counter</h2>
+      <p>Dark, huge, readable from across the kitchen, and it keeps the screen awake.</p>
+      <ul>
+        <li>One step at a time at 40px; ingredients for this step light up on the left</li>
+        <li>Timers run as rings you can see from the stove, several at once</li>
+        <li>Progress rail across the top; "Next" always visible</li>
+        <li>Big swipe targets for messy hands, plus voice: say "next"</li>
+      </ul>
+    </aside>
+    <div class="frame" data-w="1180"><div class="screen" style="width:1180px">
+      <div class="cook">
+        <div>
+          <div class="top"><span class="lblq" style="color:#b3a999">✕ Close</span><span class="t">Braised Short Ribs</span><span class="mic"><i></i><span class="lblq">Listening for "next"</span></span></div>
+          <div class="prog"><i class="d"></i><i class="d"></i><i class="c"></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="main">
+          <div class="side"><h5 class="lblq">For this step</h5><ul>
+            <li class="lit"><b>1</b>large onion</li><li class="lit"><b>2</b>carrots</li><li class="lit"><b>2 tbsp</b>tomato paste</li><li class="dim"><b>2 cups</b>red wine</li><li class="dim"><b>2 cups</b>beef stock</li></ul></div>
+          <div class="stepbig"><span class="lbl sn">Step 3 of 6</span><p>Pour off all but a spoonful of fat. Add the <mark>onion</mark> and <mark>carrots</mark> and cook until soft, then stir in the <mark>tomato paste</mark> until it darkens.</p></div>
+          <div class="timers">
+            <div class="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="#463e33" stroke-width="4"/><circle id="arc" cx="50" cy="50" r="45" fill="none" stroke="#e6a497" stroke-width="4" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="80"/></svg><div class="tt"><b id="clock">8:41</b><span class="lblq">Soften veg</span></div></div>
+            <div class="mini lblq"><span>Oven to 300°F</span><span style="color:#e6a497">Ready</span></div>
+            <div class="mini lblq"><span>Ribs resting</span><span>4:10</span></div>
+          </div>
+        </div>
+        <div class="bot"><div class="next"><span class="lblq">Next ·</span> <b>Add the wine and stock,</b> scrape up the browned bits, and bring to a simmer.</div><div class="pills"><span class="pill">← Back</span><span class="pill p">Next step →</span></div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- D -->
+  <section class="prop" id="d">
+    <aside class="brief">
+      <div class="tag">PROPOSAL D · IMPORT</div>
+      <h2>Import feels like developing a print</h2>
+      <p>The wait while the AI reads a photo becomes the show.</p>
+      <ul>
+        <li>A scan line sweeps the cookbook page; found lines get boxed</li>
+        <li>The draft fills in live beside it: title types, rows slide in</li>
+        <li>Anything uncertain is flagged in mustard, not silently guessed</li>
+        <li>Photo, link and paste are three doors into the same darkroom</li>
+      </ul>
+    </aside>
+    <div class="frame" data-w="1280"><div class="screen" style="width:1280px">
+      <div class="mast"><div class="wordmark">Recipe <i>Box</i></div><div class="nav lblq"><span>Recipes</span><span class="on">Import</span><span>Settings</span><span>Sign out</span></div></div>
+      <div class="dbl"></div>
+      <div class="imp">
+        <div>
+          <h1 class="disp">Reading your page</h1>
+          <p class="deck">Hold tight. This usually takes about ten seconds.</p>
+          <div class="shotbox">
+            <div class="pagep"><div class="lblq" style="color:#8a7a62;font-size:11px">— 142 —</div><div class="ph">Grandma Ruth's<br>Buttermilk Biscuits</div><div class="ln" style="width:80%"></div><div class="ln" style="width:60%"></div>
+              <div class="cols"><div><div class="ln"></div><div class="ln" style="width:80%"></div><div class="ln"></div><div class="ln" style="width:70%"></div><div class="ln" style="width:90%"></div><div class="ln" style="width:60%"></div></div><div><div class="ln"></div><div class="ln"></div><div class="ln" style="width:85%"></div><div class="ln"></div><div class="ln" style="width:70%"></div><div class="ln"></div><div class="ln"></div><div class="ln" style="width:50%"></div><div class="ln"></div><div class="ln" style="width:80%"></div></div></div></div>
+            <div class="boxes"><span style="left:22%;top:12%;width:46%;height:13%"></span><span style="left:21%;top:33%;width:20%;height:30%;animation-delay:.4s"></span><span style="left:44%;top:31%;width:33%;height:44%;animation-delay:.8s"></span></div>
+            <div class="scanline"></div>
+            <div class="st"><i></i><span class="lblq">Scanning · IMG_4471.HEIC</span></div>
+          </div>
+        </div>
+        <div class="draft">
+          <div class="lbl k">Draft · not saved yet</div>
+          <h2 class="disp"><span class="typed">Grandma Ruth's Buttermilk Biscuits</span></h2>
+          <div class="lblq" style="color:var(--muted)">Makes 10 · 15 min prep · 14 min bake</div>
+          <div>
+            <div class="drow" style="animation-delay:.6s"><span class="ok">✓</span><span class="q">2 cups</span><span>all-purpose flour</span><small>98%</small></div>
+            <div class="drow" style="animation-delay:.8s"><span class="ok">✓</span><span class="q">1 tbsp</span><span>baking powder</span><small>97%</small></div>
+            <div class="drow" style="animation-delay:1s"><span class="ok">✓</span><span class="q">1 tsp</span><span>kosher salt</span><small>95%</small></div>
+            <div class="drow" style="animation-delay:1.2s"><span class="ok">✓</span><span class="q">6 tbsp</span><span>cold butter, cubed</span><small>96%</small></div>
+            <div class="drow warn" style="animation-delay:1.4s"><span class="ok">?</span><span class="q">¾ cup</span><span>buttermilk <span style="color:var(--muted)">(or 1 cup?)</span></span><small>61%</small></div>
+          </div>
+          <div class="flag"><span style="color:var(--mustard);font-weight:700">!</span><span>The oven temperature is smudged on the page. We read <b>450°F</b>; check it before you save.</span></div>
+          <div style="display:flex;gap:12px;margin-top:6px"><span class="btn">Review &amp; save</span><span class="btn sec">Retake photo</span></div>
+          <div class="srcs lblq" style="color:var(--muted);margin-top:10px"><span class="chip on" style="height:34px">Photo</span><span class="chip" style="height:34px">Link</span><span class="chip" style="height:34px">Paste text</span></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- E -->
+  <section class="prop" id="e">
+    <aside class="brief">
+      <div class="tag">PROPOSAL E · DETAIL KIT</div>
+      <h2>Motion and details, with rules</h2>
+      <p>A small kit so every screen gets the same polish. Motion only marks a change; nothing bounces for fun.</p>
+      <ul>
+        <li>Card-to-page: the plate grows into the hero (View Transitions)</li>
+        <li>Save gets a rubber-stamp moment and an undo toast</li>
+        <li>Hand-drawn spot icons for tags and empty states</li>
+        <li>Day and Evening editions switch with the clock</li>
+        <li>Content arrives in a short stagger; loading shows the page's shape</li>
+      </ul>
+    </aside>
+    <div class="frame" data-w="1280"><div class="screen" style="width:1280px">
+      <div class="ms">
+        <div style="display:flex;justify-content:space-between;align-items:end;border-bottom:3px double var(--ink);padding-bottom:14px"><h1 class="disp">The detail kit</h1><span class="lblq" style="color:var(--muted)">Durations 150–900ms · one easing curve · reduced-motion respected</span></div>
+        <div class="row">
+          <div class="tile"><h4>Card becomes the page</h4><div class="stage"><div class="film">
+            <div><div class="ph" style="left:10%;top:10%;width:80%;height:44%"><canvas class="plate" data-dish="stew" data-bg="#2b211b" data-size="300"></canvas></div><div class="tl" style="top:60%;width:70%"></div><div class="ln" style="top:72%;width:60%"></div><div class="ln" style="top:80%;width:45%"></div></div>
+            <div><div class="ph" style="left:30%;top:4%;width:70%;height:58%"><canvas class="plate" data-dish="stew" data-bg="#2b211b" data-size="300"></canvas></div><div class="tl" style="top:66%;width:60%"></div><div class="ln" style="top:78%;width:50%"></div></div>
+            <div><div class="ph" style="left:52%;top:0;width:48%;height:70%"><canvas class="plate" data-dish="stew" data-bg="#2b211b" data-size="300"></canvas></div><div class="tl" style="top:30%;width:34%;height:14px"></div><div class="tl" style="top:40%;width:30%;height:14px"></div><div class="ln" style="top:78%;width:80%"></div></div>
+          </div></div><p>The tapped card's photo and title morph into the spread's hero in 450ms.</p></div>
+          <div class="tile"><h4>Saved to the box</h4><div class="stage"><div class="stamp"><div><span class="lblq" style="font-size:11px">Filed</span><b>Saved</b><span class="lblq" style="font-size:11px">Oct 21 · 2026</span></div></div><div class="toast"><span>Biscuits saved to the box</span><u class="lblq">Undo</u></div></div><p>A one-time stamp for new recipes; edits get the quiet toast only.</p></div>
+          <div class="tile"><h4>Spot icons</h4><div class="stage"><div class="icons">
+            <div><svg viewBox="0 0 48 48"><path d="M6 24h36a18 18 0 0 1-36 0z"/><path class="a" d="M16 16c0-4 4-4 4-8M24 16c0-4 4-4 4-8"/></svg>Soups</div>
+            <div><svg viewBox="0 0 48 48"><path d="M24 42c-10-6-14-16-10-26 8 0 18 6 10 26z"/><path class="a" d="M24 42V20"/></svg>Vegetarian</div>
+            <div><svg viewBox="0 0 48 48"><path d="M8 32h32l-4-12H12z"/><path class="a" d="M18 20v-6h12v6"/></svg>Baking</div>
+            <div><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16"/><path class="a" d="M24 14v10l6 4"/></svg>Quick</div>
+            <div><svg viewBox="0 0 48 48"><path d="M10 30c4-12 24-12 28 0z"/><path d="M6 30h36"/><path class="a" d="M24 14v4"/></svg>Mains</div>
+            <div><svg viewBox="0 0 48 48"><path d="M14 10h20l-4 30H18z"/><path class="a" d="M16 20h16"/></svg>Drinks</div>
+            <div><svg viewBox="0 0 48 48"><circle cx="24" cy="26" r="13"/><path class="a" d="M24 13c0-4 3-6 6-6"/></svg>Fruit</div>
+            <div><svg viewBox="0 0 48 48"><path d="M8 20h32v6a16 16 0 0 1-32 0z"/><path class="a" d="M40 22h4"/></svg>Freezer</div>
+          </div></div><p>One line weight, one claret detail each. Also used for empty states.</p></div>
+        </div>
+        <div class="row">
+          <div class="tile"><h4>Day &amp; Evening editions</h4><div class="stage"><div class="editions"><div class="d"><span class="lblq">Day · 7am–7pm</span><span class="disp">Saffron Risotto</span><small>Cream paper, claret ink</small></div><div class="e"><span class="lblq">Evening · after 7pm</span><span class="disp">Saffron Risotto</span><small>Umber, easy on the eyes</small></div></div></div><p>The theme follows the clock by default, so cook mode is already dark at dinnertime.</p></div>
+          <div class="tile"><h4>Arrival stagger</h4><div class="stage"><div class="reveal"><div></div><div></div><div></div><div></div></div></div><p>Lists come in 120ms apart, once per visit. Never on Back.</p></div>
+          <div class="tile"><h4>Loading has a shape</h4><div class="stage"><div class="shimmer"><i class="big"></i><i style="width:70%"></i><i style="width:90%"></i><i style="width:40%"></i></div></div><p>Skeletons match the real layout so nothing jumps when the recipe lands.</p></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+</div>
+
+<script>
+/* ---------- seeded random ---------- */
+function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+function hashStr(t){let h=2166136261;for(const c of t){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+
+/* ---------- illustrated plates ---------- */
+function drawPlate(cv){
+  const S=+cv.dataset.size||600, dish=cv.dataset.dish, bg=cv.dataset.bg||'#e9e0cc';
+  cv.width=S;cv.height=S;const x=cv.getContext('2d');const R=rng(hashStr(dish+S));const c=S/2;
+  x.fillStyle=bg;x.fillRect(0,0,S,S);
+  // linen weave
+  x.globalAlpha=.06;x.strokeStyle='#000';for(let i=0;i<S;i+=4){x.beginPath();x.moveTo(i,0);x.lineTo(i,S);x.stroke()}x.globalAlpha=1;
+  // napkin + spoon peeking
+  x.save();x.translate(S*.86,S*.18);x.rotate(.5);x.fillStyle='rgba(251,248,241,.9)';x.fillRect(-S*.12,-S*.3,S*.24,S*.6);x.restore();
+  const bowl=(dish==='soup'||dish==='stew');
+  // shadow
+  x.fillStyle='rgba(0,0,0,.28)';x.beginPath();x.ellipse(c+S*.02,c+S*.03,S*.41,S*.41,0,0,7);x.fill();
+  // plate
+  let g=x.createRadialGradient(c-S*.1,c-S*.12,S*.05,c,c,S*.42);g.addColorStop(0,'#fffdf7');g.addColorStop(1,'#e2d8c4');
+  x.fillStyle=g;x.beginPath();x.arc(c,c,S*.4,0,7);x.fill();
+  x.strokeStyle='rgba(155,28,28,.55)';x.lineWidth=S*.006;x.beginPath();x.arc(c,c,S*.37,0,7);x.stroke();
+  const fr=bowl?S*.31:S*.3;
+  if(bowl){g=x.createRadialGradient(c,c,fr*.7,c,c,fr*1.05);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.25)');x.fillStyle='#f3ecdc';x.beginPath();x.arc(c,c,fr*1.05,0,7);x.fill();}
+  const inR=()=>{const a=R()*6.283,r=Math.sqrt(R())*fr*.92;return[c+Math.cos(a)*r,c+Math.sin(a)*r]};
+  const blob=(px,py,r,col,rot=0,sx=1,sy=1)=>{x.save();x.translate(px,py);x.rotate(rot);x.scale(sx,sy);x.fillStyle=col;x.beginPath();const n=9;for(let i=0;i<=n;i++){const a=i/n*6.283,rr=r*(.8+R()*.35);i?x.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):x.moveTo(Math.cos(a)*rr,Math.sin(a)*rr)}x.closePath();x.fill();x.restore()};
+  if(dish==='stew'){
+    g=x.createRadialGradient(c,c,0,c,c,fr);g.addColorStop(0,'#6b2f1c');g.addColorStop(1,'#3d1a10');x.fillStyle=g;x.beginPath();x.arc(c,c,fr,0,7);x.fill();
+    for(let i=0;i<5;i++){const a=i/5*6.283+.3,r=fr*.42;const px=c+Math.cos(a)*r,py=c+Math.sin(a)*r;blob(px,py,S*.075,'#4a2013',a,1.3,1);blob(px-S*.01,py-S*.012,S*.05,'#7a3a22',a,1.3,.9);x.fillStyle='#efe2cc';x.beginPath();x.ellipse(px+Math.cos(a)*S*.06,py+Math.sin(a)*S*.06,S*.012,S*.03,a,0,7);x.fill()}
+    blob(c,c,S*.07,'#c2602d');
+    for(let i=0;i<70;i++){const[p,q]=inR();blob(p,q,S*.008,R()<.6?'#3f6b45':'#5f8a4c',R()*3)}
+    x.strokeStyle='#e8c33b';x.lineWidth=S*.004;for(let i=0;i<40;i++){const[p,q]=inR();x.beginPath();x.moveTo(p,q);x.lineTo(p+S*.02*(R()-.5),q+S*.02*(R()-.5));x.stroke()}
+    x.fillStyle='rgba(255,230,190,.25)';for(let i=0;i<14;i++){const[p,q]=inR();x.beginPath();x.arc(p,q,S*.006,0,7);x.fill()}
+  }else if(dish==='risotto'){
+    g=x.createRadialGradient(c,c,0,c,c,fr);g.addColorStop(0,'#f2c84b');g.addColorStop(1,'#d99a22');x.fillStyle=g;x.beginPath();x.arc(c,c,fr*.95,0,7);x.fill();
+    for(let i=0;i<900;i++){const[p,q]=inR();x.fillStyle=R()<.5?'#fbe08a':'#e9ae2c';x.beginPath();x.ellipse(p,q,S*.008,S*.004,R()*3,0,7);x.fill()}
+    for(let i=0;i<14;i++){const[p,q]=inR();x.fillStyle='#fbf3dc';x.beginPath();x.ellipse(p,q,S*.03,S*.01,R()*3,0,7);x.fill()}
+    x.fillStyle='rgba(120,60,10,.55)';for(let i=0;i<40;i++){const[p,q]=inR();x.beginPath();x.arc(p,q,S*.005,0,7);x.fill()}
+    for(let i=0;i<30;i++){const[p,q]=inR();blob(p,q,S*.008,'#3f6b45',R()*3)}
+    x.strokeStyle='#b8321c';x.lineWidth=S*.003;for(let i=0;i<14;i++){const[p,q]=inR();x.beginPath();x.moveTo(p,q);x.quadraticCurveTo(p+S*.01,q-S*.01,p+S*.02,q);x.stroke()}
+  }else if(dish==='tart'){
+    x.fillStyle='#b97a34';x.beginPath();x.arc(c,c,fr,0,7);x.fill();
+    for(let i=0;i<48;i++){const a=i/48*6.283;x.fillStyle=i%2?'#c98a3e':'#a96a28';x.beginPath();x.arc(c+Math.cos(a)*fr*.97,c+Math.sin(a)*fr*.97,S*.022,0,7);x.fill()}
+    x.fillStyle='#e7c27a';x.beginPath();x.arc(c,c,fr*.86,0,7);x.fill();
+    for(let ring=0;ring<2;ring++){const n=ring?8:13,rr=ring?fr*.32:fr*.62;for(let i=0;i<n;i++){const a=i/n*6.283+ring*.2;x.save();x.translate(c+Math.cos(a)*rr,c+Math.sin(a)*rr);x.rotate(a+1.25);g=x.createLinearGradient(0,-S*.03,0,S*.03);g.addColorStop(0,'#f4e3a8');g.addColorStop(1,'#cfa452');x.fillStyle=g;x.beginPath();x.ellipse(0,0,S*.09,S*.03,0,0,7);x.fill();x.fillStyle='rgba(120,60,10,.35)';x.beginPath();x.ellipse(S*.05,0,S*.03,S*.01,0,0,7);x.fill();x.restore()}}
+    x.fillStyle='rgba(255,255,255,.35)';for(let i=0;i<25;i++){const[p,q]=inR();x.beginPath();x.arc(p,q,S*.004,0,7);x.fill()}
+    x.fillStyle='#3f6b45';blob(c,c,S*.02,'#3f6b45',1,1.8,.7);
+  }else if(dish==='salad'){
+    for(let i=0;i<9;i++){const[p,q]=inR();const r=S*.06;x.fillStyle='#c9352a';x.beginPath();x.arc(p,q,r,0,7);x.fill();x.fillStyle='#e8584a';x.beginPath();x.arc(p,q,r*.8,0,7);x.fill();
+      for(let k=0;k<4;k++){const a=k/4*6.283+R();x.fillStyle='#f6b14a';x.beginPath();x.ellipse(p+Math.cos(a)*r*.45,q+Math.sin(a)*r*.45,r*.2,r*.12,a,0,7);x.fill();x.fillStyle='#fbe3b0';x.beginPath();x.arc(p+Math.cos(a)*r*.45,q+Math.sin(a)*r*.45,r*.05,0,7);x.fill()}}
+    for(let i=0;i<7;i++){const[p,q]=inR();x.save();x.translate(p,q);x.rotate(R()*6);x.fillStyle='#f19a3e';x.beginPath();x.arc(0,0,S*.07,.3,2.8);x.arc(0,S*.02,S*.05,2.8,.3,true);x.fill();x.restore()}
+    for(let i=0;i<12;i++){const[p,q]=inR();x.save();x.translate(p,q);x.rotate(R()*6);x.fillStyle=R()<.5?'#3f6b45':'#55884b';x.beginPath();x.ellipse(0,0,S*.035,S*.017,0,0,7);x.fill();x.strokeStyle='rgba(255,255,255,.3)';x.lineWidth=1;x.beginPath();x.moveTo(-S*.03,0);x.lineTo(S*.03,0);x.stroke();x.restore()}
+    x.strokeStyle='rgba(200,170,40,.6)';x.lineWidth=S*.006;x.beginPath();x.moveTo(c-fr*.8,c-fr*.2);for(let t=0;t<1;t+=.05)x.lineTo(c-fr*.8+t*fr*1.6,c-fr*.2+Math.sin(t*12)*S*.04);x.stroke();
+    x.fillStyle='#fff';for(let i=0;i<30;i++){const[p,q]=inR();x.fillRect(p,q,S*.005,S*.005)}
+  }else if(dish==='soup'){
+    g=x.createRadialGradient(c,c,0,c,c,fr);g.addColorStop(0,'#9a7350');g.addColorStop(1,'#6b4c33');x.fillStyle=g;x.beginPath();x.arc(c,c,fr*.98,0,7);x.fill();
+    for(let i=0;i<120;i++){const[p,q]=inR();x.fillStyle='#d9c39a';x.beginPath();x.ellipse(p,q,S*.008,S*.006,R()*3,0,7);x.fill()}
+    for(let i=0;i<14;i++){const[p,q]=inR();x.save();x.translate(p,q);x.rotate(R()*6);x.fillStyle='#4a3424';x.beginPath();x.arc(0,0,S*.035,Math.PI,0);x.lineTo(S*.01,S*.03);x.lineTo(-S*.01,S*.03);x.closePath();x.fill();x.fillStyle='#c9ab82';x.beginPath();x.arc(0,0,S*.028,Math.PI,0);x.fill();x.restore()}
+    x.strokeStyle='rgba(250,240,220,.6)';x.lineWidth=S*.006;x.beginPath();for(let t=0;t<16;t+=.1){const r=t*S*.006;x.lineTo(c+Math.cos(t)*r,c+Math.sin(t)*r)}x.stroke();
+    for(let i=0;i<40;i++){const[p,q]=inR();blob(p,q,S*.007,'#3f6b45',R()*3)}
+  }
+  // riso grain
+  const id=x.getImageData(0,0,S,S),d=id.data;for(let i=0;i<d.length;i+=4){const n=(R()-.5)*34;d[i]+=n;d[i+1]+=n;d[i+2]+=n}x.putImageData(id,0,0);
+}
+document.querySelectorAll('canvas.plate').forEach(drawPlate);
+
+/* ---------- scaling ingredients ---------- */
+const fr=v=>{const w=Math.floor(v+1e-9),f=v-w;const m={0:'',.25:'¼',.5:'½',.75:'¾'};const k=Object.keys(m).reduce((a,b)=>Math.abs(b-f)<Math.abs(a-f)?b:a);return (w?w:'')+(m[k]||'')||'0'};
+let mult=1;
+function renderIngs(anim){document.querySelectorAll('#ings li[data-q]').forEach((li,i)=>{const q=li.querySelector('.q');const v=+li.dataset.q*mult;const t=(fr(v)+' '+li.dataset.u).trim();
+  if(anim){q.style.opacity=0;setTimeout(()=>{q.textContent=t;q.style.opacity=1},150+i*30)}else q.textContent=t})}
+renderIngs(false);
+document.getElementById('scale').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;mult=+b.dataset.m;document.querySelectorAll('#scale button').forEach(o=>o.classList.toggle('on',o===b));document.getElementById('srv').textContent=4*mult;renderIngs(true)});
+document.getElementById('ings').addEventListener('click',e=>{const li=e.target.closest('li[data-q]');if(li)li.classList.toggle('done')});
+
+/* ---------- cook timer ---------- */
+let secs=521;const total=720;
+setInterval(()=>{secs=secs>0?secs-1:total;document.getElementById('clock').textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');document.getElementById('arc').setAttribute('stroke-dashoffset',(282.7*(1-secs/total)).toFixed(1))},1000);
+document.getElementById('arc').setAttribute('stroke-dashoffset',(282.7*(1-secs/total)).toFixed(1));
+
+/* ---------- frames ---------- */
+const shot=(location.hash.match(/^#shot-([a-e])$/)||[])[1];
+if(shot){document.body.classList.add('shot');document.getElementById(shot).classList.add('on')}
+function fit(){document.querySelectorAll('.frame').forEach(f=>{const s=f.querySelector('.screen');const w=+f.dataset.w;const sc=shot?1:f.clientWidth/w;s.style.transform=shot?'':`scale(${sc})`;f.style.height=shot?'':(s.offsetHeight*sc)+'px'})}
+fit();addEventListener('resize',fit);if(document.fonts)document.fonts.ready.then(fit);
+</script>
