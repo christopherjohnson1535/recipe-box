@@ -30,7 +30,7 @@ type HeadingProps = {
 export function Heading({ level, size = "title", id, ruled, ref, tabIndex, children }: HeadingProps) {
   const Tag = `h${level}` as const;
   return (
-    <Tag id={id} ref={ref} tabIndex={tabIndex} className={cx(sizes[size], ruled && "flex items-center gap-4")}>
+    <Tag id={id} ref={ref} tabIndex={tabIndex} className={cx(sizes[size], ruled && "flex items-center gap-4 [overflow-wrap:anywhere]")}>
       {children}
       {ruled && <span className="h-px flex-1 bg-(--rule-hair)" aria-hidden="true" />}
     </Tag>

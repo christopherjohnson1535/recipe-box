@@ -92,3 +92,5 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #4 P-09 fixed — Math.max(0, remaining) on the timer
 #4 P-10 skipped — Button is already disabled while pending; no behaviour change
 #4 P-11 skipped — no change needed (reviewer: fine)
+#4 P1-1 fixed — PageHeader h1 gets min-w-0 + [overflow-wrap:anywhere] (shrinks min-content in the centred flex column); ruled Heading gets the same; globals h1–h3 and ContentsEntry left as is (block/min-w-0 parents already wrap)
+#4 P2-1 skipped — the undo toast is an overlay by design; it pauses on hover/focus and can be dismissed.
