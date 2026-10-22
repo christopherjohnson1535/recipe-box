@@ -87,11 +87,14 @@ body {
   touch-action: manipulation;
 }
 
-h1,
-h2,
-h3 {
-  text-wrap: balance;
-  overflow-wrap: break-word; /* only words longer than the line break; "anywhere" also shrank min-content */
+/* In the base layer so a ui component's utility (e.g. PageHeader's overflow-wrap:anywhere) can override it. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    overflow-wrap: break-word; /* only words longer than the line break; "anywhere" also shrank min-content */
+  }
 }
 
 /* Helper classes. Like component tokens, only components/ui uses these (guard test). */

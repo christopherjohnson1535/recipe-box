@@ -94,3 +94,4 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #4 P-11 skipped — no change needed (reviewer: fine)
 #4 P1-1 fixed — PageHeader h1 gets min-w-0 + [overflow-wrap:anywhere] (shrinks min-content in the centred flex column); ruled Heading gets the same; globals h1–h3 and ContentsEntry left as is (block/min-w-0 parents already wrap)
 #4 P2-1 skipped — the undo toast is an overlay by design; it pauses on hover/focus and can be dismissed.
+#4 P1-1 follow-up (orchestrator, visual check) — the unlayered global h1–h3 rule out-ranked the PageHeader utility, so the 1024 px headline stayed clipped; moved the rule into `@layer base` so ui utilities win; long unbroken titles now wrap at 390 px (h1 358 px wide) and in print.
