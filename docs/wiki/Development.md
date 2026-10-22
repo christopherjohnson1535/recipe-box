@@ -1,18 +1,22 @@
 # Development
 
-Start with `CLAUDE.md` in the repo — it is written so a fresh Claude session (or a person) can pick up one issue
-and finish it.
+Start with `CONTRIBUTING.md` (people) or `CLAUDE.md` (a fresh Claude session) in the repo; both explain how to pick
+up one issue and finish it. Testing is covered in `docs/TESTING.md`; security reports go through `SECURITY.md`.
+
+## Quick commands
+`just setup`, `just check` (everything CI runs), `just up` / `just down`, `just check-backend`, `just check-frontend`, `just test-backend`, `just test-frontend`,
+`just e2e`, `just openapi`. <!-- verify after #50 merges -->
 
 ## The workflow
 1. Pick an issue (start with the lowest open milestone; `good first session` issues are small).
 2. Read the requirement IDs (`docs/REQUIREMENTS.md`), the SPEC section and `docs/API.md` the issue cites.
 3. Branch `issue-<n>-<slug>`, stay inside the issue's **Owned paths**.
 4. Run the checks for every tree you touched; UI work gets screenshots at iPad and desktop size.
-5. PR with `Closes #<n>`; CI must be green.
+5. PR titled as a Conventional Commit (`feat(frontend): ... (#n)`), body with `Closes #<n>`; CI must be green.
 
 ## The software factory
 Built with the software factory process: requirements → plan → build (agent waves) → verify
-(independent reviewers, fix waves, `docs/review/FIXES.md`) → test (smoke + screenshots) → design QA → ship.
+(independent reviewers, fix waves, `FIXES.md` ledger in `docs/archive/factory-runs/`) → test (smoke + screenshots) → design QA → ship.
 Every issue goes through the whole loop, with the stages done by subagents on a cheaper model (Sonnet) and the main
 session orchestrating. Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
 

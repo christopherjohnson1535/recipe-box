@@ -1,0 +1,6 @@
+# Every change is reviewed by the owner; narrower rules can be added as maintainers join.
+*                       @christopherjohnson1535
+/.github/               @christopherjohnson1535
+/backend/migrations/    @christopherjohnson1535
+/backend/src/import/safe_fetch.rs @christopherjohnson1535
+/SECURITY.md            @christopherjohnson1535
