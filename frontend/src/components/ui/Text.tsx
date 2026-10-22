@@ -33,7 +33,7 @@ type TextProps = {
 
 export function Text({ variant = "body", as: Tag = "p", preserveLines, id, children }: TextProps) {
   return (
-    <Tag id={id} className={cx(variants[variant], preserveLines && "whitespace-pre-line")}>
+    <Tag id={id} className={cx(variants[variant], "[overflow-wrap:anywhere]", preserveLines && "whitespace-pre-line")}>
       {children}
     </Tag>
   );

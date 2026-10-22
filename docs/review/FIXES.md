@@ -92,3 +92,17 @@ R4-01 follow-up (orchestrator) — the stricter guard flagged the JS `class` key
 #5 Q-09 skipped — Nice; live region/pending cue is more than a one-liner
 #5 Q-10 skipped — Nice; acceptable per FND-3
 #5 Q-11 skipped — Nice; enterKeyHint left out (outside owned ui scope risk)
+#4 P-01 fixed — undo store holds a list; one toast per delete, newest on top, three shown (older keep their own timers); tests for two deletes, separate countdowns, cap
+#4 P-02 fixed — byline.ts returns data; new client LocalDate formats in the viewer's zone via useSyncExternalStore (empty `<time dateTime>` on server); tests with America/Denver and SSR
+#4 P-03 fixed — dismissUndo() on sign-out and when UndoToast (the (app) layout) unmounts; test
+#4 P-04 fixed — delete 404 = already gone: go home, "That recipe was already deleted." notice (no Undo); test
+#4 P-05 fixed — wiki says Undo appears for 10 seconds only; the 10-minute backend restore is not reachable in the UI so it is not promised (decision)
+#4 P-06 fixed — toast shadow replaced by a hairline border; UI.md notes it
+#4 P-07 fixed — REC-2 now "delete with a 10-second Undo instead of a confirmation" (owner to be told in the PR)
+#4 P-08 skipped — Escape dismiss is optional; left out
+#4 P-09 fixed — Math.max(0, remaining) on the timer
+#4 P-10 skipped — Button is already disabled while pending; no behaviour change
+#4 P-11 skipped — no change needed (reviewer: fine)
+#4 P1-1 fixed — PageHeader h1 gets min-w-0 + [overflow-wrap:anywhere] (shrinks min-content in the centred flex column); ruled Heading gets the same; globals h1–h3 and ContentsEntry left as is (block/min-w-0 parents already wrap)
+#4 P2-1 skipped — the undo toast is an overlay by design; it pauses on hover/focus and can be dismissed.
+#4 P1-1 follow-up (orchestrator, visual check) — the unlayered global h1–h3 rule out-ranked the PageHeader utility, so the 1024 px headline stayed clipped; moved the rule into `@layer base` so ui utilities win; long unbroken titles now wrap at 390 px (h1 358 px wide) and in print.

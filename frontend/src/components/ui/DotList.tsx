@@ -18,7 +18,7 @@ export function DotList({ label, tone = "inherit", align = "start", as: Tag = "u
     <Tag
       aria-label={label}
       className={cx(
-        "dot-list flex flex-wrap gap-y-1",
+        "dot-list flex flex-wrap gap-y-1 [&>*]:[overflow-wrap:anywhere]",
         align === "center" && "justify-center",
         tone === "meta" && "label text-ink-muted",
       )}

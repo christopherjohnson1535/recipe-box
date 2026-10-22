@@ -115,7 +115,11 @@ Controls and states:
   caret survive, Enter/Search/sort push history; `ResultSummary` live count; `NoMatches` with "Clear search").
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
+- `ui/Toast` (`ToastRegion`, `Toast`, `ToastAction`, `ToastDismiss`): inverse message pinned to the bottom, 44px actions, tokens `--toast-*`. The region is a polite live region and stays mounted; hidden in print. Separated by a hairline border, never a shadow. Used by `undo/UndoToast`.
 App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
+- `recipe-page/*`: `DeleteRecipeButton` (ghost Delete, no dialog: deletes, shows the toast, goes home), `byline.ts` (data for "Added by X", "Edited by Y" only when someone else or a later edit) and `LocalDate` (client-formatted `<time>` in the viewer's time zone, empty on the server).
+- `undo/*`: `undo-store.ts` (module list of offers kept across client navigation; one toast each, newest on top, three shown; cleared on sign-out and when the layout unmounts), `UndoToast` (mounted once in `(app)/layout.tsx`; 10 s countdown paused by hover or focus; Undo restores and reopens the recipe; 409 says it is too late).
+- Print: the `@media print` block at the end of `globals.css` sets ink on white, keeps each step whole and prints link URLs; chrome uses `print:hidden`.
 - `recipe-form/RecipeForm`: the editor for new recipes, edits and import review. Props `initial`
   (`RecipeInput`, `RecipeDraft` or `Recipe`; draft `warnings` are shown), `submitLabel`, `onSubmit(input)` (saves and
   navigates; throw an `ApiError` to show it), `cancelHref`, `draftKey` (recipe id or "new": names the

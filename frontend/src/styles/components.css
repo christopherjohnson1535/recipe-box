@@ -45,6 +45,12 @@
   --alert-rule-error: var(--color-danger);
   --alert-title-error: var(--color-danger);
 
+  /* Toast: inverse of the page, so it reads as a separate layer */
+  --toast-bg: var(--color-ink);
+  --toast-fg: var(--color-paper);
+  --toast-action-fg: var(--color-paper);
+  --toast-focus: var(--color-paper);
+
   /* Progress bar of a request in flight */
   --progress-fg: var(--color-accent);
 

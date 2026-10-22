@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { UndoToast } from "@/components/undo/UndoToast";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type User } from "@/lib/api";
 import { serverApi } from "@/lib/server-api";
@@ -21,6 +22,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <main id="main" className="mx-auto w-full max-w-page px-gutter pt-10 pb-20 sm:pt-14">
         {failure ? <ServerError error={failure} /> : children}
       </main>
+      <UndoToast />
     </>
   );
 }
