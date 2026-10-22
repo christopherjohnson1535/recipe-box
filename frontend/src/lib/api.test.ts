@@ -17,12 +17,24 @@ function capture(method: "get" | "post" | "delete", path: string, respond: () =>
   return seen;
 }
 
+/** A fetch that records the raw input the client passed, so tests can assert it was relative. */
+function recordingFetch() {
+  const inputs: string[] = [];
+  const impl: typeof fetch = (input, init) => {
+    inputs.push(String(input));
+    return fetch(input, init);
+  };
+  return { inputs, impl };
+}
+
 describe("createApi", () => {
   it("uses relative URLs in the browser and sends JSON bodies", async () => {
     const seen = capture("post", "*/api/auth/login", () => HttpResponse.json(user));
-    const got = await createApi().login({ username: "chris", password: "secret-pass" });
+    const rec = recordingFetch();
+    const got = await createApi({ fetch: rec.impl }).login({ username: "chris", password: "secret-pass" });
 
     expect(got.username).toBe("chris");
+    expect(rec.inputs).toEqual(["/api/auth/login"]);
     expect(new URL(seen.request.url).pathname).toBe("/api/auth/login");
     expect(seen.request.method).toBe("POST");
     expect(seen.request.headers.get("content-type")).toBe("application/json");
@@ -78,7 +90,9 @@ describe("createApi", () => {
 
   it("encodes path ids", async () => {
     const seen = capture("get", "*/api/recipes/:id", () => HttpResponse.json({}));
-    await createApi().getRecipe("a/b");
+    const rec = recordingFetch();
+    await createApi({ fetch: rec.impl }).getRecipe("a/b");
+    expect(rec.inputs).toEqual(["/api/recipes/a%2Fb"]);
     expect(new URL(seen.request.url).pathname).toBe("/api/recipes/a%2Fb");
   });
 });

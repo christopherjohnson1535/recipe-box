@@ -112,7 +112,7 @@ jobs:
           workspaces: backend
       - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
         with:
-          tool: cargo-llvm-cov
+          tool: cargo-llvm-cov@0.9.1
       - name: Frontend coverage
         working-directory: frontend
         run: |
@@ -124,6 +124,8 @@ jobs:
           cargo llvm-cov --html --output-dir coverage
           cargo llvm-cov report --json --summary-only --output-path coverage-summary.json
       - name: Ratchet and summary
+        # bash with pipefail: a ratchet failure must fail the job even though its output is piped into tee.
+        shell: bash
         run: node scripts/coverage-ratchet.mjs | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

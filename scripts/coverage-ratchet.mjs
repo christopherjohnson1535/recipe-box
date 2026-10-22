@@ -1,6 +1,12 @@
 // Coverage ratchet. Usage: node scripts/coverage-ratchet.mjs [--update]
 // Reads frontend/coverage/coverage-summary.json (vitest) and backend/coverage-summary.json (cargo llvm-cov --json
 // --summary-only), compares with coverage-baseline.json, prints a markdown table, fails if a number drops > 0.1.
+//
+// How to raise the baseline: after a change that improves coverage, run both coverage commands (see the `coverage`
+// job in .github/workflows/ci.yml), then `node scripts/coverage-ratchet.mjs --update`, and commit
+// coverage-baseline.json. --update rewrites EVERY metric at once, so it can also lower one: review the diff and only
+// commit increases. Lowering on purpose means editing coverage-baseline.json by hand, explained in the PR.
+// A null baseline value means "report only".
 import { readFileSync, writeFileSync } from "node:fs";
 
 const TOLERANCE = 0.1;
