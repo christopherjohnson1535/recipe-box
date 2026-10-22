@@ -29,7 +29,7 @@ export function PageHeader({ title, kicker, description, byline, actions, align 
         </p>
       )}
       {byline && <div className="label text-ink-muted">{byline}</div>}
-      {actions && <div className={cx("mt-2 flex flex-wrap gap-3", centered && "justify-center")}>{actions}</div>}
+      {actions && <div className={cx("mt-2 flex flex-wrap gap-3 print:hidden", centered && "justify-center")}>{actions}</div>}
     </header>
   );
 }

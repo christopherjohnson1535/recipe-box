@@ -112,7 +112,11 @@ Controls and states:
 - `ui/Panel`: tinted (paper-deep) block for an inline form or confirmation. `ui/ConfirmInline`: two-step confirmation in a Panel; focus starts on the safe "Keep" button. `ui/MemberList` + `MemberItem`: people separated by hairlines with name, "You" marker, detail, actions, a note and an opened panel. `ui/DetailList`: label/value pairs as a definition list.
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
+- `ui/Toast` (`ToastRegion`, `Toast`, `ToastAction`, `ToastDismiss`): inverse message pinned to the bottom, 44px actions, tokens `--toast-*`. The region is a polite live region and stays mounted; hidden in print. Used by `undo/UndoToast`.
 App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
+- `recipe-page/*`: `DeleteRecipeButton` (ghost Delete, no dialog: deletes, shows the toast, goes home), `byline.ts` ("Added by X on date", "Edited by Y on date" only when someone else or a later edit).
+- `undo/*`: `undo-store.ts` (module store kept across client navigation), `UndoToast` (mounted once in `(app)/layout.tsx`; 10 s countdown paused by hover or focus; Undo restores and reopens the recipe; 409 says it is too late).
+- Print: the `@media print` block at the end of `globals.css` sets ink on white, keeps each step whole and prints link URLs; chrome uses `print:hidden`.
 - `recipe-form/RecipeForm`: the editor for new recipes, edits and import review. Props `initial`
   (`RecipeInput`, `RecipeDraft` or `Recipe`; draft `warnings` are shown), `submitLabel`, `onSubmit(input)` (saves and
   navigates; throw an `ApiError` to show it), `cancelHref`, `draftKey` (recipe id or "new": names the
