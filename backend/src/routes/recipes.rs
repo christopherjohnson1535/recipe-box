@@ -55,7 +55,43 @@ const LIST_WHERE: &str = "
     where r.deleted_at is null
       and ($1::citext is null or exists (select 1 from recipe_tags rt join tags t on t.id = rt.tag_id
                                          where rt.recipe_id = r.id and t.name = $1::citext))
-      and ($2::text is null or strpos(lower(r.title), lower($2)) > 0)";
+      and ($2::text is null
+           or r.search @@ websearch_to_tsquery('simple', $2)
+           or r.title ilike $3
+           or r.search @@ to_tsquery('simple', $4))";
+
+/// `$3`: the query as an escaped `ilike` title prefix. `$4`: a prefix tsquery (`weeknight & lasag:*`) so a
+/// half-typed word finds "Weeknight lasagne"; none when the query uses websearch operators, which keep their
+/// meaning in the `websearch_to_tsquery` term only.
+fn search_terms(q: &str) -> (String, Option<String>) {
+    let like = format!(
+        "{}%",
+        q.replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_")
+    );
+    let words: Vec<&str> = q.split_whitespace().collect();
+    if q.contains('"')
+        || words
+            .iter()
+            .any(|w| w.starts_with('-') || w.eq_ignore_ascii_case("or"))
+    {
+        return (like, None);
+    }
+    let mut terms: Vec<String> = words
+        .iter()
+        .map(|w| {
+            w.chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
+        .filter(|w| !w.is_empty())
+        .collect();
+    if let Some(last) = terms.last_mut() {
+        last.push_str(":*");
+    }
+    (like, (!terms.is_empty()).then(|| terms.join(" & ")))
+}
 
 pub async fn list(
     State(state): State<AppState>,
@@ -68,24 +104,31 @@ pub async fn list(
     if q.offset < 0 {
         return Err(AppError::validation("offset: must be 0 or more."));
     }
-    let order = match q.sort.as_deref().unwrap_or("newest") {
-        "newest" => "r.created_at desc, r.id",
-        "title" => "lower(r.title), r.id",
-        "time" => "r.total_minutes asc nulls last, lower(r.title), r.id",
+    let search = q.q.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    // Ranked by relevance when searching and no sort was asked for.
+    let order = match q.sort.as_deref() {
+        None if search.is_some() => {
+            "(r.title ilike $3) desc, ts_rank(r.search, websearch_to_tsquery('simple', $2)) desc, r.created_at desc, r.id"
+        }
+        None | Some("newest") => "r.created_at desc, r.id",
+        Some("title") => "lower(r.title), r.id",
+        Some("time") => "r.total_minutes asc nulls last, lower(r.title), r.id",
         _ => return Err(AppError::validation("sort: newest, title or time.")),
     };
     let tag = q
         .tag
         .map(|t| t.trim().to_lowercase())
         .filter(|t| !t.is_empty());
-    // shortcut: plain title substring match until the search issue (FND-2) adds websearch_to_tsquery on `search`.
-    let search = q.q.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let (like, prefix) = search.as_deref().map(search_terms).unzip();
+    let prefix = prefix.flatten();
 
     // `order` is one of the fixed strings above, never user input.
-    let sql = format!("{SUMMARY_SELECT} {LIST_WHERE} order by {order} limit $3 offset $4");
+    let sql = format!("{SUMMARY_SELECT} {LIST_WHERE} order by {order} limit $5 offset $6");
     let mut items = sqlx::query_as::<_, RecipeSummary>(AssertSqlSafe(sql))
         .bind(&tag)
         .bind(&search)
+        .bind(&like)
+        .bind(&prefix)
         .bind(q.limit)
         .bind(q.offset)
         .fetch_all(&state.pool)
@@ -97,6 +140,8 @@ pub async fn list(
     let total: i64 = sqlx::query_scalar(AssertSqlSafe(count_sql))
         .bind(&tag)
         .bind(&search)
+        .bind(&like)
+        .bind(&prefix)
         .fetch_one(&state.pool)
         .await?;
     Ok(Json(RecipePage { items, total }))
