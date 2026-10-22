@@ -8,7 +8,42 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde_json::json;
+use serde::Serialize;
+use utoipa::ToSchema;
+
+/// The `code` of an error response (docs/API.md "Errors"). `api_unreachable` and `network` are not in it: the
+/// frontend proxy and browser client make those up.
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorCode {
+    Validation,
+    Unauthenticated,
+    Forbidden,
+    NotFound,
+    MethodNotAllowed,
+    Conflict,
+    TooLarge,
+    UnsupportedMedia,
+    NoRecipeFound,
+    AiDisabled,
+    BlockedAddress,
+    SiteBlocked,
+    FetchFailed,
+    NotImplemented,
+    Internal,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ErrorDetail {
+    pub code: ErrorCode,
+    pub message: String,
+}
+
+/// Body of every non-2xx response.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ErrorBody {
+    pub error: ErrorDetail,
+}
 
 /// Every non-2xx response goes through this type: `{ "error": { "code", "message" } }` (docs/API.md "Errors").
 #[derive(Debug, thiserror::Error)]
@@ -52,23 +87,26 @@ impl AppError {
         Self::Validation(msg.into())
     }
 
-    pub fn status_and_code(&self) -> (StatusCode, &'static str) {
+    pub fn status_and_code(&self) -> (StatusCode, ErrorCode) {
         match self {
-            Self::Validation(_) => (StatusCode::BAD_REQUEST, "validation"),
-            Self::Unauthenticated(_) => (StatusCode::UNAUTHORIZED, "unauthenticated"),
-            Self::Forbidden(_) => (StatusCode::FORBIDDEN, "forbidden"),
-            Self::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
-            Self::MethodNotAllowed => (StatusCode::METHOD_NOT_ALLOWED, "method_not_allowed"),
-            Self::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
-            Self::TooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "too_large"),
-            Self::UnsupportedMedia(_) => (StatusCode::UNSUPPORTED_MEDIA_TYPE, "unsupported_media"),
-            Self::NoRecipeFound(_) => (StatusCode::UNPROCESSABLE_ENTITY, "no_recipe_found"),
-            Self::AiDisabled => (StatusCode::UNPROCESSABLE_ENTITY, "ai_disabled"),
-            Self::BlockedAddress => (StatusCode::UNPROCESSABLE_ENTITY, "blocked_address"),
-            Self::SiteBlocked(_) => (StatusCode::BAD_GATEWAY, "site_blocked"),
-            Self::FetchFailed(_) => (StatusCode::BAD_GATEWAY, "fetch_failed"),
-            Self::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
-            Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
+            Self::Validation(_) => (StatusCode::BAD_REQUEST, ErrorCode::Validation),
+            Self::Unauthenticated(_) => (StatusCode::UNAUTHORIZED, ErrorCode::Unauthenticated),
+            Self::Forbidden(_) => (StatusCode::FORBIDDEN, ErrorCode::Forbidden),
+            Self::NotFound(_) => (StatusCode::NOT_FOUND, ErrorCode::NotFound),
+            Self::MethodNotAllowed => (StatusCode::METHOD_NOT_ALLOWED, ErrorCode::MethodNotAllowed),
+            Self::Conflict(_) => (StatusCode::CONFLICT, ErrorCode::Conflict),
+            Self::TooLarge => (StatusCode::PAYLOAD_TOO_LARGE, ErrorCode::TooLarge),
+            Self::UnsupportedMedia(_) => (
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                ErrorCode::UnsupportedMedia,
+            ),
+            Self::NoRecipeFound(_) => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::NoRecipeFound),
+            Self::AiDisabled => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::AiDisabled),
+            Self::BlockedAddress => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::BlockedAddress),
+            Self::SiteBlocked(_) => (StatusCode::BAD_GATEWAY, ErrorCode::SiteBlocked),
+            Self::FetchFailed(_) => (StatusCode::BAD_GATEWAY, ErrorCode::FetchFailed),
+            Self::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, ErrorCode::NotImplemented),
+            Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, ErrorCode::Internal),
         }
     }
 }
@@ -85,7 +123,9 @@ impl IntoResponse for AppError {
         };
         (
             status,
-            Json(json!({ "error": { "code": code, "message": message } })),
+            Json(ErrorBody {
+                error: ErrorDetail { code, message },
+            }),
         )
             .into_response()
     }

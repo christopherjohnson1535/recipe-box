@@ -12,6 +12,7 @@ pub mod export;
 pub mod health;
 pub mod imports;
 pub mod media;
+pub mod openapi;
 pub mod recipes;
 pub mod setup;
 pub mod tags;

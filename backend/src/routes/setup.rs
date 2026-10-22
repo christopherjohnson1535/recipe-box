@@ -1,24 +1,36 @@
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use utoipa::ToSchema;
 
 use crate::{
     auth::{password, session},
-    error::{AppError, AppJson, AppResult},
+    error::{AppError, AppJson, AppResult, ErrorBody},
     models::User,
     state::AppState,
     user_columns, validate,
 };
 
-pub async fn status(State(state): State<AppState>) -> AppResult<Json<Value>> {
+#[derive(serde::Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupStatus {
+    needs_setup: bool,
+}
+
+/// Whether the first admin still has to be created.
+#[utoipa::path(get, path = "/api/setup", operation_id = "getSetupStatus", tag = "setup", responses(
+    (status = 200, description = "Setup status.", body = SetupStatus),
+))]
+pub async fn status(State(state): State<AppState>) -> AppResult<Json<SetupStatus>> {
     let has_users: bool = sqlx::query_scalar("select exists (select 1 from users)")
         .fetch_one(&state.pool)
         .await?;
-    Ok(Json(json!({ "needsSetup": !has_users })))
+    Ok(Json(SetupStatus {
+        needs_setup: !has_users,
+    }))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SetupBody {
     username: String,
@@ -27,6 +39,12 @@ pub struct SetupBody {
 }
 
 /// Creates the first admin and signs them in. Only allowed while there are no users.
+#[utoipa::path(post, path = "/api/setup", operation_id = "createAdmin", tag = "setup", request_body = SetupBody, responses(
+    (status = 201, description = "Admin created and signed in.", body = User,
+        headers(("Set-Cookie" = String, description = "The `rb_session` cookie."))),
+    (status = 400, description = "Invalid username, display name or password (`validation`).", body = ErrorBody),
+    (status = 403, description = "Setup is already done (`forbidden`).", body = ErrorBody),
+))]
 pub async fn create_admin(
     State(state): State<AppState>,
     jar: CookieJar,

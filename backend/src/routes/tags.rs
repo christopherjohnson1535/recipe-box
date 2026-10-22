@@ -1,15 +1,19 @@
 use axum::{Json, extract::State};
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::{auth::CurrentUser, error::AppResult, state::AppState};
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize, sqlx::FromRow, ToSchema)]
 pub struct TagCount {
     name: String,
     count: i64,
 }
 
 /// Tags used by live recipes, with counts, sorted by name.
+#[utoipa::path(get, path = "/api/tags", operation_id = "listTags", tag = "tags", security(("session" = [])), responses(
+    (status = 200, description = "Tags in use.", body = Vec<TagCount>),
+))]
 pub async fn list(
     State(state): State<AppState>,
     _user: CurrentUser,
