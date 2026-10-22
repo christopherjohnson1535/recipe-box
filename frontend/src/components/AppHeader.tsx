@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { dismissUndo } from "./undo/undo-store";
 import { Masthead, NavButton, NavLink } from "./ui/Masthead";
 
 const NAV = [
@@ -21,6 +22,7 @@ export function AppHeader({ displayName }: { displayName?: string }) {
     setSigningOut(true);
     // Even if the API is unreachable, leave: the proxy sends cookie-less visitors to /login.
     await api.logout().catch(() => undefined);
+    dismissUndo(); // a pending Undo must not reach whoever signs in next
     router.replace("/login");
     router.refresh();
   }

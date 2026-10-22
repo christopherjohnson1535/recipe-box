@@ -87,11 +87,14 @@ body {
   touch-action: manipulation;
 }
 
-h1,
-h2,
-h3 {
-  text-wrap: balance;
-  overflow-wrap: break-word; /* only words longer than the line break; "anywhere" also shrank min-content */
+/* In the base layer so a ui component's utility (e.g. PageHeader's overflow-wrap:anywhere) can override it. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    overflow-wrap: break-word; /* only words longer than the line break; "anywhere" also shrank min-content */
+  }
 }
 
 /* Helper classes. Like component tokens, only components/ui uses these (guard test). */
@@ -166,5 +169,44 @@ h3 {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+}
+
+/* ===== PRINT ===== Ink on white. Chrome (masthead, page actions, toast, skip link) is hidden with `print:hidden` in ui. */
+@media print {
+  :root {
+    --color-paper: #fff;
+    --color-paper-deep: #fff;
+    --color-ink: #000;
+    --color-ink-muted: #333;
+    --color-accent: #000;
+    --color-accent-hover: #000;
+    --color-rule: #999;
+    --color-rule-strong: #666;
+    --photo-filter: none;
+  }
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 12pt;
+  }
+  main {
+    padding: 0;
+    max-width: none;
+  }
+  /* A step or ingredient never splits across pages; headings stay with what follows. */
+  main li,
+  main figure {
+    break-inside: avoid;
+  }
+  main h2,
+  main h3 {
+    break-after: avoid;
+  }
+  /* The source URL is printed after the link text. */
+  main a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
   }
 }

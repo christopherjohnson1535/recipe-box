@@ -13,6 +13,9 @@ import { ServerError } from "@/components/ServerError";
 import { ApiError, type Recipe } from "@/lib/api";
 import { formatMinutes, groupBySection } from "@/lib/recipe";
 import { serverApi } from "@/lib/server-api";
+import { bylines } from "@/components/recipe-page/byline";
+import { LocalDate } from "@/components/recipe-page/LocalDate";
+import { DeleteRecipeButton } from "@/components/recipe-page/DeleteRecipeButton";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -58,6 +61,8 @@ export default async function RecipePage({ params }: Params) {
   const deck = description.length > 0 && description.length <= 160 ? description : undefined;
   const lede = description.length > 160 ? description : undefined;
 
+  const by = bylines(recipe);
+
   return (
     <article className="flex flex-col gap-10">
       <PageHeader
@@ -76,9 +81,15 @@ export default async function RecipePage({ params }: Params) {
         title={recipe.title}
         description={deck}
         byline={
-          recipe.createdBy || source ? (
+          by.length > 0 || source ? (
             <DotList as="p" align="center">
-              {recipe.createdBy && <span>Added by {recipe.createdBy.displayName}</span>}
+              {by.map((line) => (
+                <span key={line.verb}>
+                  {line.verb}
+                  {line.who ? ` by ${line.who}` : ""}
+                  <LocalDate iso={line.iso} />
+                </span>
+              ))}
               {source && (
                 <Text as="span" variant="aside">
                   Source: {source}
@@ -93,6 +104,7 @@ export default async function RecipePage({ params }: Params) {
             <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
               Edit
             </ButtonLink>
+            <DeleteRecipeButton id={id} title={recipe.title} />
           </>
         }
       />

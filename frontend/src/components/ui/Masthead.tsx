@@ -6,7 +6,7 @@ import { Logo } from "./Logo";
 /** The app's masthead: wordmark linking home on the left, section links on the right, a double rule under. */
 export function Masthead({ children }: { children: ReactNode }) {
   return (
-    <header className="mx-auto w-full max-w-page px-gutter pt-4">
+    <header className="mx-auto w-full max-w-page px-gutter pt-4 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-1 pb-2">
         <Link href="/" className="inline-flex min-h-control items-center" aria-label="Recipe Box home">
           <Logo />

@@ -69,7 +69,7 @@ export function RuledList({ items }: { items: string[] }) {
   return (
     <ul className="flex flex-col divide-y divide-(--rule-hair)">
       {items.map((text, i) => (
-        <li key={i} className="py-2.5 text-body leading-snug">
+        <li key={i} className="py-2.5 text-body leading-snug [overflow-wrap:anywhere]">
           {text}
         </li>
       ))}
@@ -86,7 +86,7 @@ export function StepList({ steps }: { steps: string[] }) {
           <span className="font-display text-numeral text-(--numeral-fg) tabular-nums">
             {i + 1}
           </span>
-          <p className="text-body">{text}</p>
+          <p className="text-body [overflow-wrap:anywhere]">{text}</p>
         </li>
       ))}
     </ol>
