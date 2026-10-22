@@ -1,213 +1,28 @@
-//! Household member routes against a real Postgres (same harness as api.rs; skipped without `TEST_DATABASE_URL`).
+//! Household member routes against a real Postgres through the shared harness in `common/`.
 
-use std::{path::PathBuf, str::FromStr};
+mod common;
 
 use axum::{
-    Router,
     body::Body,
     http::{Method, Request, StatusCode, header},
 };
-use http_body_util::BodyExt;
-use recipe_box_api::{config::Config, state::AppState};
+use common::{MEMBER_PASSWORD, TestApp, a_user, session_pair};
 use serde_json::{Value, json};
-use sqlx::{
-    Executor, PgPool,
-    postgres::{PgConnectOptions, PgPoolOptions},
-};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-struct Ctx {
-    app: Router,
-    pool: PgPool,
-    admin_pool: PgPool,
-    schema: String,
-    media_dir: PathBuf,
+const PW: &str = MEMBER_PASSWORD;
+
+/// `ctx.add(admin_cookie, username, role)`: a member made through the API.
+trait AddUser {
+    async fn add(&self, admin: &str, username: &str, role: &str) -> Value;
 }
 
-#[allow(dead_code)]
-struct Res {
-    status: StatusCode,
-    cookie: Option<String>,
-    content_type: Option<String>,
-    bytes: Vec<u8>,
-    json: Value,
-}
-
-impl Res {
-    fn code(&self) -> &str {
-        self.json["error"]["code"].as_str().unwrap_or("")
-    }
-}
-
-async fn ctx() -> Option<Ctx> {
-    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
-        eprintln!("note: TEST_DATABASE_URL not set, skipping integration test");
-        return None;
-    };
-    let admin_pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect(&url)
-        .await
-        .unwrap();
-    // The extension is database-wide; create it once in `public` (serialised, tests run in parallel).
-    let mut tx = admin_pool.begin().await.unwrap();
-    tx.execute("select pg_advisory_xact_lock(727274)")
-        .await
-        .unwrap();
-    tx.execute("create extension if not exists citext with schema public")
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
-
-    let schema = format!("test_{}", Uuid::new_v4().simple());
-    admin_pool
-        .execute(sqlx::AssertSqlSafe(format!("create schema {schema}")))
-        .await
-        .unwrap();
-    let opts = PgConnectOptions::from_str(&url)
-        .unwrap()
-        .options([("search_path", format!("{schema},public"))]);
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect_with(opts)
-        .await
-        .unwrap();
-    recipe_box_api::migrate(&pool).await.unwrap();
-
-    let media_dir = std::env::temp_dir().join(&schema);
-    std::fs::create_dir_all(&media_dir).unwrap();
-    let config = Config {
-        database_url: url,
-        media_dir: media_dir.clone(),
-        bind_addr: "127.0.0.1:0".into(),
-        cookie_secure: false,
-        session_days: 30,
-        ai_provider: "none".into(),
-        anthropic_api_key: None,
-        ai_model: "test".into(),
-        max_upload_mb: 2,
-    };
-    let app = recipe_box_api::router(AppState::new(pool.clone(), config).unwrap());
-    Some(Ctx {
-        app,
-        pool,
-        admin_pool,
-        schema,
-        media_dir,
-    })
-}
-
-impl Ctx {
-    async fn send(&self, req: Request<Body>) -> Res {
-        let res = self.app.clone().oneshot(req).await.unwrap();
-        let status = res.status();
-        let cookie = res
-            .headers()
-            .get(header::SET_COOKIE)
-            .map(|v| v.to_str().unwrap().to_string());
-        let content_type = res
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .map(|v| v.to_str().unwrap().to_string());
-        let bytes = res.into_body().collect().await.unwrap().to_bytes().to_vec();
-        let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-        Res {
-            status,
-            cookie,
-            content_type,
-            bytes,
-            json,
-        }
-    }
-
-    async fn call(
-        &self,
-        method: Method,
-        path: &str,
-        cookie: Option<&str>,
-        body: Option<Value>,
-    ) -> Res {
-        let mut req = Request::builder().method(method).uri(path);
-        if let Some(c) = cookie {
-            req = req.header(header::COOKIE, c);
-        }
-        let body = match body {
-            Some(v) => {
-                req = req.header(header::CONTENT_TYPE, "application/json");
-                Body::from(v.to_string())
-            }
-            None => Body::empty(),
-        };
-        self.send(req.body(body).unwrap()).await
-    }
-
-    /// Runs setup and returns the admin's `rb_session=...` cookie pair.
-    async fn setup_admin(&self) -> String {
-        let res = self
-            .call(
-                Method::POST,
-                "/api/setup",
-                None,
-                Some(json!({ "username": "admin", "displayName": "Admin", "password": "correct horse battery" })),
-            )
-            .await;
-        assert_eq!(res.status, StatusCode::CREATED, "{}", res.json);
-        session_pair(&res)
-    }
-
-    async fn cleanup(self) {
-        self.pool.close().await;
-        self.admin_pool
-            .execute(sqlx::AssertSqlSafe(format!(
-                "drop schema {} cascade",
-                self.schema
-            )))
-            .await
-            .unwrap();
-        let _ = std::fs::remove_dir_all(&self.media_dir);
-    }
-}
-
-fn session_pair(res: &Res) -> String {
-    let c = res.cookie.as_deref().expect("set-cookie");
-    assert!(
-        c.contains("HttpOnly") && c.contains("SameSite=Lax") && c.contains("Max-Age=2592000"),
-        "{c}"
-    );
-    c.split(';').next().unwrap().to_string()
-}
-
-const PW: &str = "member password 1";
-
-impl Ctx {
-    async fn login(&self, username: &str, password: &str) -> Res {
-        self.call(
-            Method::POST,
-            "/api/auth/login",
-            None,
-            Some(json!({ "username": username, "password": password })),
-        )
-        .await
-    }
-
+impl AddUser for TestApp {
     async fn add(&self, admin: &str, username: &str, role: &str) -> Value {
-        let res = self
-            .call(
-                Method::POST,
-                "/api/users",
-                Some(admin),
-                Some(json!({ "username": username, "displayName": username.to_uppercase(), "password": PW, "role": role })),
-            )
-            .await;
-        assert_eq!(res.status, StatusCode::CREATED, "{}", res.json);
-        res.json
-    }
-
-    async fn me_status(&self, cookie: &str) -> StatusCode {
-        self.call(Method::GET, "/api/auth/me", Some(cookie), None)
+        let user = a_user().named(username);
+        self.create_user(admin, if role == "admin" { user.admin() } else { user })
             .await
-            .status
     }
 }
 
@@ -217,7 +32,7 @@ fn id(u: &Value) -> String {
 
 #[tokio::test]
 async fn members_are_refused_admin_routes() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let admin_id = id(&ctx
         .call(Method::GET, "/api/auth/me", Some(&admin), None)
@@ -251,12 +66,11 @@ async fn members_are_refused_admin_routes() {
             "{method} {path}"
         );
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn admin_lists_creates_and_rejects_bad_input() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let a = Some(admin.as_str());
     let zed = ctx.add(&admin, "zed", "member").await;
@@ -306,12 +120,11 @@ async fn admin_lists_creates_and_rejects_bad_input() {
     }
     // The new member can sign in.
     assert_eq!(ctx.login("zed", PW).await.status, StatusCode::OK);
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn delete_rules_and_effects() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let a = Some(admin.as_str());
     let admin_id = id(&ctx.call(Method::GET, "/api/auth/me", a, None).await.json);
@@ -394,12 +207,11 @@ async fn delete_rules_and_effects() {
         .await;
     assert_eq!(del.status, StatusCode::NO_CONTENT);
     assert_eq!(ctx.me_status(&bob_cookie).await, StatusCode::UNAUTHORIZED);
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn two_admins_cannot_remove_each_other() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let admin_id = id(&ctx
         .call(Method::GET, "/api/auth/me", Some(&admin), None)
@@ -432,12 +244,11 @@ async fn two_admins_cannot_remove_each_other() {
         .await
         .unwrap();
     assert_eq!(admins, 1);
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn password_change_rules() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let a = Some(admin.as_str());
     let mem = id(&ctx.add(&admin, "mem", "member").await);
@@ -527,12 +338,11 @@ async fn password_change_rules() {
         (missing.status, missing.code()),
         (StatusCode::NOT_FOUND, "not_found")
     );
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn id_edges_and_admin_own_password() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let a = Some(admin.as_str());
     ctx.add(&admin, "mem", "member").await;
@@ -595,12 +405,11 @@ async fn id_edges_and_admin_own_password() {
     assert_eq!(res.status, StatusCode::NO_CONTENT);
     assert_eq!(ctx.me_status(&admin).await, StatusCode::OK);
     assert_eq!(ctx.me_status(&other).await, StatusCode::UNAUTHORIZED);
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn json_errors_do_not_echo_values() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let res = ctx
         .call(
@@ -617,14 +426,13 @@ async fn json_errors_do_not_echo_values() {
     let msg = res.json["error"]["message"].as_str().unwrap();
     assert!(!msg.contains("98765432101234"), "{msg}");
     assert!(msg.ends_with("invalid JSON or wrong field type"), "{msg}");
-    ctx.cleanup().await;
 }
 
 /// The delete takes row locks on every admin before checking "last admin". Hold one admin row from the test:
 /// the delete must wait for it. Without `for update` it would finish straight away.
 #[tokio::test]
 async fn remove_waits_for_the_admin_row_lock() {
-    let Some(ctx) = ctx().await else { return };
+    let ctx = TestApp::spawn().await;
     let admin = ctx.setup_admin().await;
     let bob = id(&ctx.add(&admin, "bob", "admin").await);
 
@@ -634,7 +442,7 @@ async fn remove_waits_for_the_admin_row_lock() {
         .await
         .unwrap();
 
-    let app = ctx.app.clone();
+    let app = ctx.router.clone();
     let req = Request::builder()
         .method(Method::DELETE)
         .uri(format!("/api/users/{bob}"))
@@ -650,5 +458,4 @@ async fn remove_waits_for_the_admin_row_lock() {
     );
     tx.rollback().await.unwrap();
     assert_eq!(task.await.unwrap(), StatusCode::NO_CONTENT);
-    ctx.cleanup().await;
 }

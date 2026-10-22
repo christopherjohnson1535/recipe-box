@@ -1,8 +1,10 @@
 //! `POST /api/import/url` through the router, against a local HTTP server on 127.0.0.1 (no real network).
-//! Needs `TEST_DATABASE_URL`; without it the tests are skipped. The app under test only gets to reach the test
+//! Uses the shared harness in `common/`. The app under test only gets to reach the test
 //! server because `FetchPolicy::allow_loopback_port_for_tests` opens that one port; everything else stays blocked.
 
-use std::{io::Cursor, path::PathBuf, str::FromStr, sync::Arc};
+mod common;
+
+use std::{io::Cursor, sync::Arc};
 
 use axum::{
     Router,
@@ -11,175 +13,40 @@ use axum::{
     response::{Html, IntoResponse},
     routing::{MethodRouter, get},
 };
+use common::{Res, TestApp};
 use futures_util::StreamExt;
-use http_body_util::BodyExt;
-use recipe_box_api::{config::Config, import::safe_fetch::FetchPolicy, state::AppState};
-use serde_json::{Value, json};
-use sqlx::{
-    Executor, PgPool,
-    postgres::{PgConnectOptions, PgPoolOptions},
-};
+use recipe_box_api::import::safe_fetch::FetchPolicy;
+use serde_json::json;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const RECIPE_HTML: &str = include_str!("fixtures/wprm-graph.html");
 const NO_RECIPE_HTML: &str = include_str!("fixtures/no-recipe.html");
 
-struct Ctx {
-    app: Router,
-    pool: PgPool,
-    admin_pool: PgPool,
-    schema: String,
-    media_dir: PathBuf,
-    cookie: String,
-}
-
-struct Res {
-    cookie: Option<String>,
-    status: StatusCode,
-    bytes: Vec<u8>,
-    content_type: Option<String>,
-    json: Value,
-}
-
-impl Res {
-    fn code(&self) -> &str {
-        self.json["error"]["code"].as_str().unwrap_or("")
-    }
-}
-
 /// `loopback_port`: the test server's port to allow, or `None` for the production policy.
-async fn ctx(loopback_port: Option<u16>) -> Option<Ctx> {
+async fn ctx(loopback_port: Option<u16>) -> TestApp {
     ctx_with(loopback_port.map(FetchPolicy::allow_loopback_port_for_tests)).await
 }
 
-/// `policy`: the fetch policy to test with, or `None` for the production default.
-async fn ctx_with(policy: Option<FetchPolicy>) -> Option<Ctx> {
-    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
-        eprintln!("note: TEST_DATABASE_URL not set, skipping integration test");
-        return None;
-    };
-    let admin_pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect(&url)
-        .await
-        .unwrap();
-    let mut tx = admin_pool.begin().await.unwrap();
-    tx.execute("select pg_advisory_xact_lock(727274)")
-        .await
-        .unwrap();
-    tx.execute("create extension if not exists citext with schema public")
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
-
-    let schema = format!("test_{}", Uuid::new_v4().simple());
-    admin_pool
-        .execute(sqlx::AssertSqlSafe(format!("create schema {schema}")))
-        .await
-        .unwrap();
-    let opts = PgConnectOptions::from_str(&url)
-        .unwrap()
-        .options([("search_path", format!("{schema},public"))]);
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect_with(opts)
-        .await
-        .unwrap();
-    recipe_box_api::migrate(&pool).await.unwrap();
-
-    let media_dir = std::env::temp_dir().join(&schema);
-    std::fs::create_dir_all(&media_dir).unwrap();
-    let config = Config {
-        database_url: url,
-        media_dir: media_dir.clone(),
-        bind_addr: "127.0.0.1:0".into(),
-        cookie_secure: false,
-        session_days: 30,
-        ai_provider: "none".into(),
-        anthropic_api_key: None,
-        ai_model: "test".into(),
-        max_upload_mb: 2,
-    };
-    let mut state = AppState::new(pool.clone(), config).unwrap();
-    if let Some(policy) = policy {
-        state.fetch_policy = policy;
-    }
-    let mut ctx = Ctx {
-        app: recipe_box_api::router(state),
-        pool,
-        admin_pool,
-        schema,
-        media_dir,
-        cookie: String::new(),
-    };
-    let res = ctx
-        .call(
-            Method::POST,
-            "/api/setup",
-            Some(json!({ "username": "admin", "displayName": "Admin", "password": "correct horse battery" })),
-            None,
-        )
-        .await;
-    assert_eq!(res.status, StatusCode::CREATED, "{}", res.json);
-    ctx.cookie = res.cookie.unwrap().split(';').next().unwrap().to_string();
-    Some(ctx)
+/// `policy`: the fetch policy to test with, or `None` for the production default. Signed in as the admin.
+async fn ctx_with(policy: Option<FetchPolicy>) -> TestApp {
+    TestApp::spawn_as_admin_with(|state| {
+        if let Some(policy) = policy {
+            state.fetch_policy = policy;
+        }
+    })
+    .await
 }
 
-impl Ctx {
-    async fn call(
-        &self,
-        method: Method,
-        path: &str,
-        body: Option<Value>,
-        cookie: Option<&str>,
-    ) -> Res {
-        let mut req = Request::builder().method(method).uri(path);
-        if let Some(c) = cookie {
-            req = req.header(header::COOKIE, c);
-        }
-        let body = match body {
-            Some(v) => {
-                req = req.header(header::CONTENT_TYPE, "application/json");
-                Body::from(v.to_string())
-            }
-            None => Body::empty(),
-        };
-        let res = self
-            .app
-            .clone()
-            .oneshot(req.body(body).unwrap())
-            .await
-            .unwrap();
-        let status = res.status();
-        let cookie = res
-            .headers()
-            .get(header::SET_COOKIE)
-            .map(|v| v.to_str().unwrap().to_string());
-        let content_type = res
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .map(|v| v.to_str().unwrap().to_string());
-        let bytes = res.into_body().collect().await.unwrap().to_bytes().to_vec();
-        let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-        Res {
-            status,
-            cookie,
-            bytes,
-            content_type,
-            json,
-        }
-    }
+trait ImportExt {
+    async fn import(&self, url: &str) -> Res;
+    async fn recipe_count(&self) -> i64;
+}
 
+impl ImportExt for TestApp {
     /// Signed-in `POST /api/import/url`.
     async fn import(&self, url: &str) -> Res {
-        self.call(
-            Method::POST,
-            "/api/import/url",
-            Some(json!({ "url": url })),
-            Some(&self.cookie),
-        )
-        .await
+        self.post("/api/import/url", &self.cookie, json!({ "url": url }))
+            .await
     }
 
     async fn recipe_count(&self) -> i64 {
@@ -187,18 +54,6 @@ impl Ctx {
             .fetch_one(&self.pool)
             .await
             .unwrap()
-    }
-
-    async fn cleanup(self) {
-        self.pool.close().await;
-        self.admin_pool
-            .execute(sqlx::AssertSqlSafe(format!(
-                "drop schema {} cascade",
-                self.schema
-            )))
-            .await
-            .unwrap();
-        let _ = std::fs::remove_dir_all(&self.media_dir);
     }
 }
 
@@ -343,9 +198,7 @@ async fn site() -> (String, u16) {
 #[tokio::test]
 async fn imports_a_draft_with_photo_and_saves_nothing() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     let res = ctx.import(&format!("{base}/recipe")).await;
     assert_eq!(res.status, StatusCode::OK, "{}", res.json);
     let d = &res.json;
@@ -363,50 +216,39 @@ async fn imports_a_draft_with_photo_and_saves_nothing() {
     assert!(d["imageId"].is_string(), "{d}");
     let image_url = d["imageUrl"].as_str().unwrap();
     assert!(image_url.starts_with("/media/"), "{image_url}");
-    let media = ctx
-        .call(Method::GET, image_url, None, Some(&ctx.cookie))
-        .await;
+    let media = ctx.get(image_url, &ctx.cookie).await;
     assert_eq!(
         (media.status, media.content_type.as_deref()),
         (StatusCode::OK, Some("image/jpeg"))
     );
     assert_eq!(&media.bytes[..2], &[0xFF, 0xD8]);
     assert_eq!(ctx.recipe_count().await, 0);
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn photo_failure_is_a_warning_not_an_error() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     let res = ctx.import(&format!("{base}/recipe-no-photo")).await;
     assert_eq!(res.status, StatusCode::OK, "{}", res.json);
     assert!(res.json["imageId"].is_null() && res.json["imageUrl"].is_null());
     assert_eq!(res.json["warnings"].as_array().unwrap().len(), 1);
     assert_eq!(res.json["title"], "Brown Butter Pasta with Sage");
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn uses_the_final_url_after_redirects() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     let res = ctx.import(&format!("{base}/to-recipe")).await;
     assert_eq!(res.status, StatusCode::OK, "{}", res.json);
     assert_eq!(res.json["sourceUrl"], format!("{base}/recipe"));
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn page_without_recipe_is_no_recipe_found() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     for path in ["/none", "/headers"] {
         let res = ctx.import(&format!("{base}{path}")).await;
         assert_eq!(
@@ -415,15 +257,12 @@ async fn page_without_recipe_is_no_recipe_found() {
             "{path}"
         );
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn blocking_sites_are_site_blocked() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     for path in ["/forbidden", "/botcheck"] {
         let res = ctx.import(&format!("{base}{path}")).await;
         assert_eq!(
@@ -432,15 +271,12 @@ async fn blocking_sites_are_site_blocked() {
             "{path}"
         );
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn other_failures_are_fetch_failed() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     for path in ["/boom", "/huge", "/loop", "/nothing-here"] {
         let res = ctx.import(&format!("{base}{path}")).await;
         assert_eq!(
@@ -450,15 +286,12 @@ async fn other_failures_are_fetch_failed() {
             res.json
         );
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn redirects_into_internal_addresses_are_blocked() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     for path in ["/to-loopback", "/to-metadata", "/to-ipv6-loopback"] {
         let res = ctx.import(&format!("{base}{path}")).await;
         assert_eq!(
@@ -467,13 +300,12 @@ async fn redirects_into_internal_addresses_are_blocked() {
             "{path}"
         );
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn production_policy_refuses_internal_addresses() {
     let (base, _) = site().await; // a real listener on 127.0.0.1, still refused
-    let Some(ctx) = ctx(None).await else { return };
+    let ctx = ctx(None).await;
     for url in [
         format!("{base}/recipe"),
         "http://127.0.0.1/".into(),
@@ -489,12 +321,11 @@ async fn production_policy_refuses_internal_addresses() {
             "{url}"
         );
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn bad_input_and_no_session() {
-    let Some(ctx) = ctx(None).await else { return };
+    let ctx = ctx(None).await;
     for bad in [
         "",
         "not a url",
@@ -515,29 +346,25 @@ async fn bad_input_and_no_session() {
         .call(
             Method::POST,
             "/api/import/url",
-            Some(json!({ "url": "https://example.com/" })),
             None,
+            Some(json!({ "url": "https://example.com/" })),
         )
         .await;
     assert_eq!(
         (res.status, res.code()),
         (StatusCode::UNAUTHORIZED, "unauthenticated")
     );
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn already_saved_link_sets_duplicate_of() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     let saved = ctx
-        .call(
-            Method::POST,
+        .post(
             "/api/recipes",
-            Some(json!({ "title": "Saved pasta", "sourceUrl": format!("{base}/recipe/?utm_source=newsletter#top") })),
-            Some(&ctx.cookie),
+            &ctx.cookie,
+            json!({ "title": "Saved pasta", "sourceUrl": format!("{base}/recipe/?utm_source=newsletter#top") }),
         )
         .await;
     assert_eq!(saved.status, StatusCode::CREATED, "{}", saved.json);
@@ -550,26 +377,16 @@ async fn already_saved_link_sets_duplicate_of() {
     assert_eq!(res.json["duplicateOf"], id.as_str());
 
     // A deleted recipe no longer counts.
-    let del = ctx
-        .call(
-            Method::DELETE,
-            &format!("/api/recipes/{id}"),
-            None,
-            Some(&ctx.cookie),
-        )
-        .await;
+    let del = ctx.delete(&format!("/api/recipes/{id}"), &ctx.cookie).await;
     assert_eq!(del.status, StatusCode::NO_CONTENT);
     let res = ctx.import(&format!("{base}/recipe")).await;
     assert!(res.json["duplicateOf"].is_null());
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn redirects_to_other_schemes_are_blocked() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     // Loopback is allowed on this port, so only the scheme check can refuse these.
     for path in ["/to-ftp", "/to-gopher"] {
         let res = ctx.import(&format!("{base}{path}")).await;
@@ -579,30 +396,24 @@ async fn redirects_to_other_schemes_are_blocked() {
             "{path}"
         );
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn loopback_allowance_is_one_port_only() {
     let (_, port) = site().await;
     let (other_base, _) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     let res = ctx.import(&format!("{other_base}/recipe")).await;
     assert_eq!(
         (res.status, res.code()),
         (StatusCode::UNPROCESSABLE_ENTITY, "blocked_address")
     );
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn body_cap_applies_without_content_length() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     let res = ctx.import(&format!("{base}/huge-chunked")).await;
     assert_eq!(
         (res.status, res.code()),
@@ -616,7 +427,6 @@ async fn body_cap_applies_without_content_length() {
         "{}",
         res.json
     );
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
@@ -624,9 +434,7 @@ async fn slow_sites_time_out() {
     let (base, port) = site().await;
     let policy = FetchPolicy::allow_loopback_port_for_tests(port)
         .with_timeout_for_tests(std::time::Duration::from_millis(700));
-    let Some(ctx) = ctx_with(Some(policy)).await else {
-        return;
-    };
+    let ctx = ctx_with(Some(policy)).await;
     let t = std::time::Instant::now();
     let res = ctx.import(&format!("{base}/drip")).await;
     assert_eq!(
@@ -642,15 +450,12 @@ async fn slow_sites_time_out() {
         res.json
     );
     assert!(t.elapsed().as_secs() < 5);
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn bad_photos_are_warnings_not_failures() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     for path in [
         "/img-js",
         "/img-data",
@@ -669,12 +474,11 @@ async fn bad_photos_are_warnings_not_failures() {
         assert_eq!(res.json["title"], "Brown Butter Pasta with Sage");
         assert!(t.elapsed().as_secs() < 5, "{path} took {:?}", t.elapsed());
     }
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn upload_of_a_huge_canvas_is_refused() {
-    let Some(ctx) = ctx(None).await else { return };
+    let ctx = ctx(None).await;
     let boundary = "XBOUNDARYX";
     let mut body = format!(
         "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.png\"\r\nContent-Type: image/png\r\n\r\n"
@@ -693,18 +497,15 @@ async fn upload_of_a_huge_canvas_is_refused() {
         .body(Body::from(body))
         .unwrap();
     let t = std::time::Instant::now();
-    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    let res = ctx.router.clone().oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     assert!(t.elapsed().as_secs() < 5);
-    ctx.cleanup().await;
 }
 
 #[tokio::test]
 async fn pathological_pages_return_promptly() {
     let (base, port) = site().await;
-    let Some(ctx) = ctx(Some(port)).await else {
-        return;
-    };
+    let ctx = ctx(Some(port)).await;
     let t = std::time::Instant::now();
     let res = ctx.import(&format!("{base}/nested")).await;
     assert_eq!(
@@ -717,5 +518,4 @@ async fn pathological_pages_return_promptly() {
     let res = ctx.import(&format!("{base}/nested-with-ld")).await;
     assert_eq!(res.status, StatusCode::OK, "{}", res.json);
     assert!(t.elapsed().as_secs() < 2, "took {:?}", t.elapsed());
-    ctx.cleanup().await;
 }

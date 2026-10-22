@@ -77,6 +77,6 @@ pub async fn create_admin(
     .await?;
     tx.commit().await?;
 
-    let jar = session::start(&state.pool, &state.config, jar, user.id).await?;
+    let jar = session::start(&state, jar, user.id).await?;
     Ok((StatusCode::CREATED, jar, Json(user)))
 }

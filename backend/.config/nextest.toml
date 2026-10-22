@@ -1,0 +1,15 @@
+# cargo-nextest settings. Run the suite with `cargo nextest run` (CI: `--profile ci`).
+# Determinism rules (issue #52): no retries, a failure never hides behind a re-run.
+
+[profile.default]
+retries = 0
+fail-fast = false
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+[profile.ci]
+retries = 0
+fail-fast = false
+failure-output = "immediate-final"
+status-level = "fail"
+final-status-level = "fail"
+slow-timeout = { period = "30s", terminate-after = 4 }

@@ -1,4 +1,7 @@
-use std::sync::LazyLock;
+use std::sync::{
+    LazyLock,
+    atomic::{AtomicU64, Ordering},
+};
 
 use anyhow::anyhow;
 use argon2::{
@@ -8,8 +11,17 @@ use argon2::{
 
 use crate::error::AppResult;
 
+/// How many argon2 operations (hash or verify) ran in this process. Lets a test prove that a request was refused
+/// before any hashing work, without timing it. Only meaningful when no other test shares the process.
+pub fn work_count() -> u64 {
+    WORK.load(Ordering::SeqCst)
+}
+
+static WORK: AtomicU64 = AtomicU64::new(0);
+
 /// Hashes on a blocking thread (argon2 is deliberately slow).
 pub async fn hash(password: String) -> AppResult<String> {
+    WORK.fetch_add(1, Ordering::SeqCst);
     let phc = tokio::task::spawn_blocking(move || {
         Argon2::default()
             .hash_password(password.as_bytes())
@@ -23,6 +35,7 @@ pub async fn hash(password: String) -> AppResult<String> {
 
 /// Verifies against `phc`, or against a dummy hash when the user does not exist so timing does not reveal it.
 pub async fn verify(password: String, phc: Option<String>) -> AppResult<bool> {
+    WORK.fetch_add(1, Ordering::SeqCst);
     static DUMMY: LazyLock<String> = LazyLock::new(|| {
         Argon2::default()
             .hash_password(b"dummy password for timing")

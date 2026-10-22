@@ -1,5 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use sqlx::{AssertSqlSafe, PgPool, Postgres, Transaction, types::Json as SqlJson};
 use utoipa::{IntoParams, ToSchema};
@@ -259,8 +259,9 @@ pub async fn remove(
     AppPath(id): AppPath<Uuid>,
 ) -> AppResult<StatusCode> {
     let done =
-        sqlx::query("update recipes set deleted_at = now() where id = $1 and deleted_at is null")
+        sqlx::query("update recipes set deleted_at = $2 where id = $1 and deleted_at is null")
             .bind(id)
+            .bind(state.clock.now())
             .execute(&state.pool)
             .await?;
     if done.rows_affected() == 0 {
@@ -293,10 +294,10 @@ pub async fn restore(
         Some(Some(_)) => {
             let done = sqlx::query(
                 "update recipes set deleted_at = null
-                 where id = $1 and deleted_at > now() - make_interval(mins => $2)",
+                 where id = $1 and deleted_at > $2",
             )
             .bind(id)
-            .bind(RESTORE_WINDOW_MINUTES)
+            .bind(state.clock.now() - Duration::minutes(i64::from(RESTORE_WINDOW_MINUTES)))
             .execute(&state.pool)
             .await?;
             if done.rows_affected() == 0 {

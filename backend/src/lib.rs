@@ -1,6 +1,7 @@
 //! Recipe Box API: library crate so integration tests can build the router against a test database.
 
 pub mod auth;
+pub mod clock;
 pub mod config;
 pub mod error;
 pub mod import;
@@ -11,7 +12,10 @@ pub mod validate;
 
 use std::time::Duration;
 
+use chrono::Duration as ChronoDuration;
 use sqlx::PgPool;
+
+use clock::Clock;
 
 pub use routes::router;
 
@@ -25,14 +29,20 @@ pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
     sqlx::migrate!("./migrations").run(pool).await
 }
 
+/// Soft-deleted recipes are hard-deleted once they are older than this.
+pub const PURGE_AFTER: ChronoDuration = ChronoDuration::days(1);
+
 /// Hard-deletes recipes soft-deleted more than a day ago and expired sessions.
-pub async fn purge(pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn purge(pool: &PgPool, clock: &Clock) -> Result<(), sqlx::Error> {
+    let now = clock.now();
     // shortcut: image files of purged recipes stay on disk, add an orphan-image sweep if storage matters.
-    let recipes = sqlx::query("delete from recipes where deleted_at < now() - interval '1 day'")
+    let recipes = sqlx::query("delete from recipes where deleted_at < $1")
+        .bind(now - PURGE_AFTER)
         .execute(pool)
         .await?
         .rows_affected();
-    let sessions = sqlx::query("delete from sessions where expires_at < now()")
+    let sessions = sqlx::query("delete from sessions where expires_at < $1")
+        .bind(now)
         .execute(pool)
         .await?
         .rows_affected();
@@ -41,12 +51,12 @@ pub async fn purge(pool: &PgPool) -> Result<(), sqlx::Error> {
 }
 
 /// Runs [`purge`] now and then every hour.
-pub fn spawn_purge_task(pool: PgPool) {
+pub fn spawn_purge_task(pool: PgPool, clock: Clock) {
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(Duration::from_secs(3600));
         loop {
             tick.tick().await;
-            if let Err(e) = purge(&pool).await {
+            if let Err(e) = purge(&pool, &clock).await {
                 tracing::error!(error = %e, "purge failed");
             }
         }
