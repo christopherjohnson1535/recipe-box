@@ -8,6 +8,15 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 const draft = (over: Partial<RecipeDraft> = {}): RecipeDraft => ({
   title: "Best pancakes",
+  description: "",
+  notes: "",
+  servings: null,
+  prepMinutes: null,
+  cookMinutes: null,
+  totalMinutes: null,
+  sourceName: null,
+  photoImageIds: [],
+  tags: [],
   ingredients: [{ text: "2 eggs", section: null }],
   steps: [{ text: "Whisk.", section: null }],
   sourceUrl: "https://example.com/pancakes",

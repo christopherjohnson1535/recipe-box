@@ -1,65 +1,28 @@
-// Typed client for docs/API.md. Works in the browser (relative /api through the web origin)
+// Typed client for the API (docs/openapi.json). Works in the browser (relative /api through the web origin)
 // and on the server (API_INTERNAL_URL + the caller's forwarded cookie, see server-api.ts).
 
-export type Ingredient = { text: string; section: string | null };
-export type Step = { text: string; section: string | null };
-export type SourceType = "manual" | "link" | "photo" | "text";
+import type { components } from "./api-types";
 
-export type RecipeInput = {
-  title: string;
-  description?: string;
-  ingredients?: Ingredient[];
-  steps?: Step[];
-  servings?: string | null;
-  prepMinutes?: number | null;
-  cookMinutes?: number | null;
-  totalMinutes?: number | null;
-  notes?: string;
-  sourceUrl?: string | null;
-  sourceName?: string | null;
-  sourceType?: SourceType;
-  imageId?: string | null;
-  photoImageIds?: string[];
-  tags?: string[];
-};
+// Every shape below is generated from the backend's OpenAPI spec (docs/openapi.json, see docs/API.md).
+type Schemas = components["schemas"];
 
-export type UserRef = { id: string; displayName: string };
-
-export type Recipe = Required<RecipeInput> & {
-  id: string;
-  imageUrl: string | null;
-  photoUrls: string[];
-  createdBy: UserRef | null;
-  updatedBy: UserRef | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type RecipeSummary = {
-  id: string;
-  title: string;
-  description: string;
-  totalMinutes: number | null;
-  tags: string[];
-  imageUrl: string | null;
-  sourceType: SourceType;
-  updatedAt: string;
-};
-
-export type RecipeDraft = Omit<RecipeInput, "title"> & {
-  title: string;
-  imageUrl: string | null;
-  warnings: string[];
-  duplicateOf: string | null;
-};
-
-export type Role = "admin" | "member";
-export type User = { id: string; username: string; displayName: string; role: Role; createdAt: string };
-export type Image = { id: string; url: string; width: number; height: number };
-export type Tag = { name: string; count: number };
-export type Health = { status: string; db: string; version: string };
-export type Capabilities = { ai: boolean; provider: "none" | "anthropic" };
-export type RecipeSort = "newest" | "title" | "time";
+export type Ingredient = Schemas["Ingredient"];
+export type Step = Ingredient;
+export type SourceType = Schemas["SourceType"];
+export type RecipeInput = Schemas["RecipeInput"];
+export type UserRef = Schemas["UserRef"];
+export type Recipe = Schemas["Recipe"];
+export type RecipeSummary = Schemas["RecipeSummary"];
+export type RecipeDraft = Schemas["RecipeDraft"];
+export type User = Schemas["User"];
+export type Role = User["role"];
+export type Image = Schemas["Image"];
+export type Tag = Schemas["TagCount"];
+export type Health = Schemas["Health"];
+export type Capabilities = Schemas["Capabilities"];
+export type RecipeSort = Schemas["RecipeSort"];
+export type RecipePage = Schemas["RecipePage"];
+export type ImportSummary = Schemas["ImportSummary"];
 export type RecipeQuery = { q?: string; tag?: string; sort?: RecipeSort; limit?: number; offset?: number };
 
 /** A non-2xx API response (`code` from the API's error body) or `network` when the API can't be reached. */
@@ -122,11 +85,10 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
 
   return {
     health: () => get<Health>("/api/health"),
-    getSetup: () => get<{ needsSetup: boolean }>("/api/setup"),
-    setup: (body: { username: string; displayName: string; password: string }) =>
-      request<User>("POST", "/api/setup", body),
+    getSetup: () => get<Schemas["SetupStatus"]>("/api/setup"),
+    setup: (body: Schemas["SetupBody"]) => request<User>("POST", "/api/setup", body),
 
-    login: (body: { username: string; password: string }) => request<User>("POST", "/api/auth/login", body),
+    login: (body: Schemas["LoginBody"]) => request<User>("POST", "/api/auth/login", body),
     logout: () => request<void>("POST", "/api/auth/logout"),
     me: () => get<User>("/api/auth/me"),
 
@@ -134,7 +96,7 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "") params.set(k, String(v));
       const qs = params.toString();
-      return get<{ items: RecipeSummary[]; total: number }>(`/api/recipes${qs ? `?${qs}` : ""}`);
+      return get<RecipePage>(`/api/recipes${qs ? `?${qs}` : ""}`);
     },
     createRecipe: (body: RecipeInput) => request<Recipe>("POST", "/api/recipes", body),
     getRecipe: (recipeId: string) => get<Recipe>(`/api/recipes/${id(recipeId)}`),
@@ -151,10 +113,10 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
     },
 
     importCapabilities: () => get<Capabilities>("/api/import/capabilities"),
-    importUrl: (url: string) => request<RecipeDraft>("POST", "/api/import/url", { url }),
+    importUrl: (url: string) => request<RecipeDraft>("POST", "/api/import/url", { url } satisfies Schemas["ImportUrlBody"]),
     importText: (text: string, sourceUrl?: string) =>
-      request<RecipeDraft>("POST", "/api/import/text", sourceUrl ? { text, sourceUrl } : { text }),
-    importPhoto: (files: Blob[], mode: "recipe" | "dish") => {
+      request<RecipeDraft>("POST", "/api/import/text", (sourceUrl ? { text, sourceUrl } : { text }) satisfies Schemas["ImportTextBody"]),
+    importPhoto: (files: Blob[], mode: Schemas["PhotoMode"]) => {
       const form = new FormData();
       for (const f of files) form.append("files", f);
       form.append("mode", mode);
@@ -162,8 +124,7 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
     },
 
     listUsers: () => get<User[]>("/api/users"),
-    createUser: (body: { username: string; displayName: string; password: string; role: Role }) =>
-      request<User>("POST", "/api/users", body),
+    createUser: (body: Schemas["CreateUserBody"]) => request<User>("POST", "/api/users", body),
     deleteUser: (userId: string) => request<void>("DELETE", `/api/users/${id(userId)}`),
     setPassword: (userId: string, password: string, currentPassword?: string) =>
       request<void>("PUT", `/api/users/${id(userId)}/password`, currentPassword === undefined ? { password } : { password, currentPassword }),
@@ -172,7 +133,7 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
     importExport: (file: Blob) => {
       const form = new FormData();
       form.append("file", file);
-      return request<{ imported: number; skipped: number }>("POST", "/api/import/export", form);
+      return request<ImportSummary>("POST", "/api/import/export", form);
     },
   };
 }
