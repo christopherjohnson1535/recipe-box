@@ -9,7 +9,7 @@ export function ToastRegion({ children }: { children?: ReactNode }) {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-gutter pb-[max(1rem,env(safe-area-inset-bottom))] print:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-gutter pb-[max(1rem,env(safe-area-inset-bottom))] print:hidden"
     >
       {children}
     </div>
@@ -20,7 +20,7 @@ export function ToastRegion({ children }: { children?: ReactNode }) {
 export function Toast({ children, actions, ...rest }: ComponentProps<"div"> & { actions?: ReactNode }) {
   return (
     <div
-      className="pointer-events-auto flex w-full max-w-measure items-center gap-1 bg-(--toast-bg) py-1 ps-4 pe-1 text-small text-(--toast-fg) shadow-lg"
+      className="pointer-events-auto flex w-full max-w-measure items-center gap-1 bg-(--toast-bg) py-1 ps-4 pe-1 text-small text-(--toast-fg) border border-(--toast-fg)/20"
       {...rest}
     >
       <p className="min-w-0 flex-1 line-clamp-2 py-2 [overflow-wrap:anywhere]">{children}</p>

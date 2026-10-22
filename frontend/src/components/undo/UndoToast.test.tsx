@@ -83,11 +83,44 @@ describe("UndoToast", () => {
     expect(toastText()).toBe("");
   });
 
-  it("a second delete starts a fresh countdown", () => {
+  it("two deletes within 10 s are both undoable, newest on top", async () => {
+    const restore = setup();
+    tick(4_000);
+    act(() => showUndo({ id: "r2", title: "Stew" }));
+    const undos = screen.getAllByRole("button", { name: "Undo" });
+    expect(undos).toHaveLength(2);
+    expect(toastText().indexOf("Stew")).toBeLessThan(toastText().indexOf("Soup"));
+    await act(async () => void fireEvent.click(undos[1]));
+    expect(restore).toHaveBeenCalledWith("r1");
+    expect(toastText()).toContain("Stew");
+    expect(toastText()).not.toContain("Soup");
+  });
+
+  it("each toast keeps its own countdown", () => {
     setup();
     tick(8_000);
     act(() => showUndo({ id: "r2", title: "Stew" }));
-    tick(8_000);
+    tick(3_000);
     expect(toastText()).toContain('Deleted "Stew".');
+    expect(toastText()).not.toContain("Soup");
+    tick(7_100);
+    expect(toastText()).toBe("");
+  });
+
+  it("shows the three newest and keeps older ones in the background", () => {
+    setup();
+    for (const t of ["B", "C", "D"]) act(() => showUndo({ id: t, title: t }));
+    expect(document.querySelectorAll("[hidden]")).toHaveLength(1);
+  });
+
+  it("clears every offer when the layout unmounts or on dismissUndo()", () => {
+    const { unmount } = render(<UndoToast />);
+    act(() => showUndo({ id: "r1", title: "Soup" }));
+    unmount();
+    render(<UndoToast />);
+    expect(toastText()).toBe("");
+    act(() => showUndo({ id: "r3", title: "Pie" }));
+    act(() => dismissUndo());
+    expect(toastText()).toBe("");
   });
 });
