@@ -1,65 +1,65 @@
-import { describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
+import { server } from "@/test/server";
+import { user } from "@/test/handlers";
 import { ApiError, createApi } from "./api";
 
-function mockFetch(response: Response | Error) {
-  return vi.fn<typeof fetch>(async () => {
-    if (response instanceof Error) throw response;
-    return response;
-  });
+/** Records the one request an override receives. */
+function capture(method: "get" | "post" | "delete", path: string, respond: () => Response) {
+  const seen: { request: Request; body: string } = { request: undefined as never, body: "" };
+  server.use(
+    http[method](path, async ({ request }) => {
+      seen.request = request.clone();
+      seen.body = await request.text();
+      return respond();
+    }),
+  );
+  return seen;
 }
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 describe("createApi", () => {
   it("uses relative URLs in the browser and sends JSON bodies", async () => {
-    const fetch = mockFetch(json({ id: "u1", username: "chris" }));
-    const user = await createApi({ fetch }).login({ username: "chris", password: "secret-pass" });
+    const seen = capture("post", "*/api/auth/login", () => HttpResponse.json(user));
+    const got = await createApi().login({ username: "chris", password: "secret-pass" });
 
-    expect(user.username).toBe("chris");
-    const [url, init] = fetch.mock.calls[0];
-    expect(url).toBe("/api/auth/login");
-    expect(init?.method).toBe("POST");
-    expect(new Headers(init?.headers).get("content-type")).toBe("application/json");
-    expect(JSON.parse(init?.body as string)).toEqual({ username: "chris", password: "secret-pass" });
+    expect(got.username).toBe("chris");
+    expect(new URL(seen.request.url).pathname).toBe("/api/auth/login");
+    expect(seen.request.method).toBe("POST");
+    expect(seen.request.headers.get("content-type")).toBe("application/json");
+    expect(JSON.parse(seen.body)).toEqual({ username: "chris", password: "secret-pass" });
   });
 
   it("server-side: prefixes API_INTERNAL_URL and forwards the cookie", async () => {
-    const fetch = mockFetch(json({ items: [], total: 0 }));
-    await createApi({ baseUrl: "http://api:8080", cookie: "rb_session=abc", fetch }).listRecipes({
-      q: "soup",
-      tag: "",
-      limit: 10,
-    });
+    const seen = capture("get", "http://api:8080/api/recipes", () => HttpResponse.json({ items: [], total: 0 }));
+    await createApi({ baseUrl: "http://api:8080", cookie: "rb_session=abc" }).listRecipes({ q: "soup", tag: "", limit: 10 });
 
-    const [url, init] = fetch.mock.calls[0];
-    expect(url).toBe("http://api:8080/api/recipes?q=soup&limit=10");
-    expect(new Headers(init?.headers).get("cookie")).toBe("rb_session=abc");
+    expect(seen.request.url).toBe("http://api:8080/api/recipes?q=soup&limit=10");
+    expect(seen.request.headers.get("cookie")).toBe("rb_session=abc");
   });
 
   it("returns undefined for 204", async () => {
-    const fetch = mockFetch(new Response(null, { status: 204 }));
-    await expect(createApi({ fetch }).deleteRecipe("r1")).resolves.toBeUndefined();
-    expect(fetch.mock.calls[0][0]).toBe("/api/recipes/r1");
-    expect(fetch.mock.calls[0][1]?.method).toBe("DELETE");
+    const seen = capture("delete", "*/api/recipes/r1", () => new HttpResponse(null, { status: 204 }));
+    await expect(createApi().deleteRecipe("r1")).resolves.toBeUndefined();
+    expect(seen.request.method).toBe("DELETE");
   });
 
   it("sends multipart without forcing a content-type", async () => {
-    const fetch = mockFetch(json({ id: "i1", url: "/media/x.jpg", width: 1, height: 1 }, 201));
-    await createApi({ fetch }).importPhoto([new Blob(["a"]), new Blob(["b"])], "dish");
+    const seen = capture("post", "*/api/import/photo", () => HttpResponse.json({ title: "x" }));
+    await createApi().importPhoto([new Blob(["a"]), new Blob(["b"])], "dish");
 
-    const init = fetch.mock.calls[0][1]!;
-    const form = init.body as FormData;
+    const form = await seen.request.formData();
     expect(form.getAll("files")).toHaveLength(2);
     expect(form.get("mode")).toBe("dish");
-    expect(new Headers(init.headers).has("content-type")).toBe(false);
+    expect(seen.request.headers.get("content-type")).toMatch(/^multipart\/form-data; boundary=/);
   });
 
   it("maps the API error body to ApiError, keeping extra fields", async () => {
-    const fetch = mockFetch(
-      json({ error: { code: "ai_disabled", message: "AI is off.", photoImageIds: ["p1"] } }, 422),
+    server.use(
+      http.post("*/api/import/photo", () =>
+        HttpResponse.json({ error: { code: "ai_disabled", message: "AI is off.", photoImageIds: ["p1"] } }, { status: 422 }),
+      ),
     );
-    const err = await createApi({ fetch }).importPhoto([new Blob(["a"])], "recipe").catch((e) => e);
+    const err = await createApi().importPhoto([new Blob(["a"])], "recipe").catch((e) => e);
 
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 422, code: "ai_disabled", message: "AI is off." });
@@ -67,18 +67,18 @@ describe("createApi", () => {
   });
 
   it("handles non-JSON error bodies", async () => {
-    const fetch = mockFetch(new Response("Bad gateway", { status: 502 }));
-    await expect(createApi({ fetch }).me()).rejects.toMatchObject({ status: 502, code: "internal" });
+    server.use(http.get("*/api/auth/me", () => new HttpResponse("Bad gateway", { status: 502 })));
+    await expect(createApi().me()).rejects.toMatchObject({ status: 502, code: "internal" });
   });
 
   it("turns network failures into a 'network' ApiError", async () => {
-    const fetch = mockFetch(new TypeError("fetch failed"));
-    await expect(createApi({ fetch }).getSetup()).rejects.toMatchObject({ status: 0, code: "network" });
+    server.use(http.get("*/api/setup", () => HttpResponse.error()));
+    await expect(createApi().getSetup()).rejects.toMatchObject({ status: 0, code: "network" });
   });
 
   it("encodes path ids", async () => {
-    const fetch = mockFetch(json({}));
-    await createApi({ fetch }).getRecipe("a/b");
-    expect(fetch.mock.calls[0][0]).toBe("/api/recipes/a%2Fb");
+    const seen = capture("get", "*/api/recipes/:id", () => HttpResponse.json({}));
+    await createApi().getRecipe("a/b");
+    expect(new URL(seen.request.url).pathname).toBe("/api/recipes/a%2Fb");
   });
 });

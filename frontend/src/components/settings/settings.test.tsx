@@ -8,10 +8,7 @@ import { SettingsView } from "./SettingsView";
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-afterEach(() => {
-  cleanup();
-  refresh.mockClear();
-});
+afterEach(() => refresh.mockClear());
 
 const user = (id: string, displayName: string, role: User["role"] = "member"): User => ({
   id,

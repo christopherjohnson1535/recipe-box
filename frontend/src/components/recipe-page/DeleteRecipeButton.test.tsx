@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
 import { UndoToast } from "@/components/undo/UndoToast";
@@ -11,7 +11,6 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 
 afterEach(() => {
   act(() => dismissUndo());
-  cleanup();
   push.mockClear();
   refresh.mockClear();
 });

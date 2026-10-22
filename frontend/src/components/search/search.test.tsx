@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NoMatches } from "./ResultSummary";
 import { SEARCH_DEBOUNCE_MS, SearchControls } from "./SearchControls";
@@ -10,8 +10,6 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace }) }));
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
-  cleanup();
-  vi.useRealTimers();
   push.mockClear();
   replace.mockClear();
 });

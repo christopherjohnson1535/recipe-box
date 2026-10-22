@@ -64,6 +64,64 @@ jobs:
       - run: npx vitest run
       - run: npm run build
 
+  coverage:
+    # Reports coverage for both stacks and fails if a number drops (see coverage-baseline.json).
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: recipes
+          POSTGRES_PASSWORD: recipes
+          POSTGRES_DB: recipes_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U recipes"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://recipes:recipes@localhost:5432/recipes_test
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: backend
+      - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Frontend coverage
+        working-directory: frontend
+        run: |
+          npm ci
+          npx vitest run --coverage
+      - name: Backend coverage
+        working-directory: backend
+        run: |
+          cargo llvm-cov --html --output-dir coverage
+          cargo llvm-cov report --json --summary-only --output-path coverage-summary.json
+      - name: Ratchet and summary
+        run: node scripts/coverage-ratchet.mjs | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: coverage-html
+          path: |
+            frontend/coverage
+            backend/coverage
+          if-no-files-found: ignore
+
   compose:
     # Proves the containers build and the stack comes up healthy.
     runs-on: ubuntu-latest

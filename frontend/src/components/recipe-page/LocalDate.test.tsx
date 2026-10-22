@@ -1,9 +1,7 @@
-import { cleanup, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { LocalDate } from "./LocalDate";
-
-afterEach(cleanup);
 
 describe("LocalDate", () => {
   it("shows the viewer's day, not the UTC day", () => {

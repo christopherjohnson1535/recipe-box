@@ -1,12 +1,11 @@
-import { cleanup, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LoginForm } from "./login/LoginForm";
 import { SetupForm } from "./setup/SetupForm";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
-afterEach(cleanup);
 
 describe("auth forms post natively", () => {
   it.each([

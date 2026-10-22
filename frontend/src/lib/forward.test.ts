@@ -1,11 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { describe, expect, it, vi } from "vitest";
+import { server } from "@/test/server";
 import { downstreamResponseHeaders, forwardToApi, upstreamRequestHeaders, upstreamUrl } from "./forward";
 import { safeNext } from "./nav";
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-});
 
 describe("upstreamUrl", () => {
   it("keeps path and query, tolerating a trailing slash on the base", () => {
@@ -54,10 +51,13 @@ describe("header mapping", () => {
 describe("forwardToApi", () => {
   it("sends method, body and headers to API_INTERNAL_URL read at request time", async () => {
     vi.stubEnv("API_INTERNAL_URL", "http://backend.internal:9000");
-    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
-      new Response('{"ok":true}', { status: 201, headers: { "set-cookie": "rb_session=new; Path=/" } }),
+    let seen: { url: string; method: string; cookie: string | null; body: string } | undefined;
+    server.use(
+      http.post("http://backend.internal:9000/api/auth/login", async ({ request }) => {
+        seen = { url: request.url, method: request.method, cookie: request.headers.get("cookie"), body: await request.text() };
+        return new HttpResponse('{"ok":true}', { status: 201, headers: { "set-cookie": "rb_session=new; Path=/" } });
+      }),
     );
-    vi.stubGlobal("fetch", fetch);
 
     const res = await forwardToApi(
       new Request("http://localhost:3000/api/auth/login", {
@@ -67,17 +67,14 @@ describe("forwardToApi", () => {
       }),
     );
 
-    const [url, init] = fetch.mock.calls[0];
-    expect(url).toBe("http://backend.internal:9000/api/auth/login");
-    expect(init?.method).toBe("POST");
-    expect(new Headers(init?.headers).get("cookie")).toBe("a=1");
-    expect(await new Response(init?.body).text()).toBe('{"username":"chris"}');
+    expect(seen).toEqual({ url: "http://backend.internal:9000/api/auth/login", method: "POST", cookie: "a=1", body: '{"username":"chris"}' });
     expect(res.status).toBe(201);
     expect(res.headers.getSetCookie()).toEqual(["rb_session=new; Path=/"]);
   });
 
   it("answers 502 api_unreachable when the API is down", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("fetch failed"))));
+    vi.stubEnv("API_INTERNAL_URL", "http://backend.internal:9000");
+    server.use(http.get("http://backend.internal:9000/api/setup", () => HttpResponse.error()));
     const res = await forwardToApi(new Request("http://localhost:3000/api/setup"));
     expect(res.status).toBe(502);
     expect((await res.json()).error.code).toBe("api_unreachable");
