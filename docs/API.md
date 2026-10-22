@@ -84,7 +84,15 @@ type Image = { id: string; url: string; width: number; height: number };
 
 ### Recipes
 - `GET /api/recipes?q=&tag=&sort=newest|title|time&limit=50&offset=0` → `200 { items: RecipeSummary[], total: number }`.
-  Excludes soft-deleted. `limit` 1..200.
+  Excludes soft-deleted. `limit` 1..200. `total` counts all matches, ignoring `limit`/`offset`.
+  - `q` (blank = no filter): a recipe matches when the `websearch_to_tsquery('simple', q)` hits its title,
+    description, notes or ingredients (`"exact phrase"`, `-exclude`, `or` work), **or** its title starts with `q`
+    (`%`/`_` literal), **or** every word of `q` is a word prefix (`weeknight lasag` finds "Weeknight lasagne"; skipped
+    when `q` uses quotes, `-` or `or`). Tag names are not searched; filter them with `tag`.
+  - `tag`: exact tag name (case-insensitive), ANDed with `q`.
+  - `sort`: `newest` (default), `title` (A–Z), `time` (total minutes ascending, unknown last, then title). With `q` and
+    no `sort`, results are ranked: title-prefix hits, then `ts_rank`, then newest. An explicit `sort` always wins.
+    Anything else is `400 validation`.
 - `POST /api/recipes` `RecipeInput` → `201 Recipe`.
 - `GET /api/recipes/:id` → `200 Recipe` (404 if deleted).
 - `PUT /api/recipes/:id` `RecipeInput` (full replace) → `200 Recipe`.
