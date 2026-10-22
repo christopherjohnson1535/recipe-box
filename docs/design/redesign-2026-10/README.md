@@ -7,12 +7,12 @@ proposals keep the New Yorker restraint and add what was missing. Each one is a 
 
 | # | Proposal | Screenshot | Issue |
 |---|---|---|---|
-| E | Detail kit: motion tokens, spot icons, Day/Evening editions, save stamp, skeletons | `5-detail-kit.jpg` | build first, the others use it |
-| A | Homepage as a magazine cover | `1-cover-homepage.jpg` | |
-| B | Recipe page as a feature spread | `2-recipe-spread.jpg` | |
-| C | iPad cook mode, Evening Edition | `3-ipad-cook-mode.jpg` | design for #13 |
-| D | Import as a darkroom (live scan + draft) | `4-import-darkroom.jpg` | |
-| F | Illustrated plates: one print treatment for every photo | plates in A and B | |
+| E | Detail kit: motion tokens, spot icons, Day/Evening editions, save stamp, skeletons | `5-detail-kit.jpg` | #38 (build first) |
+| A | Homepage as a magazine cover | `1-cover-homepage.jpg` | #39 |
+| B | Recipe page as a feature spread | `2-recipe-spread.jpg` | #40 |
+| C | iPad cook mode, Evening Edition | `3-ipad-cook-mode.jpg` | #41 (design for #13) |
+| D | Import as a darkroom (live scan + draft) | `4-import-darkroom.jpg` | #42 |
+| F | Illustrated plates: one print treatment for every photo | plates in A and B | #43 |
 
 ## Files
 - `*.jpg`: screenshots at 2× (desktop 1280 px wide; cook mode at iPad landscape 1180 × 820).
