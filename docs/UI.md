@@ -110,6 +110,9 @@ Controls and states:
   `ui/Pending` (status note with a quiet bar and a way out; token `--progress-fg`). `Heading` takes `ref` and
   `tabIndex` so a page can move focus to a result.
 - `ui/Panel`: tinted (paper-deep) block for an inline form or confirmation. `ui/ConfirmInline`: two-step confirmation in a Panel; focus starts on the safe "Keep" button. `ui/MemberList` + `MemberItem`: people separated by hairlines with name, "You" marker, detail, actions, a note and an opened panel. `ui/DetailList`: label/value pairs as a definition list.
+- `ui/Select`: native select set like Input (iPadOS wheel picker); used for the home sort menu. Home search lives in
+  `components/search/` (`SearchControls`: debounced 250 ms `router.replace` of `?q=`, uncontrolled input so focus and
+  caret survive, Enter/Search/sort push history; `ResultSummary` live count; `NoMatches` with "Clear search").
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
 - `ui/Toast` (`ToastRegion`, `Toast`, `ToastAction`, `ToastDismiss`): inverse message pinned to the bottom, 44px actions, tokens `--toast-*`. The region is a polite live region and stays mounted; hidden in print. Separated by a hairline border, never a shadow. Used by `undo/UndoToast`.

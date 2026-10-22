@@ -10,6 +10,11 @@ pub const MIN_PASSWORD: usize = 10;
 /// Upper bound so argon2 is not fed megabytes.
 pub const MAX_PASSWORD: usize = 1024;
 
+/// Postgres text cannot hold NUL bytes (they would 500); drop them from free text.
+fn clean(s: &str) -> String {
+    s.replace('\0', "").trim().to_string()
+}
+
 /// Trims and lower-cases; 3–40 chars of `[a-z0-9_.-]`.
 pub fn username(raw: &str) -> AppResult<String> {
     let u = raw.trim().to_lowercase();
@@ -49,7 +54,7 @@ pub fn display_name(raw: &str) -> AppResult<String> {
 pub fn tags(raw: &[String]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for t in raw {
-        let t = t.trim().to_lowercase();
+        let t = clean(t).to_lowercase();
         if !t.is_empty() && !out.contains(&t) {
             out.push(t);
         }
@@ -74,7 +79,7 @@ fn lines(items: Vec<Ingredient>) -> Vec<Ingredient> {
     items
         .into_iter()
         .filter_map(|i| {
-            let text = i.text.trim().to_string();
+            let text = clean(&i.text);
             (!text.is_empty()).then(|| Ingredient {
                 text,
                 section: blank_to_none(i.section),
@@ -84,7 +89,7 @@ fn lines(items: Vec<Ingredient>) -> Vec<Ingredient> {
 }
 
 fn blank_to_none(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    s.map(|s| clean(&s)).filter(|s| !s.is_empty())
 }
 
 fn minutes(field: &str, v: Option<i32>) -> AppResult<Option<i32>> {
@@ -96,7 +101,7 @@ fn minutes(field: &str, v: Option<i32>) -> AppResult<Option<i32>> {
 
 /// Validates and normalises a POST/PUT recipe body.
 pub fn recipe(input: RecipeInput) -> AppResult<RecipeInput> {
-    let title = input.title.trim().to_string();
+    let title = clean(&input.title);
     if title.is_empty() || title.chars().count() > MAX_TITLE {
         return Err(AppError::validation(format!(
             "title: 1–{MAX_TITLE} characters."
@@ -104,14 +109,14 @@ pub fn recipe(input: RecipeInput) -> AppResult<RecipeInput> {
     }
     Ok(RecipeInput {
         title,
-        description: input.description.trim().to_string(),
+        description: clean(&input.description),
         ingredients: lines(input.ingredients),
         steps: lines(input.steps),
         servings: blank_to_none(input.servings),
         prep_minutes: minutes("prepMinutes", input.prep_minutes)?,
         cook_minutes: minutes("cookMinutes", input.cook_minutes)?,
         total_minutes: minutes("totalMinutes", input.total_minutes)?,
-        notes: input.notes.trim().to_string(),
+        notes: clean(&input.notes),
         source_url: source_url(input.source_url.as_deref())?,
         source_name: blank_to_none(input.source_name),
         source_type: input.source_type,

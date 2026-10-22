@@ -5,6 +5,7 @@ A household recipe website: save recipes from links and photos, find them fast, 
 **Using it**
 - [[Getting Started]] — run it on your computer in 10 minutes
 - [[Importing Recipes]] — links, photos, pasted text
+- [[Finding Recipes]] — search, tags, sorting
 - [[Using on iPad]] — Home Screen app, cooking mode, offline
 - [[AI Photo Import]] — optional setup for reading recipes from photos
 - [[Backup and Restore]]

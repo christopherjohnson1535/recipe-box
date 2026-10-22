@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from "react";
+import type { ComponentProps } from "react";
 import { cx } from "./cx";
 
 /** The look shared by every text control (Input, Textarea). */
@@ -10,6 +10,6 @@ export const inputClass = (className?: string) =>
     className,
   );
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...rest }: ComponentProps<"input">) {
   return <input className={inputClass(className)} {...rest} />;
 }

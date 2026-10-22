@@ -516,6 +516,29 @@ async fn recipe_crud_list_delete_restore() {
 }
 
 #[tokio::test]
+async fn nul_bytes_in_recipe_text_are_dropped() {
+    let Some(ctx) = ctx().await else { return };
+    let c = ctx.setup_admin().await;
+    let res = ctx
+        .call(
+            Method::POST,
+            "/api/recipes",
+            Some(c.as_str()),
+            Some(json!({
+                "title": "So\u{0}up", "description": "a\u{0}b", "notes": "n\u{0}",
+                "ingredients": [{ "text": "1 on\u{0}ion", "section": "s\u{0}" }],
+                "steps": [{ "text": "boil\u{0}" }], "tags": ["di\u{0}nner"]
+            })),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::CREATED, "{}", res.json);
+    assert_eq!(res.json["title"], "Soup");
+    assert_eq!(res.json["ingredients"][0]["text"], "1 onion");
+    assert_eq!(res.json["tags"], json!(["dinner"]));
+    ctx.cleanup().await;
+}
+
+#[tokio::test]
 async fn tags_with_counts() {
     let Some(ctx) = ctx().await else { return };
     let c = ctx.setup_admin().await;
