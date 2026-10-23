@@ -3756,7 +3756,7 @@ version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8765fe27aeff71012a3f90fa474cf1df863a7d0dd81ed25de4e63fff2544994f"
 dependencies = [
- "indexmap",
+ "indexmap 2.14.2",
  "serde",
  "serde_json",
  "utoipa-gen",
