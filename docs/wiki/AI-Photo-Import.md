@@ -28,4 +28,4 @@ See the [Claude vision docs](https://platform.claude.com/docs/en/build-with-clau
 HEIC photos are read with libheif (`heif-convert`), which is installed in the API container. Running the API
 outside Docker? Install it (`apt install libheif-examples`, `brew install libheif`) or point `HEIF_CONVERT` at it.
 
-_Status: photo import works (Phase 2); text import is next — see [[Roadmap]]._
+_Status: photo and text import work; link import falls back to AI for pages without recipe data — see [[Roadmap]]._

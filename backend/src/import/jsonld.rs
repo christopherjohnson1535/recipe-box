@@ -68,17 +68,9 @@ pub fn extract(html: &str, page_url: &Url) -> Option<RecipeDraft> {
             .unwrap_or_default();
     }
     if draft.source_name.is_none() {
-        draft.source_name = meta(html, "og:site_name").or_else(|| {
-            page_url
-                .host_str()
-                .map(|h| h.trim_start_matches("www.").to_string())
-        });
+        draft.source_name = site_name(html, page_url);
     }
-    let mut shown = page_url.clone(); // no credentials or fragment in the stored link
-    let _ = shown.set_username("");
-    let _ = shown.set_password(None);
-    shown.set_fragment(None);
-    draft.source_url = Some(shown.to_string());
+    draft.source_url = Some(shown_url(page_url));
     draft.source_type = SourceType::Link;
     draft.warnings.extend(NOTES.with(|n| {
         n.borrow_mut()
@@ -87,6 +79,24 @@ pub fn extract(html: &str, page_url: &Url) -> Option<RecipeDraft> {
             .collect::<Vec<_>>()
     }));
     Some(draft)
+}
+
+/// `og:site_name`, else the host without `www.`.
+pub(crate) fn site_name(html: &str, page_url: &Url) -> Option<String> {
+    meta(html, "og:site_name").or_else(|| {
+        page_url
+            .host_str()
+            .map(|h| h.trim_start_matches("www.").to_string())
+    })
+}
+
+/// `url` as stored in `source_url`: no credentials or fragment.
+pub(crate) fn shown_url(url: &Url) -> String {
+    let mut shown = url.clone();
+    let _ = shown.set_username("");
+    let _ = shown.set_password(None);
+    shown.set_fragment(None);
+    shown.to_string()
 }
 
 // ---------- cheap scans (no DOM) ----------
@@ -193,7 +203,7 @@ fn title_tag(html: &str) -> Option<String> {
 
 /// Rough tag count and nesting depth from a tag scan (void elements ignored), to refuse DOM-building for pages
 /// that would make the parser quadratic.
-fn too_complex(html: &str) -> bool {
+pub(crate) fn too_complex(html: &str) -> bool {
     const VOID: &[&str] = &[
         "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
         "track", "wbr", "param",

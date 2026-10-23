@@ -457,7 +457,6 @@ async fn capabilities_and_stubs() {
     assert_eq!(caps.json, json!({ "ai": false, "provider": "none" }));
 
     let stubs = [
-        (Method::POST, "/api/import/text".to_string()),
         (Method::GET, "/api/export".to_string()),
         (Method::POST, "/api/import/export".to_string()),
     ];

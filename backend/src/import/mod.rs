@@ -8,6 +8,7 @@ use url::Url;
 pub mod ai;
 pub mod jsonld;
 pub mod photo;
+pub mod readable;
 pub mod safe_fetch;
 
 /// Form of a source URL used to spot "already saved" links (LNK-5): lower-case scheme/host and default port (the

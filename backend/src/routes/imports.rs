@@ -1,5 +1,4 @@
-//! Import routes. Capabilities is real; the rest are 501 stubs until the import issues land
-//! (see `crate::import` for what each must do).
+//! Import routes: capabilities, link, text and photo.
 
 use std::time::Instant;
 
@@ -13,19 +12,17 @@ use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::{
-    media::{delete_images, store_image, store_jpeg},
-    not_implemented,
-};
+use super::media::{delete_images, store_image, store_jpeg};
 use crate::{
     auth::CurrentUser,
     error::{AppError, AppJson, AppResult, ErrorBody},
     import::{
         ai::{self, AiProvider as _},
         jsonld, normalize_url,
+        readable::readable,
         safe_fetch::{self, PAGE_MAX_BYTES},
     },
-    models::{Image, RecipeDraft},
+    models::{Image, RecipeDraft, SourceType},
     state::AppState,
     validate,
 };
@@ -64,12 +61,13 @@ pub struct ImportUrlBody {
     url: String,
 }
 
-/// Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing.
+/// Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. A page with no recipe data goes to
+/// the AI as plain text when AI is on (LNK-4).
 #[utoipa::path(post, path = "/api/import/url", operation_id = "importFromUrl", tag = "import", security(("session" = [])), request_body = ImportUrlBody, responses(
     (status = 200, description = "The draft. `sourceUrl` is the final URL after redirects.", body = RecipeDraft),
     (status = 400, description = "Not an http(s) address (`validation`).", body = ErrorBody),
     (status = 422, description = "No recipe on the page (`no_recipe_found`), or the address is not public (`blocked_address`).", body = ErrorBody),
-    (status = 502, description = "The site refused us (`site_blocked`), or the fetch failed or timed out (`fetch_failed`).", body = ErrorBody),
+    (status = 502, description = "The site refused us (`site_blocked`), the fetch failed or timed out (`fetch_failed`), or the AI fallback failed (`ai_error`).", body = ErrorBody),
 ))]
 pub async fn from_url(
     State(state): State<AppState>,
@@ -93,22 +91,70 @@ pub async fn from_url(
         .total_timeout()
         .saturating_sub(started.elapsed());
     let final_url = page.final_url.clone();
+    let ai_on = state.config.ai_enabled();
     let parse = tokio::task::spawn_blocking(move || {
         // shortcut: pages are decoded as UTF-8 (lossy); honour <meta charset> if a non-UTF-8 site turns up.
-        jsonld::extract(&String::from_utf8_lossy(&page.body), &page.final_url)
+        let html = String::from_utf8_lossy(&page.body);
+        if let Some(draft) = jsonld::extract(&html, &page.final_url) {
+            return Parsed::Draft(Box::new(draft));
+        }
+        if !ai_on || jsonld::too_complex(&html) {
+            return Parsed::Nothing;
+        }
+        let page_text = readable(&html, &page.final_url);
+        let site_name = jsonld::site_name(&html, &page.final_url);
+        Parsed::Text(page_text, site_name)
     });
-    let extracted = tokio::time::timeout(left, parse)
+    let parsed = tokio::time::timeout(left, parse)
         .await
         .map_err(|_| AppError::FetchFailed("That page took too long to read.".into()))?
         .map_err(|e| anyhow::anyhow!(e))?;
-    let mut draft = extracted.ok_or_else(|| {
+    let no_recipe = || {
         AppError::NoRecipeFound(
             "We couldn't find a recipe on that page. You can paste the recipe text instead.".into(),
         )
-    })?;
+    };
+    let mut draft = match parsed {
+        Parsed::Draft(d) => *d,
+        Parsed::Nothing => return Err(no_recipe()),
+        Parsed::Text(page_text, site_name) => {
+            if page_text
+                .text
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .count()
+                < MIN_PAGE_CHARS
+            {
+                return Err(no_recipe());
+            }
+            // Outside the page budget: the AI call has its own timeout.
+            let mut d = match state.ai.recipe_from_text(&page_text.text).await {
+                Err(AppError::NoRecipeFound(_)) => return Err(no_recipe()),
+                r => r?,
+            };
+            d.source_type = SourceType::Link;
+            d.source_url = Some(jsonld::shown_url(&final_url));
+            d.source_name = site_name;
+            d.image_url = page_text.image_url;
+            d.warnings
+                .push("Read from the page text by AI — check it against the page.".into());
+            d
+        }
+    };
     draft.duplicate_of = duplicate_of(&state.pool, &[&requested, &final_url]).await?;
     attach_image(&state, user.id, &mut draft).await;
     Ok(Json(draft))
+}
+
+/// Fewest non-space characters of page text worth sending to the AI.
+const MIN_PAGE_CHARS: usize = 200;
+
+/// What the blocking parse of a fetched page found.
+enum Parsed {
+    Draft(Box<RecipeDraft>),
+    /// No recipe data; the page's text and site name, for the AI fallback.
+    Text(crate::import::readable::Readable, Option<String>),
+    Nothing,
 }
 
 /// Id of a live recipe saved from the same page (LNK-5), comparing normalised URLs.
@@ -162,21 +208,42 @@ async fn attach_image(state: &AppState, user_id: Uuid, draft: &mut RecipeDraft) 
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)] // the stub handler does not read it yet
 pub struct ImportTextBody {
     text: String,
     source_url: Option<String>,
 }
 
-/// Reads a recipe from pasted text with AI (LNK-3/4). Returns a draft.
+/// Reads a recipe from pasted text with AI (LNK-3/4). Returns a draft; saves nothing and never fetches `sourceUrl`.
 #[utoipa::path(post, path = "/api/import/text", operation_id = "importFromText", tag = "import", security(("session" = [])), request_body = ImportTextBody, responses(
-    (status = 200, description = "The draft.", body = RecipeDraft),
-    (status = 400, description = "Invalid body (`validation`).", body = ErrorBody),
+    (status = 200, description = "The draft. `sourceType` is `text`; `sourceUrl` is the given address without credentials or fragment.", body = RecipeDraft),
+    (status = 400, description = "Empty text or a bad `sourceUrl` (`validation`).", body = ErrorBody),
     (status = 422, description = "No recipe in the text (`no_recipe_found`), or no AI provider (`ai_disabled`).", body = ErrorBody),
-    (status = 501, description = "Not built yet (`not_implemented`); every call returns this today.", body = ErrorBody),
+    (status = 502, description = "The AI provider failed (`ai_error`).", body = ErrorBody),
 ))]
-pub async fn from_text(_user: CurrentUser) -> AppError {
-    not_implemented("Import from text")
+pub async fn from_text(
+    State(state): State<AppState>,
+    _user: CurrentUser,
+    AppJson(body): AppJson<ImportTextBody>,
+) -> AppResult<Json<RecipeDraft>> {
+    if body.text.trim().is_empty() {
+        return Err(AppError::validation("text: paste the recipe text."));
+    }
+    // Cleaned first so credentials cannot hide a duplicate.
+    let source = validate::source_url(body.source_url.as_deref())?
+        .and_then(|u| Url::parse(&u).ok())
+        .and_then(|u| Url::parse(&jsonld::shown_url(&u)).ok());
+    let mut draft = state.ai.recipe_from_text(&body.text).await?;
+    if body.text.chars().count() > ai::MAX_TEXT_INPUT_CHARS {
+        draft.warnings.push(format!(
+            "The text was very long, so only the first {} characters were read.",
+            ai::MAX_TEXT_INPUT_CHARS
+        ));
+    }
+    if let Some(url) = source {
+        draft.source_url = Some(url.to_string());
+        draft.duplicate_of = duplicate_of(&state.pool, &[&url]).await?;
+    }
+    Ok(Json(draft))
 }
 
 /// What the photos show.

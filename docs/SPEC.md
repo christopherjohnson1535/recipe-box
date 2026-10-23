@@ -109,7 +109,7 @@ Anything else needs a one-line reason in the agent's report.
 | POST `/api/media` (multipart `file`) → image | s | PHO-1 | done (re-encode, resize) |
 | GET `/media/:file` | s | — | done |
 | POST `/api/import/url` `{url}` → `RecipeDraft` | s | LNK-1/2/5/7 | **501 stub** → issue |
-| POST `/api/import/text` `{text, sourceUrl?}` → `RecipeDraft` | s | LNK-3/4 | **501 stub** → issue |
+| POST `/api/import/text` `{text, sourceUrl?}` → `RecipeDraft` | s | LNK-3/4 | done (#12; also the AI fallback of `import/url`) |
 | POST `/api/import/photo` (multipart `files[]`, `mode=recipe\|dish`) → `RecipeDraft` | s | PHO-1–5, PHO-7 | done (#11) |
 | GET `/api/import/capabilities` → `{ ai: bool, provider }` | s | PHO-5/6 | done |
 | GET/POST `/api/users`, DELETE `/api/users/:id`, PUT `/api/users/:id/password` | admin | ACC-2 | **501 stub** → issue |

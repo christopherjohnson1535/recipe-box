@@ -10,6 +10,7 @@ From the first release on, GitHub release notes are generated from merged PR tit
 ## [Unreleased]
 
 ### Added
+- Text import (`POST /api/import/text`) and an AI fallback for link import when a page has no recipe data (#12).
 - Repository quality work (tracked in #52): community docs (`CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS`),
   `docs/TESTING.md`, architecture decision records in `docs/adr/`, a PR-title check and release-note categories.
 - October 2026 redesign proposals with screenshots and mockup source (`docs/design/redesign-2026-10/`, #44).

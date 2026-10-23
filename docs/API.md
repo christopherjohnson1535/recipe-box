@@ -76,6 +76,19 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   out of it the answer is `502 fetch_failed` ("took too long to read"). Pages too deeply nested or tag-dense to read
   safely count as `422 no_recipe_found` unless they carry JSON-LD. Lists are cut at 500 items and text fields at
   10,000 characters, durations over 7 days are dropped; each adds a `warnings` entry.
+- **Text import** (`POST /api/import/text`, `{text, sourceUrl?}`): `text` empty or blank is `400 validation`; so is a
+  `sourceUrl` that is not http(s). The text goes to the AI provider (`422 ai_disabled` when `AI_PROVIDER=none`,
+  `422 no_recipe_found` when the model finds none, `502 ai_error` when the provider fails). Only the first 50,000
+  characters are read; a longer text adds a `warnings` entry. The draft has `sourceType` `text`; if `sourceUrl` is
+  given it is kept (credentials and fragment removed) and `duplicateOf` is set as for links, but the address is
+  never fetched.
+- **AI fallback for links.** When `import/url` finds no JSON-LD or microdata recipe and AI is on, the page's visible
+  text (main content, at most 20,000 characters, no navigation or scripts) goes to the AI provider as for text
+  import. The draft has `sourceType` `link`, the page's `sourceUrl`/`sourceName`/main photo, and a `warnings` entry
+  saying the AI read the page text. Pages with fewer than about 200 characters of text, pages too complex to read,
+  and "no recipe" answers from the model are `422 no_recipe_found`; a provider failure is `502 ai_error`. Pages that
+  have recipe data never reach the AI. The AI call has its own timeout and is not part of the 15 s page budget.
+  With AI off nothing changes.
 - **Photo import** (`POST /api/import/photo`, multipart): 1-6 `files` (repeat the field) and optional `mode`
   `recipe` (default) or `dish`; 0 or more than 6 files, or another `mode`, is 400 `validation`. The request may be up
   to 6 × `MAX_UPLOAD_MB`; each file over `MAX_UPLOAD_MB` is 413 `too_large`. Every photo is stored first (re-encoded
