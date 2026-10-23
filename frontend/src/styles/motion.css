@@ -11,3 +11,86 @@
   --duration-slow: 900ms; /* headline words rise, the save stamp lands */
   --stagger-step: 120ms; /* gap between list entries arriving */
 }
+
+/* ===== Keyframes: the only places movement is defined. All use --ease-out and the duration tokens above. ===== */
+@keyframes rise {
+  from { opacity: 0; translate: 0 0.45em; }
+}
+@keyframes draw {
+  from { transform: scaleX(0); }
+}
+@keyframes arrive {
+  from { opacity: 0; translate: 0 0.75rem; }
+}
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+@keyframes stamp-land {
+  from { opacity: 0; scale: 1.15; }
+}
+@keyframes stamp-land-still {
+  from { opacity: 0; }
+}
+@keyframes stamp-out {
+  to { opacity: 0; }
+}
+
+/*
+ * Arrival (once per visit): ui/Arrive sets data-arrive="play" the first time a page key is shown in this tab, and
+ * removes it on revisits and Back. Without the attribute (or without JS) nothing is hidden. With it, each animation
+ * fills "both", so content is visible once it ends.
+ */
+[data-arrive="play"] .rise-word {
+  display: inline-block;
+  animation: rise var(--duration-slow) var(--ease-out) both;
+  animation-delay: calc(var(--w, 0) * var(--stagger-step) / 2);
+}
+[data-arrive="play"] .draw-rule {
+  transform-origin: left;
+  animation: draw var(--duration-base) var(--ease-out) both;
+}
+[data-arrive="play"] .stagger-item {
+  animation: arrive var(--duration-base) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger-step));
+}
+
+/* Card photo and title become the recipe page (React <ViewTransition share="morph">). */
+::view-transition-group(.morph) {
+  animation-duration: var(--duration-morph);
+  animation-timing-function: var(--ease-out);
+}
+::view-transition {
+  pointer-events: none;
+}
+
+/* Loading skeleton: a slow shimmer while a request is in flight. */
+.skeleton-shimmer {
+  animation: shimmer calc(var(--duration-slow) * 2) var(--ease-out) infinite;
+}
+
+/* Save stamp: lands with a press, holds about two seconds, fades. */
+.stamp-run {
+  animation:
+    stamp-land var(--duration-slow) var(--ease-out) both,
+    stamp-out var(--duration-base) var(--ease-out) calc(var(--duration-slow) + 2s) forwards;
+}
+
+/* Reduced motion removes all movement. Opacity changes (the stamp, the arrival fades) become instant or stay still. */
+@media (prefers-reduced-motion: reduce) {
+  [data-arrive="play"] .rise-word,
+  [data-arrive="play"] .draw-rule,
+  [data-arrive="play"] .stagger-item,
+  .skeleton-shimmer {
+    animation: none;
+  }
+  .stamp-run {
+    animation:
+      stamp-land-still var(--duration-base) var(--ease-out) both,
+      stamp-out var(--duration-base) var(--ease-out) calc(var(--duration-base) + 2s) forwards;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}

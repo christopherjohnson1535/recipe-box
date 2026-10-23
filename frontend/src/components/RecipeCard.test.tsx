@@ -25,3 +25,14 @@ describe("RecipeCard", () => {
     expect(screen.getByRole("list", { name: "Tags" }).textContent).toBe("dinnerpasta");
   });
 });
+
+describe("RecipeCard motion", () => {
+  it("passes the stagger index and still renders without a photo", () => {
+    const { container } = render(
+      <RecipeCard recipe={{ id: "r2", title: "Soup", description: "", tags: [], imageUrl: null, sourceType: "manual", updatedAt: "2026-10-21T10:00:00Z" } as never} index={3} />,
+    );
+    expect(container.querySelector("li")?.getAttribute("style")).toContain("--i: 3");
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Soup" })).toBeTruthy();
+  });
+});

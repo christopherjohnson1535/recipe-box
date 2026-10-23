@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Heading } from "./Heading";
+import { Morph, photoName } from "./morph";
 
 /* Pieces of the article layout a recipe page is set in. */
 
@@ -18,18 +19,20 @@ export function MetaStrip({ items }: { items: { label: string; value: ReactNode 
 }
 
 /** The lead photo, wide column, 3:2. */
-export function LeadPhoto({ src, alt }: { src: string; alt: string }) {
+export function LeadPhoto({ src, alt, morphId }: { src: string; alt: string; /** Recipe id: the card photo morphs into this one. */ morphId?: string }) {
   return (
     <figure className="mx-auto w-full max-w-page">
       {/* Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send. */}
-      <img
-        src={src}
-        alt={alt}
-        width={1200}
-        height={800}
-        fetchPriority="high"
-        className="aspect-[3/2] h-auto max-h-[36rem] w-full object-cover [filter:var(--photo-filter)]"
-      />
+      <Morph name={morphId ? photoName(morphId) : undefined}>
+        <img
+          src={src}
+          alt={alt}
+          width={1200}
+          height={800}
+          fetchPriority="high"
+          className="aspect-[3/2] h-auto max-h-[36rem] w-full object-cover [filter:var(--photo-filter)]"
+        />
+      </Morph>
     </figure>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { showSaveStamp } from "@/components/ui/save-stamp-store";
 import { showNotice } from "@/components/undo/undo-store";
 import { api, type Recipe, type RecipeInput } from "@/lib/api";
 import { RecipeForm } from "./RecipeForm";
@@ -10,7 +11,8 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
   const router = useRouter();
   async function save(input: RecipeInput) {
     const saved = recipe ? await api.updateRecipe(recipe.id, input) : await api.createRecipe(input);
-    showNotice(recipe ? "Saved." : "Recipe saved.");
+    if (recipe) showNotice("Saved.");
+    else showSaveStamp();
     router.push(`/recipes/${saved.id}`);
   }
   return (

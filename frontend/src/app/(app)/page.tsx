@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Arrive } from "@/components/ui/Arrive";
 import { ButtonLink } from "@/components/ui/Button";
 import { Chip, ChipRow } from "@/components/ui/Chip";
 import { Contents } from "@/components/ui/Contents";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SpotIcon } from "@/components/ui/SpotIcon";
 import { RecipeCard } from "@/components/RecipeCard";
 import { NoMatches } from "@/components/search/ResultSummary";
 import { SearchControls } from "@/components/search/SearchControls";
@@ -45,14 +47,14 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     result = await Promise.all([api.listRecipes({ q, tag, sort }), api.listTags()]);
   } catch (e) {
     return (
-      <div className="flex flex-col gap-8">
+      <Arrive arriveKey="home" className="flex flex-col gap-8">
         {header(undefined, Boolean(q || tag))}
         {/* Same position and shape as the success layout, so the input keeps its text and focus. */}
         <div className="flex flex-col gap-3">
           <SearchControls q={q} tag={tag} sort={sort} />
         </div>
         <ServerError error={e} />
-      </div>
+      </Arrive>
     );
   }
   const [{ items, total }, tags] = result;
@@ -60,10 +62,11 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
 
   if (total === 0 && !filtered) {
     return (
-      <div className="flex flex-col gap-8">
+      <Arrive arriveKey="home" className="flex flex-col gap-8">
         {header()}
         <EmptyState
           title="No recipes yet"
+          icon={<SpotIcon name="mains" size={40} />}
           actions={
             <>
               <ButtonLink href="/import">Import from a link</ButtonLink>
@@ -75,12 +78,12 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         >
           <p>Paste a link from a recipe site, snap a cookbook page, or type in a family favourite.</p>
         </EmptyState>
-      </div>
+      </Arrive>
     );
   }
 
   return (
-    <div className="flex flex-col gap-10">
+    <Arrive arriveKey="home" className="flex flex-col gap-10">
       {header(
         filtered
           ? total > 0
@@ -124,12 +127,12 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       ) : (
         <section aria-label={filtered ? `${total} matching recipes` : "All recipes"} className="flex flex-col gap-2">
           <Contents>
-            {items.map((r) => (
-              <RecipeCard key={r.id} recipe={r} />
+            {items.map((r, i) => (
+              <RecipeCard key={r.id} recipe={r} index={i} />
             ))}
           </Contents>
         </section>
       )}
-    </div>
+    </Arrive>
   );
 }

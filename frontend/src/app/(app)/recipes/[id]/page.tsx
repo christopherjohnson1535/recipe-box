@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { Arrive } from "@/components/ui/Arrive";
 import { EndNote, Lede, LeadPhoto, MetaStrip, RuledList, Sidebar, SidebarLayout, StepList } from "@/components/ui/Article";
 import { ButtonLink } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Chip";
 import { DotList } from "@/components/ui/DotList";
 import { ExternalLink } from "@/components/ui/ExternalLink";
 import { Heading } from "@/components/ui/Heading";
+import { recipeArrivalKey } from "@/components/ui/morph";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SpotIcon } from "@/components/ui/SpotIcon";
+import { iconForTag } from "@/components/ui/spot-icons";
 import { Text } from "@/components/ui/Text";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type Recipe } from "@/lib/api";
@@ -64,15 +68,17 @@ export default async function RecipePage({ params }: Params) {
   const by = bylines(recipe);
 
   return (
-    <article className="flex flex-col gap-10">
+    <Arrive as="article" arriveKey={recipeArrivalKey(id)} className="flex flex-col gap-10">
       <PageHeader
         align="center"
+        rise
+        morphId={id}
         kicker={
           recipe.tags.length > 0 ? (
             <DotList label="Tags" align="center">
               {recipe.tags.map((t) => (
                 <li key={t}>
-                  <Badge>{t}</Badge>
+                  <Badge icon={<SpotIcon name={iconForTag(t)} size={18} />}>{t}</Badge>
                 </li>
               ))}
             </DotList>
@@ -111,7 +117,7 @@ export default async function RecipePage({ params }: Params) {
 
       <MetaStrip items={meta} />
 
-      {recipe.imageUrl && <LeadPhoto src={recipe.imageUrl} alt={recipe.title} />}
+      {recipe.imageUrl && <LeadPhoto src={recipe.imageUrl} alt={recipe.title} morphId={id} />}
 
       {lede && <Lede>{lede}</Lede>}
 
@@ -159,6 +165,6 @@ export default async function RecipePage({ params }: Params) {
           )}
         </section>
       </SidebarLayout>
-    </article>
+    </Arrive>
   );
 }

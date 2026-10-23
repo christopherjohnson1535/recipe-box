@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { NotFoundContent } from "../NotFoundContent";
 import { Chip } from "./Chip";
 import { EmptyState } from "./EmptyState";
+import { SpotIcon } from "./SpotIcon";
 
 describe("EmptyState and Chip", () => {
   it("is an h2 by default and an h1 on request; not-found renders the h1", () => {
@@ -20,5 +21,12 @@ describe("EmptyState and Chip", () => {
     expect(link.getAttribute("title")).toBe(tag);
     expect(link.className).toContain("max-w-full");
     expect(link.className).not.toContain("whitespace-nowrap");
+  });
+});
+
+describe("EmptyState icon", () => {
+  it("draws the icon above the title", () => {
+    const { container } = render(<EmptyState title="Nothing" icon={<SpotIcon name="mains" />} />);
+    expect(container.querySelector("svg[data-spot='mains']")).toBeTruthy();
   });
 });

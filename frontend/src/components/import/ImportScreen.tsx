@@ -10,7 +10,7 @@ import { Pending } from "@/components/ui/Pending";
 import { PhotoGallery } from "@/components/ui/PhotoPicker";
 import { Tabs } from "@/components/ui/Tabs";
 import { Text } from "@/components/ui/Text";
-import { showNotice } from "@/components/undo/undo-store";
+import { showSaveStamp } from "@/components/ui/save-stamp-store";
 import { ApiError, api as browserApi, type Api, type Capabilities, type Image, type RecipeDraft } from "@/lib/api";
 import { LinkPanel, MAX_PHOTOS, PhotoPanel, TextPanel, type PhotoKind } from "./ImportPanels";
 import { explainImportError, type ImportMode, type ImportProblem } from "./import-errors";
@@ -222,7 +222,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
 
   async function save(input: Parameters<ImportApi["createRecipe"]>[0]) {
     const saved = await api.createRecipe(input);
-    showNotice("Recipe saved.");
+    showSaveStamp();
     router.push(`/recipes/${saved.id}`);
   }
 

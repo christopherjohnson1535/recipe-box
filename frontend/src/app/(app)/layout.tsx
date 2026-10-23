@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { RouteFocus } from "@/components/RouteFocus";
+import { SaveStamp } from "@/components/ui/SaveStamp";
 import { UndoToast } from "@/components/undo/UndoToast";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type User } from "@/lib/api";
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       </main>
       <RouteFocus />
       <UndoToast />
+      <SaveStamp />
     </>
   );
 }
