@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type User } from "@/lib/api";
+import { AppearanceSection } from "./AppearanceSection";
 import { HouseholdSection } from "./HouseholdSection";
 import { PasswordForm } from "./PasswordForm";
 import { SettingsView } from "./SettingsView";
@@ -204,5 +205,26 @@ describe("SettingsView", () => {
     expect(screen.queryByRole("heading", { name: "Household" })).toBeNull();
     expect(screen.getByRole("heading", { name: "My account" })).toBeTruthy();
     expect(screen.getByText("on")).toBeTruthy();
+  });
+});
+
+describe("AppearanceSection", () => {
+  it("defaults to the clock, applies a choice at once and remembers it on this device", () => {
+    localStorage.clear();
+    document.documentElement.removeAttribute("data-theme");
+    render(<AppearanceSection />);
+    const evening = screen.getByLabelText("Always evening") as HTMLInputElement;
+    expect((screen.getByLabelText(/By the clock/) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(evening);
+    expect(evening.checked).toBe(true);
+    expect(localStorage.getItem("rb-edition")).toBe("evening");
+    fireEvent.click(screen.getByLabelText(/Follow this device/));
+    expect(localStorage.getItem("rb-edition")).toBe("device");
+    localStorage.clear();
+  });
+
+  it("is part of the settings page", () => {
+    render(<SettingsView me={chris} users={[chris]} capabilities={null} />);
+    expect(screen.getByRole("heading", { name: "Appearance" })).toBeTruthy();
   });
 });

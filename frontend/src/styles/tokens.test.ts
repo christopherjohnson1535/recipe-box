@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { PAPER } from "@/lib/edition";
 
 const dir = join(__dirname);
 const read = (f: string) => readFileSync(join(dir, f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
@@ -20,8 +21,24 @@ const themes = Object.fromEntries(
   }),
 );
 const components = decls(read("components.css"));
+const motion = decls(read("motion.css"));
 // Component tokens that are not colours, so they don't point at a semantic token.
 const NON_COLOUR = ["--photo-filter"];
+// Decorative tokens that sit behind or between content and carry no text or state, so they need no contrast pairing.
+const DECORATIVE: Record<string, string> = {
+  "--skeleton-bg": "loading placeholder block behind content that has not arrived; aria-hidden, carries nothing",
+  "--skeleton-shine": "the moving highlight across a skeleton; decoration only",
+};
+// The edition selectors: evening applies under the attribute, and under a dark device when no attribute is set.
+const EVENING_ATTR = ':root[data-theme="evening"]';
+const EVENING_DEVICE = /@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme\]\)\s*\{([^}]*)\}\s*\}/;
+
+/** The declarations of the evening block selected by attribute and of the one selected by the device scheme. */
+function eveningBlocks(css: string) {
+  const attr = css.match(new RegExp(`${EVENING_ATTR.replace(/[[\]()]/g, "\\$&")}\\s*\\{([^}]*)\\}`))?.[1];
+  const device = css.match(EVENING_DEVICE)?.[1];
+  return { attr: decls(attr ?? ""), device: decls(device ?? ""), found: Boolean(attr && device), raw: [attr ?? "", device ?? ""] };
+}
 const semanticNames = Object.keys(themes.day).sort();
 
 /** Resolves a semantic or component token to a hex colour in one theme. */
@@ -90,6 +107,7 @@ const TEXT: [string, string][] = [
   ["--entry-title-hover", "--color-paper"],
   ["--entry-kicker-fg", "--color-paper"],
   ["--selection-fg", "--selection-bg"],
+  ["--stamp-fg", "--color-paper"], // the save stamp carries text
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
 const UI: [string, string][] = [
@@ -110,6 +128,8 @@ const UI: [string, string][] = [
   ["--editor-heading-rule", "--color-paper"],
   ["--focus-ring", "--color-paper"],
   ["--focus-ring", "--color-paper-deep"],
+  ["--spot-line", "--color-paper"], // spot icons are graphics, 3:1
+  ["--spot-detail", "--color-paper"],
 ];
 
 describe("design tokens", () => {
@@ -140,15 +160,44 @@ describe("design tokens", () => {
     const evening = read("themes/evening.css");
     expect(day).toContain("@theme static");
     expect(day).not.toContain("@media");
-    expect(evening).toMatch(/@media \(prefers-color-scheme: dark\)/);
-    expect(evening).toMatch(/color-scheme:\s*dark/);
+    expect(day).not.toContain("data-theme");
     expect(evening).not.toContain("@theme");
+    const blocks = eveningBlocks(evening);
+    expect(blocks.found, "evening.css needs the data-theme block and the :root:not([data-theme]) dark-device block").toBe(true);
+    expect(blocks.attr["--color-paper"]).toBeDefined();
+    for (const raw of blocks.raw) expect(raw).toMatch(/color-scheme:\s*dark/);
+  });
+
+  it("evening applies the same values by attribute and by device, and a chosen day edition beats a dark device", () => {
+    const evening = eveningBlocks(read("themes/evening.css"));
+    expect(evening.device).toEqual(evening.attr);
+    expect(Object.keys(evening.attr).sort()).toEqual(semanticNames);
+    const comp = eveningBlocks(read("components.css"));
+    expect(comp.found).toBe(true);
+    expect(comp.device).toEqual(comp.attr);
+    expect(Object.keys(comp.attr).sort()).toEqual(["--photo-filter", "--rule-double"]);
+    // The device block only matches when no attribute is set, so data-theme="day" is never overridden.
+    for (const css of [read("themes/evening.css"), read("components.css")]) {
+      expect(css).not.toMatch(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{/);
+    }
+  });
+
+  it("edition.ts paper colours equal the resolved paper token of each theme", () => {
+    expect(PAPER.day).toBe(hex("day", "--color-paper"));
+    expect(PAPER.evening).toBe(hex("evening", "--color-paper"));
   });
 
   it("every fg/bg component token has a contrast pairing", () => {
     const paired = new Set([...TEXT, ...UI].flat());
-    const unpaired = Object.keys(components).filter((n) => /-(fg|bg)(-[a-z]+)?$/.test(n) && !paired.has(n));
+    const unpaired = Object.keys(components).filter((n) => /-(fg|bg)(-[a-z]+)?$/.test(n) && !paired.has(n) && !(n in DECORATIVE));
     expect(unpaired).toEqual([]);
+  });
+
+  it("decorative exceptions are real component tokens with a reason", () => {
+    for (const [name, reason] of Object.entries(DECORATIVE)) {
+      expect(components[name], name).toBeDefined();
+      expect(reason.length, name).toBeGreaterThan(10);
+    }
   });
 
   it("themeColor and the manifest match the paper colour of each theme", () => {
@@ -172,11 +221,32 @@ describe("design tokens", () => {
     for (const code of [...sources, globals]) {
       for (const m of code.matchAll(/(?:\(|var\()(--[a-z0-9-]+)\)?/g)) used.add(m[1]);
     }
-    const defined = new Set([...Object.keys(components), ...semanticNames, ...Object.keys(decls(globals))]);
+    const motionCss = read("motion.css");
+    for (const m of motionCss.matchAll(/var\((--[a-z0-9-]+)\)/g)) used.add(m[1]);
+    const defined = new Set([...Object.keys(components), ...semanticNames, ...Object.keys(decls(globals)), ...Object.keys(motion)]);
     // Tailwind's own variables (--tw-*) are generated, not declared by us.
     const undefinedTokens = [...used].filter((n) => !defined.has(n) && !n.startsWith("--tw-"));
     expect(undefinedTokens).toEqual([]);
     expect(Object.keys(components).filter((n) => !used.has(n))).toEqual([]);
+  });
+
+  it("print inks: where each is safe on day and evening paper", () => {
+    // Recorded, not aspirational. text = 4.5:1 (may carry words); graphic = 3:1 (icons, strokes, large marks);
+    // decorative = below 3:1, flat colour with no meaning of its own. Nothing uses the inks yet (no semantic tokens).
+    const use = (c: number) => (c >= 4.5 ? "text" : c >= 3 ? "graphic" : "decorative");
+    const inks = { "--mustard-500": "#d9a21b", "--fern-700": "#3f6b45", "--tomato-600": "#d2492a" };
+    for (const [name, value] of Object.entries(inks)) expect(primitives[name], name).toBe(value);
+    const result = Object.fromEntries(
+      Object.entries(inks).map(([name, v]) => [
+        name,
+        { day: use(contrast(v, PAPER.day)), evening: use(contrast(v, PAPER.evening)) },
+      ]),
+    );
+    expect(result).toEqual({
+      "--mustard-500": { day: "decorative", evening: "text" }, // 2.17:1 on day paper, 8.05:1 on evening paper
+      "--fern-700": { day: "text", evening: "decorative" }, // 5.82:1 on day paper; 2.998:1 on evening paper, a hair under 3
+      "--tomato-600": { day: "graphic", evening: "graphic" }, // 4.19:1 and 4.17:1: icons yes, body text no
+    });
   });
 
   it("the contrast helper matches WCAG", () => {

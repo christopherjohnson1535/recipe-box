@@ -14,7 +14,10 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 - Rule `#cdc3b0` decorative hairlines only · Rule-strong `#8c8377` control borders (3.52:1 paper, 3.22:1 paper-deep)
 - Button label: paper on ink (16.83:1); paper on accent (7.68:1)
 
-## Dark mode: runtime via prefers-color-scheme ("evening edition")
+## Dark mode: the "evening edition", chosen by the clock
+- Evening shows 19:00 to 06:59 local time by default, day 07:00 to 18:59. Per device, Settings can pin day, pin
+  evening or follow the device (`localStorage` `rb-edition`). `<html data-theme>` carries the result; with no
+  attribute the device's `prefers-color-scheme` decides. See `docs/THEMING.md`.
 - Paper `#16130f` · Paper-deep `#241f19` (a step lighter so the sidebar reads) · Ink `#efe8da` (15.19:1 / 13.4:1) · Ink-muted `#b3a999` (7.98:1 / 7.04:1)
 - Accent `#d98c7f` desaturated red (7.06:1 on paper, 6.23:1 on paper-deep) · Accent-hover/focus `#e6a497` (8.92:1)
 - Rule `#463e33` decorative · Rule-strong `#7a7064` (3.82:1 on paper) · On-accent `#16130f`
@@ -50,8 +53,15 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 - Auth: centred wordmark + tagline + double rule, form in a hairline frame.
 
 ## Motion
-- Colour/border transitions only (150ms). No GSAP: a reading app, restraint is the point. Reduced motion handled
-  globally in globals.css.
+- Motion marks a change of state or place. One easing (`--ease-out`), durations 150-900ms, nothing loops except an
+  active timer, a scan in progress or the in-season ticker; arrival staggers run once per visit, never on Back.
+  Reduced motion removes movement and keeps colour changes. No GSAP: a reading app, restraint is the point. Tokens in
+  `motion.css`; rules in `docs/UI.md` "Motion".
+
+## Print inks (illustration only, no semantic token yet)
+- Mustard `#d9a21b` (2.17:1 day, 8.05:1 evening) · Fern `#3f6b45` (5.82:1 day, 2.998:1 evening) · Tomato `#d2492a`
+  (4.19:1 day, 4.17:1 evening). Mustard is decorative-only on day paper, fern on evening paper; tomato is for graphics
+  (3:1), not text.
 
 ## Do not
 - Use The New Yorker's name, logo, mascot, masthead, or Irvin / Irvin look-alike fonts.

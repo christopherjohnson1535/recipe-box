@@ -14,7 +14,7 @@ primitives            semantic (per theme)          component                   
 
 | Layer | File | What it holds | Who may read it |
 |---|---|---|---|
-| 1. Primitives | `frontend/src/styles/primitives.css` | Raw hex values named by what they look like (`--cream-50`, `--umber-900`, `--claret-700`) | Theme files only |
+| 1. Primitives | `frontend/src/styles/primitives.css` | Raw hex values named by what they look like (`--cream-50`, `--umber-900`, `--claret-700`, print inks `--mustard-500`, `--fern-700`, `--tomato-600`) | Theme files only |
 | 2. Semantic | `frontend/src/styles/themes/day.css`, `evening.css` | What a colour means: `--color-paper`, `--color-ink`, `--color-ink-muted`, `--color-rule`, `--color-rule-strong`, `--color-accent`, `--color-accent-hover`, `--color-on-accent`, `--color-danger`, `--color-focus` | ui components (as `bg-paper`, `text-ink`...), component tokens, `globals.css` base styles |
 | 3. Component | `frontend/src/styles/components.css` | One decision inside one component: `--button-primary-bg`, `--input-border`, `--chip-underline-selected`, `--panel-bg`, `--numeral-fg`, `--focus-ring`... | `frontend/src/components/ui/*` only, written as Tailwind arbitrary values: `bg-(--button-primary-bg)` |
 
@@ -24,6 +24,26 @@ ui components and use layout utilities (flex, grid, gap, padding, widths such as
 `day.css` is written as Tailwind `@theme static`, which is what creates the `bg-paper`/`text-ink`/`border-rule`
 utilities. Tailwind's own colour palette is switched off (`--color-*: initial`), so a class like `text-red-600`
 produces nothing. Type scale, fonts, radius and easing don't change between themes and live in `globals.css`.
+
+## Editions: how day and evening are chosen
+Day is the default token set (`:root`, from `day.css`). Evening is the same names redefined in `evening.css` (and the
+two non-colour tokens `--photo-filter` and `--rule-double` in `components.css`) under two selectors with identical
+values:
+
+- `:root[data-theme="evening"]`: set by script, wins over everything.
+- `@media (prefers-color-scheme: dark) { :root:not([data-theme]) }`: when no attribute is set (no JavaScript, or the
+  device preference). `data-theme="day"` therefore always beats a dark device.
+
+Print (`globals.css`) overrides both so paper is white however the edition was chosen.
+
+Which edition shows is a per-device preference in `localStorage["rb-edition"]`: `clock` (default; evening 19:00 to
+06:59 local), `day`, `evening` or `device` (leave `data-theme` off). `src/lib/edition.ts` holds the rules
+(`resolveEdition`, `msUntilNextSwitch`) and `EDITION_SCRIPT`, built from the same constants. The root layout puts that
+script in `<head>`, so `data-theme` is set before first paint (`<html suppressHydrationWarning>`).
+`components/edition/EditionController` (mounted once in the layout, renders nothing) re-applies it at the next
+07:00/19:00, when the tab becomes visible, on a `storage` event and when the device scheme changes, and rewrites
+`<meta name="theme-color">` to the paper colour so the iPad status bar matches. Settings, Appearance changes the
+preference and applies it at once. `PAPER` in `edition.ts` is checked against the tokens by `tokens.test.ts`.
 
 ## Changing a colour
 - **Everywhere a meaning is used** (say, a warmer paper): change the primitive the theme points at, or point the
@@ -52,7 +72,8 @@ primitive, under a selector. Example, a high-contrast "large print" theme:
 3. Import it in `frontend/src/app/globals.css` after `evening.css`.
 4. Switch to it by setting `data-theme="large-print"` on `<html>` (a settings toggle would store the choice and
    set the attribute before first paint). `evening.css` follows the device's dark mode with
-   `@media (prefers-color-scheme: dark)`; a forced theme needs the attribute selector instead.
+   `@media (prefers-color-scheme: dark)` plus `:root[data-theme="evening"]`; a new theme uses the attribute selector,
+   and `edition.ts` must learn to set it.
 5. Run the guard tests. The theme is picked up automatically: they fail if it misses a token or any pairing in the
    contract drops below its contrast floor.
 6. Update `.tastemaker/style-lock.md` with the new palette and `themeColor` in `frontend/src/app/layout.tsx` if
@@ -63,8 +84,12 @@ primitive, under a selector. Example, a high-contrast "large print" theme:
   - every theme file defines exactly the semantic tokens in `day.css`, each from a primitive hex;
   - every component token points at a semantic token (non-colour tokens such as `--photo-filter` are listed as
     exceptions and set per scheme in `components.css`);
-  - every theme file has its scope: `day.css` is `@theme static` with no media query, `evening.css` is inside
-    `prefers-color-scheme: dark` and sets `color-scheme: dark`;
+  - every theme file has its scope: `day.css` is `@theme static` with no media query, `evening.css` has the
+    `[data-theme="evening"]` block and the dark-device `:root:not([data-theme])` block, both with `color-scheme: dark`
+    and identical values (the same check covers `--photo-filter` and `--rule-double` in `components.css`);
+  - `PAPER` in `lib/edition.ts` equals each theme's `--color-paper`;
+  - print inks: each ink's contrast on day and evening paper is recorded (text-safe, graphic or decorative only);
+  - decorative component tokens (`--skeleton-bg`, `--skeleton-shine`) are listed with a reason instead of a pairing;
   - every `(--x)` / `var(--x)` read by `components/ui` and `globals.css` is defined, and every component token is read;
   - every `-fg` / `-bg` component token has a contrast pairing below;
   - `themeColor` in `app/layout.tsx` and the manifest colours equal the resolved `--color-paper` of day and evening;
