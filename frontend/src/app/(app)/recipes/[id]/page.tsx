@@ -126,6 +126,9 @@ export default async function RecipePage({ params }: Params) {
           }
           actions={
             <>
+              <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">
+                Start cooking
+              </ButtonLink>
               <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
                 Edit
               </ButtonLink>

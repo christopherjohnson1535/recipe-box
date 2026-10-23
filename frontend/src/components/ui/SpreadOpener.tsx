@@ -19,6 +19,9 @@ type SpreadOpenerProps = {
   morphId?: string;
 };
 
+/** The actions block's id: the recipe page's floating bar watches it to know when to appear. */
+export const OPENER_ACTIONS_ID = "opener-actions";
+
 // Headline sizes step down for long titles so they wrap in a few lines instead of filling the screen.
 const HEADLINE = {
   normal: "[font-size:clamp(2.75rem,11vw,4rem)] sm:[font-size:clamp(3.5rem,9vw,5.5rem)] lg:[font-size:clamp(4.25rem,7vw,6.25rem)]",
@@ -46,7 +49,7 @@ export function SpreadOpener({ title, kicker, deck, byline, actions, photo, icon
         </Morph>
         {deck && <p className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{deck}</p>}
         {byline && <div className="label text-ink-muted">{byline}</div>}
-        {actions && <div className="mt-2 flex w-full flex-wrap gap-3 print:hidden">{actions}</div>}
+        {actions && <div id={OPENER_ACTIONS_ID} className="mt-2 flex w-full flex-wrap gap-3 print:hidden">{actions}</div>}
       </div>
       {photo && (
         <Morph name={morphId ? photoName(morphId) : undefined}>

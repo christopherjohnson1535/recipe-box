@@ -10,7 +10,7 @@ UI-7 — fixed: new `scaleServings` sets "6-8" as "6–8" at every scale
 UI-8 — fixed (per orchestrator): hours/minutes as side-by-side number + small unit ("3hr 20min"); no "3:20"
 UI-9 — fixed: long notes render a paragraph per line break; the display quote is for single-line notes of 140 characters or fewer
 UI-10 — fixed: removed the tag icon from the kicker badges (only the large icon remains, and only without a photo)
-UI-11 — fixed: removed the opener's Start cooking; the server-rendered bar owns it (Edit and Delete remain)
+UI-11 — fixed: opener keeps Start cooking; the bar appears once it scrolls away
 UI-12 — fixed: method groups gap-8 apart, kicker gap-3 to its own steps
 UI-13 — fixed: quantity is struck and turns ink-muted when ticked (no opacity, so contrast holds)
 UI-14 — fixed: `li:target > button` gets a tint and claret bar that fades after a moment; no animation under reduced motion (colour stays); scroll-mt-24 on phone

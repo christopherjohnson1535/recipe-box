@@ -45,9 +45,6 @@
   from { background-color: var(--target-bg); box-shadow: inset 3px 0 0 var(--qty-fg); }
   to { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
 }
-@keyframes bar-in {
-  from { translate: 0 160%; }
-}
 
 /*
  * Arrival (once per visit): ui/Arrive sets data-arrive="play" the first time a page key is shown in this tab, and
@@ -133,7 +130,7 @@
  * Recipe spread (#40). The opener photo turns slowly as it scrolls through view (CSS scroll-driven animation, no
  * script; browsers without it keep the photo still). A ticked ingredient gets a claret line drawn through it
  * (background-size, so it follows wrapped lines); a rescaled quantity fades to its new value; the floating bar
- * slides up once on arrival.
+ * slides up once the opener's buttons scroll away.
  */
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {
@@ -155,8 +152,17 @@
 .qty-fade {
   animation: fade-in var(--duration-base) var(--ease-out) both;
 }
-[data-arrive="play"] .bar-in {
-  animation: bar-in var(--duration-slow) var(--ease-out) 600ms both;
+.floating-bar {
+  transition:
+    translate var(--duration-slow) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out),
+    visibility 0s;
+}
+.floating-bar[data-shown="false"] {
+  translate: 0 160%;
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s, 0s, var(--duration-slow);
 }
 /* The ingredient row a step link jumped to: a claret bar and a tint, fading out after a moment (kept still when motion is reduced). */
 li:target > button {
@@ -180,12 +186,18 @@ html:has(.floating-bar) {
   [data-arrive="play"] .stagger-item {
     animation: none;
   }
-  [data-arrive="play"] .bar-in,
   .qty-fade {
     animation: none;
   }
   .strike {
     transition: none;
+  }
+  .floating-bar {
+    transition: opacity var(--duration-base) var(--ease-out), visibility 0s;
+  }
+  .floating-bar[data-shown="false"] {
+    translate: none;
+    transition-delay: 0s, var(--duration-base);
   }
   .stamp-run {
     animation:
