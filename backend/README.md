@@ -5,7 +5,7 @@ map: [`docs/SPEC.md`](../docs/SPEC.md).
 
 ## Run locally
 
-Needs Rust (stable) and Postgres 16. The role must be allowed to create the `citext` extension (or create it
+Needs Rust (pinned in `../rust-toolchain.toml`; rustup installs it on first `cargo` run) and Postgres 16. The role must be allowed to create the `citext` extension (or create it
 once yourself: `create extension citext;`). Migrations in `migrations/` run on start.
 
 ```sh
@@ -35,6 +35,9 @@ web container; the API port is not published.
 | `RUST_LOG` | `info` | tracing filter, e.g. `info,recipe_box_api=debug,tower_http=debug` |
 
 ## Test
+
+From the repo root, `just check-backend` runs all of the below and `just test-backend` only the tests (`just db` shows how
+to get Postgres). Raw commands:
 
 ```sh
 cargo fmt --check

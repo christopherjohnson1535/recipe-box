@@ -1,0 +1,6 @@
+# Single source of truth for the Rust toolchain: rustup reads this automatically (locally, in the devcontainer and
+# in CI). Bump deliberately, in a PR that also fixes any new clippy lints. Node is pinned in .nvmrc.
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -1,0 +1,13 @@
+# Optional git hooks (https://lefthook.dev). Install lefthook, then `just setup` (or `lefthook install`).
+# Fast by design: only staged files, formatting and lint. Full checks (clippy, tests, build) stay in `just check`
+# and CI. Skip once with `LEFTHOOK=0 git commit ...`.
+pre-commit:
+  parallel: true
+  commands:
+    rustfmt:
+      glob: "backend/**/*.rs"
+      run: rustfmt --edition 2024 --check {staged_files}
+    eslint:
+      root: frontend/
+      glob: "*.{js,jsx,mjs,ts,tsx,mts}"
+      run: npx eslint --max-warnings=0 {staged_files}

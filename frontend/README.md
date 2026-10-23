@@ -15,6 +15,8 @@ The API must be running (`cargo run` in `../backend`, or `docker compose up api 
 
 ## Scripts
 
+Node is pinned in `../.nvmrc` (22). From the repo root, `just check-frontend` runs lint, typecheck, tests and build.
+
 | Script | What it does |
 |---|---|
 | `npm run dev` | dev server with hot reload |

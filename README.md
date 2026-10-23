@@ -44,11 +44,10 @@ Without it the app still works: a photo is saved next to an empty form to type i
 
 ## Development
 ```sh
-just setup    # toolchains, dependencies, git hooks
-just check    # every lint, type check and test CI runs
+just setup    # dependencies, factory skills, git hooks (if lefthook is installed)
+just check    # lint, format, type checks, tests and dependency audits (coverage and scans run in CI only)
 just up       # the full stack at http://localhost:3000
 ```
-<!-- verify after #50 merges -->
 Without `just`: API `cd backend && cargo run` (needs `DATABASE_URL`); web
 `cd frontend && npm install && API_INTERNAL_URL=http://localhost:8080 npm run dev`.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branches, PR titles and the definition of done. Security reports:
