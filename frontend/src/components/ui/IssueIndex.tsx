@@ -37,10 +37,10 @@ export function IssueIndexItem({ n, href, title, time }: { n: number; href: stri
 /** The inverse panel under the index: a label, a recipe worth cooking again, a note. */
 export function FeaturePanel({ label, title, href, note }: { label: string; title: string; href: string; note: string }) {
   return (
-    <aside aria-label={label} className="relative flex flex-col gap-2 bg-(--feature-bg) p-6 text-(--feature-fg)">
+    <aside aria-label={label} className="group relative flex flex-col gap-2 bg-(--feature-bg) p-6 text-(--feature-fg)">
       <h2 className="label">{label}</h2>
       <p className="font-display text-title-sm">
-        <Link href={href} className="after:absolute after:inset-0 hover:underline hover:underline-offset-4 focus-visible:outline-(--feature-focus)">
+        <Link href={href} className="after:absolute after:inset-0 hover:underline hover:underline-offset-4 group-hover:underline group-hover:underline-offset-4 focus-visible:outline-(--feature-focus)">
           {title}
         </Link>
       </p>

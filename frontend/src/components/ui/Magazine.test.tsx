@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -12,12 +12,24 @@ describe("Ticker", () => {
   it("is read once: the looping copy is aria-hidden", () => {
     render(<Ticker label="In season" items={["Pears", "Quince"]} />);
     const region = screen.getByRole("region", { name: "In season" });
-    expect(region.getAttribute("tabindex")).toBe("0"); // keyboard users can pause it
+    expect(region.getAttribute("tabindex")).toBeNull();
     const lists = region.querySelectorAll("ul");
     expect(lists).toHaveLength(2);
     expect(lists[0].getAttribute("aria-hidden")).toBeNull();
     expect(lists[1].getAttribute("aria-hidden")).toBe("true");
     expect(within(region).getAllByRole("listitem")).toHaveLength(2); // the hidden copy is out of the tree
+  });
+
+  it("has a Pause/Play button that toggles data-paused (WCAG 2.2.2)", () => {
+    render(<Ticker label="In season" items={["Pears"]} />);
+    const region = screen.getByRole("region", { name: "In season" });
+    expect(region.hasAttribute("data-paused")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(region.hasAttribute("data-paused")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    expect(region.hasAttribute("data-paused")).toBe(false);
+    fireEvent.click(region.querySelector(".ticker-track")!); // a tap on the text toggles too
+    expect(region.hasAttribute("data-paused")).toBe(true);
   });
 });
 
@@ -25,7 +37,8 @@ describe("motion.css", () => {
   const css = readFileSync(join(__dirname, "../../styles/motion.css"), "utf8");
   const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
   it("pauses the ticker on hover and focus, and stops it under reduced motion", () => {
-    expect(css).toMatch(/\.ticker:hover \.ticker-track,\s*\.ticker:focus-within \.ticker-track\s*\{\s*animation-play-state: paused/);
+    expect(css).toMatch(/\.ticker:focus-within \.ticker-track,\s*\.ticker\[data-paused\] \.ticker-track\s*\{\s*animation-play-state: paused/);
+    expect(css).toMatch(/@media \(hover: hover\)\s*\{\s*\.ticker:hover \.ticker-track/);
     expect(reduced).toMatch(/\.ticker-track\s*\{\s*animation: none/);
     expect(reduced).toMatch(/\[aria-hidden="true"\]\s*\{\s*display: none/);
   });
@@ -56,9 +69,9 @@ describe("IssueLine, CoverStory and IssueIndex", () => {
     expect(screen.getByText("Friday, October 23, 2026").getAttribute("datetime")).toBe("2026-10-23");
   });
 
-  it("sets the cover headline as the one h1, omitting an empty deck", () => {
+  it("sets the cover headline as an h2, omitting an empty deck", () => {
     const { container } = render(<CoverStory title="Short Ribs" kicker="Cover story" imageSrc="/media/a.jpg" actions={<a href="/x">Go</a>} />);
-    expect(screen.getByRole("heading", { level: 1, name: "Short Ribs" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Short Ribs" })).toBeTruthy();
     expect(container.querySelectorAll(".rise-word")).toHaveLength(2);
     expect(container.querySelector("p.italic")).toBeNull();
   });

@@ -33,7 +33,7 @@ type CardProps = {
   kicker?: ReactNode;
   /** Total time, right of the kicker. */
   time?: ReactNode;
-  /** Italic line under the title, clamped to one line. */
+  /** Italic line under the title, clamped to two lines. */
   deck?: string;
   imageSrc?: string | null;
   /** Drawn on paper when there is no photo. */
@@ -46,7 +46,7 @@ type CardProps = {
 
 /**
  * One recipe in the home grid: a 4:3 photo (or a paper plate with a spot icon), a kicker line with tags and time, a
- * display title and a one-line deck. On hover and on keyboard focus the plate scales and turns and the title draws a
+ * display title and a two-line deck. On hover and on keyboard focus the plate scales and turns and the title draws a
  * claret underline (motion.css); under reduced motion only the underline and colour change. The whole card is the link.
  */
 export function MagazineCard({ href, title, kicker, time, deck, imageSrc, fallbackIcon, index = 0, morphId }: CardProps) {
@@ -78,11 +78,10 @@ export function MagazineCard({ href, title, kicker, time, deck, imageSrc, fallba
           <div className="label min-w-0 text-(--entry-kicker-fg)">{kicker}</div>
           {time && <p className="label shrink-0 text-ink-muted">{time}</p>}
         </div>
-        <h2 className="font-display text-[1.875rem] leading-[1.1] text-ink transition-[color] duration-150 ease-out group-hover:text-(--entry-title-hover)">
+        <h2 className="font-display text-[1.875rem] leading-[1.1] text-ink [overflow-wrap:anywhere] transition-[color] duration-150 ease-out group-hover:text-(--entry-title-hover)">
           <Morph name={morphId ? titleName(morphId) : undefined}>
             <Link
               href={href}
-              title={title}
               onClick={
                 morphId
                   ? (e) => {
@@ -93,13 +92,13 @@ export function MagazineCard({ href, title, kicker, time, deck, imageSrc, fallba
                     }
                   : undefined
               }
-              className="line-clamp-3 after:absolute after:inset-0 focus-visible:outline-none"
+              className="after:absolute after:inset-0 focus-visible:outline-none!"
             >
               <span className="title-draw">{title}</span>
             </Link>
           </Morph>
         </h2>
-        {deck && <p className="line-clamp-1 text-body text-ink-muted italic">{deck}</p>}
+        {deck && <p className="line-clamp-2 text-body text-ink-muted italic">{deck}</p>}
       </article>
     </li>
   );

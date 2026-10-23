@@ -49,7 +49,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
       <label htmlFor="q" className="sr-only">
         Search recipes
       </label>
-      <div className="flex min-w-60 flex-1 items-end gap-4 max-sm:basis-full">
+      <div className="flex min-w-0 flex-1 sm:min-w-60 items-end gap-4 max-sm:basis-full">
         <SearchField
           ref={input}
           id="q"
@@ -65,7 +65,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
           }}
         />
         {tag && <input type="hidden" name="tag" value={tag} />}
-        <Button type="submit" variant="ghost">
+        <Button type="submit" variant="ghost" className="shrink-0">
           Search
         </Button>
       </div>
@@ -73,7 +73,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
         Sort recipes
       </label>
       <SearchSort
-        className="max-sm:ml-auto"
+        className="max-sm:w-full"
         id="sort"
         name="sort"
         value={sort === "newest" && !q ? "" : (sort ?? "")}

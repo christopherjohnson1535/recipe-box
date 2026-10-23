@@ -102,9 +102,16 @@
   display: flex;
   width: max-content;
   animation: ticker 70s linear infinite;
+  will-change: transform;
 }
-.ticker:hover .ticker-track,
-.ticker:focus-within .ticker-track {
+/* Pause on a pointer's hover (not on touch, where a tap would leave :hover stuck), on focus, or from the Pause button. */
+@media (hover: hover) {
+  .ticker:hover .ticker-track {
+    animation-play-state: paused;
+  }
+}
+.ticker:focus-within .ticker-track,
+.ticker[data-paused] .ticker-track {
   animation-play-state: paused;
 }
 
@@ -140,6 +147,9 @@
   .ticker-track > ul {
     flex-wrap: wrap;
     row-gap: 0.25rem;
+  }
+  .ticker-pause {
+    display: none;
   }
   .ticker-track > [aria-hidden="true"] {
     display: none;
