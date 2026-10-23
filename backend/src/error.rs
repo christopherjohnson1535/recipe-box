@@ -26,6 +26,7 @@ pub enum ErrorCode {
     UnsupportedMedia,
     NoRecipeFound,
     AiDisabled,
+    AiError,
     BlockedAddress,
     SiteBlocked,
     FetchFailed,
@@ -68,6 +69,8 @@ pub enum AppError {
     NoRecipeFound(String),
     #[error("This needs an AI provider, and none is configured.")]
     AiDisabled,
+    #[error("{0}")]
+    AiError(String),
     #[error("That address is not allowed.")]
     BlockedAddress,
     #[error("{0}")]
@@ -102,6 +105,7 @@ impl AppError {
             ),
             Self::NoRecipeFound(_) => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::NoRecipeFound),
             Self::AiDisabled => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::AiDisabled),
+            Self::AiError(_) => (StatusCode::BAD_GATEWAY, ErrorCode::AiError),
             Self::BlockedAddress => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::BlockedAddress),
             Self::SiteBlocked(_) => (StatusCode::BAD_GATEWAY, ErrorCode::SiteBlocked),
             Self::FetchFailed(_) => (StatusCode::BAD_GATEWAY, ErrorCode::FetchFailed),

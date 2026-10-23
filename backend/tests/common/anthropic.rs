@@ -1,0 +1,141 @@
+//! A local stand-in for `POST /v1/messages` on 127.0.0.1 (no real network). It records every request and answers
+//! from a queue of canned replies, one per request, in order. An empty queue answers 418 so the test fails loudly.
+//!
+//! ```ignore
+//! let mock = MockAnthropic::start(vec![error_reply(529), tool_reply(json!({...}))]).await;
+//! let provider = AnthropicProvider::with_base_url(Secret::new("k"), "m".into(), &mock.base_url)?
+//!     .with_retry_delay_cap(Duration::ZERO);
+//! // ... mock.requests() -> Vec<Recorded { headers, body }>
+//! ```
+
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{Arc, Mutex},
+};
+
+use axum::{
+    Router,
+    body::Bytes,
+    extract::State,
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
+    routing::post,
+};
+use serde_json::{Value, json};
+
+#[derive(Clone)]
+pub struct Canned {
+    pub status: u16,
+    pub body: Value,
+    pub headers: Vec<(String, String)>,
+}
+
+impl Canned {
+    pub fn with_header(mut self, name: &str, value: &str) -> Self {
+        self.headers.push((name.into(), value.into()));
+        self
+    }
+}
+
+/// A 200 reply whose only content is a `tool_use` block named `record_recipe` with `input`.
+pub fn tool_reply(input: Value) -> Canned {
+    Canned {
+        status: 200,
+        body: json!({
+            "id": "msg_test", "type": "message", "role": "assistant", "model": "test", "stop_reason": "tool_use",
+            "content": [{ "type": "tool_use", "id": "toolu_test", "name": "record_recipe", "input": input }],
+        }),
+        headers: vec![("request-id".into(), "req_test".into())],
+    }
+}
+
+/// An Anthropic-shaped error reply (`{"type":"error","error":{"type":..,"message":..}}`).
+pub fn error_reply(status: u16) -> Canned {
+    Canned {
+        status,
+        body: json!({ "type": "error", "error": { "type": "test_error", "message": "mock failure" } }),
+        headers: vec![("request-id".into(), "req_test".into())],
+    }
+}
+
+/// A plausible recipe input for `tool_reply`.
+pub fn pancakes() -> Value {
+    json!({
+        "found": true, "title": "Pancakes", "description": "Fluffy.",
+        "ingredients": [{ "text": "1 cup flour", "section": null }, { "text": "1 egg", "section": null }],
+        "steps": [{ "text": "Mix.", "section": null }, { "text": "Fry.", "section": null }],
+        "servings": "4", "prepMinutes": 5, "cookMinutes": 10, "totalMinutes": 15,
+        "notes": "", "tags": ["breakfast"], "warnings": [],
+    })
+}
+
+#[derive(Clone)]
+pub struct Recorded {
+    /// Header names lower-cased.
+    pub headers: HashMap<String, String>,
+    pub body: Value,
+}
+
+#[derive(Default)]
+struct Inner {
+    queue: VecDeque<Canned>,
+    seen: Vec<Recorded>,
+}
+
+#[derive(Clone)]
+pub struct MockAnthropic {
+    /// `http://127.0.0.1:<port>`: pass to `AnthropicProvider::with_base_url`.
+    pub base_url: String,
+    inner: Arc<Mutex<Inner>>,
+}
+
+impl MockAnthropic {
+    pub async fn start(replies: Vec<Canned>) -> Self {
+        let inner = Arc::new(Mutex::new(Inner {
+            queue: replies.into(),
+            seen: vec![],
+        }));
+        let app = Router::new()
+            .route("/v1/messages", post(handle))
+            .with_state(inner.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        Self { base_url, inner }
+    }
+
+    pub fn push(&self, reply: Canned) {
+        self.inner.lock().unwrap().queue.push_back(reply);
+    }
+
+    /// Everything received so far, oldest first.
+    pub fn requests(&self) -> Vec<Recorded> {
+        self.inner.lock().unwrap().seen.clone()
+    }
+}
+
+async fn handle(
+    State(inner): State<Arc<Mutex<Inner>>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let mut inner = inner.lock().unwrap();
+    inner.seen.push(Recorded {
+        headers: headers
+            .iter()
+            .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect(),
+        body: serde_json::from_slice(&body).unwrap_or(Value::Null),
+    });
+    let Some(c) = inner.queue.pop_front() else {
+        return (StatusCode::IM_A_TEAPOT, "mock queue empty").into_response();
+    };
+    let mut res = (StatusCode::from_u16(c.status).unwrap(), axum::Json(c.body)).into_response();
+    for (k, v) in c.headers {
+        res.headers_mut().insert(
+            HeaderName::try_from(k).unwrap(),
+            HeaderValue::from_str(&v).unwrap(),
+        );
+    }
+    res
+}
