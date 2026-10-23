@@ -87,7 +87,9 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   show them beside an empty form (PHO-5). No other error has that field.
 - **AI provider** (`AI_PROVIDER=anthropic`): images are shrunk to at most 1568 px on the long edge before sending; the
   reply is validated and capped like link import (500 items, field lengths as in `/api/recipes`), each cut adding a
-  `warnings` entry. One retry on 429/5xx; otherwise 502 `ai_error`. The API key is never logged or returned.
+  `warnings` entry. One retry on 429/5xx/connect errors (not after
+  a timeout, nor when `retry-after` asks for more than 10 s); otherwise 502 `ai_error`. A reply cut off at the token
+  limit is kept when usable, with a warning. The API key is never logged or returned.
 - **Users (admin)**: changing **your own** password requires `currentPassword` (401 `unauthenticated` if wrong, same
   message as a bad login); an admin resetting **someone else's** doesn't. Password at least 10 characters. Ends that
   user's other sessions (the caller's current session stays when it is their own password). `DELETE` ends the deleted
