@@ -60,21 +60,20 @@ These apply to every test at every layer. A flaky test is a bug, not something t
 
 ## Running tests
 ```sh
-just check          # everything CI runs
+just check          # lint, format, types, tests, audits (coverage and scans are CI-only)
 just check-backend  # cargo fmt, clippy, tests
 just check-frontend # lint, tsc, vitest, build
 just test-backend   # all Rust unit + integration tests
 just test-frontend  # vitest
-just fmt            # format both trees
-just e2e            # boots the e2e stack and runs both Playwright projects
-just openapi        # regenerate docs/openapi.json and the frontend types
+just fmt            # format the Rust code
+just e2e            # Playwright e2e (fails until #46 lands)
+just openapi        # regenerate docs/openapi.json (fails until #47 lands)
 just up / down      # start and stop the Compose stack; `just logs` follows it
-just db             # open a psql shell on the dev database
-just setup          # install dependencies and git hooks
+just db             # how to get a Postgres for the backend tests
+just setup          # install dependencies, fetch skills, git hooks if lefthook is installed
 ```
-<!-- verify after #50 merges: recipe names and what each runs -->
 `just` recipes are intended to be the single source of truth; CI is meant to call the same ones, so local and CI
-cannot disagree. <!-- verify after #50 merges -->
+cannot disagree (today the frontend CI job does; the backend job still lists the raw cargo commands).
 
 Backend integration tests find Postgres in this order: `TEST_DATABASE_URL` if set
 (e.g. `postgres://recipes:recipes@127.0.0.1:5432/recipes_test`), otherwise (planned) a Postgres 16 container started by

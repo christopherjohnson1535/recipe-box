@@ -1,4 +1,4 @@
-# Recipe Box task runner (https://just.systems). `just` lists the recipes; `just check` runs every check CI runs.
+# Recipe Box task runner (https://just.systems). `just` lists the recipes; `just check` runs the lint, type, format and test checks plus the audits (see `check`).
 # Works on Linux, macOS and Windows via Git Bash. Toolchains: rust-toolchain.toml (Rust), .nvmrc (Node).
 
 set windows-shell := ["bash", "-cu"]
@@ -20,8 +20,14 @@ setup: install-frontend
 install-frontend:
     npm --prefix frontend ci
 
-# Every check CI runs, for both trees
-check: check-backend check-frontend
+# Lint, format, type checks and tests for both trees, plus the audits. Not run locally: coverage ratchet, zizmor,
+# CodeQL, image scan, compose smoke test (CI only).
+check: check-backend check-frontend audit
+
+# Dependency audits: cargo deny + npm audit (same as the CI security workflow). Skips a tool that is not installed.
+audit:
+    @if cargo deny --version >/dev/null 2>&1; then cd backend && cargo deny --config deny.toml check; else echo "skipping cargo deny: cargo-deny not installed (cargo install cargo-deny --locked); CI runs it"; fi
+    cd frontend && npm audit --omit=dev --audit-level=high
 
 # Backend: format, clippy, tests (needs Postgres, see `just db`)
 check-backend:
@@ -53,10 +59,10 @@ e2e:
     @if [ ! -f e2e/package.json ]; then echo "e2e/ does not exist yet (planned in issue #46)." >&2; exit 1; fi
     npm --prefix e2e test
 
-# Regenerate docs/openapi.json from the API code
+# Regenerate docs/openapi.json from the API code (the checked-in file is replaced only if the binary succeeds)
 openapi:
-    @if [ ! -f backend/src/bin/openapi.rs ] && ! grep -q openapi backend/Cargo.toml; then echo "No openapi binary yet (planned in issue #47)." >&2; exit 1; fi
-    cd backend && cargo run --bin openapi > ../docs/openapi.json
+    @if [ ! -f backend/src/bin/openapi.rs ]; then echo "No openapi binary yet (planned in issue #47)." >&2; exit 1; fi
+    cd backend && cargo run --bin openapi > ../docs/openapi.json.tmp && mv ../docs/openapi.json.tmp ../docs/openapi.json || { rm -f ../docs/openapi.json.tmp; exit 1; }
 
 # Start the whole stack in containers (http://localhost:3000)
 up:

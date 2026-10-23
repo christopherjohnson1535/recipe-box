@@ -4,8 +4,8 @@ Start with `CONTRIBUTING.md` (people) or `CLAUDE.md` (a fresh Claude session) in
 up one issue and finish it. Testing is covered in `docs/TESTING.md`; security reports go through `SECURITY.md`.
 
 ## Quick commands
-`just setup`, `just check` (everything CI runs), `just up` / `just down`, `just check-backend`, `just check-frontend`, `just test-backend`, `just test-frontend`,
-`just e2e`, `just openapi`. <!-- verify after #50 merges -->
+`just setup`, `just check` (lint, format, types, tests, audits; coverage and scans are CI-only), `just up` / `just down`, `just check-backend`, `just check-frontend`, `just test-backend`, `just test-frontend`,
+`just e2e`, `just openapi`, `just audit`.
 
 ## The workflow
 1. Pick an issue (start with the lowest open milestone; `good first session` issues are small).

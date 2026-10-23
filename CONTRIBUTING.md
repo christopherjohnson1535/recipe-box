@@ -8,10 +8,9 @@ You need Docker, [`just`](https://github.com/casey/just), and the toolchains pin
 ```sh
 git clone https://github.com/christopherjohnson1535/recipe-box.git
 cd recipe-box
-just setup        # installs dependencies and git hooks
-just check        # every lint, type check and test CI runs
+just setup        # installs dependencies; git hooks if lefthook is installed
+just check        # lint, format, type checks, tests and dependency audits (coverage and scans run in CI only)
 ```
-<!-- verify after #50 merges: just recipe names -->
 Run the whole stack with `just up` (http://localhost:3000) and stop it with `just down`. Without `just`, the raw
 commands are in [docs/wiki/Development.md](docs/wiki/Development.md).
 

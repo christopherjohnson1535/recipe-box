@@ -21,8 +21,11 @@ dish photos), search them, and cook from an iPad (installable PWA, cooking mode,
 | DB | Postgres 16 | container `db` | migrations in `backend/migrations/`, run on API start |
 | Containers | `docker-compose.yml` (db, api, web, optional caddy) | root, `deploy/` | CI `compose` job boots the stack |
 
-`just check` runs both trees (CI runs the same recipes); `just` lists everything else (`setup`, `fmt`, `up`, `down`,
-`logs`, `e2e`, `openapi`, `db`). Without `just`, run the raw commands:
+`just check` runs both trees' format, lint, type and test checks plus `just audit` (cargo deny + npm audit; a tool
+that is not installed is skipped with a message). It does not run the coverage ratchet, zizmor, CodeQL, the image
+scan or the compose smoke test: those are CI-only. The frontend CI job calls the same `just` recipes. `just` lists
+everything else (`setup`, `fmt`, `up`, `down`, `logs`, `e2e`, `openapi`, `db`; `e2e` and `openapi` fail until #46 and
+#47 land). Without `just`, run the raw commands:
 - API (`cd backend`): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
 - Web (`cd frontend`): `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`
 
@@ -30,7 +33,10 @@ Toolchains are pinned: Rust in `rust-toolchain.toml` (rustup picks it up), Node 
 Dockerfile). Bump them in one place. Optional git hooks: `lefthook.yml` (format and lint staged files; `just setup`
 installs them when lefthook is present).
 
-End-to-end tests live in `e2e/` (TypeScript + Playwright); run with `just e2e`; scripts/smoke.sh is removed.
+Frontend tests: `frontend/vitest.setup.ts` pins the clock, blocks unmocked network (MSW) and fails a test on
+unexpected `console.error`/`warn` (use `expectConsole()` if intended). CI also has a coverage ratchet
+(`coverage-baseline.json`, `scripts/coverage-ratchet.mjs`): coverage may not drop. Workflows are hardened (zizmor):
+`permissions: {}` at top, per-job `contents: read`, actions pinned by full SHA, `persist-credentials: false`.
 
 The browser only talks to the web container; the web container proxies `/api/*` and `/media/*` to the API at
 runtime (`API_INTERNAL_URL`). Session cookie `rb_session`.
