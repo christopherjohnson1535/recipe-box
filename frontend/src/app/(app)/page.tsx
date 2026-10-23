@@ -59,14 +59,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       reserveDeck={!filtered}
       liveDescription={filtered}
       description={description}
-      actions={
-        <>
-          <ButtonLink href="/recipes/new">Add recipe</ButtonLink>
-          <ButtonLink href="/import" variant="secondary">
-            Import
-          </ButtonLink>
-        </>
-      }
     />
   );
 
@@ -166,14 +158,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
             }
           />
           <LocalTicker serverDay={issue.dateTime} />
-          <div className="flex justify-end gap-6">
-            <ButtonLink href="/recipes/new" variant="ghost">
-              Add recipe
-            </ButtonLink>
-            <ButtonLink href="/import" variant="ghost">
-              Import
-            </ButtonLink>
-          </div>
         </>
       ) : (
         header(
