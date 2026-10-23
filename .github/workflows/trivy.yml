@@ -1,7 +1,9 @@
 name: Image scan
 
 # Builds both images for the runner's architecture (loaded locally, never pushed) and scans them with Trivy.
-# Fixable HIGH/CRITICAL vulnerabilities fail the job. The scheduled run catches CVEs published after the build.
+# Reporting only: fixable HIGH/CRITICAL findings go to the Security tab (SARIF) and never fail the run, because the base
+# images are floating tags and an unrelated PR must not turn red when a new CVE appears. The scheduled run catches CVEs
+# published after the build. Fork PRs have a read-only token, so they skip the upload.
 on:
   push:
     branches: [main]
@@ -21,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -42,11 +45,19 @@ jobs:
           tags: recipe-box-${{ matrix.name }}:scan
           cache-from: type=gha,scope=trivy-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=trivy-${{ matrix.name }}
-      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: recipe-box-${{ matrix.name }}:scan
+          # v0.33.1 installed Trivy v0.65.0 by default and failed before writing any SARIF; pin a current release.
+          version: v0.76.1
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           vuln-type: os,library
-          exit-code: "1"
-          format: table
+          exit-code: "0"
+          format: sarif
+          output: trivy-${{ matrix.name }}.sarif
+      - uses: github/codeql-action/upload-sarif@51f77329afa6477de8c49fc9c7046c15b9a4e79d # v3.29.5
+        if: ${{ !cancelled() && hashFiles(format('trivy-{0}.sarif', matrix.name)) != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        with:
+          sarif_file: trivy-${{ matrix.name }}.sarif
+          category: trivy-${{ matrix.name }}

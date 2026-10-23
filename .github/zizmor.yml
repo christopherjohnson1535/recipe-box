@@ -1,6 +1,9 @@
 rules:
   cache-poisoning:
     ignore:
-      # Dependency caches are only written by the check jobs, which publish nothing. Actions caches are scoped per
-      # branch/ref, so a PR run cannot write a cache that the main-branch publishing job (`images`) restores.
+      # ci.yml only. Its caches (rust-cache, setup-node, the coverage job's caches) are dependency caches in check jobs
+      # that publish nothing. Actions caches are scoped per ref, so a PR run cannot write a cache that the main-branch
+      # publishing job (`images`) restores. That job uses buildx's gha cache with its own scopes, and nothing else.
+      # File-level rather than line-level: line ignores broke as soon as another PR added lines above them.
+      # Other workflow files are still checked.
       - ci.yml
