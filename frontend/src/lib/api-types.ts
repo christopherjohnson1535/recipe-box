@@ -386,10 +386,9 @@ export interface components {
         };
         /**
          * @description The `code` of an error response (docs/API.md "Errors"). `api_unreachable` and `network` are not in it: the
-         *     frontend proxy and browser client make those up.
-         * @enum {string}
+         *     frontend proxy and browser client make those up. New codes may be added; treat an unknown code as a generic error.
          */
-        ErrorCode: "validation" | "unauthenticated" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "too_large" | "unsupported_media" | "no_recipe_found" | "ai_disabled" | "ai_error" | "blocked_address" | "site_blocked" | "fetch_failed" | "not_implemented" | "internal";
+        ErrorCode: string;
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
             message: string;

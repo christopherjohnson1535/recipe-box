@@ -37,6 +37,8 @@ Every non-2xx response:
 | 502 | `api_unreachable` | **frontend proxy only**: the web container can't reach the API |
 | 0 | `network` | **browser client only** (`ApiError`): the browser can't reach the web server |
 
+The list of codes can grow. Clients treat an unknown code as a generic failure; the OpenAPI spec marks `ErrorCode` with `x-extensible-enum` for that reason.
+
 Limits on JSON routes: body 1 MB; passwords at most 1024 characters (a longer one on login or password change is
 refused with the usual 401 "Wrong username or password."; elsewhere 400); recipe `description` at most 10,000
 characters, `notes` 20,000, each ingredient/step line 2,000, at most 500 ingredients, 500 steps and 50 tags

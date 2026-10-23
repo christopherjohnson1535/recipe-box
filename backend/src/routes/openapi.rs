@@ -4,7 +4,7 @@
 use utoipa::{
     Modify, OpenApi,
     openapi::{
-        OpenApi as Spec,
+        OpenApi as Spec, RefOr, Schema,
         content::Content,
         path::Operation,
         response::ResponseBuilder,
@@ -49,7 +49,7 @@ use crate::auth::session::COOKIE_NAME;
         export::import_zip,
     ),
     components(schemas(recipes::RecipeSort)), // only named in a query parameter's `value_type`
-    modifiers(&Session, &CommonErrors),
+    modifiers(&Session, &CommonErrors, &ExtensibleErrorCode),
 )]
 pub struct ApiDoc;
 
@@ -95,6 +95,34 @@ impl Modify for CommonErrors {
                 "Something went wrong on the server (`internal`).",
             );
         }
+    }
+}
+
+/// `ErrorCode` grows over time, so the spec lists its values as `x-extensible-enum` (Zalando) instead of `enum`:
+/// oasdiff then does not report a new code as a breaking change. The list comes from the generated schema.
+struct ExtensibleErrorCode;
+
+impl Modify for ExtensibleErrorCode {
+    fn modify(&self, spec: &mut Spec) {
+        let Some(RefOr::T(Schema::Object(obj))) = spec
+            .components
+            .as_mut()
+            .and_then(|c| c.schemas.get_mut("ErrorCode"))
+        else {
+            panic!("ErrorCode must be an inline object schema");
+        };
+        let codes = obj
+            .enum_values
+            .take()
+            .expect("ErrorCode must be a string enum");
+        obj.extensions
+            .get_or_insert_default()
+            .insert("x-extensible-enum".into(), codes.into());
+        let note = "New codes may be added; treat an unknown code as a generic error.";
+        obj.description = Some(match obj.description.take() {
+            Some(d) => format!("{d} {note}"),
+            None => note.to_string(),
+        });
     }
 }
 
