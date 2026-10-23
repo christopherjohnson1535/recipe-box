@@ -208,6 +208,7 @@ body {
     --color-rule: #999;
     --color-rule-strong: #666;
     --photo-filter: none;
+    color-scheme: light;
   }
   body {
     background: #fff;
