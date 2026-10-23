@@ -33,15 +33,15 @@ async fn run() -> anyhow::Result<()> {
     recipe_box_api::spawn_purge_task(pool.clone());
 
     let bind_addr = config.bind_addr.clone();
+    let allow_host = std::env::var("IMPORT_ALLOW_HOST").unwrap_or_default();
+    recipe_box_api::config::check_import_allow_host(&allow_host, config.cookie_secure)?;
     let mut state = AppState::new(pool, config)?;
-    if let Ok(host) = std::env::var("IMPORT_ALLOW_HOST") {
-        state.fetch_policy = state
-            .fetch_policy
-            .with_allowed_host(&host)
-            .map_err(anyhow::Error::msg)?;
-        if !host.trim().is_empty() {
-            tracing::warn!(%host, "IMPORT_ALLOW_HOST is set: link import may fetch this non-public host (test stacks only)");
-        }
+    state.fetch_policy = state
+        .fetch_policy
+        .with_allowed_host(&allow_host)
+        .map_err(anyhow::Error::msg)?;
+    if !allow_host.trim().is_empty() {
+        tracing::warn!(host = %allow_host, "IMPORT_ALLOW_HOST is set: link import may fetch this non-public host (test stacks only)");
     }
     let app = recipe_box_api::router(state);
     let listener = tokio::net::TcpListener::bind(&bind_addr)

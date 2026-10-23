@@ -56,7 +56,6 @@ fmt:
 
 # End-to-end tests (Playwright, e2e/ package)
 e2e:
-    @if [ ! -f e2e/package.json ]; then echo "e2e/ does not exist yet (planned in issue #46)." >&2; exit 1; fi
     npm --prefix e2e test
 
 # Regenerate docs/openapi.json from the API code (the checked-in file is replaced only if the binary succeeds)

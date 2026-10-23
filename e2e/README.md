@@ -16,3 +16,7 @@ Native mode needs Postgres reachable as `E2E_PG_ADMIN_URL` (default `postgres://
 Rules (see issue #52): no retries, fixed clock/timezone/locale, nothing leaves 127.0.0.1/localhost/the fixture site,
 every test creates its own user and data (`member`, `makeUser`, `unique()` in `support/fixtures.ts`), no sleeps.
 Link import reaches the fixture site (`backend/tests/fixtures/`) through `IMPORT_ALLOW_HOST` (test stacks only).
+
+Compose mode keeps Postgres on tmpfs, so the restart spec recreates `api` and `web` only (not `db`): it proves uploaded
+media survives on the `media` volume, not that Postgres data survives a restart.
+`COOKIE_SECURE` stays false in both stacks; the API refuses `IMPORT_ALLOW_HOST` together with `COOKIE_SECURE=true`.
