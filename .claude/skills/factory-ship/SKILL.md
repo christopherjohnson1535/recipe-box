@@ -6,7 +6,7 @@ description: Stage 7 of the software factory — deliver the verified build to t
 # Ship
 
 ## 1. Final state
-- Working tree clean; last commit message is one short line saying what the round did. Commits end with the attribution trailer the
+- Working tree clean; last commit message is a short subject plus a 1-3 line body saying what the round did. Commits end with the attribution trailer the
   session provides.
 - The fix ledger lives in the PR description: a line for every finding; open items listed.
 
