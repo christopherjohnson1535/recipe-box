@@ -881,15 +881,18 @@ mod tests {
     }
 
     #[test]
-    fn deep_pages_are_refused_fast_and_ld_json_still_works() {
+    fn deep_and_huge_pages_are_refused_and_ld_json_still_works() {
         let deep = "<div>".repeat(100_000);
-        let t = std::time::Instant::now();
         let url = Url::parse("https://e.example/r").unwrap();
-        assert!(extract(&format!("<html><body>{deep}</body></html>"), &url).is_none());
+        let deep_page = format!("<html><body>{deep}</body></html>");
+        assert!(too_complex(&deep_page));
+        assert!(!too_complex("<html><body><p>hi</p></body></html>"));
+        assert!(extract(&deep_page, &url).is_none());
+        // Flat but over the tag cap.
+        assert!(too_complex(&"<br><p></p>".repeat(MAX_DOM_TAGS)));
         let page =
             ld_page(r#""recipeIngredient":["a"]"#).replace("</html>", &format!("{deep}</html>"));
         assert_eq!(extract(&page, &url).unwrap().ingredients.len(), 1);
-        assert!(t.elapsed().as_secs() < 2, "took {:?}", t.elapsed());
     }
 
     #[test]

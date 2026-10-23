@@ -449,11 +449,29 @@ async fn remove_waits_for_the_admin_row_lock() {
         .header(header::COOKIE, &admin)
         .body(Body::empty())
         .unwrap();
-    let mut task = tokio::spawn(async move { app.oneshot(req).await.unwrap().status() });
+    let task = tokio::spawn(async move { app.oneshot(req).await.unwrap().status() });
 
-    let early = tokio::time::timeout(std::time::Duration::from_millis(500), &mut task).await;
+    // Each test's pool sets application_name to its schema, so only this test's blocked delete matches.
+    let mut blocked = false;
+    for _ in 0..500 {
+        blocked = sqlx::query_scalar::<_, bool>(
+            "select exists(select 1 from pg_stat_activity where application_name = $1 and wait_event_type = 'Lock')",
+        )
+        .bind(ctx.schema())
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap();
+        if blocked {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
     assert!(
-        early.is_err(),
+        blocked,
+        "delete never started waiting on the admin row lock"
+    );
+    assert!(
+        !task.is_finished(),
         "delete finished while an admin row was locked"
     );
     tx.rollback().await.unwrap();
