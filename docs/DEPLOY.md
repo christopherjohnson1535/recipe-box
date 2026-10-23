@@ -52,6 +52,6 @@ tested (issue: deploy guides).
 - `GET /api/health` through the web port → `{"status":"ok","db":"ok"}`.
 - `docker compose ps` shows `healthy` for `db` and `api`.
 - Logs: `docker compose logs -f api web`.
-- End-to-end check: `SMOKE_USER=<you> SMOKE_PASSWORD=<pw> sh scripts/smoke.sh` logs in through the web port, uploads a
-  small test image, restarts the stack and confirms the image survived (`SMOKE_RESTART=0` skips the restart). CI runs
-  the same script on a fresh stack with `SMOKE_SETUP=1`. On Windows run it from Git Bash.
+- End-to-end check: the Playwright suite in `e2e/` (see `e2e/README.md`) drives a throwaway stack from `docker-compose.e2e.yml`,
+  including a restart that checks uploaded images survive. CI runs it on every pull request. For a live stack, the
+  health check above plus signing in and opening a recipe is enough.

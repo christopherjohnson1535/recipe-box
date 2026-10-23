@@ -34,8 +34,9 @@ const BOT_MARKERS: &[&str] = &[
     "are you a robot",
 ];
 
-/// Which addresses may be fetched. The default allows public addresses only; there is no env var or request
-/// field that changes it.
+/// Which addresses may be fetched. The default allows public addresses only. The one operator opt-in is
+/// `IMPORT_ALLOW_HOST` (test stacks only; `main` refuses it together with `COOKIE_SECURE=true`); no request field
+/// changes the policy.
 #[derive(Clone, Debug, Default)]
 pub struct FetchPolicy {
     loopback_port: Option<u16>,
@@ -212,7 +213,11 @@ async fn send(policy: &FetchPolicy, url: &Url) -> AppResult<reqwest::Response> {
             "That address could not be found.".into(),
         ));
     }
-    if !policy.exempts(url, port) && addrs.iter().any(|a| !policy.allows(*a)) {
+    let exempt = policy.exempts(url, port);
+    if addrs
+        .iter()
+        .any(|a| !policy.allows(*a) && !(exempt && !never_exempt(a.ip())))
+    {
         return Err(AppError::BlockedAddress);
     }
     let mut headers = header::HeaderMap::new();
@@ -241,6 +246,32 @@ async fn send(policy: &FetchPolicy, url: &Url) -> AppResult<reqwest::Response> {
         .send()
         .await
         .map_err(|_| AppError::FetchFailed("Could not reach that site.".into()))
+}
+
+/// Addresses that stay blocked even for the `IMPORT_ALLOW_HOST` host: link-local, unspecified, multicast and the
+/// cloud metadata endpoints. The exemption only lifts the loopback/private-range block, so a bad DNS answer for the
+/// test host cannot reach instance metadata.
+fn never_exempt(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let [a, b, ..] = v4.octets();
+            v4.is_unspecified()
+                || (a == 169 && b == 254)
+                || a >= 224
+                || v4 == Ipv4Addr::new(100, 100, 100, 200) // Alibaba metadata
+                || v4 == Ipv4Addr::new(192, 0, 0, 192) // Oracle metadata
+        }
+        IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => never_exempt(IpAddr::V4(v4)),
+            None => {
+                let s = v6.segments();
+                v6.is_unspecified()
+                    || s[0] & 0xffc0 == 0xfe80 // fe80::/10
+                    || s[0] & 0xff00 == 0xff00 // ff00::/8
+                    || v6 == Ipv6Addr::new(0xfd00, 0x0ec2, 0, 0, 0, 0, 0, 0x0254) // AWS IPv6 metadata
+            }
+        },
+    }
 }
 
 /// True only for globally routable unicast addresses.
@@ -300,6 +331,51 @@ mod tests {
 
     fn public(s: &str) -> bool {
         is_public_ip(s.parse().unwrap())
+    }
+
+    #[test]
+    fn exempt_host_still_never_reaches_link_local_or_metadata() {
+        for ip in [
+            "169.254.169.254",
+            "169.254.0.1",
+            "0.0.0.0",
+            "224.0.0.1",
+            "255.255.255.255",
+            "100.100.100.200",
+            "192.0.0.192",
+            "::",
+            "fe80::1",
+            "febf::1",
+            "ff02::1",
+            "fd00:ec2::254",
+            "::ffff:169.254.169.254",
+            "::ffff:0.0.0.0",
+        ] {
+            assert!(never_exempt(ip.parse().unwrap()), "{ip} must stay blocked");
+        }
+        for ip in [
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.18.0.5",
+            "192.168.1.1",
+            "::1",
+            "fd12::1",
+            "8.8.8.8",
+        ] {
+            assert!(!never_exempt(ip.parse().unwrap()), "{ip} may be exempted");
+        }
+    }
+
+    #[tokio::test]
+    async fn exempt_host_cannot_be_a_metadata_address() {
+        let policy = FetchPolicy::default()
+            .with_allowed_host("169.254.169.254:80")
+            .unwrap();
+        let url = Url::parse("http://169.254.169.254/latest/meta-data/").unwrap();
+        assert!(matches!(
+            fetch(&policy, &url, 1024).await,
+            Err(AppError::BlockedAddress)
+        ));
     }
 
     #[test]

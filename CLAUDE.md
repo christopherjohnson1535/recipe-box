@@ -24,10 +24,12 @@ dish photos), search them, and cook from an iPad (installable PWA, cooking mode,
 `just check` runs both trees' format, lint, type and test checks plus `just audit` (cargo deny + npm audit; a tool
 that is not installed is skipped with a message). It does not run the coverage ratchet, zizmor, CodeQL, the image
 scan or the compose smoke test: those are CI-only. The frontend CI job calls the same `just` recipes. `just` lists
-everything else (`setup`, `fmt`, `up`, `down`, `logs`, `e2e`, `openapi`, `db`; `e2e` and `openapi` fail until #46 and
-#47 land). Without `just`, run the raw commands:
+everything else (`setup`, `fmt`, `up`, `down`, `logs`, `e2e`, `openapi`, `db`). Without `just`, run the raw commands:
 - API (`cd backend`): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
 - Web (`cd frontend`): `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`
+- E2E (`just e2e`, or `cd e2e && npm ci && npm test`): Playwright against a throwaway stack (native: local Postgres +
+  cargo-built API; `E2E_STACK=compose` uses `docker-compose.e2e.yml`, which CI runs). It replaces `scripts/smoke.sh`.
+  `IMPORT_ALLOW_HOST` is test-only and the API refuses it with `COOKIE_SECURE=true`. See `e2e/README.md`.
 
 Toolchains are pinned: Rust in `rust-toolchain.toml` (rustup picks it up), Node in `.nvmrc` (22, same as the
 Dockerfile). Bump them in one place. Optional git hooks: `lefthook.yml` (format and lint staged files; `just setup`

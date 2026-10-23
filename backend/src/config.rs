@@ -2,6 +2,17 @@ use std::{env, path::PathBuf};
 
 use anyhow::{Context, bail};
 
+/// `IMPORT_ALLOW_HOST` is for throwaway test stacks. `COOKIE_SECURE=true` is a production-looking config, so the two
+/// together are refused at startup.
+pub fn check_import_allow_host(allow_host: &str, cookie_secure: bool) -> anyhow::Result<()> {
+    if cookie_secure && !allow_host.trim().is_empty() {
+        bail!(
+            "IMPORT_ALLOW_HOST is for test stacks only and must not be set together with COOKIE_SECURE=true; unset it"
+        );
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub database_url: String,
@@ -81,5 +92,19 @@ mod tests {
             let err = parse_session_days(bad).unwrap_err().to_string();
             assert!(err.contains("1 to 3650"), "{bad}: {err}");
         }
+mod import_allow_host_tests {
+    use super::check_import_allow_host;
+
+    #[test]
+    fn refused_with_secure_cookies() {
+        assert!(check_import_allow_host("fixture:4146", true).is_err());
+        assert!(check_import_allow_host(" 127.0.0.1:9 ", true).is_err());
+    }
+
+    #[test]
+    fn fine_when_unset_or_not_production_looking() {
+        assert!(check_import_allow_host("", true).is_ok());
+        assert!(check_import_allow_host("  ", true).is_ok());
+        assert!(check_import_allow_host("fixture:4146", false).is_ok());
     }
 }

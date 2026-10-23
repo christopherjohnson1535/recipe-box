@@ -16,5 +16,6 @@ Why HTTPS matters: iPad Home Screen install, offline, the camera and keep-screen
 ## Health
 - http://localhost:3000/api/health (or your HTTPS address) should show `"db":"ok"`.
 - `docker compose ps` shows `db`, `api` and `web` as **healthy**. Logs: `docker compose logs -f api web`.
-- Full check: `SMOKE_USER=<you> SMOKE_PASSWORD=<your password> sh scripts/smoke.sh` logs in, uploads a small test image,
-  restarts the stack and confirms the image survived. On Windows, run it from Git Bash.
+- Full check: the Playwright suite in `e2e/` (`e2e/README.md`) runs against a throwaway test stack, not your live one;
+  it covers sign-in, recipes, photos, link import and a restart. For your own stack, the health address above plus
+  signing in and opening a recipe is the quick check.
