@@ -2,24 +2,32 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Arrive } from "@/components/ui/Arrive";
-import { EndNote, Lede, LeadPhoto, MetaStrip, RuledList, Sidebar, SidebarLayout, StepList } from "@/components/ui/Article";
+import { Lede, SidebarLayout } from "@/components/ui/Article";
 import { ButtonLink } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Chip";
 import { DotList } from "@/components/ui/DotList";
 import { ExternalLink } from "@/components/ui/ExternalLink";
 import { Heading } from "@/components/ui/Heading";
+import { MethodHeader, MethodStep } from "@/components/ui/Method";
+import { NumeralsBand } from "@/components/ui/NumeralsBand";
 import { recipeArrivalKey } from "@/components/ui/morph";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PullQuote } from "@/components/ui/PullQuote";
+import { SpreadOpener } from "@/components/ui/SpreadOpener";
 import { SpotIcon } from "@/components/ui/SpotIcon";
 import { iconForTag } from "@/components/ui/spot-icons";
 import { Text } from "@/components/ui/Text";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type Recipe } from "@/lib/api";
-import { formatMinutes, groupBySection } from "@/lib/recipe";
+import { formatMinutes, groupBySection, minuteNumeral } from "@/lib/recipe";
+import { splitIngredient } from "@/lib/scale";
 import { serverApi } from "@/lib/server-api";
 import { bylines } from "@/components/recipe-page/byline";
 import { LocalDate } from "@/components/recipe-page/LocalDate";
 import { DeleteRecipeButton } from "@/components/recipe-page/DeleteRecipeButton";
+import { IngredientChecklist } from "@/components/recipe-page/IngredientChecklist";
+import { RecipeBar } from "@/components/recipe-page/RecipeBar";
+import { RecipeStateProvider, ScaledServings } from "@/components/recipe-page/RecipeState";
+import { StepText } from "@/components/recipe-page/StepText";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -43,12 +51,18 @@ export default async function RecipePage({ params }: Params) {
   const recipe = await loadRecipe(id);
   if ("error" in recipe) return <ServerError error={recipe.error} />;
 
-  const meta = [
-    { label: "Serves", value: recipe.servings },
-    { label: "Prep", value: formatMinutes(recipe.prepMinutes) },
-    { label: "Cook", value: formatMinutes(recipe.cookMinutes) },
-    { label: "Total", value: formatMinutes(recipe.totalMinutes) },
-  ].filter((m) => m.value);
+  const times = [
+    { label: "Prep", minutes: recipe.prepMinutes },
+    { label: "Cook", minutes: recipe.cookMinutes },
+    { label: "Total", minutes: recipe.totalMinutes },
+  ].flatMap(({ label, minutes }) => {
+    const n = minuteNumeral(minutes);
+    return n ? [{ label, parts: n, spoken: formatMinutes(minutes) ?? undefined }] : [];
+  });
+  const servings = recipe.servings?.trim();
+  // A bare number or range is set as a big numeral; a phrase ("makes about 4 bowls") as smaller text.
+  const servingsText = servings ? splitIngredient(servings).quantity !== servings : false;
+  const numerals = [...(servings ? [{ label: "Serves", value: <ScaledServings servings={servings} />, text: servingsText }] : []), ...times];
 
   const source =
     recipe.sourceUrl || recipe.sourceName ? (
@@ -66,105 +80,98 @@ export default async function RecipePage({ params }: Params) {
   const lede = description.length > 160 ? description : undefined;
 
   const by = bylines(recipe);
+  const ingredientLines = recipe.ingredients.map((i) => i.text);
+  const ingredientGroups = groupBySection(recipe.ingredients.map((ing, index) => ({ ...ing, index })));
+  const notes = recipe.notes.trim();
+  // Steps are numbered straight through the sections.
+  const stepGroups = groupBySection(recipe.steps.map((s, number) => ({ ...s, number })));
 
   return (
-    <Arrive as="article" arriveKey={recipeArrivalKey(id)} className="flex flex-col gap-10">
-      <PageHeader
-        align="center"
-        rise
-        morphId={id}
-        kicker={
-          recipe.tags.length > 0 ? (
-            <DotList label="Tags" align="center">
-              {recipe.tags.map((t) => (
-                <li key={t}>
-                  <Badge icon={<SpotIcon name={iconForTag(t)} size={24} />}>{t}</Badge>
-                </li>
-              ))}
-            </DotList>
-          ) : undefined
-        }
-        title={recipe.title}
-        description={deck}
-        byline={
-          by.length > 0 || source ? (
-            <DotList as="p" align="center" stackOnPhone>
-              {by.map((line) => (
-                <span key={line.verb}>
-                  {line.verb}
-                  {line.who ? ` by ${line.who}` : ""}
-                  <LocalDate iso={line.iso} />
-                </span>
-              ))}
-              {source && (
-                <Text as="span" variant="aside">
-                  Source: {source}
-                </Text>
-              )}
-            </DotList>
-          ) : undefined
-        }
-        actions={
-          <>
-            <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">Start cooking</ButtonLink>
-            <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
-              Edit
-            </ButtonLink>
-            <DeleteRecipeButton id={id} title={recipe.title} />
-          </>
-        }
-      />
-
-      <MetaStrip items={meta} />
-
-      {recipe.imageUrl && <LeadPhoto src={recipe.imageUrl} alt={recipe.title} morphId={id} />}
-
-      {lede && <Lede>{lede}</Lede>}
-
-      <SidebarLayout
-        sidebar={
-          <Sidebar title="Ingredients" id="ingredients">
-            {recipe.ingredients.length === 0 && <Text variant="note">No ingredients listed.</Text>}
-            {groupBySection(recipe.ingredients).map((g, i) => (
-              <div key={i} className="flex flex-col gap-1">
-                {g.section && (
-                  <div className="pt-2">
-                    <Heading level={3} size="group">
-                      {g.section}
-                    </Heading>
-                  </div>
+    <Arrive as="article" arriveKey={recipeArrivalKey(id)} className="flex flex-col gap-10 pb-28">
+      <RecipeStateProvider id={id}>
+        <SpreadOpener
+          morphId={id}
+          kicker={
+            recipe.tags.length > 0 ? (
+              <DotList label="Tags">
+                {recipe.tags.map((t) => (
+                  <li key={t}>
+                    <Badge>{t}</Badge>
+                  </li>
+                ))}
+              </DotList>
+            ) : undefined
+          }
+          title={recipe.title}
+          deck={deck}
+          icon={<SpotIcon name={iconForTag(recipe.tags[0] ?? "")} size={72} />}
+          photo={recipe.imageUrl ? { src: recipe.imageUrl, alt: recipe.title } : undefined}
+          byline={
+            by.length > 0 || source ? (
+              <DotList as="p" stackOnPhone>
+                {by.map((line) => (
+                  <span key={line.verb}>
+                    {line.verb}
+                    {line.who ? ` by ${line.who}` : ""}
+                    <LocalDate iso={line.iso} />
+                  </span>
+                ))}
+                {source && (
+                  <Text as="span" variant="aside">
+                    Source: {source}
+                  </Text>
                 )}
-                <RuledList items={g.items.map((ing) => ing.text)} />
+              </DotList>
+            ) : undefined
+          }
+          actions={
+            <>
+              <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">
+                Start cooking
+              </ButtonLink>
+              <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
+                Edit
+              </ButtonLink>
+              <DeleteRecipeButton id={id} title={recipe.title} />
+            </>
+          }
+        />
+
+        <NumeralsBand items={numerals} />
+
+        {lede && <Lede>{lede}</Lede>}
+
+        <SidebarLayout sidebar={<IngredientChecklist groups={ingredientGroups} />}>
+          <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-8">
+            <MethodHeader steps={recipe.steps.length} />
+            {recipe.steps.length === 0 && <Text variant="note">No steps listed.</Text>}
+            {stepGroups.map((g, i) => (
+              <div key={i} className="flex flex-col gap-3">
+                {g.section && (
+                  <Heading level={3} size="kicker">
+                    {g.section}
+                  </Heading>
+                )}
+                <ol className="flex flex-col gap-6" start={g.items[0].number + 1}>
+                  {g.items.map((s) => (
+                    <MethodStep key={s.number} number={s.number + 1}>
+                      <StepText text={s.text} ingredients={ingredientLines} />
+                    </MethodStep>
+                  ))}
+                </ol>
               </div>
             ))}
-          </Sidebar>
-        }
-      >
-        <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-6">
-          <Heading level={2} id="steps" ruled>
-            Method
-          </Heading>
-          {recipe.steps.length === 0 && <Text variant="note">No steps listed.</Text>}
-          {groupBySection(recipe.steps).map((g, i) => (
-            <div key={i} className="flex flex-col gap-4">
-              {g.section && (
-                <Heading level={3} size="kicker">
-                  {g.section}
-                </Heading>
-              )}
-              <StepList steps={g.items.map((s) => s.text)} />
-            </div>
-          ))}
 
-          {recipe.notes && (
-            <EndNote title="Notes" id="notes">
-              <Text variant="note" preserveLines>
-                {recipe.notes}
-              </Text>
-            </EndNote>
-          )}
-        </section>
-      </SidebarLayout>
+            {notes && (
+              <PullQuote caption={recipe.createdBy ? `${recipe.createdBy.displayName}’s note on this recipe` : "Note on this recipe"} short={notes.length <= 140 && !notes.includes("\n")}>
+                {notes}
+              </PullQuote>
+            )}
+          </section>
+        </SidebarLayout>
+
+        <RecipeBar id={id} total={recipe.ingredients.length} />
+      </RecipeStateProvider>
     </Arrive>
   );
 }

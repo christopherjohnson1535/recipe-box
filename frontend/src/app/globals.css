@@ -228,6 +228,13 @@ body {
   main h3 {
     break-after: avoid;
   }
+  /* Recipe spread: a clean page. Ticks, the scale control and the floating bar are on-screen tools. */
+  .strike {
+    background: none;
+  }
+  .photo-turn {
+    animation: none;
+  }
   /* The source URL is printed after the link text. */
   main a[href^="http"]::after {
     content: " (" attr(href) ")";

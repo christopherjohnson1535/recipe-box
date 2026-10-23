@@ -20,7 +20,10 @@ const themes = Object.fromEntries(
     return [f.replace(".css", ""), all];
   }),
 );
-const components = decls(read("components.css"));
+// The first definition of each name is the day value; the evening blocks that follow override some of them.
+const components = Object.fromEntries(
+  [...read("components.css").matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)].reverse().map((m) => [m[1], m[2].trim()]),
+);
 const motion = decls(read("motion.css"));
 // Component tokens that are not colours, so they don't point at a semantic token.
 const NON_COLOUR = ["--photo-filter"];
@@ -43,7 +46,9 @@ const semanticNames = Object.keys(themes.day).sort();
 
 /** Resolves a semantic or component token to a hex colour in one theme. */
 function hex(theme: string, token: string): string {
-  const semantic = token.startsWith("--color-") ? token : ref(components[token] ?? "");
+  // Evening can re-point a component token (timer chips, the floating bar) in components.css.
+  const override = theme === "evening" ? eveningBlocks(read("components.css")).attr[token] : undefined;
+  const semantic = token.startsWith("--color-") ? token : ref(override ?? components[token] ?? "");
   if (!semantic) throw new Error(`${token} is not a component token that points at a semantic token`);
   const primitive = ref(themes[theme][semantic] ?? "");
   const value = primitive && primitives[primitive];
@@ -109,6 +114,12 @@ const TEXT: [string, string][] = [
   ["--selection-fg", "--selection-bg"],
   ["--stamp-fg", "--color-paper"], // the save stamp carries text
   ["--feature-fg", "--feature-bg"], // the inverse home panel
+  ["--qty-fg", "--panel-bg"], // ingredient quantities
+  ["--timer-fg", "--timer-bg"], // timer chips in a step
+  ["--bar-fg", "--bar-bg"], // the floating bar
+  ["--bar-action-fg", "--bar-action-bg"], // its Start cooking link
+  ["--qty-fg", "--target-bg"], // the ingredient row a step link jumped to
+  ["--color-ink", "--target-bg"],
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
 const UI: [string, string][] = [
@@ -133,6 +144,9 @@ const UI: [string, string][] = [
   ["--spot-detail", "--color-paper"],
   ["--card-underline", "--color-paper"], // the drawn title underline
   ["--feature-focus", "--feature-bg"],
+  ["--strike-fg", "--panel-bg"], // the drawn line through a ticked ingredient
+  ["--mention-line", "--color-paper"], // dotted underline on an ingredient named in a step
+  ["--bar-focus", "--bar-bg"],
 ];
 
 describe("design tokens", () => {
@@ -178,7 +192,7 @@ describe("design tokens", () => {
     const comp = eveningBlocks(read("components.css"));
     expect(comp.found).toBe(true);
     expect(comp.device).toEqual(comp.attr);
-    expect(Object.keys(comp.attr).sort()).toEqual(["--photo-filter", "--rule-double"]);
+    expect(Object.keys(comp.attr).sort()).toEqual(["--bar-bg", "--bar-fg", "--bar-focus", "--photo-filter", "--rule-double", "--timer-bg", "--timer-fg"]);
     // The device block only matches when no attribute is set, so data-theme="day" is never overridden.
     for (const css of [read("themes/evening.css"), read("components.css")]) {
       expect(css).not.toMatch(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{/);
