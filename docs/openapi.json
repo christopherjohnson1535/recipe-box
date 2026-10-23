@@ -1953,8 +1953,8 @@
       },
       "ErrorCode": {
         "type": "string",
-        "description": "The `code` of an error response (docs/API.md \"Errors\"). `api_unreachable` and `network` are not in it: the\nfrontend proxy and browser client make those up.",
-        "enum": [
+        "description": "The `code` of an error response (docs/API.md \"Errors\"). `api_unreachable` and `network` are not in it: the\nfrontend proxy and browser client make those up. New codes may be added; treat an unknown code as a generic error.",
+        "x-extensible-enum": [
           "validation",
           "unauthenticated",
           "forbidden",

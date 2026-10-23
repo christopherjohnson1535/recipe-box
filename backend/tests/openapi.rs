@@ -119,3 +119,23 @@ async fn spec_and_router_list_the_same_operations() {
         }
     }
 }
+
+#[test]
+fn error_code_is_an_extensible_enum() {
+    let spec: Value = serde_json::from_str(&openapi::json()).unwrap();
+    let schema = &spec["components"]["schemas"]["ErrorCode"];
+    assert!(
+        schema.get("enum").is_none(),
+        "plain enum breaks oasdiff on every new code"
+    );
+    let codes: Vec<&str> = schema["x-extensible-enum"]
+        .as_array()
+        .expect("x-extensible-enum")
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    for c in ["validation", "ai_disabled", "ai_error", "internal"] {
+        assert!(codes.contains(&c), "missing {c}");
+    }
+    assert_eq!(codes.len(), 16, "{codes:?}");
+}
