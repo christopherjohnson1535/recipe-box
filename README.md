@@ -67,7 +67,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for branches, PR titles and the definitio
 
 **Explanation** (understand why)
 - [Architecture decision records](docs/adr/README.md) · [Software factory](docs/FACTORY.md) · [Wiki: Architecture](docs/wiki/Architecture.md) · [Roadmap](docs/wiki/Roadmap.md)
-- [Redesign proposals](docs/design/redesign-2026-10/README.md) · [Archived factory runs](docs/archive/factory-runs/README.md)
+- [Redesign proposals](docs/design/redesign-2026-10/README.md)
 
 ## Backup
 `sh scripts/backup.sh` → `backups/<time>/` · `sh scripts/restore.sh backups/<time>`

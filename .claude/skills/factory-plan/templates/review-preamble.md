@@ -17,6 +17,5 @@ You REVIEW; you do not change code. The only file you write is your findings fil
   requirements in scope that are missing or wrong.
 
 ## Output
-`docs/review/<slug>.md`: each finding = ID (e.g. R1-01), Must/Should/Nice, file:line, failing case, smallest fix.
-Commit only that file (`git add docs/review/<slug>.md && git commit -m "Review: <slug>"`).
+Write findings to a scratch path, `<SCRATCH_DIR>/<slug>.md`, not `docs/review/`: each finding = ID (e.g. R1-01), Must/Should/Nice, file:line, failing case, smallest fix. Review files are working notes: never `git add` or commit them. Report findings to the orchestrator.
 Report (under 150 words): counts per group and the Must list, one line each.

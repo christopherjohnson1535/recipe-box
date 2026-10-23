@@ -22,6 +22,7 @@
   `npx vitest run <your tests>`; finish with the full `npx vitest run`.
 - Commit only your paths: `git add <your paths> && git commit -m "<msg>"`. If `index.lock` exists, wait 5 s and
   retry (max 5). Never `git add -A`, never reset/checkout/stash.
+- Commit message: a subject line (imperative, under 72 characters, says what changes, e.g. `fix(backend): re-check redirects in safe_fetch`), then a blank line and a short body of 1-3 lines on what and why. No bullet lists or run summaries; longer detail goes in the PR description.
 - Framework gotchas: <e.g. Next.js 16 params are Promises; "use client" on hook files; no runtime export with
   cacheComponents>.
 

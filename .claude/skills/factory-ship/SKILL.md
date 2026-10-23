@@ -6,9 +6,9 @@ description: Stage 7 of the software factory — deliver the verified build to t
 # Ship
 
 ## 1. Final state
-- Working tree clean; last commit message says what the round did. Commits end with the attribution trailer the
+- Working tree clean; last commit message is a short subject plus a 1-3 line body saying what the round did. Commits end with the attribution trailer the
   session provides.
-- `docs/review/FIXES.md` has a line for every finding; open items listed.
+- The fix ledger lives in the PR description: a line for every finding; open items listed.
 
 ## 2. Deliver to the owner's machine (when building in a separate sandbox)
 - Copy source + `.git`, never `node_modules`, `.next`, `data`:

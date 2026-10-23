@@ -25,7 +25,7 @@ Filled-in copy of `.claude/skills/factory-plan/templates/agent-preamble.md` for 
 - Edit ONLY files you own per your brief. Need something elsewhere? Work around it and put it in your report.
 - Only run installs/builds in your own tree (`cargo` in `backend/`, `npm` in `frontend/`).
 - Commit only your paths: `git add <your paths> && git commit -m "<msg>"`. If `.git/index.lock` exists, wait 5 s and
-  retry (max 5). Never `git add -A`, never reset/checkout/stash. End commit messages with:
+  retry (max 5). Never `git add -A`, never reset/checkout/stash. Commit message: a subject line (imperative, under 72 characters, says what changes, e.g. `fix(backend): re-check redirects in safe_fetch`), then a blank line and a short body of 1-3 lines on what and why. No bullet lists or run summaries; longer detail goes in the PR description. After the body, add only the attribution trailer your session provides, for example:
   ```
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
   ```
