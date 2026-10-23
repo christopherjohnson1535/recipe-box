@@ -28,6 +28,7 @@ Every non-2xx response:
 | 415 | `unsupported_media` | not an image we can decode, or over 10,000 px a side / 40 megapixels |
 | 422 | `no_recipe_found` | page/photo had no recipe |
 | 422 | `ai_disabled` | AI needed but `AI_PROVIDER=none` |
+| 502 | `ai_error` | the AI provider failed: timeout, rejected key, busy after one retry, or a reply we could not read |
 | 422 | `blocked_address` | URL resolves to a non-public IP |
 | 502 | `site_blocked` | site returned 401/403/429/503 or a bot check — UI offers paste-text |
 | 502 | `fetch_failed` | DNS, timeout, too large, other HTTP error |
@@ -64,7 +65,8 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
     no `sort`, results are ranked: title-prefix hits, then `ts_rank`, then newest. An explicit `sort` always wins.
     Anything else is `400 validation`.
 - **Tags**: only tags used by live recipes, sorted by name.
-- **Media**: accepts JPEG/PNG/WebP/GIF (HEIC: issue). Re-encoded to JPEG q85, EXIF orientation applied, long edge at
+- **Media**: accepts JPEG/PNG/WebP/GIF and HEIC/HEIF (iPhone/iPad photos; decoded by libheif's `heif-convert` in a
+  child process with a 30 s limit, binary from `HEIF_CONVERT`). Re-encoded to JPEG q85, EXIF orientation applied, long edge at
   most 2400 px. Images over 10,000 px a side or 40 megapixels are refused (`415 unsupported_media`) before any pixels
   are decoded. `GET /media/{file_name}` requires a session; `file_name` must match `^[0-9a-f-]{36}\.jpg$`.
 - **Imports return drafts and never save.** For `import/url`, `sourceUrl` is the final URL after redirects,
@@ -74,8 +76,18 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   out of it the answer is `502 fetch_failed` ("took too long to read"). Pages too deeply nested or tag-dense to read
   safely count as `422 no_recipe_found` unless they carry JSON-LD. Lists are cut at 500 items and text fields at
   10,000 characters, durations over 7 days are dropped; each adds a `warnings` entry.
-- **Photo import** without AI: 422 `ai_disabled` **after** storing the photos; the body's `error` also carries
-  `"photoImageIds": [...]` so the UI can show photo + empty form (PHO-5). Not built yet, so the spec lists 501.
+- **Photo import** (`POST /api/import/photo`, multipart): 1-6 `files` (repeat the field) and optional `mode`
+  `recipe` (default) or `dish`; 0 or more than 6 files, or another `mode`, is 400 `validation`. The request may be up
+  to 6 × `MAX_UPLOAD_MB`; each file over `MAX_UPLOAD_MB` is 413 `too_large`. Every photo is stored first (re-encoded
+  like `/api/media`; an unreadable one is 415 and nothing from that request is kept), then the photos go to the AI
+  provider in upload order, so several pages become one draft (PHO-3). The draft has `sourceType: photo` and
+  `photoImageIds` in upload order; in `dish` mode `imageId`/`imageUrl` are the first photo and `warnings` includes
+  "Guessed from a photo of the dish" (PHO-4). When no draft comes back (422 `ai_disabled`, 422 `no_recipe_found`,
+  502 `ai_error`) the photos stay stored and the body's `error` also carries `"photoImageIds": [...]` so the UI can
+  show them beside an empty form (PHO-5). No other error has that field.
+- **AI provider** (`AI_PROVIDER=anthropic`): images are shrunk to at most 1568 px on the long edge before sending; the
+  reply is validated and capped like link import (500 items, field lengths as in `/api/recipes`), each cut adding a
+  `warnings` entry. One retry on 429/5xx; otherwise 502 `ai_error`. The API key is never logged or returned.
 - **Users (admin)**: changing **your own** password requires `currentPassword` (401 `unauthenticated` if wrong, same
   message as a bad login); an admin resetting **someone else's** doesn't. Password at least 10 characters. Ends that
   user's other sessions (the caller's current session stays when it is their own password). `DELETE` ends the deleted

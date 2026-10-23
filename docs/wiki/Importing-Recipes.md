@@ -32,8 +32,10 @@ Every import gives you a **draft** to check and fix before it is saved. Open **I
 
 Already saved that link? You'll be told "You already have this recipe" with a link to it; **Import anyway** continues if you want a second copy.
 
-With AI switched **on**, reading photos and pasted text shows **Coming soon** until that feature is released (Phase 2). With AI **off**, *Keep photos and type it in* already works: your photos are saved and shown beside an empty form.
+**Photos.** JPEG, PNG, WebP and iPhone/iPad HEIC photos all work, up to 6 per recipe; the pages are read in the order you pick them and become one recipe. If the AI can't find a recipe in them, or isn't available right now, your photos are still kept and shown beside an empty form. With AI **off**, *Keep photos and type it in* does the same straight away.
+
+Pasting recipe text still shows **Coming soon** until text import is released (Phase 2).
 
 Imported recipes keep the source link and author credit. Recipes are for private household use.
 
-_Status: link import is Phase 1, photo/text import Phase 2 — see [[Roadmap]]._
+_Status: link and photo import work; text import is Phase 2 — see [[Roadmap]]._
