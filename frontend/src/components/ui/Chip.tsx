@@ -6,7 +6,7 @@ import { cx } from "./cx";
 export function Badge({ children, icon }: { children: ReactNode; /** A `SpotIcon` drawn before the name. */ icon?: ReactNode }) {
   if (icon) {
     return (
-      <span className="label inline-flex items-center gap-1.5">
+      <span className="label inline-flex items-baseline gap-2 [&>svg]:-translate-y-1 [&>svg]:self-center">
         {icon}
         {children}
       </span>

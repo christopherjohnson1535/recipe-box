@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { markArrived } from "./Arrive";
-import { Morph, photoName, rememberPhoto, recipeArrivalKey, titleName } from "./morph";
+import { Morph, photoName, rememberPhoto, rememberTitle, recipeArrivalKey, titleName } from "./morph";
 
 /** The contents listing: entries between hairlines, two columns from 1024px. Entries keep source order
  * (left to right, then down), so reading and focus order match what is seen. Children are `<ContentsEntry>`s. */
@@ -50,6 +50,7 @@ export function ContentsEntry({ href, title, kicker, deck, meta, imageSrc, index
                         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // a new tab/window is not this tab's arrival
                         markArrived(recipeArrivalKey(morphId));
                         rememberPhoto(morphId, Boolean(imageSrc));
+                        rememberTitle(morphId, title);
                       }
                     : undefined
                 }

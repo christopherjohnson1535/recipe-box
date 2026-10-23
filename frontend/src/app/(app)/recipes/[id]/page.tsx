@@ -78,7 +78,7 @@ export default async function RecipePage({ params }: Params) {
             <DotList label="Tags" align="center">
               {recipe.tags.map((t) => (
                 <li key={t}>
-                  <Badge icon={<SpotIcon name={iconForTag(t)} size={18} />}>{t}</Badge>
+                  <Badge icon={<SpotIcon name={iconForTag(t)} size={24} />}>{t}</Badge>
                 </li>
               ))}
             </DotList>

@@ -10,6 +10,10 @@ export const recipeArrivalKey = (id: string) => `recipe:${id}`;
 // a direct load knows nothing, and a photo arriving later pushes the page down less than a 576px box collapsing.
 const photoSeen = new Map<string, boolean>();
 export const rememberPhoto = (id: string, has: boolean) => void photoSeen.set(id, has);
+const titleSeen = new Map<string, string>();
+/** The skeleton sets the card's own title in the headline's type, so the title morph carries real text, not a tinted bar. */
+export const rememberTitle = (id: string, title: string) => void titleSeen.set(id, title);
+export const titleFor = (id: string) => titleSeen.get(id);
 export const hasPhotoFor = (id: string) => photoSeen.get(id) === true;
 
 /**

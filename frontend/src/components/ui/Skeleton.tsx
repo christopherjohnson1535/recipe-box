@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { SidebarLayout } from "./Article";
 import { Contents } from "./Contents";
 import { cx } from "./cx";
-import { hasPhotoFor, Morph, photoName, titleName } from "./morph";
+import { hasPhotoFor, Morph, photoName, titleFor, titleName } from "./morph";
 import { Pending } from "./Pending";
 
 /** One placeholder box: the static skeleton tint with a soft highlight in the middle. Nothing moves. Size it with className. */
@@ -104,6 +104,7 @@ export function RecipeSkeleton() {
   const { id } = useParams<{ id: string }>();
   if (typeof id !== "string" || path !== `/recipes/${id}`) return <Pending>Loading…</Pending>;
   const photo = hasPhotoFor(id);
+  const title = titleFor(id);
   return (
     <Loading>
       <div className="flex flex-col gap-10">
@@ -111,9 +112,15 @@ export function RecipeSkeleton() {
           <div className="flex min-h-[25px] items-center">
             <TextBar type="label" className="w-40" center />
           </div>
-          <Morph name={titleName(id)}>
+          {title ? (
+            <Morph name={titleName(id)}>
+              <div aria-hidden="true" className="min-w-0 max-w-measure-wide font-display text-headline text-ink [overflow-wrap:anywhere]">
+                {title}
+              </div>
+            </Morph>
+          ) : (
             <TextBar type="font-display text-headline" className="w-72 max-w-full" center />
-          </Morph>
+          )}
           <TextBar type="text-deck" className="w-80 max-w-full" center />
           <TextBar type="label" className="w-56 max-w-full" center />
           <div className="mt-2 flex flex-wrap justify-center gap-3">
