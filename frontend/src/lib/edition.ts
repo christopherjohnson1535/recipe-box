@@ -1,6 +1,6 @@
 // Day and evening editions. The choice is per device (localStorage `rb-edition`); by default the clock decides.
-// The same rules run in the inline <head> script (EDITION_SCRIPT, built from the constants below) so the first
-// paint is already right; edition.test.ts runs that script against resolveEdition. See docs/THEMING.md.
+// The same rules run in the inline <head> script (EDITION_SCRIPT, written out literally below) so the first
+// paint is already right; edition.test.ts runs that script against resolveEdition and checks its literals match the constants. See docs/THEMING.md.
 
 export type Edition = "day" | "evening";
 export type EditionPreference = "clock" | "day" | "evening" | "device";
@@ -39,7 +39,7 @@ export function msUntilNextSwitch(now: Date): number {
 }
 
 /** Runs in <head> before first paint. `device` leaves data-theme off so the prefers-color-scheme rule decides. */
-export const EDITION_SCRIPT = `(function(){try{var p;try{p=localStorage.getItem(${JSON.stringify(EDITION_KEY)})}catch(e){}var h=new Date().getHours();var t=p==="day"||p==="evening"?p:p==="device"?"":h>=${EVENING_STARTS_AT}||h<${DAY_STARTS_AT}?"evening":"day";if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme}catch(e){}})()`;
+export const EDITION_SCRIPT = `(function(){try{var p;try{p=localStorage.getItem("rb-edition")}catch(e){}var h=new Date().getHours();var t=p==="day"||p==="evening"?p:p==="device"?"":h>=19||h<7?"evening":"day";if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme}catch(e){}})()`;
 
 // Kept when storage is blocked, so a manual choice still holds for this page session.
 let memory: EditionPreference | null = null;

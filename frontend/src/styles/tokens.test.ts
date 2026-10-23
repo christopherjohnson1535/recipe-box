@@ -30,12 +30,12 @@ const DECORATIVE: Record<string, string> = {
   "--skeleton-shine": "the soft highlight in the middle of a skeleton block (static); decoration only",
 };
 // The edition selectors: evening applies under the attribute, and under a dark device when no attribute is set.
-const EVENING_ATTR = ':root[data-theme="evening"]';
+const EVENING_ATTR = /:root\[data-theme="evening"\]\s*\{([^}]*)\}/;
 const EVENING_DEVICE = /@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme\]\)\s*\{([^}]*)\}\s*\}/;
 
 /** The declarations of the evening block selected by attribute and of the one selected by the device scheme. */
 function eveningBlocks(css: string) {
-  const attr = css.match(new RegExp(`${EVENING_ATTR.replace(/[[\]()]/g, "\\$&")}\\s*\\{([^}]*)\\}`))?.[1];
+  const attr = css.match(EVENING_ATTR)?.[1];
   const device = css.match(EVENING_DEVICE)?.[1];
   return { attr: decls(attr ?? ""), device: decls(device ?? ""), found: Boolean(attr && device), raw: [attr ?? "", device ?? ""] };
 }

@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyEdition,
   EDITION_KEY,
+  DAY_STARTS_AT,
   EDITION_SCRIPT,
+  EVENING_STARTS_AT,
   getEditionPreference,
   msUntilNextSwitch,
   parsePreference,
@@ -69,6 +71,12 @@ describe("msUntilNextSwitch", () => {
 });
 
 describe("the head script", () => {
+  it("spells out the storage key and switch hours that the constants define", () => {
+    expect(EDITION_SCRIPT).toContain(`localStorage.getItem("${EDITION_KEY}")`);
+    expect(EDITION_SCRIPT).toContain(`h>=${EVENING_STARTS_AT}||h<${DAY_STARTS_AT}`);
+    expect(EDITION_KEY).toBe("rb-edition");
+  });
+
   const run = (pref: string | null, now: Date) => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(now);
