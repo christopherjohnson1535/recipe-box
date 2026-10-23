@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { SearchField, SearchSort } from "@/components/ui/SearchField";
 import type { RecipeSort } from "@/lib/api";
 import { homeHref, parseSort, SORTS } from "./url";
 
@@ -41,7 +40,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
       role="search"
       method="get"
       action="/"
-      className="flex flex-wrap gap-2"
+      className="flex flex-wrap items-end gap-x-6 gap-y-1"
       onSubmit={(e) => {
         e.preventDefault();
         go({}, "push");
@@ -50,15 +49,15 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
       <label htmlFor="q" className="sr-only">
         Search recipes
       </label>
-      <div className="flex min-w-60 max-w-xl flex-1 gap-2 max-sm:basis-full">
-        <Input
+      <div className="flex min-w-0 flex-1 sm:min-w-60 items-end gap-4 max-sm:basis-full">
+        <SearchField
           ref={input}
           id="q"
           name="q"
           type="search"
           defaultValue={q}
           autoComplete="off"
-          placeholder="Search recipes, e.g. lasagne…"
+          placeholder="Search the box…"
           onChange={(e) => {
             clearTimeout(timer.current);
             const value = e.currentTarget.value;
@@ -66,16 +65,15 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
           }}
         />
         {tag && <input type="hidden" name="tag" value={tag} />}
-        <Button type="submit" variant="secondary">
+        <Button type="submit" variant="ghost" className="shrink-0">
           Search
         </Button>
       </div>
       <label htmlFor="sort" className="sr-only">
         Sort recipes
       </label>
-      <Select
-        quietOnPhone
-        className="max-sm:ml-auto"
+      <SearchSort
+        className="max-sm:w-full"
         id="sort"
         name="sort"
         value={sort === "newest" && !q ? "" : (sort ?? "")}
@@ -87,7 +85,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
             {s.label}
           </option>
         ))}
-      </Select>
+      </SearchSort>
     </form>
   );
 }

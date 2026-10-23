@@ -108,6 +108,7 @@ const TEXT: [string, string][] = [
   ["--entry-kicker-fg", "--color-paper"],
   ["--selection-fg", "--selection-bg"],
   ["--stamp-fg", "--color-paper"], // the save stamp carries text
+  ["--feature-fg", "--feature-bg"], // the inverse home panel
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
 const UI: [string, string][] = [
@@ -130,6 +131,8 @@ const UI: [string, string][] = [
   ["--focus-ring", "--color-paper-deep"],
   ["--spot-line", "--color-paper"], // spot icons are graphics, 3:1
   ["--spot-detail", "--color-paper"],
+  ["--card-underline", "--color-paper"], // the drawn title underline
+  ["--feature-focus", "--feature-bg"],
 ];
 
 describe("design tokens", () => {

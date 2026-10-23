@@ -7,7 +7,8 @@ import { dismissUndo } from "./undo/undo-store";
 import { Masthead, NavButton, NavLink } from "./ui/Masthead";
 
 const NAV = [
-  { href: "/", label: "Recipes", match: (p: string) => p === "/" || p.startsWith("/recipes") },
+  { href: "/", label: "Recipes", match: (p: string) => p === "/" || (p.startsWith("/recipes") && p !== "/recipes/new") },
+  { href: "/recipes/new", label: "Add", match: (p: string) => p === "/recipes/new" },
   { href: "/import", label: "Import", match: (p: string) => p.startsWith("/import") },
   { href: "/settings", label: "Settings", match: (p: string) => p.startsWith("/settings") },
 ];

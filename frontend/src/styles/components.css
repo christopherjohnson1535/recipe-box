@@ -79,6 +79,12 @@
   --stamp-fg: var(--color-accent);
   --skeleton-bg: var(--color-paper-deep);
   --skeleton-shine: var(--color-rule);
+
+  /* Magazine home (#39): the drawn underline on card titles, and the inverse "haven't cooked in a while" panel */
+  --card-underline: var(--color-accent);
+  --feature-bg: var(--color-ink);
+  --feature-fg: var(--color-paper);
+  --feature-focus: var(--color-paper);
 }
 
 /*
