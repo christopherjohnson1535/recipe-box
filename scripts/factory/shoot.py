@@ -33,6 +33,9 @@ with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or None)
     for scheme in ("light", "dark"):
         ctx = browser.new_context(color_scheme=scheme)
+        # The edition follows the clock by default; pin it so "light"/"dark" shots show day/evening at any hour.
+        edition = "day" if scheme == "light" else "evening"
+        ctx.add_init_script(f"try {{ localStorage.setItem('rb-edition', '{edition}') }} catch {{}}")
         pg = ctx.new_page()
         pg.set_viewport_size({"width": 820, "height": 1180})
         pg.goto(base + "/login")

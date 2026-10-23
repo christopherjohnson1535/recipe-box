@@ -3,7 +3,15 @@ import type { ReactNode } from "react";
 import { cx } from "./cx";
 
 /** Static label, e.g. a recipe's tags in a kicker; takes the colour of the kicker it sits in. Siblings in a `.dot-list` get a middle dot between them. */
-export function Badge({ children }: { children: ReactNode }) {
+export function Badge({ children, icon }: { children: ReactNode; /** A `SpotIcon` drawn before the name. */ icon?: ReactNode }) {
+  if (icon) {
+    return (
+      <span className="label inline-flex items-baseline gap-2 [&>svg]:-translate-y-1 [&>svg]:self-center">
+        {icon}
+        {children}
+      </span>
+    );
+  }
   return <span className="label">{children}</span>;
 }
 

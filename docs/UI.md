@@ -47,12 +47,51 @@ Fonts: `--font-display`, `--font-text`. Layout: `--measure` (38rem, `max-w-measu
 
 Tailwind's default colour palette and font stacks are switched off (`--color-*: initial`), so every colour must be a
 token. Dark mode (the "evening edition", `src/styles/themes/evening.css`) redefines the same variables under
-`prefers-color-scheme: dark`; components never branch on theme. Inside a ui component, themed decisions (button
+`:root[data-theme="evening"]` and, when no `data-theme` is set, under `prefers-color-scheme: dark`; components never
+branch on theme (see "Editions" below). Inside a ui component, themed decisions (button
 fills, input borders, chip underlines, kicker and numeral colour, focus ring) use component tokens such as
 `bg-(--button-primary-bg)`, so they can be retuned in `src/styles/components.css` without touching the component.
 
 Old scaffold names map as: surface → paper, surface-sunk → paper-deep, text → ink, muted → ink-muted, border → rule,
 border-strong → rule-strong, accent-ink → accent.
+
+## Editions: day and evening
+The app has two editions of the same page: the **day edition** (warm paper, brown-black ink) and the **evening
+edition** (dark). By default the clock chooses: evening from 19:00 to 06:59 local time, day from 07:00 to 18:59, so the
+iPad is easy on the eyes at dinnertime whatever the device setting. Each device can instead pin day, pin evening or
+follow its own light/dark setting (Settings, Appearance; stored in `localStorage` as `rb-edition`). An inline script in
+the root layout sets `<html data-theme>` before first paint; `EditionController` keeps it current. How it works:
+`docs/THEMING.md`. Components never branch on the edition; they read tokens.
+
+## Print inks
+Three illustration colours exist as primitives (`--mustard-500` `#d9a21b`, `--fern-700` `#3f6b45`, `--tomato-600`
+`#d2492a`) for spot icons and stamps. No semantic token uses them yet; point a component token at a new semantic token
+that names the meaning before using one. Contrast against paper (recorded in `tokens.test.ts`):
+
+| Ink | Day paper | Evening paper | Use |
+|---|---|---|---|
+| Mustard | 2.17:1 decorative only | 8.05:1 text-safe | flat fills and decoration by day; never text or a lone line |
+| Fern | 5.82:1 text-safe | 2.998:1 decorative only | text-safe by day; decoration only in the evening |
+| Tomato | 4.19:1 graphics | 4.17:1 graphics | icons and strokes (3:1); not for body text |
+
+## Motion
+Motion marks a change of state or place. It never decorates.
+- One easing, `--ease-out`; durations between 150 and 900 ms.
+- Nothing loops except an active timer, a scan in progress or the in-season ticker.
+- Loading skeletons are a static tint: they do not shimmer or pulse.
+- Arrival staggers (list entries rising in) run once per visit and never when the person goes Back.
+- `prefers-reduced-motion` removes movement (rises, draws, morphs); colour changes stay.
+
+| Token | Value | Use |
+|---|---|---|
+| `--ease-out` | `cubic-bezier(0.2, 0.7, 0.2, 1)` | the one curve (defined in `globals.css`) |
+| `--duration-quick` | 150ms | hover and press feedback, colour changes |
+| `--duration-base` | 300ms | a state change in place: draw a rule, show a toast |
+| `--duration-morph` | 450ms | card photo and title become the recipe page |
+| `--duration-slow` | 900ms | headline words rise, the save stamp lands |
+| `--stagger-step` | 120ms | gap between list entries arriving |
+
+Durations are defined in `src/styles/motion.css`.
 
 ## Where styling lives (enforced by `src/styles/page-styling.test.ts`)
 - **Only `src/components/ui/*` styles things.** Colour, type, borders, the helper classes below, arbitrary values

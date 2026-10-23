@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { cx } from "./cx";
+import { Morph, titleName } from "./morph";
 
 type PageHeaderProps = {
   title: string;
@@ -15,15 +16,32 @@ type PageHeaderProps = {
   reserveDeck?: boolean;
   /** Announce the description politely when it changes (a live result count). */
   liveDescription?: boolean;
+  /** The title's words rise in one after another (inside an `Arrive` scope, first visit only). */
+  rise?: boolean;
+  /** Recipe id: names the title so the card that opened this page morphs into it. */
+  morphId?: string;
 };
 
 /** Article-style page head: kicker, display headline, italic deck, byline, then a hairline. */
-export function PageHeader({ title, kicker, description, byline, actions, align = "start", reserveDeck, liveDescription }: PageHeaderProps) {
+export function PageHeader({ title, kicker, description, byline, actions, align = "start", reserveDeck, liveDescription, rise, morphId }: PageHeaderProps) {
   const centered = align === "center";
   return (
-    <header className={cx("flex flex-col gap-4 border-b border-(--rule-hair) pb-8", centered && "items-center text-center")}>
+    <header className={cx("relative flex flex-col gap-4 pb-[calc(2rem+1px)]", centered && "items-center text-center")}>
       {kicker && <div className="label text-(--kicker-fg)">{kicker}</div>}
-      <h1 className="min-w-0 max-w-measure-wide font-display text-headline text-ink [overflow-wrap:anywhere]">{title}</h1>
+      <Morph name={morphId ? titleName(morphId) : undefined}>
+        <h1 className="min-w-0 max-w-measure-wide font-display text-headline text-ink [overflow-wrap:anywhere]">
+          {rise
+            ? title.split(" ").map((word, i) => (
+                <Fragment key={i}>
+                  {i > 0 && " "}
+                  <span className="rise-word" style={{ "--w": Math.min(i, 8) } as CSSProperties}>
+                    {word}
+                  </span>
+                </Fragment>
+              ))
+            : title}
+        </h1>
+      </Morph>
       {description && <p role={liveDescription ? "status" : undefined} className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{description}</p>}
       {!description && reserveDeck && (
         <p className="text-deck" aria-hidden="true">
@@ -32,6 +50,8 @@ export function PageHeader({ title, kicker, description, byline, actions, align 
       )}
       {byline && <div className="label text-ink-muted">{byline}</div>}
       {actions && <div className={cx("mt-2 flex flex-wrap gap-3 print:hidden", centered && "justify-center")}>{actions}</div>}
+      {/* The closing hairline; it draws in from the left on a first visit. */}
+      <div className="draw-rule absolute inset-x-0 bottom-0 h-px bg-(--rule-hair) print:border-t print:border-(--rule-hair)" aria-hidden="true" />
     </header>
   );
 }

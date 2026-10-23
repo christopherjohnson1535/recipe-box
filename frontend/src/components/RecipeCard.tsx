@@ -5,7 +5,7 @@ import { ContentsEntry } from "./ui/Contents";
 import { DotList } from "./ui/DotList";
 
 /** A recipe as one entry in the contents listing: up to two tags (a third would wrap the kicker on a phone), title, description, total time, photo. */
-export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
+export function RecipeCard({ recipe, index }: { recipe: RecipeSummary; index?: number }) {
   return (
     <ContentsEntry
       href={`/recipes/${recipe.id}`}
@@ -24,6 +24,8 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
       deck={recipe.description || undefined}
       meta={formatMinutes(recipe.totalMinutes)}
       imageSrc={recipe.imageUrl}
+      index={index}
+      morphId={recipe.id}
     />
   );
 }
