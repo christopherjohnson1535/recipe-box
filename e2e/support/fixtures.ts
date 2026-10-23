@@ -36,8 +36,9 @@ export const unique = (prefix = "t") => `${prefix}${randomUUID().replaceAll("-",
 
 export type Member = { user: User; password: string; client: ApiClient };
 
-async function newClient(playwright: { request: { newContext: (o: { baseURL: string }) => Promise<APIRequestContext> } }) {
-  return new ApiClient(await playwright.request.newContext({ baseURL: BASE_URL }));
+async function newClient(playwright: { request: { newContext: (o: { baseURL: string; extraHTTPHeaders?: Record<string, string> }) => Promise<APIRequestContext> } }) {
+  // `Connection: close`: a reused keep-alive socket that `next start` has just closed shows up as a flaky ECONNRESET.
+  return new ApiClient(await playwright.request.newContext({ baseURL: BASE_URL, extraHTTPHeaders: { connection: "close" } }));
 }
 
 type Fixtures = {
