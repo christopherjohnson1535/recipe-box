@@ -31,6 +31,15 @@ const QUERIES: [&str; 4] = [
     "q=lasag&tag=dinner&sort=title",
 ];
 
+/// Removes the temp media dir on drop, including while unwinding from a panic.
+struct RemoveDir(std::path::PathBuf);
+
+impl Drop for RemoveDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let url = std::env::var("TEST_DATABASE_URL")
@@ -52,13 +61,19 @@ async fn main() {
         .await
         .unwrap();
 
-    let slowest = run(&url, &schema, &media_dir).await;
-
+    // Clean up even if `run` panics: the schema is dropped below, the temp dir by the guard.
+    let cleanup = RemoveDir(media_dir.clone());
+    let outcome = tokio::spawn({
+        let (url, schema, media_dir) = (url.clone(), schema.clone(), media_dir.clone());
+        async move { run(&url, &schema, &media_dir).await }
+    })
+    .await;
     admin
         .execute(sqlx::AssertSqlSafe(format!("drop schema {schema} cascade")))
         .await
         .unwrap();
-    let _ = std::fs::remove_dir_all(&media_dir);
+    drop(cleanup); // process::exit below skips destructors
+    let slowest = outcome.unwrap_or_else(|e| std::panic::resume_unwind(e.into_panic()));
     if slowest > BUDGET {
         eprintln!("FAIL: a median exceeded the FND-2 budget of {BUDGET:?}");
         std::process::exit(1);

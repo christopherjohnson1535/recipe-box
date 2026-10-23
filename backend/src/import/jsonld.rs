@@ -896,6 +896,28 @@ mod tests {
     }
 
     #[test]
+    fn nesting_beyond_the_depth_cap_is_too_complex_even_with_few_tags() {
+        let nested = |n: usize| format!("{}x{}", "<div>".repeat(n), "</div>".repeat(n));
+        assert!(too_complex(&nested(MAX_DOM_DEPTH + 1)));
+        assert!(!too_complex(&nested(MAX_DOM_DEPTH)));
+    }
+
+    #[test]
+    fn extract_skips_the_microdata_fallback_for_too_deep_pages() {
+        let url = Url::parse("https://oldpantry.example/lentil-stew/").unwrap();
+        let fixture = include_str!("../../tests/fixtures/microdata.html");
+        // Shallow: the microdata fallback finds the recipe.
+        assert!(extract(fixture, &url).is_some());
+        // Same content, wrapped deeper than the cap: extract must refuse to build the DOM.
+        let n = MAX_DOM_DEPTH + 100;
+        let wrapped = fixture
+            .replace("<body>", &format!("<body>{}", "<div>".repeat(n)))
+            .replace("</body>", &format!("{}</body>", "</div>".repeat(n)));
+        assert!(too_complex(&wrapped));
+        assert!(extract(&wrapped, &url).is_none());
+    }
+
+    #[test]
     fn source_url_drops_credentials_and_fragment() {
         let page = ld_page(r#""recipeIngredient":["a"]"#);
         let d = draft(&page, "https://user:pw@e.example/r#top");

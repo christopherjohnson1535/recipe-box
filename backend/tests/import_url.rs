@@ -497,7 +497,7 @@ async fn upload_of_a_huge_canvas_is_refused() {
 }
 
 #[tokio::test]
-async fn pathological_pages_are_refused_without_a_dom() {
+async fn pathological_pages_are_refused_and_ld_json_still_imports() {
     let (base, port) = site().await;
     let ctx = ctx(Some(port)).await;
     let res = ctx.import(&format!("{base}/nested")).await;

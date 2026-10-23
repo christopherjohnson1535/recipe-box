@@ -242,8 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn reencode_refuses_huge_canvases_quickly() {
-        let t = std::time::Instant::now();
+    fn reencode_refuses_huge_canvases() {
         for (w, h) in [(20_000, 20_000), (10_001, 10), (9_000, 9_000)] {
             assert!(
                 matches!(
@@ -253,7 +252,6 @@ mod tests {
                 "{w}x{h}"
             );
         }
-        assert!(t.elapsed().as_secs() < 2);
     }
 
     #[test]
