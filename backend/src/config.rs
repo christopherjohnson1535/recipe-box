@@ -61,6 +61,8 @@ impl Config {
         }
         let anthropic_api_key = env::var("ANTHROPIC_API_KEY")
             .ok()
+            // A key pasted with a trailing newline or `\r` (Windows editors) would be an invalid header.
+            .map(|k| k.trim().to_string())
             .filter(|k| !k.is_empty())
             .map(Secret::new);
         if ai_provider == "anthropic" && anthropic_api_key.is_none() {

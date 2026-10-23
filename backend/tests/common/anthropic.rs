@@ -28,11 +28,28 @@ pub struct Canned {
     pub status: u16,
     pub body: Value,
     pub headers: Vec<(String, String)>,
+    /// Pause before answering (tests use it to trip a short client timeout).
+    pub delay: std::time::Duration,
 }
 
 impl Canned {
     pub fn with_header(mut self, name: &str, value: &str) -> Self {
         self.headers.push((name.into(), value.into()));
+        self
+    }
+
+    pub fn with_delay(mut self, delay: std::time::Duration) -> Self {
+        self.delay = delay;
+        self
+    }
+
+    pub fn with_stop_reason(mut self, reason: &str) -> Self {
+        self.body["stop_reason"] = reason.into();
+        self
+    }
+
+    pub fn with_error_type(mut self, error_type: &str) -> Self {
+        self.body["error"]["type"] = error_type.into();
         self
     }
 }
@@ -46,6 +63,7 @@ pub fn tool_reply(input: Value) -> Canned {
             "content": [{ "type": "tool_use", "id": "toolu_test", "name": "record_recipe", "input": input }],
         }),
         headers: vec![("request-id".into(), "req_test".into())],
+        delay: Default::default(),
     }
 }
 
@@ -55,6 +73,7 @@ pub fn error_reply(status: u16) -> Canned {
         status,
         body: json!({ "type": "error", "error": { "type": "test_error", "message": "mock failure" } }),
         headers: vec![("request-id".into(), "req_test".into())],
+        delay: Default::default(),
     }
 }
 
@@ -119,17 +138,21 @@ async fn handle(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let mut inner = inner.lock().unwrap();
-    inner.seen.push(Recorded {
-        headers: headers
-            .iter()
-            .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
-            .collect(),
-        body: serde_json::from_slice(&body).unwrap_or(Value::Null),
-    });
-    let Some(c) = inner.queue.pop_front() else {
+    let c = {
+        let mut inner = inner.lock().unwrap();
+        inner.seen.push(Recorded {
+            headers: headers
+                .iter()
+                .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+                .collect(),
+            body: serde_json::from_slice(&body).unwrap_or(Value::Null),
+        });
+        inner.queue.pop_front()
+    };
+    let Some(c) = c else {
         return (StatusCode::IM_A_TEAPOT, "mock queue empty").into_response();
     };
+    tokio::time::sleep(c.delay).await;
     let mut res = (StatusCode::from_u16(c.status).unwrap(), axum::Json(c.body)).into_response();
     for (k, v) in c.headers {
         res.headers_mut().insert(

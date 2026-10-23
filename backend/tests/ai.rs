@@ -139,6 +139,78 @@ async fn rate_limit_honours_retry_after_then_gives_up_after_two_requests() {
 }
 
 #[tokio::test]
+async fn retry_after_over_the_cap_is_not_retried() {
+    let mock = MockAnthropic::start(vec![
+        error_reply(429).with_header("retry-after", "60"),
+        tool_reply(pancakes()),
+    ])
+    .await;
+    let msg = ai_error(provider(&mock).recipe_from_text("x").await.unwrap_err());
+    assert_eq!(msg, "The AI service is busy. Try again in a minute.");
+    assert_eq!(mock.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn timeout_is_not_retried() {
+    let mock = MockAnthropic::start(vec![
+        tool_reply(pancakes()).with_delay(Duration::from_millis(500)),
+        tool_reply(pancakes()),
+    ])
+    .await;
+    let p = provider(&mock).with_request_timeout(Duration::from_millis(50));
+    let msg = ai_error(p.recipe_from_text("x").await.unwrap_err());
+    assert_eq!(msg, "The AI service did not answer in time. Try again.");
+    assert_eq!(mock.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn max_tokens_with_a_usable_draft_warns() {
+    let mock =
+        MockAnthropic::start(vec![tool_reply(pancakes()).with_stop_reason("max_tokens")]).await;
+    let d = provider(&mock).recipe_from_text("x").await.unwrap();
+    assert_eq!(d.title, "Pancakes");
+    assert_eq!(d.warnings, ["The recipe may be cut short; check the end."]);
+}
+
+#[tokio::test]
+async fn max_tokens_without_a_usable_draft_is_an_error() {
+    let mock = MockAnthropic::start(vec![
+        tool_reply(json!({ "title": "Half a ti" })).with_stop_reason("max_tokens"),
+        tool_reply(json!({ "found": true, "title": "x", "ingredients": [{ "text": "a" }] }))
+            .with_stop_reason("max_tokens"),
+    ])
+    .await;
+    let p = provider(&mock);
+    let msg = ai_error(p.recipe_from_text("x").await.unwrap_err());
+    assert_eq!(msg, "The AI service sent a reply we could not read.");
+    // Ingredients alone are usable, so the second one is returned with the warning.
+    let d = p.recipe_from_text("x").await.unwrap();
+    assert_eq!(d.warnings, ["The recipe may be cut short; check the end."]);
+}
+
+#[tokio::test]
+async fn unknown_model_names_ai_model() {
+    let mock =
+        MockAnthropic::start(vec![error_reply(404).with_error_type("not_found_error")]).await;
+    let msg = ai_error(provider(&mock).recipe_from_text("x").await.unwrap_err());
+    assert_eq!(msg, "The AI model name was not recognised. Check AI_MODEL.");
+    assert_eq!(mock.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn key_with_trailing_newline_is_trimmed() {
+    let mock = MockAnthropic::start(vec![tool_reply(pancakes())]).await;
+    let p = AnthropicProvider::with_base_url(
+        Secret::new(format!("{KEY}\r\n")),
+        "m".into(),
+        &mock.base_url,
+    )
+    .unwrap();
+    p.recipe_from_text("x").await.unwrap();
+    assert_eq!(mock.requests()[0].headers["x-api-key"], KEY);
+}
+
+#[tokio::test]
 async fn bad_key_is_not_retried_and_not_echoed() {
     let mock = MockAnthropic::start(vec![error_reply(401), tool_reply(pancakes())]).await;
     let err = provider(&mock).recipe_from_text("x").await.unwrap_err();

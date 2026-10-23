@@ -4,8 +4,9 @@
 //! [`Ai::from_config`]. [`AnthropicProvider`] calls the Messages API with one forced tool, `record_recipe`, so the
 //! reply is structured. The reply is never trusted: [`coerce`] reads it leniently, trims, drops blanks, applies the
 //! same limits the save endpoint enforces (so a draft always saves) and adds a warning for everything it cut.
-//! Photos are shrunk to <= 1568 px before sending. One retry on 429, 5xx and connect/timeout errors. The API key
-//! (a [`Secret`]) and image data are never logged.
+//! Photos are shrunk to <= 1568 px before sending. One retry on 429, 5xx and connect errors (not on a timeout, and
+//! not when `retry-after` asks for more than [`MAX_RETRY_AFTER_SECS`]). The API key (a [`Secret`]) and image data
+//! are never logged.
 
 use std::{future::Future, time::Duration};
 
@@ -96,6 +97,10 @@ const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
 const TOOL: &str = "record_recipe";
 /// Anthropic downsizes anything larger than this anyway.
 const MAX_IMAGE_EDGE: u32 = 1568;
+/// A `retry-after` longer than this is not waited for; the caller gets "busy" at once.
+const MAX_RETRY_AFTER_SECS: u64 = 10;
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120); // vision replies are slow
 const MAX_TEXT_INPUT_CHARS: usize = 50_000;
 const MAX_MODEL_WARNINGS: usize = 10;
 const MAX_WARNING_CHARS: usize = 300;
@@ -106,6 +111,7 @@ const MAX_TAG_CHARS: usize = 40;
 const MAX_SERVINGS_CHARS: usize = 100;
 const MAX_SECTION_CHARS: usize = 200;
 const DISH_WARNING: &str = "Guessed from a photo of the dish";
+const CUT_SHORT: &str = "The recipe may be cut short; check the end.";
 const NO_RECIPE: &str = "We couldn't find a recipe in that.";
 
 const SYSTEM_RECIPE: &str = "You read recipes for a household recipe box. Transcribe the recipe faithfully, in the \
@@ -123,6 +129,8 @@ pub struct AnthropicProvider {
     base_url: String,
     /// Upper bound for the pause before the retry; tests set it to zero.
     retry_delay_cap: Duration,
+    /// Whole-request timeout; tests set it to a few milliseconds.
+    request_timeout: Duration,
 }
 
 /// Why one attempt failed; `retry` says whether a second attempt makes sense.
@@ -130,6 +138,21 @@ struct Failure {
     err: AppError,
     retry: bool,
     retry_after: Option<u64>,
+}
+
+fn unreadable() -> AppError {
+    AppError::AiError("The AI service sent a reply we could not read.".into())
+}
+
+/// How long to pause before the single retry; `None` means do not retry (the server asked for more than
+/// [`MAX_RETRY_AFTER_SECS`]). Never longer than `cap`.
+fn retry_wait(retry_after: Option<u64>, cap: Duration) -> Option<Duration> {
+    let wait = match retry_after {
+        Some(s) if s > MAX_RETRY_AFTER_SECS => return None,
+        Some(s) => Duration::from_secs(s),
+        None => Duration::from_secs(1),
+    };
+    Some(wait.min(cap))
 }
 
 impl Failure {
@@ -150,7 +173,7 @@ impl AnthropicProvider {
     /// `base_url` has no trailing path (`http://127.0.0.1:1234`); tests point it at a local mock.
     pub fn with_base_url(api_key: Secret, model: String, base_url: &str) -> anyhow::Result<Self> {
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(120)) // vision replies are slow
+            .connect_timeout(CONNECT_TIMEOUT)
             .redirect(reqwest::redirect::Policy::none())
             .user_agent(concat!("RecipeBox/", env!("CARGO_PKG_VERSION")))
             .build()?;
@@ -159,13 +182,20 @@ impl AnthropicProvider {
             api_key,
             model,
             base_url: base_url.trim_end_matches('/').to_string(),
-            retry_delay_cap: Duration::from_secs(10),
+            retry_delay_cap: Duration::from_secs(MAX_RETRY_AFTER_SECS),
+            request_timeout: REQUEST_TIMEOUT,
         })
     }
 
     /// Caps the pause before the single retry (tests pass `Duration::ZERO`).
     pub fn with_retry_delay_cap(mut self, cap: Duration) -> Self {
         self.retry_delay_cap = cap;
+        self
+    }
+
+    /// Overrides the 120 s whole-request timeout (tests only need milliseconds).
+    pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
+        self.request_timeout = timeout;
         self
     }
 
@@ -186,6 +216,7 @@ impl AnthropicProvider {
             "messages": [{ "role": "user", "content": content }],
         });
         let reply = self.send_with_retry(&body).await?;
+        let max_tokens = reply["stop_reason"] == "max_tokens";
         let input = reply["content"]
             .as_array()
             .and_then(|blocks| {
@@ -197,9 +228,22 @@ impl AnthropicProvider {
             .filter(|i| i.is_object())
             .ok_or_else(|| {
                 tracing::warn!("anthropic reply had no usable {TOOL} block");
-                AppError::AiError("The AI service sent a reply we could not read.".into())
+                unreadable()
             })?;
-        coerce(input, source, dish)
+        if !max_tokens {
+            return coerce(input, source, dish);
+        }
+        // The reply was cut off mid tool call: keep it only if it is still a usable draft.
+        match coerce(input, source, dish) {
+            Ok(mut draft) => {
+                warn(&mut draft.warnings, CUT_SHORT);
+                Ok(draft)
+            }
+            Err(_) => {
+                tracing::warn!("anthropic reply hit max_tokens and was not usable");
+                Err(unreadable())
+            }
+        }
     }
 
     async fn send_with_retry(&self, body: &Value) -> AppResult<Value> {
@@ -207,12 +251,12 @@ impl AnthropicProvider {
             Ok(v) => return Ok(v),
             Err(f) => f,
         };
-        if failure.retry {
-            let wait = failure
-                .retry_after
-                .filter(|s| *s <= 10)
-                .map_or(Duration::from_secs(1), Duration::from_secs);
-            tokio::time::sleep(wait.min(self.retry_delay_cap)).await;
+        if let Some(wait) = failure
+            .retry
+            .then(|| retry_wait(failure.retry_after, self.retry_delay_cap))
+            .flatten()
+        {
+            tokio::time::sleep(wait).await;
             match self.send_once(body).await {
                 Ok(v) => return Ok(v),
                 Err(f) => failure = f,
@@ -222,23 +266,40 @@ impl AnthropicProvider {
     }
 
     async fn send_once(&self, body: &Value) -> Result<Value, Failure> {
+        // Trimmed: a key copied with a stray newline or `\r` is not a valid header value.
+        let mut key = reqwest::header::HeaderValue::from_str(self.api_key.expose().trim())
+            .map_err(|_| {
+                tracing::error!(
+                    "ANTHROPIC_API_KEY contains characters that cannot be sent in a header"
+                );
+                Failure::new(
+                    "The AI service rejected the API key. Check ANTHROPIC_API_KEY.",
+                    false,
+                )
+            })?;
+        key.set_sensitive(true);
         let res = self
             .client
             .post(format!("{}/v1/messages", self.base_url))
-            .header("x-api-key", self.api_key.expose())
+            .header("x-api-key", key)
             .header("anthropic-version", "2023-06-01")
+            .timeout(self.request_timeout)
             .json(body)
             .send()
             .await
             .map_err(|e| {
+                if e.is_builder() {
+                    tracing::error!("could not build the anthropic request (check AI settings)");
+                }
                 tracing::warn!(
                     timeout = e.is_timeout(),
                     connect = e.is_connect(),
                     "anthropic request failed to complete"
                 );
+                // A timeout means the server was working on it; retrying would only double the wait.
                 Failure::new(
                     "The AI service did not answer in time. Try again.",
-                    e.is_timeout() || e.is_connect(),
+                    e.is_connect(),
                 )
             })?;
         let status = res.status();
@@ -255,24 +316,39 @@ impl AnthropicProvider {
             .and_then(|v| v.trim().parse::<u64>().ok());
         let json: Option<Value> = res.json().await.ok();
         if status.is_success() {
-            return json.ok_or_else(|| {
-                Failure::new("The AI service sent a reply we could not read.", false)
+            return json.ok_or_else(|| Failure {
+                err: unreadable(),
+                retry: false,
+                retry_after: None,
             });
         }
         let error_type = json
             .as_ref()
             .and_then(|j| j["error"]["type"].as_str())
             .unwrap_or("");
+        // Anthropic error messages describe the problem, never the key.
+        let error_message: String = json
+            .as_ref()
+            .and_then(|j| j["error"]["message"].as_str())
+            .unwrap_or("")
+            .chars()
+            .take(300)
+            .collect();
         tracing::warn!(
             status = status.as_u16(),
             request_id,
             error_type,
+            error_message,
             "anthropic request failed"
         );
         let code = status.as_u16();
         Err(match code {
             401 | 403 => Failure::new(
                 "The AI service rejected the API key. Check ANTHROPIC_API_KEY.",
+                false,
+            ),
+            404 => Failure::new(
+                "The AI model name was not recognised. Check AI_MODEL.",
                 false,
             ),
             429 | 500..=599 => Failure {
@@ -551,6 +627,17 @@ fn coerce(input: &Value, source: SourceType, dish: bool) -> AppResult<RecipeDraf
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retry_wait_rules() {
+        let cap = Duration::from_secs(10);
+        let s = Duration::from_secs;
+        assert_eq!(retry_wait(Some(3), cap), Some(s(3)));
+        assert_eq!(retry_wait(Some(10), cap), Some(s(10)));
+        assert_eq!(retry_wait(Some(60), cap), None);
+        assert_eq!(retry_wait(None, cap), Some(s(1)));
+        assert_eq!(retry_wait(Some(3), Duration::ZERO), Some(Duration::ZERO));
+    }
 
     fn ok(v: Value, dish: bool) -> RecipeDraft {
         coerce(&v, SourceType::Photo, dish).unwrap()
