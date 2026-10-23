@@ -3,22 +3,29 @@
 
 use std::time::Instant;
 
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::{Multipart, State},
+};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::{media::store_image, not_implemented};
+use super::{
+    media::{delete_images, store_image, store_jpeg},
+    not_implemented,
+};
 use crate::{
     auth::CurrentUser,
     error::{AppError, AppJson, AppResult, ErrorBody},
     import::{
+        ai::{self, AiProvider as _},
         jsonld, normalize_url,
         safe_fetch::{self, PAGE_MAX_BYTES},
     },
-    models::RecipeDraft,
+    models::{Image, RecipeDraft},
     state::AppState,
     validate,
 };
@@ -193,15 +200,92 @@ pub struct PhotoForm {
     mode: PhotoMode,
 }
 
+/// Most photos in one import (PHO-3).
+pub const MAX_PHOTOS: usize = 6;
+
 /// Reads a recipe from photos (PHO-2–5). Returns a draft with `photoImageIds` set.
 #[utoipa::path(post, path = "/api/import/photo", operation_id = "importFromPhoto", tag = "import", security(("session" = [])),
     request_body(content = PhotoForm, content_type = "multipart/form-data"), responses(
-    (status = 200, description = "The draft.", body = RecipeDraft),
-    (status = 400, description = "Missing files or bad `mode` (`validation`).", body = ErrorBody),
-    (status = 415, description = "A file is not an image we can read (`unsupported_media`).", body = ErrorBody),
-    (status = 422, description = "No recipe in the photos (`no_recipe_found`), or no AI provider (`ai_disabled`; the photos are stored first).", body = ErrorBody),
-    (status = 501, description = "Not built yet (`not_implemented`); every call returns this today.", body = ErrorBody),
+    (status = 200, description = "The draft. `photoImageIds` lists the stored photos in upload order; in `dish` mode `imageId` is the first.", body = RecipeDraft),
+    (status = 400, description = "No files, more than 6, or a bad `mode` (`validation`).", body = ErrorBody),
+    (status = 413, description = "A file is over `MAX_UPLOAD_MB` (`too_large`).", body = ErrorBody),
+    (status = 415, description = "A file is not an image we can read, including a HEIC the server cannot decode (`unsupported_media`). Nothing is kept.", body = ErrorBody),
+    (status = 422, description = "No AI provider (`ai_disabled`) or no recipe in the photos (`no_recipe_found`). The photos stay stored and `error.photoImageIds` lists them.", body = ErrorBody),
+    (status = 502, description = "The AI provider failed (`ai_error`). The photos stay stored and `error.photoImageIds` lists them.", body = ErrorBody),
 ))]
-pub async fn from_photo(_user: CurrentUser) -> AppError {
-    not_implemented("Import from photos")
+pub async fn from_photo(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    mut multipart: Multipart,
+) -> AppResult<Json<RecipeDraft>> {
+    let (mut files, mut mode) = (Vec::new(), None);
+    while let Some(field) = multipart.next_field().await? {
+        match field.name() {
+            Some("files") => {
+                if files.len() == MAX_PHOTOS {
+                    return Err(AppError::validation("files: send at most 6 photos."));
+                }
+                let data = field.bytes().await?;
+                if data.len() > state.config.max_upload_bytes() {
+                    return Err(AppError::TooLarge);
+                }
+                files.push(data);
+            }
+            Some("mode") => mode = Some(field.text().await?),
+            _ => {}
+        }
+    }
+    if files.is_empty() {
+        return Err(AppError::validation("files: send 1 to 6 photos."));
+    }
+    let dish = match mode.as_deref() {
+        None | Some("recipe") => false,
+        Some("dish") => true,
+        Some(_) => return Err(AppError::validation("mode: use recipe or dish.")),
+    };
+
+    let (mut images, mut jpegs) = (Vec::new(), Vec::new());
+    for data in files {
+        match store_jpeg(&state, user.id, data.to_vec()).await {
+            Ok((image, jpeg)) => {
+                images.push(image);
+                jpegs.push(jpeg);
+            }
+            Err(e) => {
+                delete_images(&state, &ids_of(&images)).await;
+                return Err(e);
+            }
+        }
+    }
+    let ids = ids_of(&images);
+    let mode = if dish {
+        ai::PhotoMode::Dish
+    } else {
+        ai::PhotoMode::Recipe
+    };
+    match state.ai.recipe_from_images(&jpegs, mode).await {
+        Ok(mut draft) => {
+            draft.photo_image_ids = ids;
+            if dish {
+                draft.image_id = Some(images[0].id);
+                draft.image_url = Some(images[0].url.clone());
+            }
+            Ok(Json(draft))
+        }
+        // No draft, but the photos are kept so the form can show them next to an empty recipe (PHO-5).
+        Err(error @ (AppError::AiDisabled | AppError::NoRecipeFound(_) | AppError::AiError(_))) => {
+            Err(AppError::WithPhotos {
+                error: Box::new(error),
+                photo_image_ids: ids,
+            })
+        }
+        Err(e) => {
+            delete_images(&state, &ids).await;
+            Err(e)
+        }
+    }
+}
+
+fn ids_of(images: &[Image]) -> Vec<Uuid> {
+    images.iter().map(|i| i.id).collect()
 }

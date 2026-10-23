@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::{
     auth::CurrentUser,
     error::{AppError, AppPath, AppResult, ErrorBody},
+    import::photo,
     models::{BinaryFile, Image, media_url},
     state::AppState,
 };
@@ -31,7 +32,7 @@ const MAX_DECODE_ALLOC: u64 = 256 << 20;
 #[derive(ToSchema)]
 #[allow(dead_code)] // schema only; the handler reads the multipart stream itself
 pub struct UploadForm {
-    /// JPEG, PNG, WebP or GIF.
+    /// JPEG, PNG, WebP, GIF or HEIC.
     #[schema(value_type = String, format = Binary)]
     file: Vec<u8>,
 }
@@ -66,6 +67,18 @@ pub async fn upload(
 
 /// Decodes, re-encodes and stores an uploaded image, returning its row. Shared with photo import.
 pub async fn store_image(state: &AppState, user_id: Uuid, data: Vec<u8>) -> AppResult<Image> {
+    Ok(store_jpeg(state, user_id, data).await?.0)
+}
+
+/// Like [`store_image`], also returning the stored JPEG bytes (photo import sends them to the AI provider).
+pub async fn store_jpeg(
+    state: &AppState,
+    user_id: Uuid,
+    mut data: Vec<u8>,
+) -> AppResult<(Image, Vec<u8>)> {
+    if photo::is_heic(&data) {
+        data = photo::heic_to_png(&data).await?;
+    }
     let jpeg = tokio::task::spawn_blocking(move || reencode(&data))
         .await
         .map_err(|e| anyhow!(e))??;
@@ -90,12 +103,29 @@ pub async fn store_image(state: &AppState, user_id: Uuid, data: Vec<u8>) -> AppR
         let _ = tokio::fs::remove_file(&path).await;
         return Err(e.into());
     }
-    Ok(Image {
+    let image = Image {
         id,
         url: media_url(&file_name),
         width: jpeg.width as i32,
         height: jpeg.height as i32,
-    })
+    };
+    Ok((image, jpeg.bytes))
+}
+
+/// Deletes images stored by a request that then failed (row and file); best effort.
+pub async fn delete_images(state: &AppState, ids: &[Uuid]) {
+    if sqlx::query("delete from images where id = any($1)")
+        .bind(ids)
+        .execute(&state.pool)
+        .await
+        .is_err()
+    {
+        tracing::warn!("could not delete images of a failed request");
+        return;
+    }
+    for id in ids {
+        let _ = tokio::fs::remove_file(state.config.media_dir.join(format!("{id}.jpg"))).await;
+    }
 }
 
 pub struct Jpeg {

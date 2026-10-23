@@ -458,7 +458,6 @@ async fn capabilities_and_stubs() {
 
     let stubs = [
         (Method::POST, "/api/import/text".to_string()),
-        (Method::POST, "/api/import/photo".to_string()),
         (Method::GET, "/api/export".to_string()),
         (Method::POST, "/api/import/export".to_string()),
     ];

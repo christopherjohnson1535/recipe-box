@@ -10,6 +10,7 @@ use axum::{
 };
 use serde::Serialize;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 /// The `code` of an error response (docs/API.md "Errors"). `api_unreachable` and `network` are not in it: the
 /// frontend proxy and browser client make those up.
@@ -38,6 +39,9 @@ pub enum ErrorCode {
 pub struct ErrorDetail {
     pub code: ErrorCode,
     pub message: String,
+    /// Photo import only: the photos were stored but no draft could be made.
+    #[serde(skip_serializing_if = "Option::is_none", rename = "photoImageIds")]
+    pub photo_image_ids: Option<Vec<Uuid>>,
 }
 
 /// Body of every non-2xx response.
@@ -81,6 +85,12 @@ pub enum AppError {
     NotImplemented(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
+    /// `error` plus the ids of photos that were stored anyway (photo import).
+    #[error("{error}")]
+    WithPhotos {
+        error: Box<AppError>,
+        photo_image_ids: Vec<Uuid>,
+    },
 }
 
 impl AppError {
@@ -111,6 +121,7 @@ impl AppError {
             Self::FetchFailed(_) => (StatusCode::BAD_GATEWAY, ErrorCode::FetchFailed),
             Self::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, ErrorCode::NotImplemented),
             Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, ErrorCode::Internal),
+            Self::WithPhotos { error, .. } => error.status_and_code(),
         }
     }
 }
@@ -125,10 +136,20 @@ impl IntoResponse for AppError {
             }
             other => other.to_string(),
         };
+        let photo_image_ids = match &self {
+            Self::WithPhotos {
+                photo_image_ids, ..
+            } => Some(photo_image_ids.clone()),
+            _ => None,
+        };
         (
             status,
             Json(ErrorBody {
-                error: ErrorDetail { code, message },
+                error: ErrorDetail {
+                    code,
+                    message,
+                    photo_image_ids,
+                },
             }),
         )
             .into_response()
