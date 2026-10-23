@@ -4,16 +4,16 @@
 use std::time::Instant;
 
 use axum::{Json, extract::State};
-use serde::Deserialize;
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use url::Url;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{media::store_image, not_implemented};
 use crate::{
     auth::CurrentUser,
-    error::{AppError, AppJson, AppResult},
+    error::{AppError, AppJson, AppResult, ErrorBody},
     import::{
         jsonld, normalize_url,
         safe_fetch::{self, PAGE_MAX_BYTES},
@@ -23,20 +23,51 @@ use crate::{
     validate,
 };
 
-pub async fn capabilities(State(state): State<AppState>, _user: CurrentUser) -> Json<Value> {
-    Json(json!({ "ai": state.config.ai_enabled(), "provider": state.config.ai_provider }))
+#[derive(Serialize, ToSchema)]
+pub struct Capabilities {
+    ai: bool,
+    provider: AiProvider,
 }
 
-#[derive(Deserialize)]
-pub struct UrlBody {
+/// Mirrors the values `AI_PROVIDER` accepts (checked in `Config::from_env`).
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+enum AiProvider {
+    None,
+    Anthropic,
+}
+
+/// What the server can do, so the UI can hide AI features.
+#[utoipa::path(get, path = "/api/import/capabilities", operation_id = "getImportCapabilities", tag = "import", security(("session" = [])), responses(
+    (status = 200, description = "Whether an AI provider is configured.", body = Capabilities),
+))]
+pub async fn capabilities(State(state): State<AppState>, _user: CurrentUser) -> Json<Capabilities> {
+    let provider = match state.config.ai_provider.as_str() {
+        "anthropic" => AiProvider::Anthropic,
+        _ => AiProvider::None,
+    };
+    Json(Capabilities {
+        ai: state.config.ai_enabled(),
+        provider,
+    })
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct ImportUrlBody {
     url: String,
 }
 
-/// `POST /api/import/url` `{ url }` → `RecipeDraft` (LNK-1/2/5/7). Saves nothing.
+/// Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing.
+#[utoipa::path(post, path = "/api/import/url", operation_id = "importFromUrl", tag = "import", security(("session" = [])), request_body = ImportUrlBody, responses(
+    (status = 200, description = "The draft. `sourceUrl` is the final URL after redirects.", body = RecipeDraft),
+    (status = 400, description = "Not an http(s) address (`validation`).", body = ErrorBody),
+    (status = 422, description = "No recipe on the page (`no_recipe_found`), or the address is not public (`blocked_address`).", body = ErrorBody),
+    (status = 502, description = "The site refused us (`site_blocked`), or the fetch failed or timed out (`fetch_failed`).", body = ErrorBody),
+))]
 pub async fn from_url(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
-    AppJson(body): AppJson<UrlBody>,
+    AppJson(body): AppJson<ImportUrlBody>,
 ) -> AppResult<Json<RecipeDraft>> {
     // The shared helper names `sourceUrl`; this endpoint's field is `url`, so use our own message.
     let requested = validate::source_url(Some(&body.url))
@@ -122,12 +153,55 @@ async fn attach_image(state: &AppState, user_id: Uuid, draft: &mut RecipeDraft) 
     }
 }
 
-/// `POST /api/import/text` `{ text, sourceUrl? }` → `RecipeDraft` (LNK-3/4).
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // the stub handler does not read it yet
+pub struct ImportTextBody {
+    text: String,
+    source_url: Option<String>,
+}
+
+/// Reads a recipe from pasted text with AI (LNK-3/4). Returns a draft.
+#[utoipa::path(post, path = "/api/import/text", operation_id = "importFromText", tag = "import", security(("session" = [])), request_body = ImportTextBody, responses(
+    (status = 200, description = "The draft.", body = RecipeDraft),
+    (status = 400, description = "Invalid body (`validation`).", body = ErrorBody),
+    (status = 422, description = "No recipe in the text (`no_recipe_found`), or no AI provider (`ai_disabled`).", body = ErrorBody),
+    (status = 501, description = "Not built yet (`not_implemented`); every call returns this today.", body = ErrorBody),
+))]
 pub async fn from_text(_user: CurrentUser) -> AppError {
     not_implemented("Import from text")
 }
 
-/// `POST /api/import/photo` multipart `files` (1–6) + `mode` → `RecipeDraft` (PHO-2–5).
+/// What the photos show.
+#[derive(ToSchema)]
+#[schema(rename_all = "lowercase")]
+#[allow(dead_code)] // schema only
+pub enum PhotoMode {
+    /// A cookbook page, card or screenshot of a recipe.
+    Recipe,
+    /// A photo of a finished dish.
+    Dish,
+}
+
+/// Multipart body of `POST /api/import/photo`.
+#[derive(ToSchema)]
+#[allow(dead_code)] // schema only; the handler reads the multipart stream itself
+pub struct PhotoForm {
+    /// 1 to 6 images (repeat the field).
+    #[schema(value_type = Vec<String>, format = Binary)]
+    files: Vec<Vec<u8>>,
+    mode: PhotoMode,
+}
+
+/// Reads a recipe from photos (PHO-2–5). Returns a draft with `photoImageIds` set.
+#[utoipa::path(post, path = "/api/import/photo", operation_id = "importFromPhoto", tag = "import", security(("session" = [])),
+    request_body(content = PhotoForm, content_type = "multipart/form-data"), responses(
+    (status = 200, description = "The draft.", body = RecipeDraft),
+    (status = 400, description = "Missing files or bad `mode` (`validation`).", body = ErrorBody),
+    (status = 415, description = "A file is not an image we can read (`unsupported_media`).", body = ErrorBody),
+    (status = 422, description = "No recipe in the photos (`no_recipe_found`), or no AI provider (`ai_disabled`; the photos are stored first).", body = ErrorBody),
+    (status = 501, description = "Not built yet (`not_implemented`); every call returns this today.", body = ErrorBody),
+))]
 pub async fn from_photo(_user: CurrentUser) -> AppError {
     not_implemented("Import from photos")
 }

@@ -3,6 +3,7 @@
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -10,13 +11,17 @@ use crate::{
         AdminUser, CurrentUser, password,
         session::{self, COOKIE_NAME},
     },
-    error::{AppError, AppJson, AppPath, AppResult},
-    models::User,
+    error::{AppError, AppJson, AppPath, AppResult, ErrorBody},
+    models::{User, role_schema},
     state::AppState,
     user_columns, validate,
 };
 
-/// `GET /api/users` → `User[]`, ordered by display name.
+/// All users, ordered by display name. Admin only.
+#[utoipa::path(get, path = "/api/users", operation_id = "listUsers", tag = "users", security(("session" = [])), responses(
+    (status = 200, description = "Users.", body = Vec<User>),
+    (status = 403, description = "Not an admin (`forbidden`).", body = ErrorBody),
+))]
 pub async fn list(State(state): State<AppState>, _admin: AdminUser) -> AppResult<Json<Vec<User>>> {
     let users = sqlx::query_as::<_, User>(concat!(
         "select ",
@@ -28,20 +33,27 @@ pub async fn list(State(state): State<AppState>, _admin: AdminUser) -> AppResult
     Ok(Json(users))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateBody {
+pub struct CreateUserBody {
     username: String,
     display_name: String,
     password: String,
+    #[schema(schema_with = role_schema)]
     role: String,
 }
 
-/// `POST /api/users` `{ username, displayName, password, role }` → `201 User`.
+/// Adds a household member. Admin only.
+#[utoipa::path(post, path = "/api/users", operation_id = "createUser", tag = "users", security(("session" = [])), request_body = CreateUserBody, responses(
+    (status = 201, description = "User created.", body = User),
+    (status = 400, description = "Invalid field (`validation`).", body = ErrorBody),
+    (status = 403, description = "Not an admin (`forbidden`).", body = ErrorBody),
+    (status = 409, description = "Username taken (`conflict`).", body = ErrorBody),
+))]
 pub async fn create(
     State(state): State<AppState>,
     _admin: AdminUser,
-    AppJson(body): AppJson<CreateBody>,
+    AppJson(body): AppJson<CreateUserBody>,
 ) -> AppResult<(StatusCode, Json<User>)> {
     let username = validate::username(&body.username)?;
     let display_name = validate::display_name(&body.display_name)?;
@@ -69,8 +81,16 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(user)))
 }
 
-/// `DELETE /api/users/:id` → `204`. Not yourself, not the last admin.
+/// Removes a user. Not yourself, not the last admin.
+///
 /// Their sessions go with them (FK cascade); recipes stay, with `created_by`/`updated_by` set to null (FK `set null`).
+#[utoipa::path(delete, path = "/api/users/{id}", operation_id = "deleteUser", tag = "users", security(("session" = [])),
+    params(("id" = Uuid, Path, description = "User id")), responses(
+    (status = 204, description = "User removed."),
+    (status = 400, description = "Malformed id (`validation`).", body = ErrorBody),
+    (status = 403, description = "Not an admin, removing yourself, or removing the last admin (`forbidden`).", body = ErrorBody),
+    (status = 404, description = "No such user (`not_found`).", body = ErrorBody),
+))]
 pub async fn remove(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -104,21 +124,30 @@ pub async fn remove(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PasswordBody {
+pub struct SetPasswordBody {
     password: String,
     current_password: Option<String>,
 }
 
-/// `PUT /api/users/:id/password` `{ password, currentPassword? }` → `204`.
+/// Changes a user's password.
+///
 /// Own password: `currentPassword` required. Admin resetting another user's: not needed. Ends the user's other sessions.
+#[utoipa::path(put, path = "/api/users/{id}/password", operation_id = "setUserPassword", tag = "users", security(("session" = [])),
+    params(("id" = Uuid, Path, description = "User id")), request_body = SetPasswordBody, responses(
+    (status = 204, description = "Password changed; the user's other sessions ended."),
+    (status = 400, description = "Invalid password or malformed id (`validation`).", body = ErrorBody),
+    (status = 401, description = "Not signed in, or wrong `currentPassword` for your own account (`unauthenticated`).", body = ErrorBody),
+    (status = 403, description = "A member changing someone else's password (`forbidden`).", body = ErrorBody),
+    (status = 404, description = "No such user (`not_found`).", body = ErrorBody),
+))]
 pub async fn set_password(
     State(state): State<AppState>,
     CurrentUser(caller): CurrentUser,
     jar: CookieJar,
     AppPath(id): AppPath<Uuid>,
-    AppJson(body): AppJson<PasswordBody>,
+    AppJson(body): AppJson<SetPasswordBody>,
 ) -> AppResult<StatusCode> {
     let own = id == caller.id;
     if !own && !caller.is_admin() {

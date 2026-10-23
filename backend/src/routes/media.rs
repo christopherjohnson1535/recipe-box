@@ -10,12 +10,13 @@ use axum::{
 use image::{
     DynamicImage, ImageDecoder, ImageReader, codecs::jpeg::JpegEncoder, imageops::FilterType,
 };
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
     auth::CurrentUser,
-    error::{AppError, AppPath, AppResult},
-    models::{Image, media_url},
+    error::{AppError, AppPath, AppResult, ErrorBody},
+    models::{BinaryFile, Image, media_url},
     state::AppState,
 };
 
@@ -26,7 +27,23 @@ const MAX_SIDE_PX: u32 = 10_000;
 const MAX_PIXELS: u64 = 40_000_000;
 const MAX_DECODE_ALLOC: u64 = 256 << 20;
 
-/// `POST /api/media`, multipart field `file`. The image is decoded and re-encoded, never stored as sent.
+/// Multipart body of `POST /api/media`.
+#[derive(ToSchema)]
+#[allow(dead_code)] // schema only; the handler reads the multipart stream itself
+pub struct UploadForm {
+    /// JPEG, PNG, WebP or GIF.
+    #[schema(value_type = String, format = Binary)]
+    file: Vec<u8>,
+}
+
+/// Uploads an image. It is decoded and re-encoded (JPEG, long edge at most 2400 px), never stored as sent.
+#[utoipa::path(post, path = "/api/media", operation_id = "uploadMedia", tag = "media", security(("session" = [])),
+    request_body(content = UploadForm, content_type = "multipart/form-data"), responses(
+    (status = 201, description = "The stored image.", body = Image),
+    (status = 400, description = "Missing `file` field (`validation`).", body = ErrorBody),
+    (status = 413, description = "Over `MAX_UPLOAD_MB` (`too_large`).", body = ErrorBody),
+    (status = 415, description = "Not a readable image, or over 10,000 px a side or 40 megapixels (`unsupported_media`).", body = ErrorBody),
+))]
 pub async fn upload(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -129,7 +146,13 @@ pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
     })
 }
 
-/// `GET /media/:fileName`, session required.
+/// A stored image.
+#[utoipa::path(get, path = "/media/{file_name}", operation_id = "getMedia", tag = "media", security(("session" = [])),
+    params(("file_name" = String, Path, description = "`<uuid>.jpg`")), responses(
+    (status = 200, description = "The JPEG.", content_type = "image/jpeg", body = BinaryFile,
+        headers(("Cache-Control" = String, description = "`private, max-age=31536000, immutable`"))),
+    (status = 404, description = "No such image (`not_found`).", body = ErrorBody),
+))]
 pub async fn serve(
     State(state): State<AppState>,
     _user: CurrentUser,
