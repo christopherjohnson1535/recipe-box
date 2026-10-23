@@ -85,6 +85,18 @@
   --feature-bg: var(--color-ink);
   --feature-fg: var(--color-paper);
   --feature-focus: var(--color-paper);
+
+  /* Recipe spread (#40): ingredient quantities and the drawn strike, step links, timer chips, the floating bar */
+  --qty-fg: var(--color-accent);
+  --strike-fg: var(--color-accent);
+  --mention-line: var(--color-accent);
+  --timer-bg: var(--color-ink);
+  --timer-fg: var(--color-paper);
+  --bar-bg: var(--color-ink);
+  --bar-fg: var(--color-paper);
+  --bar-action-bg: var(--color-accent);
+  --bar-action-fg: var(--color-on-accent);
+  --bar-focus: var(--color-paper);
 }
 
 /*

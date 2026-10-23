@@ -109,6 +109,10 @@ const TEXT: [string, string][] = [
   ["--selection-fg", "--selection-bg"],
   ["--stamp-fg", "--color-paper"], // the save stamp carries text
   ["--feature-fg", "--feature-bg"], // the inverse home panel
+  ["--qty-fg", "--panel-bg"], // ingredient quantities
+  ["--timer-fg", "--timer-bg"], // timer chips in a step
+  ["--bar-fg", "--bar-bg"], // the floating bar
+  ["--bar-action-fg", "--bar-action-bg"], // its Start cooking link
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
 const UI: [string, string][] = [
@@ -133,6 +137,9 @@ const UI: [string, string][] = [
   ["--spot-detail", "--color-paper"],
   ["--card-underline", "--color-paper"], // the drawn title underline
   ["--feature-focus", "--feature-bg"],
+  ["--strike-fg", "--panel-bg"], // the drawn line through a ticked ingredient
+  ["--mention-line", "--color-paper"], // dotted underline on an ingredient named in a step
+  ["--bar-focus", "--bar-bg"],
 ];
 
 describe("design tokens", () => {

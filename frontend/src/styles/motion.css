@@ -34,6 +34,16 @@
 @keyframes stamp-out {
   to { opacity: 0; }
 }
+@keyframes photo-turn {
+  from { rotate: 0deg; scale: 1.06; }
+  to { rotate: 2deg; scale: 1.12; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes bar-in {
+  from { translate: 0 160%; }
+}
 
 /*
  * Arrival (once per visit): ui/Arrive sets data-arrive="play" the first time a page key is shown in this tab, and
@@ -115,12 +125,53 @@
   animation-play-state: paused;
 }
 
+/*
+ * Recipe spread (#40). The opener photo turns slowly as it scrolls through view (CSS scroll-driven animation, no
+ * script; browsers without it keep the photo still). A ticked ingredient gets a claret line drawn through it
+ * (background-size, so it follows wrapped lines); a rescaled quantity fades to its new value; the floating bar
+ * slides up once on arrival.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .photo-turn {
+      animation: photo-turn 1ms linear both;
+      animation-timeline: view();
+    }
+  }
+}
+.strike {
+  background: linear-gradient(var(--strike-fg), var(--strike-fg)) 0 62% / 0 2px no-repeat;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-size var(--duration-morph) var(--ease-out);
+}
+[aria-pressed="true"] .strike {
+  background-size: 100% 2px;
+}
+.qty-fade {
+  animation: fade-in var(--duration-base) var(--ease-out) both;
+}
+[data-arrive="play"] .bar-in {
+  animation: bar-in var(--duration-slow) var(--ease-out) 600ms both;
+}
+/* Keep focused and linked content clear of the floating bar. */
+html:has(.floating-bar) {
+  scroll-padding-bottom: 7rem;
+}
+
 /* Reduced motion removes all movement. Opacity changes (the stamp, the arrival fades) become instant or stay still. */
 @media (prefers-reduced-motion: reduce) {
   [data-arrive="play"] .rise-word,
   [data-arrive="play"] .draw-rule,
   [data-arrive="play"] .stagger-item {
     animation: none;
+  }
+  [data-arrive="play"] .bar-in,
+  .qty-fade {
+    animation: none;
+  }
+  .strike {
+    transition: none;
   }
   .stamp-run {
     animation:

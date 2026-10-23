@@ -94,7 +94,7 @@ export function HomeSkeleton() {
 }
 
 /**
- * The recipe page's shape: centred head, meta strip, lead photo (only when the tapped card had one), ingredients beside the method. On the recipe's own
+ * The recipe page's shape: the split opener (photo only when the tapped card had one), numerals band, ingredients beside the method. On the recipe's own
  * address the photo and title boxes carry the card's view-transition names, so the tapped card morphs into this
  * skeleton (a loading fallback in the same commit would otherwise break the pairing) and then into the page. Other
  * routes under /recipes/[id] (edit, cook) get the plain note.
@@ -107,39 +107,39 @@ export function RecipeSkeleton() {
   const title = titleFor(id);
   return (
     <Loading>
-      <div className="flex flex-col gap-10">
-        <div className="flex flex-col items-center gap-4 border-b border-(--rule-hair) pb-8 text-center">
-          <div className="flex min-h-[25px] items-center">
-            <TextBar type="label" className="w-40" center />
+      <div className="flex flex-col gap-10 pb-28">
+        {/* The spread opener: text left, photo right from 1024px (a band below the text before that). */}
+        <div className={cx("grid", photo && "lg:grid-cols-[1.2fr_1fr]")}>
+          <div className={cx("flex min-w-0 flex-col items-start gap-5 pb-8", photo && "lg:min-h-[40rem] lg:justify-end lg:py-12 lg:pr-12")}>
+            <div className="flex min-h-[25px] items-center">
+              <TextBar type="label" className="w-40" />
+            </div>
+            {title ? (
+              <Morph name={titleName(id)}>
+                <div aria-hidden="true" className="min-w-0 font-display leading-[0.95] text-ink [font-size:clamp(2.75rem,11vw,4rem)] sm:[font-size:clamp(3.5rem,9vw,5.5rem)] lg:[font-size:clamp(4.25rem,7vw,6.25rem)] [overflow-wrap:anywhere]">
+                  {title}
+                </div>
+              </Morph>
+            ) : (
+              <TextBar type="font-display text-headline" className="w-72 max-w-full" />
+            )}
+            <TextBar type="text-deck" className="w-80 max-w-full" />
+            <TextBar type="label" className="w-56 max-w-full" />
+            <div className="mt-2 flex w-full flex-wrap gap-3">
+              <Skeleton className="h-11 w-full sm:w-40" />
+              <Skeleton className="h-11 w-20" />
+              <Skeleton className="h-11 w-24" />
+            </div>
           </div>
-          {title ? (
-            <Morph name={titleName(id)}>
-              <div aria-hidden="true" className="min-w-0 max-w-measure-wide font-display text-headline text-ink [overflow-wrap:anywhere]">
-                {title}
-              </div>
-            </Morph>
-          ) : (
-            <TextBar type="font-display text-headline" className="w-72 max-w-full" center />
-          )}
-          <TextBar type="text-deck" className="w-80 max-w-full" center />
-          <TextBar type="label" className="w-56 max-w-full" center />
-          <div className="mt-2 flex flex-wrap justify-center gap-3">
-            <Skeleton className="h-11 w-full sm:w-40" />
-            <Skeleton className="h-11 w-20" />
-            <Skeleton className="h-11 w-24" />
-          </div>
-        </div>
-        <div className="-mt-4 flex flex-col items-center gap-2">
-          <TextBar type="label" className="w-64 max-w-full" center />
-          <TextBar type="label sm:hidden" className="w-40 max-w-full" center />
-        </div>
-        {photo && (
-          <figure className="mx-auto w-full max-w-page">
+          {photo && (
             <Morph name={photoName(id)}>
-              <Skeleton className="aspect-[3/2] max-h-[36rem] w-full" />
+              <Skeleton className="aspect-[3/2] w-full lg:aspect-auto" />
             </Morph>
-          </figure>
-        )}
+          )}
+        </div>
+        <div className="border-t-[3px] border-b border-(--rule-double) py-4">
+          <Skeleton className="h-16 w-full" />
+        </div>
         <SidebarLayout
           sidebar={
             <div className="flex flex-col gap-4 self-start bg-(--panel-bg) px-5 pt-1 pb-6 sm:px-6">
