@@ -5,14 +5,12 @@ import { Chip, ChipRow } from "@/components/ui/Chip";
 import { CoverStory } from "@/components/ui/CoverStory";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FeaturePanel, IssueIndex, IssueIndexItem } from "@/components/ui/IssueIndex";
-import { IssueLine } from "@/components/ui/IssueLine";
 import { CardGrid, IssueLayout } from "@/components/ui/MagazineCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SpotIcon } from "@/components/ui/SpotIcon";
 import { iconForTag } from "@/components/ui/spot-icons";
-import { Ticker } from "@/components/ui/Ticker";
-import { issueLine, monthYear, planHome, seasonOf } from "@/components/home/issue";
-import { IN_SEASON } from "@/components/home/produce";
+import { issueLine, monthYear, planHome } from "@/components/home/issue";
+import { LocalIssueLine, LocalTicker } from "@/components/home/LocalIssue";
 import { formatMinutes } from "@/lib/recipe";
 import { RecipeCard } from "@/components/RecipeCard";
 import { NoMatches } from "@/components/search/ResultSummary";
@@ -77,7 +75,8 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   try {
     // shortcut: first page only (limit 50), add paging when a household passes ~50 recipes (FND issues)
     // While filtering, the issue line still needs the whole box (its number and volume), so ask for the first page unfiltered too.
-    result = await Promise.all([api.listRecipes({ q, tag, sort }), api.listTags(), q || tag ? api.listRecipes({}) : null]);
+    // That extra call only decorates the issue line, so its failure must not break searching (null = could not count).
+    result = await Promise.all([api.listRecipes({ q, tag, sort }), api.listTags(), q || tag ? api.listRecipes({}).catch(() => null) : undefined]);
   } catch (e) {
     return (
       <Arrive arriveKey="home" className="flex flex-col gap-8">
@@ -93,7 +92,9 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const [{ items, total }, tags, whole] = result;
   const filtered = Boolean(q || tag);
   const now = new Date();
+  // Filtering and the whole box could not be counted: print the name and date but no Vol./No.
   const issue = issueLine((whole ?? { items }).items, (whole ?? { total }).total, now);
+  const issueProps = whole === null ? { volume: undefined, number: undefined } : { volume: issue.volume, number: issue.number };
 
   if (total === 0 && !filtered) {
     return (
@@ -130,7 +131,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         )}
         {stale && (
           // shortcut: "last edited" stands in for "last cooked" until the Made-it log (#23) exists.
-          <FeaturePanel label="Haven’t cooked in a while" title={stale.title} href={`/recipes/${stale.id}`} note={`Last edited ${monthYear(stale.updatedAt)}`} />
+          <FeaturePanel label="Haven’t cooked in a while" title={stale.title} href={`/recipes/${stale.id}`} note={`Not touched since ${monthYear(stale.updatedAt)}`} />
         )}
       </>
     ) : undefined;
@@ -143,7 +144,9 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
 
   return (
     <Arrive arriveKey="home" className="flex flex-col gap-10">
-      <IssueLine {...issue} />
+      <LocalIssueLine serverDay={issue.dateTime} {...issueProps} />
+      {/* The one h1 whichever way the page is set: the cover headline below is an h2. */}
+      {cover && <h1 className="sr-only">Recipes</h1>}
 
       {cover ? (
         <>
@@ -162,7 +165,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
               </>
             }
           />
-          <Ticker label="In season" items={IN_SEASON[seasonOf(now)]} />
+          <LocalTicker serverDay={issue.dateTime} />
           <div className="flex justify-end gap-6">
             <ButtonLink href="/recipes/new" variant="ghost">
               Add recipe

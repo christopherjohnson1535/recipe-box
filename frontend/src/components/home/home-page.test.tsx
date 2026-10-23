@@ -42,7 +42,7 @@ describe("home page, magazine layout", () => {
     expect(screen.getByText("The Autumn Issue")).toBeTruthy();
     expect(screen.getByText("Thursday, October 22, 2026")).toBeTruthy();
 
-    expect(screen.getByRole("heading", { level: 1, name: "Short Ribs Slow and Low" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Short Ribs Slow and Low" })).toBeTruthy();
     expect(screen.getByText("Cover story · braise · sunday")).toBeTruthy();
     expect(screen.getByText("Three hours in the oven.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Start cooking" }).getAttribute("href")).toBe("/recipes/cover/cook");
@@ -58,7 +58,9 @@ describe("home page, magazine layout", () => {
     expect(within(grid).queryByText("Short Ribs Slow and Low")).toBeNull();
 
     expect(screen.getByRole("complementary", { name: "Also in this issue" })).toBeTruthy();
-    expect(screen.getByRole("complementary", { name: "Haven’t cooked in a while" }).textContent).toContain("Last edited");
+    expect(screen.getByRole("complementary", { name: "Haven’t cooked in a while" }).textContent).toContain("Not touched since");
+    // One h1 "Recipes" (visually hidden) even with a cover.
+    expect(screen.getByRole("heading", { level: 1, name: "Recipes" }).className).toContain("sr-only");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
@@ -93,6 +95,21 @@ describe("home page, magazine layout", () => {
     const nav = screen.getAllByRole("navigation", { name: "Filter by tag" })[0];
     expect(within(nav).getByRole("link", { name: /soups/ }).querySelector("svg[data-spot='soups']")).toBeTruthy();
     expect(within(nav).getByRole("link", { name: /party/ }).querySelector("svg")).toBeNull();
+  });
+
+  it("keeps searching when the whole-box count fails, and drops Vol./No.", async () => {
+    server.use(
+      http.get("*/api/recipes", ({ request }) => {
+        const url = new URL(request.url);
+        if (!url.searchParams.has("q")) return HttpResponse.json({ error: "boom" }, { status: 500 });
+        return HttpResponse.json({ items: [others[0]], total: 1 });
+      }),
+      http.get("*/api/tags", () => HttpResponse.json([])),
+    );
+    await home({ q: "soup" });
+    expect(screen.getByRole("region", { name: "1 matching recipes" })).toBeTruthy();
+    expect(screen.getByText("The Autumn Issue")).toBeTruthy();
+    expect(screen.queryByText(/Vol\./)).toBeNull();
   });
 
   it("keeps the empty box state", async () => {

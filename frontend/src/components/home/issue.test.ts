@@ -41,7 +41,7 @@ describe("planHome slicing", () => {
   it("five recipes: a panel but no index", () => {
     const plan = planHome(many(5));
     expect(plan.index).toEqual([]);
-    expect(plan.stale?.id).toBe("r00");
+    expect(plan.stale?.id).toBe("r04"); // only the fifth card is below the first screen
   });
 
   it("ten recipes with a cover: five in the index after the first four cards", () => {
@@ -52,6 +52,8 @@ describe("planHome slicing", () => {
     expect(plan.grid).toHaveLength(9);
     expect(plan.index.map((x) => x.id)).toEqual(items.slice(4, 9).map((x) => x.id));
     expect(plan.stale?.id).not.toBe("r09");
+    // Chosen below the first screen: r00 is the stalest overall but is already card 1.
+    expect(plan.stale?.id).toBe("r04");
   });
 
   it("ten recipes without a cover: still five in the index", () => {

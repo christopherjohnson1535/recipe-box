@@ -75,16 +75,18 @@ export type HomeLayout = {
 /**
  * Decides who goes where on the home page.
  * shortcut: no "times cooked" data yet, so updatedAt stands in. The cover is the recipe with a photo that was edited
- * longest ago, the panel is the stalest of the rest; swap both for the Made-it log (#23) when it lands.
+ * longest ago, the panel is the stalest of the cards below the first screen; swap both for the Made-it log (#23) when it lands.
  */
 export function planHome(items: RecipeSummary[]): HomeLayout {
   const cover = items.filter((r) => r.imageUrl).sort(stalest)[0] ?? null;
   const grid = items.filter((r) => r !== cover);
   const index = grid.slice(INDEX_FROM, INDEX_FROM + INDEX_SIZE);
+  // Not one of the first four cards: those are already on screen beside the panel. Small boxes have nothing else to pick from.
+  const pool = grid.length > INDEX_FROM ? grid.slice(INDEX_FROM) : grid;
   return {
     cover,
     grid,
     index: index.length >= INDEX_MIN ? index : [],
-    stale: items.length >= PANEL_MIN ? ([...grid].sort(stalest)[0] ?? null) : null,
+    stale: items.length >= PANEL_MIN ? ([...pool].sort(stalest)[0] ?? null) : null,
   };
 }
