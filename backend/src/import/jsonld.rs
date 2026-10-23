@@ -881,15 +881,40 @@ mod tests {
     }
 
     #[test]
-    fn deep_pages_are_refused_fast_and_ld_json_still_works() {
+    fn deep_and_huge_pages_are_refused_and_ld_json_still_works() {
         let deep = "<div>".repeat(100_000);
-        let t = std::time::Instant::now();
         let url = Url::parse("https://e.example/r").unwrap();
-        assert!(extract(&format!("<html><body>{deep}</body></html>"), &url).is_none());
+        let deep_page = format!("<html><body>{deep}</body></html>");
+        assert!(too_complex(&deep_page));
+        assert!(!too_complex("<html><body><p>hi</p></body></html>"));
+        assert!(extract(&deep_page, &url).is_none());
+        // Flat but over the tag cap.
+        assert!(too_complex(&"<br><p></p>".repeat(MAX_DOM_TAGS)));
         let page =
             ld_page(r#""recipeIngredient":["a"]"#).replace("</html>", &format!("{deep}</html>"));
         assert_eq!(extract(&page, &url).unwrap().ingredients.len(), 1);
-        assert!(t.elapsed().as_secs() < 2, "took {:?}", t.elapsed());
+    }
+
+    #[test]
+    fn nesting_beyond_the_depth_cap_is_too_complex_even_with_few_tags() {
+        let nested = |n: usize| format!("{}x{}", "<div>".repeat(n), "</div>".repeat(n));
+        assert!(too_complex(&nested(MAX_DOM_DEPTH + 1)));
+        assert!(!too_complex(&nested(MAX_DOM_DEPTH)));
+    }
+
+    #[test]
+    fn extract_skips_the_microdata_fallback_for_too_deep_pages() {
+        let url = Url::parse("https://oldpantry.example/lentil-stew/").unwrap();
+        let fixture = include_str!("../../tests/fixtures/microdata.html");
+        // Shallow: the microdata fallback finds the recipe.
+        assert!(extract(fixture, &url).is_some());
+        // Same content, wrapped deeper than the cap: extract must refuse to build the DOM.
+        let n = MAX_DOM_DEPTH + 100;
+        let wrapped = fixture
+            .replace("<body>", &format!("<body>{}", "<div>".repeat(n)))
+            .replace("</body>", &format!("{}</body>", "</div>".repeat(n)));
+        assert!(too_complex(&wrapped));
+        assert!(extract(&wrapped, &url).is_none());
     }
 
     #[test]

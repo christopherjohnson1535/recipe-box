@@ -46,6 +46,10 @@ check-frontend:
 test-backend:
     cd backend && if cargo nextest --version >/dev/null 2>&1; then cargo nextest run; else cargo test; fi
 
+# FND-2 search benchmark, 2,000 recipes (needs Postgres, see `just db`)
+bench:
+    cd backend && cargo bench --bench search
+
 # Frontend tests (vitest)
 test-frontend:
     cd frontend && npx vitest run

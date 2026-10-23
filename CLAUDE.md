@@ -23,7 +23,8 @@ dish photos), search them, and cook from an iPad (installable PWA, cooking mode,
 
 `just check` runs both trees' format, lint, type and test checks plus `just audit` (cargo deny + npm audit; a tool
 that is not installed is skipped with a message). It does not run the coverage ratchet, zizmor, CodeQL, the image
-scan or the compose smoke test: those are CI-only. The frontend CI job calls the same `just` recipes. `just` lists
+scan or the compose smoke test: those are CI-only. The frontend CI job calls the same `just` recipes. `just bench` runs the FND-2 search benchmark (`backend/benches/search.rs`; needs Postgres); the weekly
+`flake-hunt` workflow runs the backend suite 20 times plus that benchmark. `just` lists
 everything else (`setup`, `fmt`, `up`, `down`, `logs`, `e2e`, `openapi`, `db`). Without `just`, run the raw commands:
 - API (`cd backend`): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
 - Web (`cd frontend`): `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`

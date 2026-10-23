@@ -28,7 +28,8 @@ WORKDIR /app
 # Dependency layer: build against dummy sources so it stays cached until Cargo.toml/Cargo.lock change.
 COPY Cargo.toml Cargo.lock ./
 RUN . /env.sh \
-    && mkdir src && echo 'fn main() {}' > src/main.rs && touch src/lib.rs \
+    && mkdir src benches && echo 'fn main() {}' > src/main.rs && touch src/lib.rs \
+    && echo 'fn main() {}' > benches/search.rs \
     && cargo build --release --locked \
     && rm -rf src
 COPY migrations migrations
