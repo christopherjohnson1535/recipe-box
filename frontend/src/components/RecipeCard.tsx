@@ -1,13 +1,16 @@
 import type { RecipeSummary } from "@/lib/api";
 import { formatMinutes } from "@/lib/recipe";
 import { Badge } from "./ui/Chip";
-import { ContentsEntry } from "./ui/Contents";
 import { DotList } from "./ui/DotList";
+import { MagazineCard } from "./ui/MagazineCard";
+import { iconForTag } from "./ui/spot-icons";
 
-/** A recipe as one entry in the contents listing: up to two tags (a third would wrap the kicker on a phone), title, description, total time, photo. */
+/** A recipe as one card in the home grid: up to two tags (a third would wrap the kicker on a phone), total time, title, description, photo. */
 export function RecipeCard({ recipe, index }: { recipe: RecipeSummary; index?: number }) {
+  // The first tag that has a spot icon draws the placeholder when there is no photo; a bowl otherwise.
+  const icon = recipe.tags.map(iconForTag).find((n) => n !== "default") ?? "mains";
   return (
-    <ContentsEntry
+    <MagazineCard
       href={`/recipes/${recipe.id}`}
       title={recipe.title}
       kicker={
@@ -21,9 +24,10 @@ export function RecipeCard({ recipe, index }: { recipe: RecipeSummary; index?: n
           </DotList>
         ) : undefined
       }
+      time={formatMinutes(recipe.totalMinutes)}
       deck={recipe.description || undefined}
-      meta={formatMinutes(recipe.totalMinutes)}
       imageSrc={recipe.imageUrl}
+      fallbackIcon={icon}
       index={index}
       morphId={recipe.id}
     />

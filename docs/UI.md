@@ -91,6 +91,11 @@ Motion marks a change of state or place. It never decorates.
 | `--duration-slow` | 900ms | headline words rise, the save stamp lands |
 | `--stagger-step` | 120ms | gap between list entries arriving |
 
+Card hover and keyboard focus (`.mag-card` in `motion.css`) behave alike: the plate scales to 1.03 and turns -1deg over
+`--duration-slow`, and the title underline draws over `--duration-morph`. The in-season ticker is the one permitted
+loop besides timers (70 s per pass, paused by hover or focus). Under `prefers-reduced-motion: reduce` the plate does
+not move, the underline appears without drawing, and the ticker stands still as a wrapped list.
+
 Durations are defined in `src/styles/motion.css`.
 
 ## Where styling lives (enforced by `src/styles/page-styling.test.ts`)
@@ -151,6 +156,7 @@ Controls and states:
   `ui/Pending` (status note with a quiet bar and a way out; token `--progress-fg`). `Heading` takes `ref` and
   `tabIndex` so a page can move focus to a result.
 - `ui/Panel`: tinted (paper-deep) block for an inline form or confirmation. `ui/ConfirmInline`: two-step confirmation in a Panel; focus starts on the safe "Keep" button. `ui/MemberList` + `MemberItem`: people separated by hairlines with name, "You" marker, detail, actions, a note and an opened panel. `ui/DetailList`: label/value pairs as a definition list.
+- Magazine home (#39), all in `ui/`: `IssueLine` (Vol. / No. · season · date under the masthead rule), `CoverStory` (kicker, ~90px headline that is the page's h1, italic deck, meta, buttons, photo right or above on a phone), `Ticker` (in-season marquee: the looping copy is `aria-hidden`, the region is focusable and pauses on hover and `:focus-within`, reduced motion stops it and wraps the list), `MagazineCard` + `CardGrid` + `IssueLayout` (4:3 plate or a paper plate with a spot icon, kicker with tags left and time right, display title with a drawn claret underline, one-line deck; the grid sits beside the sidebar from 1024px), `IssueIndex` + `IssueIndexItem` (numbered "Also in this issue") and `FeaturePanel` (the inverse "Haven’t cooked in a while" block; tokens `--feature-*`, same inverse idea as the toast), `SearchField` + `SearchSort` (the display-type search box with a rule beneath and the sort menu set as a quiet label).
 - `ui/Select`: native select set like Input (iPadOS wheel picker); used for the home sort menu. Home search lives in
   `components/search/` (`SearchControls`: debounced 250 ms `router.replace` of `?q=`, uncontrolled input so focus and
   caret survive, Enter/Search/sort push history; `ResultSummary` live count; `NoMatches` with "Clear search").
@@ -170,12 +176,17 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   `?mode=`, `?url=` starts a link import), loading and error notes, review in `RecipeForm` with the original photos
   beside it. `explainImportError` maps every API error code to a title, message and next steps (Try again, Type it in, Sign in, Paste the text instead). Below `lg` the original photos are a horizontal strip above the form.
 - `settings/*`: `/settings`. `SettingsView` (My account always; Household for admins only; AI import), `PasswordForm` (own password asks for the current one; an admin reset doesn't; errors on the field, 401 lands on Current password), `AddMemberForm`, `HouseholdSection` (list, reset panel, remove confirmation naming the person; Remove is off for yourself and the last admin, with the reason shown; focus returns to the Reset button or the Household heading), `AiImportSection`.
-- `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `ContentsEntry`.
+- `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `MagazineCard`.
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 
 ## Page patterns
-- **Home**: article head ("The collection", Recipes, count deck, actions) then search and the tag index, then a
-  two-column contents listing separated by hairlines (one column below 1024px).
+- **Home** (a magazine cover): the issue line, then the cover story (the photo recipe edited longest ago; its headline
+  is the h1), the in-season ticker, a large search field with the sort menu, the tag index (chips carry spot icons where
+  the tag maps to one) and a two-column card grid with a sidebar (numbered "Also in this issue", the inverse "Haven’t
+  cooked in a while" panel) that drops below the grid under 1024px. Logic (cover pick, season, volume, slices) is in
+  `components/home/issue.ts`. Without a photo recipe, the plain "Recipes" head replaces the cover; while searching or
+  filtering the cover, ticker and sidebar are hidden and the issue line stays. Until the Made-it log (#23) exists,
+  `updatedAt` stands in for "last cooked" and there is no cooked-count sticker.
 - **Recipe**: centred head (tags kicker, headline, deck if the description is 160 characters or less, byline with
   "Added by" and source, actions), uppercase meta strip, photo, a drop-cap lede when the description is longer,
   then the ingredient sidebar (paper-deep, double rule) beside a numbered method set like an article (accent display
