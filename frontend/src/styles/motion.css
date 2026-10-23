@@ -1,6 +1,6 @@
 /*
  * Motion: one easing curve, a short list of durations, and the shared transitions (rise, draw, list stagger,
- * card → page morph, save stamp, skeleton shimmer). Rules: docs/UI.md "Motion". Reduced motion: globals.css.
+ * card → page morph, save stamp). Rules: docs/UI.md "Motion". Reduced motion: globals.css.
  * Theme-independent, so it lives outside the theme files.
  */
 @theme static {
@@ -21,9 +21,6 @@
 }
 @keyframes arrive {
   from { opacity: 0; translate: 0 0.75rem; }
-}
-@keyframes shimmer {
-  to { background-position: -200% 0; }
 }
 @keyframes stamp-land {
   from { opacity: 0; scale: 1.15; }
@@ -63,11 +60,6 @@
   pointer-events: none;
 }
 
-/* Loading skeleton: a slow shimmer while a request is in flight. */
-.skeleton-shimmer {
-  animation: shimmer calc(var(--duration-slow) * 2) var(--ease-out) infinite;
-}
-
 /* Save stamp: lands with a press, holds about two seconds, fades. */
 .stamp-run {
   animation:
@@ -79,8 +71,7 @@
 @media (prefers-reduced-motion: reduce) {
   [data-arrive="play"] .rise-word,
   [data-arrive="play"] .draw-rule,
-  [data-arrive="play"] .stagger-item,
-  .skeleton-shimmer {
+  [data-arrive="play"] .stagger-item {
     animation: none;
   }
   .stamp-run {

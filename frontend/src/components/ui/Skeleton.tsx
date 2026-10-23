@@ -5,16 +5,16 @@ import type { ReactNode } from "react";
 import { SidebarLayout } from "./Article";
 import { Contents } from "./Contents";
 import { cx } from "./cx";
-import { Morph, photoName, titleName } from "./morph";
+import { hasPhotoFor, Morph, photoName, titleName } from "./morph";
 import { Pending } from "./Pending";
 
-/** One placeholder box: the skeleton tint with a slow shimmer (removed under reduced motion). Size it with className. */
+/** One placeholder box: the static skeleton tint with a soft highlight in the middle. Nothing moves. Size it with className. */
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
       className={cx(
-        "skeleton-shimmer bg-linear-to-r from-(--skeleton-bg) via-(--skeleton-shine) to-(--skeleton-bg) bg-[length:200%_100%]",
+        "bg-linear-to-r from-(--skeleton-bg) via-(--skeleton-shine) to-(--skeleton-bg)",
         className,
       )}
     />
@@ -24,7 +24,7 @@ export function Skeleton({ className }: { className?: string }) {
 /** A bar set in a real text style, so the line is exactly as tall as the text that replaces it. `type` is that style. */
 function TextBar({ type, className, center }: { type: string; className: string; center?: boolean }) {
   return (
-    <div className={cx(type, center && "flex justify-center")} aria-hidden="true">
+    <div className={cx(type, center && "text-center")} aria-hidden="true">
       <Skeleton className={cx("inline-block h-[0.7em] align-middle", className)} />
     </div>
   );
@@ -74,9 +74,14 @@ export function HomeSkeleton() {
             <Skeleton className="h-11 w-24" />
           </div>
         </div>
+        {/* The search form (input, then sort on a phone), the tag index (a block from 640px, a summary row below). */}
         <div className="flex flex-col gap-3">
-          <Skeleton className="h-11 w-full max-w-xl" />
-          <Skeleton className="h-11 w-full max-w-md" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-11 w-full max-w-xl" />
+            <Skeleton className="h-11 w-28 sm:hidden" />
+          </div>
+          <Skeleton className="hidden h-22 w-full sm:block" />
+          <Skeleton className="h-11 w-full sm:hidden" />
         </div>
         <Contents>
           {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -89,7 +94,7 @@ export function HomeSkeleton() {
 }
 
 /**
- * The recipe page's shape: centred head, meta strip, lead photo, ingredients beside the method. On the recipe's own
+ * The recipe page's shape: centred head, meta strip, lead photo (only when the tapped card had one), ingredients beside the method. On the recipe's own
  * address the photo and title boxes carry the card's view-transition names, so the tapped card morphs into this
  * skeleton (a loading fallback in the same commit would otherwise break the pairing) and then into the page. Other
  * routes under /recipes/[id] (edit, cook) get the plain note.
@@ -98,30 +103,36 @@ export function RecipeSkeleton() {
   const path = usePathname();
   const { id } = useParams<{ id: string }>();
   if (typeof id !== "string" || path !== `/recipes/${id}`) return <Pending>Loading…</Pending>;
+  const photo = hasPhotoFor(id);
   return (
     <Loading>
       <div className="flex flex-col gap-10">
         <div className="flex flex-col items-center gap-4 border-b border-(--rule-hair) pb-8 text-center">
-          <TextBar type="label" className="w-40" center />
+          <div className="flex min-h-[25px] items-center">
+            <TextBar type="label" className="w-40" center />
+          </div>
           <Morph name={titleName(id)}>
             <TextBar type="font-display text-headline" className="w-72 max-w-full" center />
           </Morph>
           <TextBar type="text-deck" className="w-80 max-w-full" center />
           <TextBar type="label" className="w-56 max-w-full" center />
           <div className="mt-2 flex flex-wrap justify-center gap-3">
-            <Skeleton className="h-11 w-40" />
+            <Skeleton className="h-11 w-full sm:w-40" />
             <Skeleton className="h-11 w-20" />
             <Skeleton className="h-11 w-24" />
           </div>
         </div>
-        <div className="-mt-4 flex justify-center">
+        <div className="-mt-4 flex flex-col items-center gap-2">
           <TextBar type="label" className="w-64 max-w-full" center />
+          <TextBar type="label sm:hidden" className="w-40 max-w-full" center />
         </div>
-        <figure className="mx-auto w-full max-w-page">
-          <Morph name={photoName(id)}>
-            <Skeleton className="aspect-[3/2] max-h-[36rem] w-full" />
-          </Morph>
-        </figure>
+        {photo && (
+          <figure className="mx-auto w-full max-w-page">
+            <Morph name={photoName(id)}>
+              <Skeleton className="aspect-[3/2] max-h-[36rem] w-full" />
+            </Morph>
+          </figure>
+        )}
         <SidebarLayout
           sidebar={
             <div className="flex flex-col gap-4 self-start bg-(--panel-bg) px-5 pt-1 pb-6 sm:px-6">
@@ -129,9 +140,11 @@ export function RecipeSkeleton() {
               <div className="pt-3">
                 <TextBar type="label" className="w-28" />
               </div>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <TextBar key={i} type="py-2.5 text-body leading-snug" className={i % 2 ? "w-2/3" : "w-5/6"} />
-              ))}
+              <div className="flex flex-col divide-y divide-(--rule-hair)">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <TextBar key={i} type="py-2.5 text-body leading-snug" className={i % 2 ? "w-2/3" : "w-5/6"} />
+                ))}
+              </div>
             </div>
           }
         >

@@ -27,7 +27,7 @@ const NON_COLOUR = ["--photo-filter"];
 // Decorative tokens that sit behind or between content and carry no text or state, so they need no contrast pairing.
 const DECORATIVE: Record<string, string> = {
   "--skeleton-bg": "loading placeholder block behind content that has not arrived; aria-hidden, carries nothing",
-  "--skeleton-shine": "the moving highlight across a skeleton; decoration only",
+  "--skeleton-shine": "the soft highlight in the middle of a skeleton block (static); decoration only",
 };
 // The edition selectors: evening applies under the attribute, and under a dark device when no attribute is set.
 const EVENING_ATTR = ':root[data-theme="evening"]';

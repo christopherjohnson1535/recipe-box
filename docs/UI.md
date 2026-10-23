@@ -78,8 +78,9 @@ that names the meaning before using one. Contrast against paper (recorded in `to
 Motion marks a change of state or place. It never decorates.
 - One easing, `--ease-out`; durations between 150 and 900 ms.
 - Nothing loops except an active timer, a scan in progress or the in-season ticker.
+- Loading skeletons are a static tint: they do not shimmer or pulse.
 - Arrival staggers (list entries rising in) run once per visit and never when the person goes Back.
-- `prefers-reduced-motion` removes movement (rises, draws, morphs, shimmer); colour changes stay.
+- `prefers-reduced-motion` removes movement (rises, draws, morphs); colour changes stay.
 
 | Token | Value | Use |
 |---|---|---|

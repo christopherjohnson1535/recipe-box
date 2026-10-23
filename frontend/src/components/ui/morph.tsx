@@ -6,6 +6,12 @@ export const titleName = (id: string) => `recipe-title-${id}`;
 /** The arrival key of a recipe page (see Arrive). A card that morphs into the page marks it arrived. */
 export const recipeArrivalKey = (id: string) => `recipe:${id}`;
 
+// Which recipes the person opened from a card had a photo. The recipe skeleton shows a photo box only for those:
+// a direct load knows nothing, and a photo arriving later pushes the page down less than a 576px box collapsing.
+const photoSeen = new Map<string, boolean>();
+export const rememberPhoto = (id: string, has: boolean) => void photoSeen.set(id, has);
+export const hasPhotoFor = (id: string) => photoSeen.get(id) === true;
+
 /**
  * Names one element for the card → page morph. Both sides use the same name, `share="morph"` and `default="none"`
  * (the element animates only as one half of a pair, never on unrelated transitions). Without a name it is a no-op,
