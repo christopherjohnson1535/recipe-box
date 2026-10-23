@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 /** Opening paragraph with an accent drop cap. */
 export function Lede({ children }: { children: ReactNode }) {
-  return <p className="drop-cap mx-auto max-w-measure text-deck text-ink [overflow-wrap:anywhere]">{children}</p>;
+  return <p className="drop-cap max-w-measure text-deck text-ink [overflow-wrap:anywhere]">{children}</p>;
 }
 
 /** Two columns from 768px: the ingredient sidebar beside the main text, on the same edges as the masthead. Stacks on phones. */

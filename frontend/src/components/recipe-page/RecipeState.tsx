@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { scaleIngredient } from "@/lib/scale";
+import { scaleServings } from "@/lib/scale";
 import { useSessionString } from "./session-store";
 
 type RecipeState = {
@@ -62,5 +62,5 @@ export { useRecipeState };
 
 /** The servings string at the current scale ("4" → "8"), for the numerals band. */
 export function ScaledServings({ servings }: { servings: string }) {
-  return <>{scaleIngredient(servings, useRecipeState().scale)}</>;
+  return <>{scaleServings(servings, useRecipeState().scale)}</>;
 }

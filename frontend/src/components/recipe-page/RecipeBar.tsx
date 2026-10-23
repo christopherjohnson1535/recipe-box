@@ -8,5 +8,5 @@ export function RecipeBar({ id, total }: { id: string; total: number }) {
   const { ticked } = useRecipeState();
   const n = [...ticked].filter((i) => i < total).length;
   const status = n === 0 ? "Ready when you are" : `${n} ${n === 1 ? "ingredient" : "ingredients"} checked`;
-  return <FloatingBar status={status} href={`/recipes/${id}/cook`} action="Start cooking" />;
+  return <FloatingBar status={status} shortStatus={`${n} checked`} href={`/recipes/${id}/cook`} action="Start cooking" />;
 }

@@ -39,6 +39,11 @@ describe("IngredientChecklist", () => {
     expect(screen.getByRole("button", { name: /salt to taste/ }).getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("reads a row as one line of text (a space between quantity and name)", () => {
+    render(page());
+    expect(screen.getByRole("button", { name: /short ribs/ }).textContent).toBe("4 lb bone-in short ribs");
+  });
+
   it("ticks a row, counts it in the bar and keeps it in sessionStorage", () => {
     render(page());
     expect(screen.getByText("Ready when you are")).toBeTruthy();
@@ -79,7 +84,7 @@ describe("IngredientChecklist", () => {
     expect(screen.getByText("¼ cup")).toBeTruthy();
     expect(screen.getByText("2–3")).toBeTruthy();
     expect(sessionStorage.getItem("recipe-scale:r1")).toBe("0.5");
-    expect(screen.getByRole("radiogroup", { name: "Scale" })).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Scale ingredients" })).toBeTruthy();
   });
 
   it("ignores broken stored values", () => {
@@ -105,7 +110,36 @@ describe("StepText", () => {
     render(<p><StepText text="Brown the ribs, then braise 2 hours." ingredients={["4 lb bone-in short ribs"]} /></p>);
     expect(screen.getByRole("link", { name: "ribs" }).getAttribute("href")).toBe("#ingredient-0");
     expect(screen.getByText("2 hours")).toBeTruthy();
-    expect(screen.getByText("2 hr")).toBeTruthy();
+  });
+
+  it.each([
+    "Roast the tomatoes and garlic for 90 minutes.",
+    "Bake 10-12 minutes, then rest 1 hour 30 minutes.",
+    "Brown the ribs, then braise 2 hours.",
+  ])("keeps the step's text exactly as written: %s", (text) => {
+    const { container } = render(<p><StepText text={text} ingredients={["4 lb bone-in short ribs", "2 cloves garlic"]} /></p>);
+    expect(container.textContent).toBe(text);
+  });
+
+  it("moves focus to the ingredient row when a mention is followed", () => {
+    render(
+      <>
+        <IngredientChecklist groups={GROUPS} />
+        <p><StepText text="Brown the ribs." ingredients={["4 lb bone-in short ribs"]} /></p>
+      </>,
+      { wrapper: ({ children }) => <RecipeStateProvider id="r1">{children}</RecipeStateProvider> },
+    );
+    fireEvent.click(screen.getByRole("link", { name: "ribs" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /short ribs/ }));
+  });
+});
+
+describe("the floating bar", () => {
+  it("has a short status for phones next to the full one", () => {
+    render(page());
+    fireEvent.click(screen.getByRole("button", { name: /flour/ }));
+    expect(screen.getByText("1 checked")).toBeTruthy();
+    expect(screen.getByText("1 ingredient checked")).toBeTruthy();
   });
 });
 

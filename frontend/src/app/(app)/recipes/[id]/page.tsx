@@ -19,6 +19,7 @@ import { Text } from "@/components/ui/Text";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type Recipe } from "@/lib/api";
 import { formatMinutes, groupBySection, minuteNumeral } from "@/lib/recipe";
+import { splitIngredient } from "@/lib/scale";
 import { serverApi } from "@/lib/server-api";
 import { bylines } from "@/components/recipe-page/byline";
 import { LocalDate } from "@/components/recipe-page/LocalDate";
@@ -56,10 +57,12 @@ export default async function RecipePage({ params }: Params) {
     { label: "Total", minutes: recipe.totalMinutes },
   ].flatMap(({ label, minutes }) => {
     const n = minuteNumeral(minutes);
-    return n ? [{ label, value: n.value, unit: n.unit, spoken: formatMinutes(minutes) ?? undefined }] : [];
+    return n ? [{ label, parts: n, spoken: formatMinutes(minutes) ?? undefined }] : [];
   });
   const servings = recipe.servings?.trim();
-  const numerals = [...(servings ? [{ label: "Serves", value: <ScaledServings servings={servings} /> }] : []), ...times];
+  // A bare number or range is set as a big numeral; a phrase ("makes about 4 bowls") as smaller text.
+  const servingsText = servings ? splitIngredient(servings).quantity !== servings : false;
+  const numerals = [...(servings ? [{ label: "Serves", value: <ScaledServings servings={servings} />, text: servingsText }] : []), ...times];
 
   const source =
     recipe.sourceUrl || recipe.sourceName ? (
@@ -93,7 +96,7 @@ export default async function RecipePage({ params }: Params) {
               <DotList label="Tags">
                 {recipe.tags.map((t) => (
                   <li key={t}>
-                    <Badge icon={<SpotIcon name={iconForTag(t)} size={24} />}>{t}</Badge>
+                    <Badge>{t}</Badge>
                   </li>
                 ))}
               </DotList>
@@ -123,7 +126,6 @@ export default async function RecipePage({ params }: Params) {
           }
           actions={
             <>
-              <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">Start cooking</ButtonLink>
               <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
                 Edit
               </ButtonLink>
@@ -137,11 +139,11 @@ export default async function RecipePage({ params }: Params) {
         {lede && <Lede>{lede}</Lede>}
 
         <SidebarLayout sidebar={<IngredientChecklist groups={ingredientGroups} />}>
-          <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-6">
+          <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-8">
             <MethodHeader steps={recipe.steps.length} />
             {recipe.steps.length === 0 && <Text variant="note">No steps listed.</Text>}
             {stepGroups.map((g, i) => (
-              <div key={i} className="flex flex-col gap-4">
+              <div key={i} className="flex flex-col gap-3">
                 {g.section && (
                   <Heading level={3} size="kicker">
                     {g.section}
@@ -158,7 +160,7 @@ export default async function RecipePage({ params }: Params) {
             ))}
 
             {notes && (
-              <PullQuote caption={recipe.createdBy ? `${recipe.createdBy.displayName}’s note on this recipe` : "Note on this recipe"} short={notes.length <= 200}>
+              <PullQuote caption={recipe.createdBy ? `${recipe.createdBy.displayName}’s note on this recipe` : "Note on this recipe"} short={notes.length <= 140 && !notes.includes("\n")}>
                 {notes}
               </PullQuote>
             )}

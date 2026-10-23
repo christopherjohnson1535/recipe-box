@@ -97,11 +97,13 @@
   --bar-action-bg: var(--color-accent);
   --bar-action-fg: var(--color-on-accent);
   --bar-focus: var(--color-paper);
+  --target-bg: var(--color-paper); /* the ingredient row a step link jumped to */
 }
 
 /*
- * Not colours, so they are set per edition here rather than in a theme file: photos sit a touch dimmer in the
- * evening, and the full-cream double rule was the brightest object on the page, so evening uses the muted ink.
+ * Per-edition overrides that are set here rather than in a theme file: photos sit a touch dimmer in the evening, the
+ * full-cream double rule was the brightest object on the page, so evening uses the muted ink, and the ink-filled
+ * timer chips and floating bar (cream in the evening) become deep umber panels instead.
  * Same selectors as themes/evening.css; tokens.test.ts checks the two blocks set identical values.
  */
 :root {
@@ -110,10 +112,20 @@
 :root[data-theme="evening"] {
   --photo-filter: brightness(0.9) contrast(1.02);
   --rule-double: var(--color-ink-muted);
+  --timer-bg: var(--color-paper-deep);
+  --timer-fg: var(--color-ink);
+  --bar-bg: var(--color-paper-deep);
+  --bar-fg: var(--color-ink);
+  --bar-focus: var(--color-ink);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --photo-filter: brightness(0.9) contrast(1.02);
     --rule-double: var(--color-ink-muted);
+    --timer-bg: var(--color-paper-deep);
+    --timer-fg: var(--color-ink);
+    --bar-bg: var(--color-paper-deep);
+    --bar-fg: var(--color-ink);
+    --bar-focus: var(--color-ink);
   }
 }

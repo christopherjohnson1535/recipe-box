@@ -49,12 +49,12 @@ type IngredientRowProps = {
 /** One ingredient: a button the cook taps to tick off. Ticked rows get a checked box and a drawn claret line. */
 export function IngredientRow({ index, quantity, checked, onToggle, fade, children }: IngredientRowProps) {
   return (
-    <li id={`ingredient-${index}`} className="scroll-mt-4 border-b border-(--rule-hair)">
+    <li id={`ingredient-${index}`} className="scroll-mt-24 border-b border-(--rule-hair) md:scroll-mt-4 print:break-inside-avoid">
       <button
         type="button"
         aria-pressed={checked}
         onClick={onToggle}
-        className="group grid min-h-control w-full cursor-pointer grid-cols-[1.25rem_5.25rem_minmax(0,1fr)] items-baseline gap-x-3 py-2.5 text-left text-body leading-snug"
+        className="group grid min-h-control w-full cursor-pointer grid-cols-[1.25rem_5.25rem_minmax(0,1fr)] items-baseline gap-x-3 py-2.5 text-left text-body leading-snug sm:grid-cols-[1.25rem_6.25rem_minmax(0,1fr)] print:grid-cols-[5.5rem_minmax(0,1fr)]"
       >
         <span
           aria-hidden="true"
@@ -64,11 +64,13 @@ export function IngredientRow({ index, quantity, checked, onToggle, fade, childr
             <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
           </svg>
         </span>
-        <span className="text-small font-semibold text-(--qty-fg) [font-variant-numeric:lining-nums_tabular-nums] [overflow-wrap:anywhere]">
+        <span className="text-small font-semibold text-(--qty-fg) [font-variant-numeric:lining-nums_tabular-nums] break-words group-aria-pressed:text-ink-muted">
           {quantity && (
-            <span key={quantity} className={cx(fade && "qty-fade")}>
-              {quantity}
-            </span>
+            <>
+              <span key={quantity} className={cx("strike", fade && "qty-fade")}>
+                {quantity}
+              </span>{" "}
+            </>
           )}
         </span>
         <span className="min-w-0 [overflow-wrap:anywhere] group-aria-pressed:text-ink-muted">
@@ -84,7 +86,7 @@ export type ScaleOption = { value: number; label: string };
 /** ½× / 1× / 2×: a segmented radio group with 44px targets. */
 export function ScaleControl({ value, options, onChange }: { value: number; options: ScaleOption[]; onChange: (value: number) => void }) {
   return (
-    <div role="radiogroup" aria-label="Scale" className="flex overflow-hidden rounded-full border border-(--button-secondary-border) print:hidden">
+    <div role="radiogroup" aria-label="Scale ingredients" className="flex overflow-hidden rounded-full border border-(--button-secondary-border) print:hidden">
       {options.map((o) => (
         <label key={o.value} className="relative cursor-pointer">
           <input type="radio" name="scale" checked={value === o.value} onChange={() => onChange(o.value)} className="peer sr-only" />

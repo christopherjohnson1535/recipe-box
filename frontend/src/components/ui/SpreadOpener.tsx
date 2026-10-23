@@ -1,5 +1,6 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { cx } from "./cx";
+import { typographic } from "@/lib/recipe";
 import { Morph, photoName, titleName } from "./morph";
 
 type SpreadOpenerProps = {
@@ -27,13 +28,13 @@ const HEADLINE = {
 /** The recipe page's opener: a split screen with the headline on the left and the photo on the right. */
 export function SpreadOpener({ title, kicker, deck, byline, actions, photo, icon, morphId }: SpreadOpenerProps) {
   return (
-    <header className={cx("grid", photo && "lg:grid-cols-[1.2fr_1fr]")}>
+    <header className={cx("grid", photo && "lg:-mb-10 lg:grid-cols-[1.2fr_1fr]")}>
       <div className={cx("flex min-w-0 flex-col items-start gap-5 pb-8", photo && "lg:min-h-[40rem] lg:justify-end lg:py-12 lg:pr-12")}>
         {!photo && icon && <div className="text-ink">{icon}</div>}
         {kicker && <div className="label text-(--kicker-fg)">{kicker}</div>}
         <Morph name={morphId ? titleName(morphId) : undefined}>
-          <h1 className={cx("min-w-0 font-display leading-[0.95] text-ink [overflow-wrap:anywhere]", title.length > 40 ? HEADLINE.long : HEADLINE.normal)}>
-            {title.split(" ").map((word, i) => (
+          <h1 className={cx("min-w-0 font-display leading-[0.95] text-ink [overflow-wrap:anywhere] print:break-after-avoid", title.length > 40 ? HEADLINE.long : HEADLINE.normal)}>
+            {typographic(title).split(" ").map((word, i) => (
               <Fragment key={i}>
                 {i > 0 && " "}
                 <span className="rise-word" style={{ "--w": Math.min(i, 8) } as CSSProperties}>
@@ -49,7 +50,7 @@ export function SpreadOpener({ title, kicker, deck, byline, actions, photo, icon
       </div>
       {photo && (
         <Morph name={morphId ? photoName(morphId) : undefined}>
-          <div className="relative aspect-[3/2] overflow-hidden lg:aspect-auto">
+          <div className="relative aspect-[3/2] overflow-hidden lg:aspect-auto print:hidden">
             {/* Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send. */}
             <img
               src={photo.src}

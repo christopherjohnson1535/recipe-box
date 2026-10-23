@@ -38,9 +38,9 @@ imported draft.
 
 ## Reading a recipe
 A recipe opens like a magazine feature: the title, a one-line summary and who added it on the left, the photo on the right (on an iPad held upright or a phone the photo comes below the title). Under it, large numbers show how many it **serves** and the **prep**, **cook** and **total** times (only the ones the recipe has).
-- **Ingredients**: tap a row to cross it off (a red line is drawn through it); tap again to undo. Ticks stay while the tab is open, even if you reload, and are separate for each recipe. The bar at the bottom counts them and has **Start cooking**.
+- **Ingredients**: tap a row to cross it off (a red line is drawn through it); tap again to undo. Ticks stay while the tab is open, even if you reload, and are separate for each recipe. The bar at the bottom counts them and has **Start cooking**. Fractions are shown as ½, 1½ and so on; a line with a second amount ("2 cups plus 2 tbsp", "1 cup/240 ml") is not scaled.
 - **Scale**: **½×**, **1×** and **2×** above the ingredients change the amounts (and the number served). A line that doesn't start with a number ("salt to taste") stays as written. Scaling is only for reading: it never changes the saved recipe.
-- **Method**: an ingredient named in a step has a dotted underline that jumps to its row, and a time in the text ("12 minutes") is shown as a small clock label. The labels are only for show; they don't start a timer yet.
+- **Method**: an ingredient named in a step has a dotted underline that jumps to its row, and a time in the text ("12 minutes") is shown in a small pill with a clock. The pills are only for show; they don't start a timer yet.
 - A recipe's **notes** appear under the method as a quotation.
 - If your device is set to reduce motion, nothing slides, turns or draws; colours still change.
 

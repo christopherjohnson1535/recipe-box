@@ -41,6 +41,10 @@
 @keyframes fade-in {
   from { opacity: 0; }
 }
+@keyframes target-flash {
+  from { background-color: var(--target-bg); box-shadow: inset 3px 0 0 var(--qty-fg); }
+  to { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
+}
 @keyframes bar-in {
   from { translate: 0 160%; }
 }
@@ -153,6 +157,16 @@
 }
 [data-arrive="play"] .bar-in {
   animation: bar-in var(--duration-slow) var(--ease-out) 600ms both;
+}
+/* The ingredient row a step link jumped to: a claret bar and a tint, fading out after a moment (kept still when motion is reduced). */
+li:target > button {
+  background-color: var(--target-bg);
+  box-shadow: inset 3px 0 0 var(--qty-fg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  li:target > button {
+    animation: target-flash 2.5s var(--ease-out) 1s both;
+  }
 }
 /* Keep focused and linked content clear of the floating bar. */
 html:has(.floating-bar) {
