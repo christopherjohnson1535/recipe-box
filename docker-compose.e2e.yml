@@ -1,0 +1,69 @@
+# Stack for the end-to-end suite (e2e/). Throwaway: Postgres on tmpfs, no AI, a fixture site for link import.
+#   docker compose -f docker-compose.e2e.yml up -d --build --wait
+#   cd e2e && E2E_STACK=compose npm test        (globalSetup also runs the `up` itself when the stack is down)
+# Distinct project name and port so it never collides with a development stack.
+
+name: recipe-box-e2e
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: recipes
+      POSTGRES_PASSWORD: recipes
+      POSTGRES_DB: recipes
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recipes -d recipes"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  fixture:
+    # Serves backend/tests/fixtures/*.html and a PNG; the only site link import may reach.
+    image: node:22-alpine
+    working_dir: /e2e
+    command: ["node", "support/fixture-server.ts"]
+    environment:
+      FIXTURE_DIR: /fixtures
+      FIXTURE_PORT: "4146"
+    volumes:
+      - ./e2e/support:/e2e/support:ro
+      - ./backend/tests/fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4146/publisher.html"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgres://recipes:recipes@db:5432/recipes
+      MEDIA_DIR: /data/media
+      BIND_ADDR: 0.0.0.0:8080
+      COOKIE_SECURE: "false"
+      AI_PROVIDER: none
+      IMPORT_ALLOW_HOST: fixture:4146 # test stacks only: lets link import reach the fixture container
+      RUST_LOG: info
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+      fixture:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    environment:
+      API_INTERNAL_URL: http://api:8080
+    ports:
+      - "127.0.0.1:3146:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  media:
