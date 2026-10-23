@@ -1965,6 +1965,7 @@
           "unsupported_media",
           "no_recipe_found",
           "ai_disabled",
+          "ai_error",
           "blocked_address",
           "site_blocked",
           "fetch_failed",

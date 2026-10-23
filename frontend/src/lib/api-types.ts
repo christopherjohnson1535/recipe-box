@@ -389,7 +389,7 @@ export interface components {
          *     frontend proxy and browser client make those up.
          * @enum {string}
          */
-        ErrorCode: "validation" | "unauthenticated" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "too_large" | "unsupported_media" | "no_recipe_found" | "ai_disabled" | "blocked_address" | "site_blocked" | "fetch_failed" | "not_implemented" | "internal";
+        ErrorCode: "validation" | "unauthenticated" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "too_large" | "unsupported_media" | "no_recipe_found" | "ai_disabled" | "ai_error" | "blocked_address" | "site_blocked" | "fetch_failed" | "not_implemented" | "internal";
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
             message: string;
