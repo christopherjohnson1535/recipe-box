@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatNumber, parseNumber, scaleIngredient, scaleQuantity, splitIngredient } from "./scale";
+import { formatNumber, parseNumber, scaleIngredient, scaleQuantity, scaleServings, splitIngredient } from "./scale";
 
 describe("splitIngredient", () => {
   it.each([
@@ -60,6 +60,17 @@ describe("scaleIngredient", () => {
     ["7 cups water", 2.5, "18 cups water"],
     ["1/8 tsp nutmeg", 0.5, "⅛ tsp nutmeg"],
     ["1 tsp salt", 4, "4 tsp salt"],
+    ["1,000 g flour", 2, "2,000 g flour"],
+    ["1,5 kg flour", 2, "1,5 kg flour"],
+    ["1-1/2 cups flour", 2, "3 cups flour"],
+    ["1⁄2 cup flour", 2, "1 cup flour"],
+    ["1 1/2-inch piece ginger", 2, "1 1/2-inch piece ginger"],
+    ["1½-inch piece ginger", 2, "1½-inch piece ginger"],
+    ["2 cups plus 2 tbsp flour", 2, "2 cups plus 2 tbsp flour"],
+    ["1 cup/240 ml milk", 2, "1 cup/240 ml milk"],
+    ["2 sprigs thyme", 0.5, "1 sprig thyme"],
+    ["1 head garlic", 3, "3 heads garlic"],
+    ["1 dash bitters", 2, "2 dashes bitters"],
   ])("%s × %s → %s", (text, factor, expected) => {
     expect(scaleIngredient(text, factor)).toBe(expected);
   });
@@ -69,6 +80,28 @@ describe("scaleIngredient", () => {
     expect(scaleIngredient("a pinch of salt", 2)).toBe("a pinch of salt");
     expect(scaleIngredient("14-oz can tomatoes", 2)).toBe("14-oz can tomatoes");
     expect(scaleIngredient("1 cup flour", 1)).toBe("1 cup flour");
+  });
+
+  it("sets fractions the way a cook writes them at ×1 too (scaleQuantity)", () => {
+    expect(scaleQuantity("1/2 cup", 1)).toBe("½ cup");
+    expect(scaleQuantity("1 1/2 lb", 1)).toBe("1½ lb");
+    expect(scaleQuantity("1⁄2 cup", 1)).toBe("½ cup");
+    expect(scaleQuantity("1-1/2 cups", 1)).toBe("1½ cups");
+    expect(scaleQuantity("2", 1)).toBe("2");
+    expect(scaleQuantity("2-3 cloves", 1)).toBe("2–3 cloves");
+    expect(scaleQuantity("1000 g", 1)).toBe("1,000 g");
+    expect(scaleQuantity("0.4 cup", 1)).toBe("0.4 cup"); // no tidy fraction: stays as written
+  });
+
+  it("splits a line with a second amount into no quantity", () => {
+    expect(splitIngredient("2 cups plus 2 tbsp flour")).toEqual({ quantity: null, rest: "2 cups plus 2 tbsp flour" });
+    expect(splitIngredient("1,000 g flour")).toEqual({ quantity: "1,000 g", rest: "flour" });
+  });
+
+  it("sets a servings range with an en dash", () => {
+    expect(scaleServings("6-8", 1)).toBe("6–8");
+    expect(scaleServings("6-8", 2)).toBe("12–16");
+    expect(scaleServings("makes about 4 bowls", 1)).toBe("makes about 4 bowls");
   });
 
   it("scales servings strings", () => {

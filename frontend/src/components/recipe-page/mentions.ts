@@ -4,7 +4,7 @@ import { splitIngredient } from "@/lib/scale";
 /** A piece of step text: plain, a timer ("12 minutes"), or the name of ingredient number `ingredient`. */
 export type StepPart =
   | { kind: "text"; text: string }
-  | { kind: "timer"; text: string; label: string }
+  | { kind: "timer"; text: string }
   | { kind: "ingredient"; text: string; ingredient: number };
 
 // Words dropped from the front of an ingredient to get its name: sizes, states, preparation.
@@ -23,6 +23,7 @@ const NOISE = new Set(
 export function ingredientNames(line: string): string[] {
   const words = splitIngredient(line)
     .rest.toLowerCase()
+    .replace(/^\([^)]*\)\s*/, "") // "(14 oz) can tomatoes": the size is not the name
     .split(/[,(;]/)[0]
     .replace(/\s+(to taste|for .*|as needed|or .*)$/, "")
     .split(/\s+/)
@@ -54,7 +55,7 @@ export function annotateStep(text: string, lines: string[]): StepPart[] {
   const names = lines.map(ingredientNames);
   const parts: StepPart[] = [];
   for (const seg of splitDurations(text)) {
-    if (seg.minutes !== null) parts.push({ kind: "timer", text: seg.text, label: seg.label ?? seg.text });
+    if (seg.minutes !== null) parts.push({ kind: "timer", text: seg.text });
     else parts.push(...mentionsIn(seg.text, names));
   }
   return parts;

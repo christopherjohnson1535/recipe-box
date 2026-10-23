@@ -65,7 +65,7 @@ describe("annotateStep", () => {
   it("sets durations as timers and never links inside them", () => {
     const parts = annotateStep("Cook the onion 12 minutes, then add the wine.", LINES);
     expect(parts.map((p) => p.kind)).toEqual(["text", "ingredient", "text", "timer", "text", "ingredient", "text"]);
-    expect(parts[3]).toEqual({ kind: "timer", text: "12 minutes", label: "12 min" });
+    expect(parts[3]).toEqual({ kind: "timer", text: "12 minutes" });
     expect(linked("Simmer 10 minutes.", ["10 minutes of patience"])).toEqual([]);
   });
 
