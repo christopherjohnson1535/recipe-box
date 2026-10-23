@@ -95,7 +95,7 @@ describe("ImportScreen", () => {
     importLink();
     expect((await screen.findByRole("alert")).textContent).toMatch(/won’t let us read/);
     fireEvent.click(screen.getByRole("button", { name: "Paste the recipe text instead" }));
-    expect(screen.getByRole("tab", { name: "Text", selected: true })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Paste text", selected: true })).toBeTruthy();
     expect((screen.getByLabelText(/Where it came from/) as HTMLInputElement).value).toBe("https://example.com/pancakes");
     expect(window.location.search).toBe("?mode=text");
   });
