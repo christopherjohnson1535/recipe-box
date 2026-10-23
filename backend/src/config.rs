@@ -92,6 +92,10 @@ mod tests {
             let err = parse_session_days(bad).unwrap_err().to_string();
             assert!(err.contains("1 to 3650"), "{bad}: {err}");
         }
+    }
+}
+
+#[cfg(test)]
 mod import_allow_host_tests {
     use super::check_import_allow_host;
 
