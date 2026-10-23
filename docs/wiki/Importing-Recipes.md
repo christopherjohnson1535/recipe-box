@@ -4,8 +4,8 @@ Every import gives you a **draft** to check and fix before it is saved. Open **I
 
 | From | How | Notes |
 |---|---|---|
-| A web link | Import → Link → paste the URL | Works best on sites that publish recipe data (most big recipe sites). The main photo is downloaded so it survives the site changing. |
-| A blocked site | Import → Text → paste the recipe | Some sites block servers; copy the recipe text from the page instead. Needs AI. |
+| A web link | Import → Link → paste the URL | Works best on sites that publish recipe data (most big recipe sites). If a page has none and AI is on, the AI reads the page text instead and the draft says so; check it against the page. The main photo is downloaded so it survives the site changing. |
+| A blocked site, or any text | Import → Text → paste the recipe | Some sites block servers; copy the recipe text from the page instead. Headings such as "For the sauce" become sections. Needs AI. You can add the page address so the recipe keeps its source. |
 | A photo | Import → Photo → pick or take up to 6 photos | Cookbook pages, handwritten cards, screenshots. Needs AI; without it the photo is saved next to an empty form. |
 | A photo of a dish | Import → Photo → "Guess from a dish" | Clearly marked as a guess. Needs AI. |
 | Safari share sheet | Apple Shortcut / bookmarklet | Planned (Phase 4). |
@@ -23,7 +23,7 @@ Every import gives you a **draft** to check and fix before it is saved. Open **I
 **On the iPad**: *Take or choose photos* offers the camera as well as your photo library. Up to 6 photos.
 
 **If a link import fails**
-- *"We couldn't find a recipe on that page"*: the page has no machine-readable recipe. Paste the recipe text instead.
+- *"We couldn't find a recipe on that page"*: the page has no machine-readable recipe (and AI is off, or could not find one in the text). Paste the recipe text instead.
 - *"That site does not let us read its pages"*: the site blocks servers (login wall, bot check). Paste the text instead.
 - *"That address can’t be imported"*: only public web addresses (http or https) can be imported, never ones inside your home network.
 - If the recipe's photo cannot be downloaded you still get the draft, with a note; add a photo yourself. The same goes for photos that are too big (over 10,000 px a side or 40 megapixels).
@@ -34,8 +34,8 @@ Already saved that link? You'll be told "You already have this recipe" with a li
 
 **Photos.** JPEG, PNG, WebP and iPhone/iPad HEIC photos all work, up to 6 per recipe; the pages are read in the order you pick them and become one recipe. If the AI can't find a recipe in them, or isn't available right now, your photos are still kept and shown beside an empty form. With AI **off**, *Keep photos and type it in* does the same straight away.
 
-Pasting recipe text still shows **Coming soon** until text import is released (Phase 2).
+**Text.** Paste up to about 50,000 characters; anything longer is cut and the draft says so. Nothing is fetched from the address you add.
 
 Imported recipes keep the source link and author credit. Recipes are for private household use.
 
-_Status: link and photo import work; text import is Phase 2 — see [[Roadmap]]._
+_Status: link, photo and text import work — see [[Roadmap]]._

@@ -149,7 +149,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reads a recipe from pasted text with AI (LNK-3/4). Returns a draft. */
+        /** Reads a recipe from pasted text with AI (LNK-3/4). Returns a draft; saves nothing and never fetches `sourceUrl`. */
         post: operations["importFromText"];
         delete?: never;
         options?: never;
@@ -166,7 +166,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. */
+        /**
+         * Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. A page with no recipe data goes to
+         *     the AI as plain text when AI is on (LNK-3).
+         */
         post: operations["importFromUrl"];
         delete?: never;
         options?: never;
@@ -1064,7 +1067,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The draft. */
+            /** @description The draft. `sourceType` is `text`; `sourceUrl` is the given address without credentials or fragment. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1073,7 +1076,7 @@ export interface operations {
                     "application/json": components["schemas"]["RecipeDraft"];
                 };
             };
-            /** @description Invalid body (`validation`). */
+            /** @description Empty text or a bad `sourceUrl` (`validation`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1118,8 +1121,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Not built yet (`not_implemented`); every call returns this today. */
-            501: {
+            /** @description The AI provider failed (`ai_error`). */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1196,7 +1199,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description The site refused us (`site_blocked`), or the fetch failed or timed out (`fetch_failed`). */
+            /** @description The site refused us (`site_blocked`), the fetch failed or timed out (`fetch_failed`), or the AI fallback failed (`ai_error`). */
             502: {
                 headers: {
                     [name: string]: unknown;

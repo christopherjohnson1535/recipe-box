@@ -101,7 +101,8 @@ const MAX_IMAGE_EDGE: u32 = 1568;
 const MAX_RETRY_AFTER_SECS: u64 = 10;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120); // vision replies are slow
-const MAX_TEXT_INPUT_CHARS: usize = 50_000;
+/// Longest pasted text sent to the model; the route warns when the text is longer.
+pub const MAX_TEXT_INPUT_CHARS: usize = 50_000;
 const MAX_MODEL_WARNINGS: usize = 10;
 const MAX_WARNING_CHARS: usize = 300;
 /// Durations above a week are nonsense for a recipe (same limit as `jsonld`).

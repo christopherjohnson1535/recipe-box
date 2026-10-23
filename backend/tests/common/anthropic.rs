@@ -162,3 +162,29 @@ async fn handle(
     }
     res
 }
+
+impl MockAnthropic {
+    /// Points `state` at this mock: the Anthropic provider, and a config that says AI is on.
+    pub fn enable_ai(&self, state: &mut recipe_box_api::state::AppState) {
+        use recipe_box_api::{
+            config::Secret,
+            import::ai::{Ai, AnthropicProvider},
+        };
+        let p = AnthropicProvider::with_base_url(Secret::new("k"), "m".into(), &self.base_url)
+            .unwrap()
+            .with_retry_delay_cap(std::time::Duration::ZERO);
+        state.ai = Arc::new(Ai::Anthropic(p));
+        state.config = Arc::new(recipe_box_api::config::Config {
+            ai_provider: "anthropic".into(),
+            ..(*state.config).clone()
+        });
+    }
+
+    /// The prompt text of the `n`th request (the pasted or page text is inside it).
+    pub fn prompt(&self, n: usize) -> String {
+        self.requests()[n].body["messages"][0]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+}
