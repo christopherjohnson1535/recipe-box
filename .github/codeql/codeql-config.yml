@@ -1,0 +1,4 @@
+# Test fixtures hold made-up keys and passwords on purpose; scanning them only produces noise.
+paths-ignore:
+  - backend/tests
+  - e2e

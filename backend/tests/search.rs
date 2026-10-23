@@ -316,10 +316,21 @@ async fn two_thousand_recipes_search_returns_the_right_counts() {
     // Speed is a benchmark question, and a wall-clock assertion here fails on a busy machine.
     assert_eq!(ctx.list("q=buttermilk").await.1, 400);
     assert_eq!(ctx.list("q=lasag").await.1, 285);
-    for q in ["weeknight lasag", "recipe 12 stew", "dinner"] {
-        for query in [format!("q={}&tag=dinner", enc(q)), format!("q={}", enc(q))] {
+    // (query, total with no tag filter, total with tag=dinner). `dinner` is a tag name (on lasagne rows only); "recipe 12 stew" is exactly n = 12;
+    // "weeknight lasag" matches nothing because `weeknight` is only a tag and `lasag` only in titles (terms are
+    // not combined across fields).
+    for (q, any_tag, dinner_only) in [
+        ("weeknight lasag", 0, 0),
+        ("recipe 12 stew", 1, 0),
+        ("dinner", 285, 285),
+    ] {
+        for (query, want) in [
+            (format!("q={}&tag=dinner", enc(q)), dinner_only),
+            (format!("q={}", enc(q)), any_tag),
+        ] {
             let (items, total) = ctx.list(&query).await;
-            assert!(total >= items.len() as i64, "{query}");
+            assert_eq!(total, want, "{query}");
+            assert!(items.len() as i64 <= total, "{query}");
         }
     }
 }
