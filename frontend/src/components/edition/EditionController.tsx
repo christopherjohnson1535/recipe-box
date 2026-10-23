@@ -21,12 +21,14 @@ export function EditionController() {
     };
     apply();
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", apply); // bfcache restore on iPad
     window.addEventListener("storage", apply);
     window.addEventListener(EDITION_EVENT, apply);
     media.addEventListener("change", apply);
     return () => {
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", apply);
       window.removeEventListener("storage", apply);
       window.removeEventListener(EDITION_EVENT, apply);
       media.removeEventListener("change", apply);
