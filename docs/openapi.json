@@ -434,7 +434,7 @@
         },
         "responses": {
           "200": {
-            "description": "The draft.",
+            "description": "The draft. `photoImageIds` lists the stored photos in upload order; in `dish` mode `imageId` is the first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -444,7 +444,7 @@
             }
           },
           "400": {
-            "description": "Missing files or bad `mode` (`validation`).",
+            "description": "No files, more than 6, or a bad `mode` (`validation`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -464,7 +464,7 @@
             }
           },
           "413": {
-            "description": "Body over the size limit (`too_large`).",
+            "description": "A file is over `MAX_UPLOAD_MB` (`too_large`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -474,7 +474,7 @@
             }
           },
           "415": {
-            "description": "A file is not an image we can read (`unsupported_media`).",
+            "description": "A file is not an image we can read, including a HEIC the server cannot decode (`unsupported_media`). Nothing is kept.",
             "content": {
               "application/json": {
                 "schema": {
@@ -484,7 +484,7 @@
             }
           },
           "422": {
-            "description": "No recipe in the photos (`no_recipe_found`), or no AI provider (`ai_disabled`; the photos are stored first).",
+            "description": "No AI provider (`ai_disabled`) or no recipe in the photos (`no_recipe_found`). The photos stay stored and `error.photoImageIds` lists them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -503,8 +503,8 @@
               }
             }
           },
-          "501": {
-            "description": "Not built yet (`not_implemented`); every call returns this today.",
+          "502": {
+            "description": "The AI provider failed (`ai_error`). The photos stay stored and `error.photoImageIds` lists them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1985,6 +1985,17 @@
           },
           "message": {
             "type": "string"
+          },
+          "photoImageIds": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Photo import only: the photos were stored but no draft could be made."
           }
         }
       },
@@ -2706,7 +2717,7 @@
           "file": {
             "type": "string",
             "format": "binary",
-            "description": "JPEG, PNG, WebP or GIF."
+            "description": "JPEG, PNG, WebP, GIF or HEIC."
           }
         }
       },

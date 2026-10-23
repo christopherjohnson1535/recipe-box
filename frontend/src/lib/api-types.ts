@@ -393,6 +393,8 @@ export interface components {
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
             message: string;
+            /** @description Photo import only: the photos were stored but no draft could be made. */
+            photoImageIds?: string[] | null;
         };
         Health: {
             db: string;
@@ -596,7 +598,7 @@ export interface components {
         UploadForm: {
             /**
              * Format: binary
-             * @description JPEG, PNG, WebP or GIF.
+             * @description JPEG, PNG, WebP, GIF or HEIC.
              */
             file: string;
         };
@@ -976,7 +978,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The draft. */
+            /** @description The draft. `photoImageIds` lists the stored photos in upload order; in `dish` mode `imageId` is the first. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -985,7 +987,7 @@ export interface operations {
                     "application/json": components["schemas"]["RecipeDraft"];
                 };
             };
-            /** @description Missing files or bad `mode` (`validation`). */
+            /** @description No files, more than 6, or a bad `mode` (`validation`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1003,7 +1005,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Body over the size limit (`too_large`). */
+            /** @description A file is over `MAX_UPLOAD_MB` (`too_large`). */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -1012,7 +1014,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description A file is not an image we can read (`unsupported_media`). */
+            /** @description A file is not an image we can read, including a HEIC the server cannot decode (`unsupported_media`). Nothing is kept. */
             415: {
                 headers: {
                     [name: string]: unknown;
@@ -1021,7 +1023,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description No recipe in the photos (`no_recipe_found`), or no AI provider (`ai_disabled`; the photos are stored first). */
+            /** @description No AI provider (`ai_disabled`) or no recipe in the photos (`no_recipe_found`). The photos stay stored and `error.photoImageIds` lists them. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1039,8 +1041,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Not built yet (`not_implemented`); every call returns this today. */
-            501: {
+            /** @description The AI provider failed (`ai_error`). The photos stay stored and `error.photoImageIds` lists them. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
