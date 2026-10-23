@@ -98,7 +98,7 @@ pub async fn from_url(
         if let Some(draft) = jsonld::extract(&html, &page.final_url) {
             return Parsed::Draft(Box::new(draft));
         }
-        if !ai_on || jsonld::too_complex(&html) {
+        if !ai_on {
             return Parsed::Nothing;
         }
         let page_text = readable(&html, &page.final_url);

@@ -1,8 +1,8 @@
 //! Visible text of a web page, for the AI fallback of link import (LNK-3) when a page has no recipe data.
 //!
 //! Keeps `<main>` (else `<article>`, else `<body>`), drops page chrome and scripts, and puts every block on its own
-//! line so headings such as "For the sauce" stay recognisable. CPU-bound: call from `spawn_blocking`, and only
-//! for pages that passed `jsonld::too_complex`.
+//! line so headings such as "For the sauce" stay recognisable. CPU-bound: call from `spawn_blocking`. Pages that
+//! fail `jsonld::too_complex` are not parsed and read as empty.
 
 use scraper::{ElementRef, Html, Node, Selector};
 
@@ -14,7 +14,7 @@ pub const MAX_READABLE_CHARS: usize = 20_000;
 /// Fewest non-space characters of page text worth sending to the AI; a `<main>`/`<article>` with less falls back
 /// to the next candidate root.
 pub const MIN_PAGE_CHARS: usize = 200;
-/// Deepest element the text walk descends into (callers refuse deeper pages first; this keeps the stack safe anyway).
+/// Deepest element the text walk descends into (`too_complex` refuses deeper pages first; this keeps the stack safe anyway).
 const MAX_WALK_DEPTH: usize = 400;
 
 /// Subtrees that are never recipe content.
@@ -59,6 +59,12 @@ pub struct Readable {
 }
 
 pub fn readable(html: &str, page_url: &Url) -> Readable {
+    if jsonld::too_complex(html) {
+        return Readable {
+            text: String::new(),
+            image_url: None,
+        };
+    }
     let doc = Html::parse_document(html);
     let pick = |css: &str| {
         Selector::parse(css)
@@ -199,9 +205,31 @@ mod tests {
     }
 
     #[test]
-    fn a_very_deep_page_returns_without_overflowing_the_stack() {
-        let r = read(&format!("<body>{}hello</body>", "<div></x>".repeat(30_000)));
-        assert!(r.text.chars().count() <= MAX_READABLE_CHARS);
+    fn a_pathological_page_reads_as_empty_without_building_a_dom() {
+        let r = read(&format!(
+            "<head><meta property=\"og:image\" content=\"/p.jpg\"></head><body>{}hello</body>",
+            "<div></x>".repeat(30_000)
+        ));
+        assert_eq!((r.text.as_str(), r.image_url), ("", None));
+    }
+
+    #[test]
+    fn the_walk_stops_at_its_depth_cap_and_keeps_shallow_text() {
+        // `too_complex` refuses pages this deep first, so exercise `walk` on the parsed tree directly.
+        let n = MAX_WALK_DEPTH + 100;
+        let html = format!(
+            "<body><p>shallow</p>{}deep{}</body>",
+            "<div>".repeat(n),
+            "</div>".repeat(n)
+        );
+        let doc = Html::parse_document(&html);
+        let body = doc
+            .select(&Selector::parse("body").unwrap())
+            .next()
+            .unwrap();
+        let mut out = String::new();
+        walk(body, &mut out, false, 0);
+        assert!(out.contains("shallow") && !out.contains("deep"));
     }
 
     #[test]
