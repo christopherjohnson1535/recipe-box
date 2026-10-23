@@ -22,7 +22,7 @@ services:
 
   fixture:
     # Serves backend/tests/fixtures/*.html and a PNG; the only site link import may reach.
-    image: node:22-alpine
+    image: node:22.18-alpine # type stripping needs 22.18+; pinned so a base-image change cannot break the fixture
     working_dir: /e2e
     command: ["node", "support/fixture-server.ts"]
     environment:

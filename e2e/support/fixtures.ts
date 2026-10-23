@@ -15,10 +15,15 @@ export async function hydrated(locator: Locator) {
     .toBe(true);
 }
 
-/** On a phone the tag filter sits in a collapsed "Tag:" disclosure; on wider screens it is already showing. */
+/** Below 640 px (Tailwind `sm`) the tag filter sits in a collapsed "Tag:" disclosure; from there up it is already showing. */
 export async function openTagFilter(page: Page) {
-  const summary = page.getByText("Tag:", { exact: false }).locator("xpath=ancestor-or-self::summary");
-  if (await summary.isVisible()) await summary.click();
+  const width = page.viewportSize()?.width ?? Number.POSITIVE_INFINITY;
+  if (width < 640) {
+    const summary = page.locator("summary", { hasText: "Tag:" });
+    await expect(summary).toBeVisible();
+    await summary.click();
+  }
+  await expect(page.getByRole("navigation", { name: "Filter by tag" })).toBeVisible();
 }
 
 export const fixtureUrl = (name: string) => `${FIXTURE_ORIGIN}/${name}`;

@@ -145,8 +145,10 @@ jobs:
           persist-credentials: false
       - run: cp .env.example .env
       - run: docker compose up -d --build --wait --wait-timeout 300
-      - name: Login page renders
-        run: test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login)" = 200
+      - name: API healthy through the web port
+        run: curl -fsS http://127.0.0.1:3000/api/health | grep -q '"db":"ok"'
+      - name: Login page renders (a fresh stack redirects to /setup)
+        run: test "$(curl -fsSL -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login)" = 200
       - if: failure()
         run: docker compose logs --no-color
       - if: always()
