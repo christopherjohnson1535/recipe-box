@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  clampStep, formatClock, litIngredients, noTimers, parseVoice, railOrder, remainingMs, ringFraction, stepDurations,
+  clampStep, cookParts, formatClock, litIngredients, noTimers, parseVoice, railOrder, remainingMs, ringFraction, stepDurations,
   swipeDirection, timerReducer,
 } from "./cook-logic";
 
 const LINES = ["1 large onion, diced", "2 carrots, diced", "2 tbsp tomato paste", "2 cups dry red wine"];
 
 describe("ingredients for a step", () => {
+  it("lights the first word of a two-word name when the step says only that", () => {
+    const lines = ["4 garlic cloves, smashed", "2 cups dry red wine", "1 tbsp olive oil"];
+    const step = "Add the garlic and cook 1 minute.";
+    expect([...litIngredients(step, lines)]).toEqual([0]);
+    expect(cookParts(step, lines).filter((p) => p.kind === "ingredient").map((p) => p.text)).toEqual(["garlic"]);
+    expect([...litIngredients("Add the dry olive thing.", lines)]).toEqual([]);
+  });
   it("lights the ones the step names and lists them first", () => {
     const lit = litIngredients("Cook the onion and carrots, then stir in the tomato paste.", LINES);
     expect([...lit]).toEqual([0, 1, 2]);
@@ -74,5 +81,11 @@ describe("parseVoice", () => {
     expect(parseVoice("go back")).toBe("back");
     expect(parseVoice("repeat that")).toBe("repeat");
     expect(parseVoice("banana")).toBeNull();
+    expect(parseVoice("next step")).toBe("next");
+  });
+  it("ignores kitchen talk that happens to contain a command word", () => {
+    expect(parseVoice("put the lid back")).toBeNull();
+    expect(parseVoice("stir it next to the pot")).toBeNull();
+    expect(parseVoice("is it done, repeat")).toBeNull();
   });
 });

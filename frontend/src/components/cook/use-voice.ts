@@ -8,7 +8,7 @@ type Recognition = {
   interimResults: boolean;
   onresult: ((e: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
   start(): void;
   stop(): void;
 };
@@ -46,17 +46,28 @@ export function useVoice(onCommand: (c: "next" | "back" | "repeat") => void) {
         if (command) handler.current(command);
       }
     };
-    rec.onerror = () => {
+    const stopListening = () => {
       alive = false;
       setListening(false);
     };
+    // Only a refused microphone ends it; "no-speech" and "aborted" are routine in a quiet kitchen and fall through to onend.
+    rec.onerror = (e) => {
+      if (e?.error === undefined || e.error === "not-allowed" || e.error === "service-not-allowed") stopListening();
+    };
+    let restarts: number[] = [];
+    let restart: ReturnType<typeof setTimeout> | undefined;
     rec.onend = () => {
       if (!alive) return;
-      try {
-        rec.start(); // browsers end a session after a pause; keep listening while the toggle is on
-      } catch {
-        setListening(false);
-      }
+      const t = Date.now();
+      restarts = [...restarts.filter((r) => t - r < 5000), t];
+      if (restarts.length > 5) return stopListening(); // starts that end at once: give up rather than loop
+      restart = setTimeout(() => {
+        try {
+          rec.start(); // browsers end a session after a pause; keep listening while the toggle is on
+        } catch {
+          stopListening();
+        }
+      }, 300);
     };
     try {
       rec.start();
@@ -66,6 +77,7 @@ export function useVoice(onCommand: (c: "next" | "back" | "repeat") => void) {
     }
     return () => {
       alive = false;
+      clearTimeout(restart);
       rec.onend = rec.onerror = rec.onresult = null;
       try {
         rec.stop();

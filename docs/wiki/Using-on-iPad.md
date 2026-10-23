@@ -6,9 +6,9 @@ Open Recipe Box in Safari over **HTTPS**, tap Share → **Add to Home Screen**. 
 
 ## Cooking mode
 Open a recipe → **Start cooking**. Cooking mode is always dark (the evening edition), with one step at a time in large type.
-- **Move on** with the **Next step** and **Back** buttons, by swiping left or right on the step, or with the arrow keys.
-- **For this step** lists the ingredients the step names, bright, followed by the rest, dimmed. Held upright they appear as chips above the step.
-- **Timers**: tap a time written in the step ("10 minutes") to start a timer. Several can run, and they keep going when you change step. A finished timer flashes red and chimes (the chime needs one tap on the page first, a browser rule); tap **Dismiss** to clear it.
+- **Move on** with the **Next step** and **Back** buttons, by swiping left or right anywhere on the screen, or with the arrow keys.
+- **For this step** lists the ingredients the step names, bright, followed by the rest, dimmed. Held upright only the ones the step names appear, as chips above the step; tap **+N more** for the rest.
+- **Timers**: tap a time written in the step ("10 minutes") to start a timer. Several can run, and they keep going when you change step. A finished timer flashes red and chimes for ten seconds, then stays red (the chime needs one tap on the page first, a browser rule); tap **Dismiss** to clear it. **Close** asks first while a timer is running, since closing stops the timers.
 - **Voice** (where the browser supports it, such as Safari): turn it on at the top right and say "next", "back" or "repeat". Without support the switch is not shown.
 - With reduced motion turned on in the device settings, nothing slides or spins; colours still change.
 - A line at the bottom previews the next step.

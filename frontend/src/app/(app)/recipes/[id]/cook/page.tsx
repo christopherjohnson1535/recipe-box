@@ -4,6 +4,7 @@ import { cache } from "react";
 import { CookMode } from "@/components/cook/CookMode";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type Recipe } from "@/lib/api";
+import { PIN_EVENING_SCRIPT } from "@/lib/edition";
 import { serverApi } from "@/lib/server-api";
 
 type Params = { params: Promise<{ id: string }> };
@@ -27,5 +28,11 @@ export default async function CookPage({ params }: Params) {
   const { id } = await params;
   const recipe = await loadRecipe(id);
   if ("error" in recipe) return <ServerError error={recipe.error} />;
-  return <CookMode id={id} title={recipe.title} ingredients={recipe.ingredients.map((i) => i.text)} steps={recipe.steps.map((s) => s.text)} />;
+  return (
+    <>
+      {/* Pins the evening edition before first paint on a hard load; CookStage keeps it pinned after hydration. */}
+      <script dangerouslySetInnerHTML={{ __html: PIN_EVENING_SCRIPT }} />
+      <CookMode id={id} title={recipe.title} ingredients={recipe.ingredients.map((i) => i.text)} steps={recipe.steps.map((s) => s.text)} />
+    </>
+  );
 }

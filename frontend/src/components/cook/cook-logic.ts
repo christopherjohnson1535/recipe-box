@@ -1,9 +1,54 @@
 import { splitDurations } from "@/lib/recipe";
-import { annotateStep } from "@/components/recipe-page/mentions";
+import { annotateStep, ingredientNames, type StepPart } from "@/components/recipe-page/mentions";
+
+// Not a name on its own when it is the first word of a two-word name ("dry red wine", "olive oil", "garlic cloves").
+const NOT_A_NAME = new Set(
+  "cups cup tbsp tsp ounce ounces pound pounds clove cloves sprig sprigs pinch bunch can cans canned olive sesame black white red green brown yellow sweet sour dark light plain heavy double single baking cooking kosher sea table crushed low full all-purpose".split(
+    " ",
+  ),
+);
+
+/**
+ * Like annotateStep, plus the first word of a two-word name when the step uses just that ("4 garlic cloves, smashed" is
+ * "garlic" in the step). Each such ingredient is linked once, and only if the step did not already name it.
+ * shortcut: recipe-page/mentions.ts has the same gap; a follow-up could move this there.
+ */
+export function cookParts(step: string, lines: string[]): StepPart[] {
+  const parts = annotateStep(step, lines);
+  const named = new Set(parts.flatMap((p) => (p.kind === "ingredient" ? [p.ingredient] : [])));
+  const extra = new Map<string, number>();
+  lines.forEach((line, i) => {
+    const words = (ingredientNames(line)[0] ?? "").split(" ");
+    const first = words[0];
+    if (!named.has(i) && words.length === 2 && first.length >= 4 && !NOT_A_NAME.has(first) && !extra.has(first)) extra.set(first, i);
+  });
+  if (extra.size === 0) return parts;
+  const used = new Set<number>();
+  return parts.flatMap((part): StepPart[] => {
+    if (part.kind !== "text") return [part];
+    const out: StepPart[] = [];
+    let rest = part.text;
+    for (;;) {
+      let best: { at: number; len: number; ingredient: number } | null = null;
+      for (const [word, ingredient] of extra) {
+        if (used.has(ingredient)) continue;
+        const m = new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, "iu").exec(rest);
+        if (m && (!best || m.index < best.at)) best = { at: m.index, len: m[0].length, ingredient };
+      }
+      if (!best) break;
+      used.add(best.ingredient);
+      if (best.at > 0) out.push({ kind: "text", text: rest.slice(0, best.at) });
+      out.push({ kind: "ingredient", text: rest.slice(best.at, best.at + best.len), ingredient: best.ingredient });
+      rest = rest.slice(best.at + best.len);
+    }
+    if (rest) out.push({ kind: "text", text: rest });
+    return out;
+  });
+}
 
 /** Indexes of the ingredient lines the step names (the "lit" rows in the cook-mode rail). */
 export function litIngredients(step: string, lines: string[]): Set<number> {
-  return new Set(annotateStep(step, lines).flatMap((p) => (p.kind === "ingredient" ? [p.ingredient] : [])));
+  return new Set(cookParts(step, lines).flatMap((p) => (p.kind === "ingredient" ? [p.ingredient] : [])));
 }
 
 /** Rail order: lit ingredients first, then the rest, each in recipe order. */
@@ -68,15 +113,16 @@ export function formatClock(ms: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
+const FILLER = new Set(["please", "go", "okay", "ok", "that", "again", "hey"]);
+
 /** What a spoken phrase asks for, or null. */
 export function parseVoice(transcript: string): "next" | "back" | "repeat" | null {
-  const words = transcript.toLowerCase().match(/[a-z]+/g) ?? [];
-  const last = words.slice(-3);
-  for (let i = last.length - 1; i >= 0; i--) {
-    const w = last[i];
-    if (w === "next") return "next";
-    if (w === "back" || w === "previous") return "back";
-    if (w === "repeat") return "repeat";
-  }
+  const words = (transcript.toLowerCase().match(/[a-z]+/g) ?? []).filter((w) => !FILLER.has(w));
+  // Only a short command, so "put the lid back" in kitchen talk never moves the step.
+  if (words.length === 0 || words.length > 2) return null;
+  const phrase = words.join(" ");
+  if (phrase === "next" || phrase === "next step") return "next";
+  if (phrase === "back" || phrase === "previous" || phrase === "previous step" || phrase === "back step") return "back";
+  if (phrase === "repeat" || phrase === "repeat step") return "repeat";
   return null;
 }
