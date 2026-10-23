@@ -96,6 +96,10 @@ Card hover and keyboard focus (`.mag-card` in `motion.css`) behave alike: the pl
 loop besides timers (70 s per pass, paused by hover or focus). Under `prefers-reduced-motion: reduce` the plate does
 not move, the underline appears without drawing, and the ticker stands still as a wrapped list.
 
+On the recipe page the opener photo turns a couple of degrees as it scrolls through view (CSS scroll-driven
+animation under `@supports`, still under reduced motion), a ticked ingredient has a claret line drawn through it
+(`.strike`), rescaled quantities fade to their new value, and the floating bar slides up once on arrival.
+
 Durations are defined in `src/styles/motion.css`.
 
 ## Where styling lives (enforced by `src/styles/page-styling.test.ts`)
@@ -131,8 +135,8 @@ Text and structure:
 - `Logo` (`size="lg"` on auth), `Masthead` + `NavLink` + `NavButton` (the app header), `SkipLink`.
 - `Contents` + `ContentsEntry`: the two-column contents listing and one entry (kicker, title link, deck, meta,
   thumbnail); the whole entry is clickable and the focus ring wraps it.
-- `Article.tsx`: the recipe article pieces: `MetaStrip`, `LeadPhoto`, `Lede` (drop cap), `SidebarLayout`, `Sidebar`
-  (tinted, double rule), `RuledList`, `StepList` (accent numerals), `EndNote`.
+- `Article.tsx`: `Lede` (drop cap) and `SidebarLayout` (ingredients beside the method). The rest of the recipe page
+  is the spread kit below.
 
 Controls and states:
 - `ui/Button` / `ButtonLink`: `primary` ink fill (hover turns accent), `secondary` ink outline, `ghost` underlined,
@@ -163,8 +167,9 @@ Controls and states:
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
 - `ui/Toast` (`ToastRegion`, `Toast`, `ToastAction`, `ToastDismiss`): inverse message pinned to the bottom, 44px actions, tokens `--toast-*`. The region is a polite live region and stays mounted; hidden in print. Separated by a hairline border, never a shadow. Used by `undo/UndoToast`.
+- Recipe spread (#40), all in `ui/`: `SpreadOpener` (split opener: kicker, ~100px headline whose words rise in, italic deck, byline, actions; photo full height on the right from 1024px and a 3:2 band below the text before that; without a photo the headline spans the width over a spot icon; titles over 40 characters step down a size; carries the card→page morph names), `NumeralsBand` (items `{ label, value, unit?, spoken? }` in display numerals between a thick and a thin rule, auto-fit columns so 2×2 on a phone; `spoken` is what screen readers get for shorthand like "3:20 hr"), `IngredientPanel` + `IngredientGroup` + `IngredientRow` + `ScaleControl` (paper-deep panel; each row is a button with `aria-pressed`, a checkbox, a claret tabular quantity column and a claret line drawn through ticked text; ScaleControl is a labelled radio group, 44px targets), `MethodHeader` + `MethodStep` + `IngredientMention` (dotted claret underline linking to `#ingredient-<i>`) + `TimerChip` (ink pill with a clock, words as written for screen readers and print), `PullQuote` (notes of 200 characters or fewer in display type, longer at body size with line breaks), `FloatingBar` (fixed ink pill with a polite status and the claret Start cooking link; pages leave `pb-28` under their content; hidden in print). Tokens: `--qty-fg`, `--strike-fg`, `--mention-line`, `--timer-*`, `--bar-*`.
 App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
-- `recipe-page/*`: `DeleteRecipeButton` (ghost Delete, no dialog: deletes, shows the toast, goes home), `byline.ts` (data for "Added by X", "Edited by Y" only when someone else or a later edit) and `LocalDate` (client-formatted `<time>` in the viewer's time zone, empty on the server).
+- `recipe-page/*`: `RecipeState` (`RecipeStateProvider` keeps the ticked ingredients and the scale per recipe in sessionStorage as `recipe-ticks:<id>` and `recipe-scale:<id>`; the server and hydrating render see nothing ticked, then the stored state appears; `ScaledServings`), `session-store.ts` (the sessionStorage hook, with an in-memory fallback when storage throws), `IngredientChecklist`, `RecipeBar`, `StepText` + `mentions.ts` (`annotateStep`: timers from `splitDurations`, then ingredient names matched on word boundaries, longest first, each linked once per step; the name heuristic is documented there), `DeleteRecipeButton` (ghost Delete, no dialog: deletes, shows the toast, goes home), `byline.ts` (data for "Added by X", "Edited by Y" only when someone else or a later edit) and `LocalDate` (client-formatted `<time>` in the viewer's time zone, empty on the server).
 - `undo/*`: `undo-store.ts` (module list of offers kept across client navigation; one toast each, newest on top, three shown; cleared on sign-out and when the layout unmounts), `UndoToast` (mounted once in `(app)/layout.tsx`; 10 s countdown paused by hover or focus; Undo restores and reopens the recipe; 409 says it is too late).
 - Print: the `@media print` block at the end of `globals.css` sets ink on white, keeps each step whole and prints link URLs; chrome uses `print:hidden`.
 - `recipe-form/RecipeForm`: the editor for new recipes, edits and import review. Props `initial`
@@ -187,10 +192,13 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   `components/home/issue.ts`. Without a photo recipe, the plain "Recipes" head replaces the cover; while searching or
   filtering the cover, ticker and sidebar are hidden and the issue line stays. Until the Made-it log (#23) exists,
   `updatedAt` stands in for "last cooked" and there is no cooked-count sticker.
-- **Recipe**: centred head (tags kicker, headline, deck if the description is 160 characters or less, byline with
-  "Added by" and source, actions), uppercase meta strip, photo, a drop-cap lede when the description is longer,
-  then the ingredient sidebar (paper-deep, double rule) beside a numbered method set like an article (accent display
-  numerals in a hanging column), then notes.
+- **Recipe** (a feature spread): the split opener (tags kicker, headline, deck if the description is 160 characters
+  or less, byline with "Added by" and source, actions, photo right), the numerals band (Serves, Prep, Cook, Total;
+  times as `20 min`, `3 hr` or `3:20 hr`), a drop-cap lede when the description is longer, then the ingredient panel
+  (tap to tick, ½× / 1× / 2× scale) beside the method (large claret numerals, linked ingredient names, timer chips),
+  the notes as a pull quote, and the floating bar. Scaling (`lib/scale.ts`) reads a leading quantity (fractions,
+  ranges, a unit from a short list) and rewrites it as a cook would (1½, ¾); lines without one stay as written.
+  Household notes in the margin are not built: the single notes field is the pull quote.
 - **Auth**: centred wordmark, "The household cookbook", double rule, form in a hairline frame.
 - **Placeholders**: "Forthcoming" kicker, headline, deck, empty state.
 
