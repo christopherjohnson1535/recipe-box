@@ -33,3 +33,4 @@ utoipa = { version = "6", features = ["chrono", "uuid"] }
 futures-util = "0.3"
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }
+testcontainers-modules = { version = "0.15", features = ["postgres"] }

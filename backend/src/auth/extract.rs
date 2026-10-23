@@ -24,9 +24,10 @@ impl FromRequestParts<AppState> for CurrentUser {
         let user = sqlx::query_as::<_, User>(concat!(
             "select ",
             user_columns!(),
-            " from users where id = (select user_id from sessions where token_hash = $1 and expires_at > now())"
+            " from users where id = (select user_id from sessions where token_hash = $1 and expires_at > $2)"
         ))
         .bind(hash_token(token.value()))
+        .bind(state.clock.now())
         .fetch_optional(&state.pool)
         .await?
         .ok_or(AppError::SIGN_IN)?;

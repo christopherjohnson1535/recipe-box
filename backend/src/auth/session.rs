@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::{config::Config, error::AppResult};
+use crate::{error::AppResult, state::AppState};
 
 pub const COOKIE_NAME: &str = "rb_session";
 
@@ -19,21 +19,18 @@ pub fn hash_token(token: &str) -> Vec<u8> {
 }
 
 /// Creates a session row for `user_id` and returns the cookie jar with `rb_session` set.
-pub async fn start(
-    pool: &PgPool,
-    config: &Config,
-    jar: CookieJar,
-    user_id: Uuid,
-) -> AppResult<CookieJar> {
+pub async fn start(state: &AppState, jar: CookieJar, user_id: Uuid) -> AppResult<CookieJar> {
+    let config = &state.config;
     let token = new_token();
+    let expires_at = state.clock.now() + chrono::Duration::days(config.session_days);
     sqlx::query(
         "insert into sessions (user_id, token_hash, expires_at)
-         values ($1, $2, now() + make_interval(days => $3))",
+         values ($1, $2, $3)",
     )
     .bind(user_id)
     .bind(hash_token(&token))
-    .bind(config.session_days as i32)
-    .execute(pool)
+    .bind(expires_at)
+    .execute(&state.pool)
     .await?;
     let cookie = Cookie::build((COOKIE_NAME, token))
         .path("/")

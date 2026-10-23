@@ -52,7 +52,20 @@ jobs:
           workspaces: backend
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
+        with:
+          tool: cargo-nextest
+      # Run 1: nextest, one process per test, so no test can lean on another's in-process state. No retries.
+      - run: cargo nextest run --profile ci
+      # Run 2: libtest in a random order. nextest has no shuffle option, and RUSTC_BOOTSTRAP lets stable
+      # use libtest's --shuffle-seed. The seed is printed first: replay a failure with the same SEED.
+      - name: Shuffled order (libtest)
+        env:
+          RUSTC_BOOTSTRAP: "1"
+        run: |
+          SEED="$(date +%s)"
+          echo "shuffle seed: $SEED (replay: cargo test -- -Zunstable-options --shuffle-seed $SEED)"
+          cargo test -- -Zunstable-options --shuffle-seed "$SEED"
 
   frontend:
     runs-on: ubuntu-latest

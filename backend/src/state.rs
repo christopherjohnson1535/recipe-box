@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use sqlx::PgPool;
 
-use crate::{config::Config, import::safe_fetch::FetchPolicy};
+use crate::{clock::Clock, config::Config, import::safe_fetch::FetchPolicy};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -12,6 +12,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     /// Which addresses link import may fetch. Public only; tests may widen it for their local server.
     pub fetch_policy: FetchPolicy,
+    /// "Now" for every time rule. `Clock::System` in production; tests swap in a fixed one.
+    pub clock: Clock,
 }
 
 impl AppState {
@@ -26,6 +28,7 @@ impl AppState {
             config: Arc::new(config),
             http,
             fetch_policy: FetchPolicy::default(),
+            clock: Clock::System,
         })
     }
 }

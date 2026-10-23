@@ -57,7 +57,7 @@ pub async fn login(
         // Same answer for unknown user and wrong password.
         return Err(AppError::Unauthenticated("Wrong username or password."));
     };
-    let jar = session::start(&state.pool, &state.config, jar, user.id).await?;
+    let jar = session::start(&state, jar, user.id).await?;
     Ok((jar, Json(user)))
 }
 

@@ -44,11 +44,7 @@ impl Config {
             cookie_secure: var("COOKIE_SECURE", "false")
                 .parse()
                 .context("COOKIE_SECURE must be true or false")?,
-            session_days: var("SESSION_DAYS", "30")
-                .parse()
-                .ok()
-                .filter(|d| *d > 0)
-                .context("SESSION_DAYS must be a positive number")?,
+            session_days: parse_session_days(&var("SESSION_DAYS", "30"))?,
             ai_provider,
             anthropic_api_key,
             ai_model: var("AI_MODEL", "claude-sonnet-5-5"),
@@ -69,11 +65,34 @@ impl Config {
     }
 }
 
+/// Whole days a session lasts. Capped so date arithmetic on it can never overflow.
+fn parse_session_days(raw: &str) -> anyhow::Result<i64> {
+    raw.parse()
+        .ok()
+        .filter(|d| (1..=3650).contains(d))
+        .context("SESSION_DAYS must be a whole number from 1 to 3650")
+}
+
 fn var(name: &str, default: &str) -> String {
     env::var(name)
         .ok()
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| default.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_session_days;
+
+    #[test]
+    fn session_days_must_be_between_1_and_3650() {
+        assert_eq!(parse_session_days("1").unwrap(), 1);
+        assert_eq!(parse_session_days("3650").unwrap(), 3650);
+        for bad in ["0", "-1", "3651", "999999999999", "abc", "1.5"] {
+            let err = parse_session_days(bad).unwrap_err().to_string();
+            assert!(err.contains("1 to 3650"), "{bad}: {err}");
+        }
+    }
 }
 
 #[cfg(test)]
