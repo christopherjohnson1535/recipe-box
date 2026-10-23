@@ -33,7 +33,7 @@ docs: add contributing and security guides (#51)
 ```
 The `PR title` workflow (`.github/workflows/pr-title.yml`) fails the PR otherwise. Merges are squashed, so the
 title becomes the commit on `main` and the line in the release notes. Add `!` after the type for a breaking change.
-Keep individual commits small and clear; they are squashed away.
+Commit messages are one line, imperative, under 72 characters, saying what changes (e.g. `fix(backend): re-check redirects in safe_fetch`). No body, no bullet lists, no run summaries; put detail in the PR description.
 
 ## Open a pull request
 The [PR template](.github/pull_request_template.md) asks for `Closes #<n>`, a short list of what changed, the checks

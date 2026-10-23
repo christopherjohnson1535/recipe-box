@@ -16,7 +16,7 @@ up one issue and finish it. Testing is covered in `docs/TESTING.md`; security re
 
 ## The software factory
 Built with the software factory process: requirements → plan → build (agent waves) → verify
-(independent reviewers, fix waves, `FIXES.md` ledger in `docs/archive/factory-runs/`) → test (smoke + screenshots) → design QA → ship.
+(independent reviewers, fix waves, `FIXES.md` ledger) → test (smoke + screenshots) → design QA → ship.
 Every issue goes through the whole loop, with the stages done by subagents on a cheaper model (Sonnet) and the main
 session orchestrating. Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
 
