@@ -134,6 +134,16 @@ pub struct Jpeg {
     pub height: u32,
 }
 
+/// Refuses a canvas over the decode bounds; call it before any pixel is allocated.
+pub fn check_dimensions(w: u32, h: u32) -> AppResult<()> {
+    if w > MAX_SIDE_PX || h > MAX_SIDE_PX || u64::from(w) * u64::from(h) > MAX_PIXELS {
+        return Err(AppError::UnsupportedMedia(
+            "That image is too large to read (over 10,000 px a side or 40 megapixels).".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// JPEG/PNG/WebP/GIF in → EXIF-oriented, long edge ≤ [`MAX_EDGE`], JPEG q85 out.
 pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
     let unsupported = || {
@@ -147,11 +157,7 @@ pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
     let mut decoder = reader.into_decoder().map_err(|_| unsupported())?;
     // Bound the work before decoding: a tiny file can claim a huge canvas (decompression bomb).
     let (w, h) = decoder.dimensions();
-    if w > MAX_SIDE_PX || h > MAX_SIDE_PX || u64::from(w) * u64::from(h) > MAX_PIXELS {
-        return Err(AppError::UnsupportedMedia(
-            "That image is too large to read (over 10,000 px a side or 40 megapixels).".into(),
-        ));
-    }
+    check_dimensions(w, h)?;
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_SIDE_PX);
     limits.max_image_height = Some(MAX_SIDE_PX);

@@ -4,11 +4,19 @@
 
 use std::{path::PathBuf, process::Stdio, sync::OnceLock, time::Duration};
 
+use tokio::sync::Semaphore;
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
+use crate::{
+    error::{AppError, AppResult},
+    routes::media::check_dimensions,
+};
 
 const DECODE_TIMEOUT: Duration = Duration::from_secs(30);
+/// Decoders running at once; a heif-convert child can use a few hundred MB.
+static SLOTS: Semaphore = Semaphore::const_new(2);
+/// Address-space cap for the child (bytes), applied with `prlimit` when it is installed.
+const CHILD_MEMORY: u64 = 1 << 30;
 /// Brands (major or compatible) of the ISO-BMFF `ftyp` box that mean "HEIF image".
 const BRANDS: [&[u8; 4]; 8] = [
     b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx", b"mif1", b"msf1",
@@ -28,6 +36,78 @@ pub fn is_heic(data: &[u8]) -> bool {
         .any(|b| BRANDS.iter().any(|k| &k[..] == b))
 }
 
+/// The ISO-BMFF boxes in `data` as (type, payload).
+fn boxes(mut data: &[u8]) -> impl Iterator<Item = ([u8; 4], &[u8])> {
+    std::iter::from_fn(move || {
+        let head = data.get(..8)?;
+        let size = u32::from_be_bytes(head[..4].try_into().ok()?);
+        let (skip, len) = match size {
+            0 => (8, data.len()),
+            1 => (
+                16,
+                usize::try_from(u64::from_be_bytes(data.get(8..16)?.try_into().ok()?)).ok()?,
+            ),
+            n => (8, n as usize),
+        };
+        let payload = data.get(skip..len)?;
+        data = &data[len..];
+        Some((head[4..8].try_into().ok()?, payload))
+    })
+}
+
+fn find_box<'a>(inside: &'a [u8], kind: &[u8; 4]) -> Option<&'a [u8]> {
+    boxes(inside).find(|b| &b.0 == kind).map(|b| b.1)
+}
+
+fn be32(b: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from_be_bytes(b.get(at..at + 4)?.try_into().ok()?))
+}
+
+/// Width and height of the primary image, read from the file's boxes without decoding anything.
+/// shortcut: parsed by hand (`meta` > `pitm`, `iprp` > `ipma` + `ipco` > `ispe`) because `heif-info` output differs
+/// between libheif 1.15 (the image) and 1.17 (CI); this is short and cannot drift. Files it cannot read are refused.
+fn primary_size(data: &[u8]) -> Option<(u32, u32)> {
+    let meta = boxes(data).find(|b| &b.0 == b"meta")?.1.get(4..)?; // full box: skip version and flags
+    let pitm = find_box(meta, b"pitm")?;
+    let primary = if *pitm.first()? == 0 {
+        u32::from(u16::from_be_bytes(pitm.get(4..6)?.try_into().ok()?))
+    } else {
+        be32(pitm, 4)?
+    };
+    let iprp = find_box(meta, b"iprp")?;
+    let ipco = find_box(iprp, b"ipco")?;
+    let ipma = find_box(iprp, b"ipma")?;
+    let (version, flags) = (*ipma.first()?, *ipma.get(3)?);
+    let (mut at, entries) = (8, be32(ipma, 4)?);
+    for _ in 0..entries {
+        let id = if version == 0 {
+            at += 2;
+            u32::from(u16::from_be_bytes(ipma.get(at - 2..at)?.try_into().ok()?))
+        } else {
+            at += 4;
+            be32(ipma, at - 4)?
+        };
+        let count = *ipma.get(at)?;
+        at += 1;
+        for _ in 0..count {
+            let index = if flags & 1 == 1 {
+                at += 2;
+                u16::from_be_bytes(ipma.get(at - 2..at)?.try_into().ok()?) & 0x7FFF
+            } else {
+                at += 1;
+                u16::from(*ipma.get(at - 1)? & 0x7F)
+            };
+            if id == primary && index > 0 {
+                let (kind, ispe) = boxes(ipco).nth(usize::from(index) - 1)?;
+                if &kind == b"ispe" {
+                    return Some((be32(ispe, 4)?, be32(ispe, 8)?));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Removes the temp dir when dropped, whatever path the decode took.
 struct TempDir(PathBuf);
 
@@ -41,8 +121,25 @@ fn unreadable() -> AppError {
     AppError::UnsupportedMedia("That HEIC photo could not be read.".into())
 }
 
+fn prlimit_installed() -> bool {
+    static FOUND: OnceLock<bool> = OnceLock::new();
+    *FOUND.get_or_init(|| {
+        let found = std::env::var_os("PATH")
+            .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join("prlimit").is_file()));
+        if !found {
+            tracing::warn!("prlimit not found; heif-convert runs without a memory cap");
+        }
+        found
+    })
+}
+
 /// Decodes a HEIC/HEIF image to PNG bytes with `heif-convert` (`HEIF_CONVERT` env var, default `heif-convert`).
 pub async fn heic_to_png(data: &[u8]) -> AppResult<Vec<u8>> {
+    // A tiny file can claim a huge canvas and make libheif allocate gigabytes: bound it before decoding (S-01).
+    let (w, h) = primary_size(data).ok_or_else(unreadable)?;
+    check_dimensions(w, h)?;
+    let _slot = SLOTS.acquire().await.map_err(|e| anyhow::anyhow!(e))?;
+
     static BIN: OnceLock<String> = OnceLock::new();
     let bin =
         BIN.get_or_init(|| std::env::var("HEIF_CONVERT").unwrap_or_else(|_| "heif-convert".into()));
@@ -59,9 +156,15 @@ pub async fn heic_to_png(data: &[u8]) -> AppResult<Vec<u8>> {
         .await
         .map_err(|e| anyhow::anyhow!("write {}: {e}", input.display()))?;
 
-    // shortcut: the child has no memory or CPU cap beyond the 30 s timeout; add a cgroup/ulimit if hostile
-    // uploads ever matter (the upload size cap and the pixel bounds on the PNG still apply).
-    let run = tokio::process::Command::new(bin)
+    // Belt and braces: cap the child's address space with util-linux `prlimit` (no shell); without it, run bare.
+    let mut cmd = if prlimit_installed() {
+        let mut c = tokio::process::Command::new("prlimit");
+        c.arg(format!("--as={CHILD_MEMORY}")).arg("--").arg(bin);
+        c
+    } else {
+        tokio::process::Command::new(bin)
+    };
+    let run = cmd
         .arg(&input)
         .arg(&output)
         .stdin(Stdio::null())

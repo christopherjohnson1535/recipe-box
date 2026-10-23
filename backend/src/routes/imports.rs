@@ -225,13 +225,15 @@ pub async fn from_photo(
                 if files.len() == MAX_PHOTOS {
                     return Err(AppError::validation("files: send at most 6 photos."));
                 }
-                let data = field.bytes().await?;
-                if data.len() > state.config.max_upload_bytes() {
-                    return Err(AppError::TooLarge);
-                }
-                files.push(data);
+                // Stop reading as soon as the file is over the limit, not after buffering all of it.
+                let data = read_capped(field, state.config.max_upload_bytes()).await?;
+                files.push(data.ok_or(AppError::TooLarge)?);
             }
-            Some("mode") => mode = Some(field.text().await?),
+            Some("mode") => {
+                let bytes = read_capped(field, 16).await?;
+                let bad = || AppError::validation("mode: use recipe or dish.");
+                mode = Some(String::from_utf8(bytes.ok_or_else(bad)?).map_err(|_| bad())?);
+            }
             _ => {}
         }
     }
@@ -245,14 +247,16 @@ pub async fn from_photo(
     };
 
     let (mut images, mut jpegs) = (Vec::new(), Vec::new());
+    let mut stored = StoredGuard::new(&state);
     for data in files {
-        match store_jpeg(&state, user.id, data.to_vec()).await {
+        match store_jpeg(&state, user.id, data).await {
             Ok((image, jpeg)) => {
+                stored.ids.push(image.id);
                 images.push(image);
                 jpegs.push(jpeg);
             }
             Err(e) => {
-                delete_images(&state, &ids_of(&images)).await;
+                stored.delete().await;
                 return Err(e);
             }
         }
@@ -265,6 +269,7 @@ pub async fn from_photo(
     };
     match state.ai.recipe_from_images(&jpegs, mode).await {
         Ok(mut draft) => {
+            stored.keep();
             draft.photo_image_ids = ids;
             if dish {
                 draft.image_id = Some(images[0].id);
@@ -274,14 +279,67 @@ pub async fn from_photo(
         }
         // No draft, but the photos are kept so the form can show them next to an empty recipe (PHO-5).
         Err(error @ (AppError::AiDisabled | AppError::NoRecipeFound(_) | AppError::AiError(_))) => {
+            stored.keep();
             Err(AppError::WithPhotos {
                 error: Box::new(error),
                 photo_image_ids: ids,
             })
         }
         Err(e) => {
-            delete_images(&state, &ids).await;
+            stored.delete().await;
             Err(e)
+        }
+    }
+}
+
+/// Reads a multipart field chunk by chunk; `None` as soon as it is longer than `limit` bytes.
+async fn read_capped(
+    mut field: axum::extract::multipart::Field<'_>,
+    limit: usize,
+) -> AppResult<Option<Vec<u8>>> {
+    let mut out = Vec::new();
+    while let Some(chunk) = field.chunk().await? {
+        if out.len() + chunk.len() > limit {
+            return Ok(None);
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Ok(Some(out))
+}
+
+/// Ids of the photos stored by this request. Unless [`keep`](Self::keep)t, they are deleted when the guard drops,
+/// so a client that disconnects mid-request (the handler future is dropped) leaves no orphan images.
+struct StoredGuard {
+    state: AppState,
+    ids: Vec<Uuid>,
+    armed: bool,
+}
+
+impl StoredGuard {
+    fn new(state: &AppState) -> Self {
+        Self {
+            state: state.clone(),
+            ids: Vec::new(),
+            armed: true,
+        }
+    }
+
+    fn keep(&mut self) {
+        self.armed = false;
+    }
+
+    /// Deletes the photos now (so the caller's response comes after they are gone).
+    async fn delete(mut self) {
+        self.armed = false;
+        delete_images(&self.state, &self.ids).await;
+    }
+}
+
+impl Drop for StoredGuard {
+    fn drop(&mut self) {
+        if self.armed && !self.ids.is_empty() {
+            let (state, ids) = (self.state.clone(), std::mem::take(&mut self.ids));
+            tokio::spawn(async move { delete_images(&state, &ids).await });
         }
     }
 }

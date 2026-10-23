@@ -285,3 +285,93 @@ async fn the_route_limit_is_per_file_not_per_request() {
         .await
         .assert_error(StatusCode::UNSUPPORTED_MEDIA_TYPE, "unsupported_media");
 }
+
+/// The fixture with every `ispe` (image spatial extent) box rewritten to claim `w`x`h`.
+fn heic_claiming(w: u32, h: u32) -> Vec<u8> {
+    let mut data = HEIC.to_vec();
+    let mut at = 0;
+    while let Some(i) = data[at..].windows(4).position(|x| x == b"ispe") {
+        let p = at + i + 8; // type, version+flags, then width and height
+        data[p..p + 4].copy_from_slice(&w.to_be_bytes());
+        data[p + 4..p + 8].copy_from_slice(&h.to_be_bytes());
+        at += i + 4;
+    }
+    data
+}
+
+#[tokio::test]
+async fn heic_claiming_a_huge_canvas_is_refused_before_decoding() {
+    let app = TestApp::spawn_as_admin().await;
+    for (w, h) in [(30_000, 30_000), (10_001, 10), (9_000, 9_000)] {
+        let res = app
+            .upload("/api/media", &app.cookie, "a.heic", &heic_claiming(w, h))
+            .await;
+        res.assert_error(StatusCode::UNSUPPORTED_MEDIA_TYPE, "unsupported_media");
+        // The bounds message, not "could not be read": the decoder never ran on it.
+        assert!(
+            res.json["error"]["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("That image is too large"),
+            "{w}x{h}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_dropped_request_deletes_the_photos_it_stored() {
+    use tower::ServiceExt as _;
+    // A provider that accepts the connection and never answers keeps the handler waiting after the photos are stored.
+    let silent = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", silent.local_addr().unwrap());
+    let _hold = tokio::spawn(async move {
+        let mut held = Vec::new();
+        while let Ok(conn) = silent.accept().await {
+            held.push(conn);
+        }
+    });
+    let p = AnthropicProvider::with_base_url(Secret::new("k"), "m".into(), &base).unwrap();
+    let app = TestApp::spawn_as_admin_with(|s| s.ai = Arc::new(Ai::Anthropic(p))).await;
+
+    let a = jpeg(100, 80);
+    let boundary = "XphotoboundaryX";
+    let mut body = Vec::new();
+    body.extend(
+        format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"files\"; filename=\"x\"\r\n\r\n"
+        )
+        .bytes(),
+    );
+    body.extend(&a);
+    body.extend(format!("\r\n--{boundary}--\r\n").bytes());
+    let req = Request::post("/api/import/photo")
+        .header(
+            header::CONTENT_TYPE,
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .header(header::COOKIE, &app.cookie)
+        .body(Body::from(body))
+        .unwrap();
+    // The client gives up: the future is dropped while the photo is stored and the provider is pending.
+    let gave_up =
+        tokio::time::timeout(Duration::from_millis(1500), app.router.clone().oneshot(req)).await;
+    assert!(gave_up.is_err(), "the provider should still be pending");
+    // The guard's cleanup runs in a spawned task.
+    for _ in 0..100 {
+        if image_rows(&app).await == 0 && std::fs::read_dir(&app.media_dir).unwrap().count() == 0 {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("the stored photo was not cleaned up");
+}
+
+#[tokio::test]
+async fn an_oversized_mode_field_is_a_bad_request() {
+    let app = TestApp::spawn_as_admin().await;
+    let a = jpeg(10, 10);
+    let long = vec![b'x'; 4096];
+    let res = import(&app, &app.cookie, &[("files", &a), ("mode", &long)]).await;
+    res.assert_error(StatusCode::BAD_REQUEST, "validation");
+    assert_eq!(image_rows(&app).await, 0);
+}
