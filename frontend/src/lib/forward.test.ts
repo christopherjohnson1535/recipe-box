@@ -34,6 +34,15 @@ describe("header mapping", () => {
     expect(h.get("x-forwarded-proto")).toBe("https");
   });
 
+  it("drops Expect so Node's fetch doesn't reject large uploads", () => {
+    const incoming = new Headers({ expect: "100-continue", cookie: "rb_session=abc", "content-type": "image/jpeg" });
+    const h = upstreamRequestHeaders(incoming, new URL("https://recipes.example.com/api/media"));
+
+    expect(h.has("expect")).toBe(false);
+    expect(h.get("cookie")).toBe("rb_session=abc");
+    expect(h.get("content-type")).toBe("image/jpeg");
+  });
+
   it("keeps every Set-Cookie and drops encoding headers on the way back", () => {
     const upstream = new Headers();
     upstream.append("set-cookie", "rb_session=abc; HttpOnly; Path=/");

@@ -26,9 +26,14 @@ pub fn router(state: AppState) -> Router {
     // Multipart routes get the large `MAX_UPLOAD_MB` limit; everything else is JSON and stays small.
     let uploads = Router::new()
         .route("/api/media", post(media::upload))
-        .route("/api/import/photo", post(imports::from_photo))
         .route("/api/import/export", post(export::import_zip))
         .layer(DefaultBodyLimit::max(upload_limit));
+    // Photo import takes up to MAX_PHOTOS files (each still checked against the 1x limit) plus multipart framing.
+    let photos = Router::new()
+        .route("/api/import/photo", post(imports::from_photo))
+        .layer(DefaultBodyLimit::max(
+            imports::MAX_PHOTOS * upload_limit + (64 << 10),
+        ));
     Router::new()
         .route("/api/health", get(health::health))
         .route("/api/setup", get(setup::status).post(setup::create_admin))
@@ -54,6 +59,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/users/{id}/password", put(users::set_password))
         .layer(DefaultBodyLimit::max(JSON_BODY_LIMIT))
         .merge(uploads)
+        .merge(photos)
         .method_not_allowed_fallback(|| async { AppError::MethodNotAllowed })
         .fallback(|| async { AppError::NotFound("No such endpoint.".into()) })
         .layer(TraceLayer::new_for_http())

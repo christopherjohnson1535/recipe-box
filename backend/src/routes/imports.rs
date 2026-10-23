@@ -3,22 +3,29 @@
 
 use std::time::Instant;
 
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::{Multipart, State},
+};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::{media::store_image, not_implemented};
+use super::{
+    media::{delete_images, store_image, store_jpeg},
+    not_implemented,
+};
 use crate::{
     auth::CurrentUser,
     error::{AppError, AppJson, AppResult, ErrorBody},
     import::{
+        ai::{self, AiProvider as _},
         jsonld, normalize_url,
         safe_fetch::{self, PAGE_MAX_BYTES},
     },
-    models::RecipeDraft,
+    models::{Image, RecipeDraft},
     state::AppState,
     validate,
 };
@@ -193,15 +200,150 @@ pub struct PhotoForm {
     mode: PhotoMode,
 }
 
+/// Most photos in one import (PHO-3).
+pub const MAX_PHOTOS: usize = 6;
+
 /// Reads a recipe from photos (PHO-2–5). Returns a draft with `photoImageIds` set.
 #[utoipa::path(post, path = "/api/import/photo", operation_id = "importFromPhoto", tag = "import", security(("session" = [])),
     request_body(content = PhotoForm, content_type = "multipart/form-data"), responses(
-    (status = 200, description = "The draft.", body = RecipeDraft),
-    (status = 400, description = "Missing files or bad `mode` (`validation`).", body = ErrorBody),
-    (status = 415, description = "A file is not an image we can read (`unsupported_media`).", body = ErrorBody),
-    (status = 422, description = "No recipe in the photos (`no_recipe_found`), or no AI provider (`ai_disabled`; the photos are stored first).", body = ErrorBody),
-    (status = 501, description = "Not built yet (`not_implemented`); every call returns this today.", body = ErrorBody),
+    (status = 200, description = "The draft. `photoImageIds` lists the stored photos in upload order; in `dish` mode `imageId` is the first.", body = RecipeDraft),
+    (status = 400, description = "No files, more than 6, or a bad `mode` (`validation`).", body = ErrorBody),
+    (status = 413, description = "A file is over `MAX_UPLOAD_MB` (`too_large`).", body = ErrorBody),
+    (status = 415, description = "A file is not an image we can read, including a HEIC the server cannot decode (`unsupported_media`). Nothing is kept.", body = ErrorBody),
+    (status = 422, description = "No AI provider (`ai_disabled`) or no recipe in the photos (`no_recipe_found`). The photos stay stored and `error.photoImageIds` lists them.", body = ErrorBody),
+    (status = 502, description = "The AI provider failed (`ai_error`). The photos stay stored and `error.photoImageIds` lists them.", body = ErrorBody),
 ))]
-pub async fn from_photo(_user: CurrentUser) -> AppError {
-    not_implemented("Import from photos")
+pub async fn from_photo(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    mut multipart: Multipart,
+) -> AppResult<Json<RecipeDraft>> {
+    let (mut files, mut mode) = (Vec::new(), None);
+    while let Some(field) = multipart.next_field().await? {
+        match field.name() {
+            Some("files") => {
+                if files.len() == MAX_PHOTOS {
+                    return Err(AppError::validation("files: send at most 6 photos."));
+                }
+                // Stop reading as soon as the file is over the limit, not after buffering all of it.
+                let data = read_capped(field, state.config.max_upload_bytes()).await?;
+                files.push(data.ok_or(AppError::TooLarge)?);
+            }
+            Some("mode") => {
+                let bytes = read_capped(field, 16).await?;
+                let bad = || AppError::validation("mode: use recipe or dish.");
+                mode = Some(String::from_utf8(bytes.ok_or_else(bad)?).map_err(|_| bad())?);
+            }
+            _ => {}
+        }
+    }
+    if files.is_empty() {
+        return Err(AppError::validation("files: send 1 to 6 photos."));
+    }
+    let dish = match mode.as_deref() {
+        None | Some("recipe") => false,
+        Some("dish") => true,
+        Some(_) => return Err(AppError::validation("mode: use recipe or dish.")),
+    };
+
+    let (mut images, mut jpegs) = (Vec::new(), Vec::new());
+    let mut stored = StoredGuard::new(&state);
+    for data in files {
+        match store_jpeg(&state, user.id, data).await {
+            Ok((image, jpeg)) => {
+                stored.ids.push(image.id);
+                images.push(image);
+                jpegs.push(jpeg);
+            }
+            Err(e) => {
+                stored.delete().await;
+                return Err(e);
+            }
+        }
+    }
+    let ids = ids_of(&images);
+    let mode = if dish {
+        ai::PhotoMode::Dish
+    } else {
+        ai::PhotoMode::Recipe
+    };
+    match state.ai.recipe_from_images(&jpegs, mode).await {
+        Ok(mut draft) => {
+            stored.keep();
+            draft.photo_image_ids = ids;
+            if dish {
+                draft.image_id = Some(images[0].id);
+                draft.image_url = Some(images[0].url.clone());
+            }
+            Ok(Json(draft))
+        }
+        // No draft, but the photos are kept so the form can show them next to an empty recipe (PHO-5).
+        Err(error @ (AppError::AiDisabled | AppError::NoRecipeFound(_) | AppError::AiError(_))) => {
+            stored.keep();
+            Err(AppError::WithPhotos {
+                error: Box::new(error),
+                photo_image_ids: ids,
+            })
+        }
+        Err(e) => {
+            stored.delete().await;
+            Err(e)
+        }
+    }
+}
+
+/// Reads a multipart field chunk by chunk; `None` as soon as it is longer than `limit` bytes.
+async fn read_capped(
+    mut field: axum::extract::multipart::Field<'_>,
+    limit: usize,
+) -> AppResult<Option<Vec<u8>>> {
+    let mut out = Vec::new();
+    while let Some(chunk) = field.chunk().await? {
+        if out.len() + chunk.len() > limit {
+            return Ok(None);
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Ok(Some(out))
+}
+
+/// Ids of the photos stored by this request. Unless [`keep`](Self::keep)t, they are deleted when the guard drops,
+/// so a client that disconnects mid-request (the handler future is dropped) leaves no orphan images.
+struct StoredGuard {
+    state: AppState,
+    ids: Vec<Uuid>,
+    armed: bool,
+}
+
+impl StoredGuard {
+    fn new(state: &AppState) -> Self {
+        Self {
+            state: state.clone(),
+            ids: Vec::new(),
+            armed: true,
+        }
+    }
+
+    fn keep(&mut self) {
+        self.armed = false;
+    }
+
+    /// Deletes the photos now (so the caller's response comes after they are gone).
+    async fn delete(mut self) {
+        self.armed = false;
+        delete_images(&self.state, &self.ids).await;
+    }
+}
+
+impl Drop for StoredGuard {
+    fn drop(&mut self) {
+        if self.armed && !self.ids.is_empty() {
+            let (state, ids) = (self.state.clone(), std::mem::take(&mut self.ids));
+            tokio::spawn(async move { delete_images(&state, &ids).await });
+        }
+    }
+}
+
+fn ids_of(images: &[Image]) -> Vec<Uuid> {
+    images.iter().map(|i| i.id).collect()
 }

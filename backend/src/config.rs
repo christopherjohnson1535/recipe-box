@@ -13,6 +13,32 @@ pub fn check_import_allow_host(allow_host: &str, cookie_secure: bool) -> anyhow:
     Ok(())
 }
 
+/// A credential that never prints: `Debug` and `Display` show `[redacted]`. Read it with [`Secret::expose`].
+#[derive(Clone)]
+pub struct Secret(String);
+
+impl Secret {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[redacted]")
+    }
+}
+
+impl std::fmt::Display for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[redacted]")
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub database_url: String,
@@ -22,7 +48,7 @@ pub struct Config {
     pub session_days: i64,
     /// `none` or `anthropic`.
     pub ai_provider: String,
-    pub anthropic_api_key: Option<String>,
+    pub anthropic_api_key: Option<Secret>,
     pub ai_model: String,
     pub max_upload_mb: usize,
 }
@@ -33,7 +59,12 @@ impl Config {
         if !matches!(ai_provider.as_str(), "none" | "anthropic") {
             bail!("AI_PROVIDER must be `none` or `anthropic`, got `{ai_provider}`");
         }
-        let anthropic_api_key = env::var("ANTHROPIC_API_KEY").ok().filter(|k| !k.is_empty());
+        let anthropic_api_key = env::var("ANTHROPIC_API_KEY")
+            .ok()
+            // A key pasted with a trailing newline or `\r` (Windows editors) would be an invalid header.
+            .map(|k| k.trim().to_string())
+            .filter(|k| !k.is_empty())
+            .map(Secret::new);
         if ai_provider == "anthropic" && anthropic_api_key.is_none() {
             bail!("AI_PROVIDER=anthropic needs ANTHROPIC_API_KEY");
         }
@@ -82,7 +113,14 @@ fn var(name: &str, default: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_session_days;
+    use super::{Secret, parse_session_days};
+
+    #[test]
+    fn secret_never_prints() {
+        let s = Secret::new("sk-ant-hunter2");
+        assert_eq!(format!("{s:?} {s}"), "[redacted] [redacted]");
+        assert_eq!(s.expose(), "sk-ant-hunter2");
+    }
 
     #[test]
     fn session_days_must_be_between_1_and_3650() {

@@ -8,6 +8,8 @@
 
 #![allow(dead_code)]
 
+pub mod anthropic;
+
 use std::{
     path::PathBuf,
     str::FromStr,

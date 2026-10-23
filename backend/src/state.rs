@@ -2,7 +2,11 @@ use std::{sync::Arc, time::Duration};
 
 use sqlx::PgPool;
 
-use crate::{clock::Clock, config::Config, import::safe_fetch::FetchPolicy};
+use crate::{
+    clock::Clock,
+    config::Config,
+    import::{ai::Ai, safe_fetch::FetchPolicy},
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -14,6 +18,8 @@ pub struct AppState {
     pub fetch_policy: FetchPolicy,
     /// "Now" for every time rule. `Clock::System` in production; tests swap in a fixed one.
     pub clock: Clock,
+    /// Photo/text recipe extraction. `Ai::None` when `AI_PROVIDER=none`; tests swap in a mock-backed one.
+    pub ai: Arc<Ai>,
 }
 
 impl AppState {
@@ -23,12 +29,14 @@ impl AppState {
             .redirect(reqwest::redirect::Policy::none())
             .user_agent(concat!("RecipeBox/", env!("CARGO_PKG_VERSION")))
             .build()?;
+        let ai = Arc::new(Ai::from_config(&config)?);
         Ok(Self {
             pool,
             config: Arc::new(config),
             http,
             fetch_policy: FetchPolicy::default(),
             clock: Clock::System,
+            ai,
         })
     }
 }
