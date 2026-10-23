@@ -51,7 +51,7 @@ export function PageHeader({ title, kicker, description, byline, actions, align 
       {byline && <div className="label text-ink-muted">{byline}</div>}
       {actions && <div className={cx("mt-2 flex flex-wrap gap-3 print:hidden", centered && "justify-center")}>{actions}</div>}
       {/* The closing hairline; it draws in from the left on a first visit. */}
-      <div className="draw-rule absolute inset-x-0 bottom-0 h-px bg-(--rule-hair)" aria-hidden="true" />
+      <div className="draw-rule absolute inset-x-0 bottom-0 h-px bg-(--rule-hair) print:border-t print:border-(--rule-hair)" aria-hidden="true" />
     </header>
   );
 }
