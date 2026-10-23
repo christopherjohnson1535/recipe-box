@@ -3,7 +3,8 @@ import { apiInternalUrl } from "./config";
 // Hop-by-hop headers (RFC 9110 §7.6.1) plus ones fetch recomputes. content-encoding/length are
 // dropped from responses because Node's fetch has already decompressed the body.
 const HOP_BY_HOP = ["connection", "keep-alive", "proxy-connection", "transfer-encoding", "te", "trailer", "upgrade"];
-const DROP_REQUEST = [...HOP_BY_HOP, "host", "content-length", "accept-encoding"];
+// expect: the first server answers it (RFC 9110 §10.1.1) and undici throws on it, so never forward it.
+const DROP_REQUEST = [...HOP_BY_HOP, "host", "content-length", "accept-encoding", "expect"];
 const DROP_RESPONSE = [...HOP_BY_HOP, "content-encoding", "content-length"];
 
 /** `/api/recipes?q=x` on the web origin → the same path and query on the API. */
