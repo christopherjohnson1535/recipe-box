@@ -19,7 +19,7 @@ use crate::{
     import::{
         ai::{self, AiProvider as _},
         jsonld, normalize_url,
-        readable::readable,
+        readable::{MIN_PAGE_CHARS, readable},
         safe_fetch::{self, PAGE_MAX_BYTES},
     },
     models::{Image, RecipeDraft, SourceType},
@@ -62,7 +62,7 @@ pub struct ImportUrlBody {
 }
 
 /// Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. A page with no recipe data goes to
-/// the AI as plain text when AI is on (LNK-4).
+/// the AI as plain text when AI is on (LNK-3).
 #[utoipa::path(post, path = "/api/import/url", operation_id = "importFromUrl", tag = "import", security(("session" = [])), request_body = ImportUrlBody, responses(
     (status = 200, description = "The draft. `sourceUrl` is the final URL after redirects.", body = RecipeDraft),
     (status = 400, description = "Not an http(s) address (`validation`).", body = ErrorBody),
@@ -146,9 +146,6 @@ pub async fn from_url(
     Ok(Json(draft))
 }
 
-/// Fewest non-space characters of page text worth sending to the AI.
-const MIN_PAGE_CHARS: usize = 200;
-
 /// What the blocking parse of a fetched page found.
 enum Parsed {
     Draft(Box<RecipeDraft>),
@@ -159,7 +156,9 @@ enum Parsed {
 
 /// Id of a live recipe saved from the same page (LNK-5), comparing normalised URLs.
 async fn duplicate_of(pool: &PgPool, urls: &[&Url]) -> AppResult<Option<Uuid>> {
-    let wanted: Vec<String> = urls.iter().map(|u| normalize_url(u)).collect();
+    // Credentials and fragments never count: the saved `source_url` has none.
+    let urls: Vec<Url> = urls.iter().map(|u| jsonld::cleaned(u)).collect();
+    let wanted: Vec<String> = urls.iter().map(normalize_url).collect();
     let patterns: Vec<String> = urls
         .iter()
         .filter_map(|u| u.host_str())
@@ -231,7 +230,7 @@ pub async fn from_text(
     // Cleaned first so credentials cannot hide a duplicate.
     let source = validate::source_url(body.source_url.as_deref())?
         .and_then(|u| Url::parse(&u).ok())
-        .and_then(|u| Url::parse(&jsonld::shown_url(&u)).ok());
+        .map(|u| jsonld::cleaned(&u));
     let mut draft = state.ai.recipe_from_text(&body.text).await?;
     if body.text.chars().count() > ai::MAX_TEXT_INPUT_CHARS {
         draft.warnings.push(format!(

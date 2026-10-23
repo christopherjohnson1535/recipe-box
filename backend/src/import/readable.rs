@@ -1,19 +1,26 @@
-//! Visible text of a web page, for the AI fallback of link import (LNK-4) when a page has no recipe data.
+//! Visible text of a web page, for the AI fallback of link import (LNK-3) when a page has no recipe data.
 //!
 //! Keeps `<main>` (else `<article>`, else `<body>`), drops page chrome and scripts, and puts every block on its own
 //! line so headings such as "For the sauce" stay recognisable. CPU-bound: call from `spawn_blocking`, and only
 //! for pages that passed `jsonld::too_complex`.
 
 use scraper::{ElementRef, Html, Node, Selector};
+
+use super::jsonld;
 use url::Url;
 
 /// Most characters of page text sent to the AI.
 pub const MAX_READABLE_CHARS: usize = 20_000;
+/// Fewest non-space characters of page text worth sending to the AI; a `<main>`/`<article>` with less falls back
+/// to the next candidate root.
+pub const MIN_PAGE_CHARS: usize = 200;
+/// Deepest element the text walk descends into (callers refuse deeper pages first; this keeps the stack safe anyway).
+const MAX_WALK_DEPTH: usize = 400;
 
 /// Subtrees that are never recipe content.
 const SKIP: &[&str] = &[
-    "script", "style", "noscript", "template", "nav", "header", "footer", "aside", "form",
-    "iframe", "svg", "button", "head",
+    "script", "style", "noscript", "template", "nav", "header", "footer", "aside", "iframe", "svg",
+    "button", "head",
 ];
 /// Elements that start and end a line.
 const BLOCK: &[&str] = &[
@@ -30,6 +37,8 @@ const BLOCK: &[&str] = &[
     "h6",
     "br",
     "tr",
+    "td",
+    "th",
     "section",
     "article",
     "main",
@@ -56,38 +65,24 @@ pub fn readable(html: &str, page_url: &Url) -> Readable {
             .ok()
             .and_then(|s| doc.select(&s).next())
     };
-    let meta = |prop: &str| {
-        pick(&format!("meta[property=\"{prop}\"]"))
-            .and_then(|e| e.value().attr("content"))
-            .map(|c| c.split_whitespace().collect::<Vec<_>>().join(" "))
-            .filter(|c| !c.is_empty())
-    };
-
-    let root = pick("main")
-        .or_else(|| pick("article"))
-        .or_else(|| pick("body"));
-    let mut raw = String::new();
-    if let Some(root) = root {
-        walk(root, &mut raw);
+    // First root with enough text: a teaser `<article>` or a near-empty `<main>` must not hide the recipe.
+    let mut text = String::new();
+    for css in ["main", "article", "body"] {
+        let Some(root) = pick(css) else { continue };
+        let mut raw = String::new();
+        walk(root, &mut raw, false, 0);
+        text = raw
+            .lines()
+            .map(|l| l.split_whitespace().collect::<Vec<_>>().join(" "))
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if text.chars().filter(|c| !c.is_whitespace()).count() >= MIN_PAGE_CHARS {
+            break;
+        }
     }
-    let mut text = raw
-        .lines()
-        .map(|l| l.split_whitespace().collect::<Vec<_>>().join(" "))
-        .filter(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
 
-    let title = meta("og:title").or_else(|| {
-        pick("title")
-            .map(|t| {
-                t.text()
-                    .collect::<String>()
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            })
-            .filter(|t| !t.is_empty())
-    });
+    let title = jsonld::meta(html, "og:title").or_else(|| jsonld::title_tag(html));
     if let Some(title) = title.filter(|t| !text.starts_with(t.as_str())) {
         text = format!("{title}\n{text}");
     }
@@ -95,26 +90,33 @@ pub fn readable(html: &str, page_url: &Url) -> Readable {
         text.truncate(i);
     }
 
-    let image_url = meta("og:image")
+    let image_url = jsonld::meta(html, "og:image")
         .and_then(|u| page_url.join(&u).ok())
         .filter(|u| matches!(u.scheme(), "http" | "https"))
         .map(String::from);
     Readable { text, image_url }
 }
 
-fn walk(el: ElementRef, out: &mut String) {
+fn walk(el: ElementRef, out: &mut String, pre: bool, depth: usize) {
     let name = el.value().name();
-    if SKIP.contains(&name) {
+    if SKIP.contains(&name) || depth > MAX_WALK_DEPTH {
         return;
     }
     let block = BLOCK.contains(&name);
+    let pre = pre || name == "pre";
     if block {
         out.push('\n');
     }
     for child in el.children() {
         match child.value() {
-            Node::Text(t) => out.extend(t.chars().map(|c| if c.is_whitespace() { ' ' } else { c })),
-            Node::Element(_) => walk(ElementRef::wrap(child).unwrap(), out),
+            Node::Text(t) => out.extend(t.chars().map(|c| {
+                if c.is_whitespace() && !(pre && c == '\n') {
+                    ' '
+                } else {
+                    c
+                }
+            })),
+            Node::Element(_) => walk(ElementRef::wrap(child).unwrap(), out, pre, depth + 1),
             _ => {}
         }
     }
@@ -151,12 +153,55 @@ mod tests {
         assert_eq!(r.text, "Nice Soup\nBoil water.");
     }
 
+    fn filler() -> String {
+        "Simmer gently until thick. ".repeat(10)
+    }
+
     #[test]
     fn main_is_preferred_over_the_rest_of_the_body() {
-        let r = read("<body><div>Sidebar ad</div><main><p>The recipe</p></main></body>");
-        assert_eq!(r.text, "The recipe");
-        let r = read("<body><div>Sidebar ad</div><article><p>The article</p></article></body>");
-        assert_eq!(r.text, "The article");
+        let f = filler();
+        let r = read(&format!(
+            "<body><div>Sidebar ad</div><main><p>The recipe {f}</p></main></body>"
+        ));
+        assert!(r.text.starts_with("The recipe") && !r.text.contains("Sidebar"));
+        let r = read(&format!(
+            "<body><div>Sidebar ad</div><article><p>The article {f}</p></article></body>"
+        ));
+        assert!(r.text.starts_with("The article") && !r.text.contains("Sidebar"));
+    }
+
+    #[test]
+    fn a_thin_main_or_article_falls_back_to_the_body() {
+        let f = filler();
+        let r = read(&format!(
+            "<body><article><p>Teaser</p></article><div class=\"entry-content\">The real recipe {f}</div></body>"
+        ));
+        assert!(r.text.contains("The real recipe"), "{}", r.text);
+    }
+
+    #[test]
+    fn a_page_wrapped_in_a_form_is_still_read() {
+        let r = read(&format!(
+            "<body><form id=\"aspnetForm\"><div>Lentil stew {}</div><input type=\"text\"><button>Go</button></form></body>",
+            filler()
+        ));
+        assert!(r.text.starts_with("Lentil stew"), "{}", r.text);
+        assert!(!r.text.contains("Go"));
+    }
+
+    #[test]
+    fn table_cells_and_pre_lines_stay_apart() {
+        let r = read(
+            "<body><table><tr><td>1 cup</td><td>flour</td></tr><tr><th>2</th><th>eggs</th></tr></table>\
+             <pre>Mix.\nBake.</pre></body>",
+        );
+        assert_eq!(r.text, "1 cup\nflour\n2\neggs\nMix.\nBake.");
+    }
+
+    #[test]
+    fn a_very_deep_page_returns_without_overflowing_the_stack() {
+        let r = read(&format!("<body>{}hello</body>", "<div></x>".repeat(30_000)));
+        assert!(r.text.chars().count() <= MAX_READABLE_CHARS);
     }
 
     #[test]

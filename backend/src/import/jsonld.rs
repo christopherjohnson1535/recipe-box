@@ -90,13 +90,17 @@ pub(crate) fn site_name(html: &str, page_url: &Url) -> Option<String> {
     })
 }
 
-/// `url` as stored in `source_url`: no credentials or fragment.
-pub(crate) fn shown_url(url: &Url) -> String {
+/// `url` without credentials or fragment, as stored in `source_url`.
+pub(crate) fn cleaned(url: &Url) -> Url {
     let mut shown = url.clone();
     let _ = shown.set_username("");
     let _ = shown.set_password(None);
     shown.set_fragment(None);
-    shown.to_string()
+    shown
+}
+
+pub(crate) fn shown_url(url: &Url) -> String {
+    cleaned(url).to_string()
 }
 
 // ---------- cheap scans (no DOM) ----------
@@ -178,7 +182,7 @@ fn attrs(tag: &str) -> Vec<(String, &str)> {
 }
 
 /// `content` of `<meta property="{property}" content="...">`.
-fn meta(html: &str, property: &str) -> Option<String> {
+pub(crate) fn meta(html: &str, property: &str) -> Option<String> {
     let lower = html.to_ascii_lowercase();
     for (start, _) in lower.match_indices("<meta").take(MAX_META_TAGS) {
         let Some(gt) = tag_end(html, start) else {
@@ -193,7 +197,7 @@ fn meta(html: &str, property: &str) -> Option<String> {
     None
 }
 
-fn title_tag(html: &str) -> Option<String> {
+pub(crate) fn title_tag(html: &str) -> Option<String> {
     let lower = html.to_ascii_lowercase();
     let start = lower.find("<title")?;
     let gt = tag_end(html, start)?;
@@ -208,22 +212,33 @@ pub(crate) fn too_complex(html: &str) -> bool {
         "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
         "track", "wbr", "param",
     ];
-    let (mut tags, mut depth) = (0usize, 0usize);
+    // Open tags, like the parser's stack: an end tag closes the nearest open tag of that name (and what is
+    // inside it) and is ignored when none is open, so stray `</x>` cannot hide a deep DOM. Depth is capped, so
+    // the search stays short.
+    let mut open: Vec<String> = Vec::new();
+    let mut tags = 0usize;
     for part in html.split('<').skip(1) {
         tags += 1;
         if tags > MAX_DOM_TAGS {
             return true;
         }
-        if part.starts_with('/') {
-            depth = depth.saturating_sub(1);
-        } else if part.starts_with(|c: char| c.is_ascii_alphabetic()) {
-            let name_end = part
+        let name_of = |s: &str| {
+            let end = s
                 .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
-                .unwrap_or(part.len());
+                .unwrap_or(s.len());
+            s[..end].to_ascii_lowercase()
+        };
+        if let Some(rest) = part.strip_prefix('/') {
+            let name = name_of(rest);
+            if let Some(i) = open.iter().rposition(|n| *n == name) {
+                open.truncate(i);
+            }
+        } else if part.starts_with(|c: char| c.is_ascii_alphabetic()) {
             let self_closed = part[..part.find('>').unwrap_or(part.len())].ends_with('/');
-            if !self_closed && !VOID.contains(&part[..name_end].to_ascii_lowercase().as_str()) {
-                depth += 1;
-                if depth > MAX_DOM_DEPTH {
+            let name = name_of(part);
+            if !self_closed && !VOID.contains(&name.as_str()) {
+                open.push(name);
+                if open.len() > MAX_DOM_DEPTH {
                     return true;
                 }
             }
@@ -910,6 +925,17 @@ mod tests {
         let nested = |n: usize| format!("{}x{}", "<div>".repeat(n), "</div>".repeat(n));
         assert!(too_complex(&nested(MAX_DOM_DEPTH + 1)));
         assert!(!too_complex(&nested(MAX_DOM_DEPTH)));
+    }
+
+    #[test]
+    fn stray_end_tags_do_not_hide_depth() {
+        let page = format!("<body>{}</body>", "<div></x>".repeat(30_000));
+        assert!(too_complex(&page));
+        let url = Url::parse("https://oldpantry.example/x").unwrap();
+        assert!(extract(&page, &url).is_none());
+        // Properly closed siblings and sloppy `<li>` lists stay fine.
+        assert!(!too_complex(&"<div></div>".repeat(5_000)));
+        assert!(!too_complex(&format!("<ul>{}</ul>", "<li>a".repeat(300))));
     }
 
     #[test]

@@ -168,7 +168,7 @@ export interface paths {
         put?: never;
         /**
          * Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. A page with no recipe data goes to
-         *     the AI as plain text when AI is on (LNK-4).
+         *     the AI as plain text when AI is on (LNK-3).
          */
         post: operations["importFromUrl"];
         delete?: never;

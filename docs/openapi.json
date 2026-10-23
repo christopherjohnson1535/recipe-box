@@ -622,7 +622,7 @@
         "tags": [
           "import"
         ],
-        "summary": "Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. A page with no recipe data goes to\nthe AI as plain text when AI is on (LNK-4).",
+        "summary": "Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. A page with no recipe data goes to\nthe AI as plain text when AI is on (LNK-3).",
         "operationId": "importFromUrl",
         "requestBody": {
           "content": {
