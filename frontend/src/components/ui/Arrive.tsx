@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 
 // Pages already shown in this tab. sessionStorage survives reloads; the Set covers storage that throws (private
 // windows, blocked site data) so Back still skips the animation within one page session.
@@ -40,6 +40,15 @@ export function resetArrivals() {
   }
 }
 
+const noSubscribe = () => () => {};
+// True while the server renders and while React hydrates that HTML; false in every client-only render (navigation).
+const useDuringServerHtml = () => useSyncExternalStore(noSubscribe, () => false, () => true);
+
+// Runs as the server HTML is parsed, before first paint: a page already shown in this tab (reload, Back without the
+// bfcache) is marked done at once, so its entries never sit hidden waiting for hydration and then replay.
+const earlyDone = (key: string) =>
+  `try{if(sessionStorage.getItem(${JSON.stringify(PREFIX + key).replace(/</g, "\\u003c")}))document.currentScript.parentElement.dataset.arrive="done"}catch(e){}`;
+
 // Longer than the slowest arrival (eight list steps plus a rise), so entries added later (a new search) stay still.
 const PLAY_MS = 2400;
 
@@ -75,8 +84,11 @@ export function Arrive({
     markArrived(arriveKey);
     setTimeout(() => (el.dataset.arrive = "done"), PLAY_MS); // not cleared on cleanup: Strict Mode's fake unmount must not cancel it
   }, [arriveKey]);
+  const inServerHtml = useDuringServerHtml();
   return (
-    <Tag ref={ref as never} data-arrive="play" className={className}>
+    // suppressHydrationWarning: the early script may already have turned "play" into "done" in the server HTML.
+    <Tag ref={ref as never} data-arrive="play" className={className} suppressHydrationWarning>
+      {inServerHtml && <script dangerouslySetInnerHTML={{ __html: earlyDone(arriveKey) }} />}
       {children}
     </Tag>
   );

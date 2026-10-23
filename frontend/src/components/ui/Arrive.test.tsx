@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Arrive, markArrived, resetArrivals } from "./Arrive";
 
@@ -12,6 +13,15 @@ describe("Arrive", () => {
     first.unmount();
     const again = render(<Arrive arriveKey="home" />);
     expect(again.container.firstElementChild?.getAttribute("data-arrive")).toBe("done");
+  });
+
+  it("server HTML carries an early script that marks an already-shown key done; client renders do not", () => {
+    const html = renderToString(<Arrive arriveKey="recipe:a<b" />);
+    expect(html).toContain("<script>");
+    expect(html).toContain("rb-arrived:recipe:a\\u003cb");
+    expect(html).not.toContain("a<b\"");
+    const { container } = render(<Arrive arriveKey="home" />);
+    expect(container.querySelector("script")).toBeNull();
   });
 
   it("stops marking play once the animations have finished", () => {
