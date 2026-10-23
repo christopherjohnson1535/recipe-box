@@ -63,7 +63,8 @@ describe("ImportScreen", () => {
     importLink();
     const heading = await screen.findByRole("heading", { name: "Check the recipe" });
     expect(api.importUrl).toHaveBeenCalledWith("https://example.com/pancakes");
-    expect(document.activeElement).toBe(heading);
+    // Focus moves in a passive effect that can run just after the heading is in the DOM, so wait for it.
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Best pancakes");
 
     fireEvent.click(screen.getByRole("button", { name: "Save recipe" }));

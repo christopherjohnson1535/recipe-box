@@ -27,3 +27,5 @@ Thumbs.db
 
 # python
 __pycache__/
+backend/coverage/
+backend/coverage-summary.json
