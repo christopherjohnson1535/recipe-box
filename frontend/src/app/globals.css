@@ -11,6 +11,7 @@
 @import "../styles/themes/day.css";
 @import "../styles/themes/evening.css";
 @import "../styles/components.css";
+@import "../styles/motion.css";
 
 /* Theme-independent tokens: type, shape, motion. */
 @theme static {

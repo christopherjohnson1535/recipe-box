@@ -72,6 +72,13 @@
   --focus-ring: var(--color-focus);
   --selection-bg: var(--color-accent);
   --selection-fg: var(--color-on-accent);
+
+  /* Detail kit (#38): spot icons, save stamp, loading skeletons */
+  --spot-line: var(--color-ink);
+  --spot-detail: var(--color-accent);
+  --stamp-fg: var(--color-accent);
+  --skeleton-bg: var(--color-paper-deep);
+  --skeleton-shine: var(--color-rule);
 }
 
 /* Not a colour, so it is set per scheme here rather than in a theme file: photos sit a touch dimmer in the evening. */

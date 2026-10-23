@@ -1,0 +1,13 @@
+/*
+ * Motion: one easing curve, a short list of durations, and the shared transitions (rise, draw, list stagger,
+ * card → page morph, save stamp, skeleton shimmer). Rules: docs/UI.md "Motion". Reduced motion: globals.css.
+ * Theme-independent, so it lives outside the theme files.
+ */
+@theme static {
+  /* --ease-out is defined in globals.css (the one curve). */
+  --duration-quick: 150ms; /* hover and press feedback, colour changes */
+  --duration-base: 300ms; /* a state change in place: draw a rule, show a toast */
+  --duration-morph: 450ms; /* card photo and title become the recipe page */
+  --duration-slow: 900ms; /* headline words rise, the save stamp lands */
+  --stagger-step: 120ms; /* gap between list entries arriving */
+}
