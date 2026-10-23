@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import type { Capabilities, Health, Image, Recipe, RecipeDraft, RecipeSummary, Tag, User } from "@/lib/api";
 
-// Typed against the types api.ts exports today; switch to the generated OpenAPI types after #47.
+// Typed against the types api.ts re-exports from the generated OpenAPI types (src/lib/api-types.ts).
 // "*/api/..." matches both the browser's relative URLs and server-side absolute ones.
 export const user: User = { id: "u1", username: "chris", displayName: "Chris", role: "admin", createdAt: "2026-01-01T00:00:00Z" };
 export const summary: RecipeSummary = {
@@ -12,7 +12,11 @@ export const recipe: Recipe = {
   totalMinutes: null, notes: "", sourceUrl: null, sourceName: null, sourceType: "manual", imageId: null, photoImageIds: [], tags: [],
   imageUrl: null, photoUrls: [], createdBy: null, updatedBy: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
 };
-export const draft: RecipeDraft = { title: "Pancakes", imageUrl: null, warnings: [], duplicateOf: null };
+export const draft: RecipeDraft = {
+  title: "Pancakes", description: "", ingredients: [], steps: [], servings: null, prepMinutes: null, cookMinutes: null,
+  totalMinutes: null, notes: "", sourceUrl: null, sourceName: null, sourceType: "manual", imageId: null, photoImageIds: [],
+  tags: [], imageUrl: null, warnings: [], duplicateOf: null,
+};
 export const image: Image = { id: "i1", url: "/media/i1.jpg", width: 1, height: 1 };
 
 export const handlers = [

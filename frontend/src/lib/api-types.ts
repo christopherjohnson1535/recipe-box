@@ -310,7 +310,7 @@ export interface paths {
         post?: never;
         /**
          * Removes a user. Not yourself, not the last admin.
-         *     Their sessions go with them (FK cascade); recipes stay, with `created_by`/`updated_by` set to null (FK `set null`).
+         * @description Their sessions go with them (FK cascade); recipes stay, with `created_by`/`updated_by` set to null (FK `set null`).
          */
         delete: operations["deleteUser"];
         options?: never;
@@ -326,7 +326,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Own password: `currentPassword` required. Admin resetting another user's: not needed. Ends the user's other sessions. */
+        /**
+         * Changes a user's password.
+         * @description Own password: `currentPassword` required. Admin resetting another user's: not needed. Ends the user's other sessions.
+         */
         put: operations["setUserPassword"];
         post?: never;
         delete?: never;

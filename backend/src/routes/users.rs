@@ -82,6 +82,8 @@ pub async fn create(
 }
 
 /// Removes a user. Not yourself, not the last admin.
+///
+/// Their sessions go with them (FK cascade); recipes stay, with `created_by`/`updated_by` set to null (FK `set null`).
 #[utoipa::path(delete, path = "/api/users/{id}", operation_id = "deleteUser", tag = "users", security(("session" = [])),
     params(("id" = Uuid, Path, description = "User id")), responses(
     (status = 204, description = "User removed."),
@@ -89,7 +91,6 @@ pub async fn create(
     (status = 403, description = "Not an admin, removing yourself, or removing the last admin (`forbidden`).", body = ErrorBody),
     (status = 404, description = "No such user (`not_found`).", body = ErrorBody),
 ))]
-/// Their sessions go with them (FK cascade); recipes stay, with `created_by`/`updated_by` set to null (FK `set null`).
 pub async fn remove(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -130,6 +131,9 @@ pub struct SetPasswordBody {
     current_password: Option<String>,
 }
 
+/// Changes a user's password.
+///
+/// Own password: `currentPassword` required. Admin resetting another user's: not needed. Ends the user's other sessions.
 #[utoipa::path(put, path = "/api/users/{id}/password", operation_id = "setUserPassword", tag = "users", security(("session" = [])),
     params(("id" = Uuid, Path, description = "User id")), request_body = SetPasswordBody, responses(
     (status = 204, description = "Password changed; the user's other sessions ended."),
@@ -138,7 +142,6 @@ pub struct SetPasswordBody {
     (status = 403, description = "A member changing someone else's password (`forbidden`).", body = ErrorBody),
     (status = 404, description = "No such user (`not_found`).", body = ErrorBody),
 ))]
-/// Own password: `currentPassword` required. Admin resetting another user's: not needed. Ends the user's other sessions.
 pub async fn set_password(
     State(state): State<AppState>,
     CurrentUser(caller): CurrentUser,

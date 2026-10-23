@@ -1627,7 +1627,8 @@
         "tags": [
           "users"
         ],
-        "summary": "Removes a user. Not yourself, not the last admin.\nTheir sessions go with them (FK cascade); recipes stay, with `created_by`/`updated_by` set to null (FK `set null`).",
+        "summary": "Removes a user. Not yourself, not the last admin.",
+        "description": "Their sessions go with them (FK cascade); recipes stay, with `created_by`/`updated_by` set to null (FK `set null`).",
         "operationId": "deleteUser",
         "parameters": [
           {
@@ -1708,7 +1709,8 @@
         "tags": [
           "users"
         ],
-        "summary": "Own password: `currentPassword` required. Admin resetting another user's: not needed. Ends the user's other sessions.",
+        "summary": "Changes a user's password.",
+        "description": "Own password: `currentPassword` required. Admin resetting another user's: not needed. Ends the user's other sessions.",
         "operationId": "setUserPassword",
         "parameters": [
           {
