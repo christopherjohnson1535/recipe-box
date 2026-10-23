@@ -41,19 +41,25 @@ export function msUntilNextSwitch(now: Date): number {
 /** Runs in <head> before first paint. `device` leaves data-theme off so the prefers-color-scheme rule decides. */
 export const EDITION_SCRIPT = `(function(){try{var p;try{p=localStorage.getItem(${JSON.stringify(EDITION_KEY)})}catch(e){}var h=new Date().getHours();var t=p==="day"||p==="evening"?p:p==="device"?"":h>=${EVENING_STARTS_AT}||h<${DAY_STARTS_AT}?"evening":"day";if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme}catch(e){}})()`;
 
+// Kept when storage is blocked, so a manual choice still holds for this page session.
+let memory: EditionPreference | null = null;
+
 export function getEditionPreference(): EditionPreference {
   try {
-    return parsePreference(localStorage.getItem(EDITION_KEY));
+    const stored = localStorage.getItem(EDITION_KEY);
+    if (stored !== null) return parsePreference(stored);
   } catch {
-    return "clock";
+    // fall through to the in-memory choice
   }
+  return memory ?? "clock";
 }
 
 export function setEditionPreference(pref: EditionPreference): void {
   try {
     localStorage.setItem(EDITION_KEY, pref);
+    memory = null;
   } catch {
-    // Storage can be blocked (private window); the choice then lasts until reload.
+    memory = pref; // Storage can be blocked (private window); the choice then lasts until reload.
   }
   window.dispatchEvent(new Event(EDITION_EVENT));
 }

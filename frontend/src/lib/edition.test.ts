@@ -125,6 +125,19 @@ describe("preference storage", () => {
     expect(() => setEditionPreference("day")).not.toThrow();
     expect(seen).toHaveBeenCalledTimes(2);
     window.removeEventListener("rb-edition-change", seen);
+    vi.restoreAllMocks();
+    setEditionPreference("clock"); // storage works again: drops the in-memory choice
+  });
+
+  it("keeps a manual choice for this page session when storage is blocked", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    setEditionPreference("day");
+    expect(getEditionPreference()).toBe("day");
+    vi.restoreAllMocks();
+    setEditionPreference("clock");
+    expect(getEditionPreference()).toBe("clock");
   });
 });
 
