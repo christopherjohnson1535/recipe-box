@@ -143,10 +143,11 @@ function parseTicksObject(raw: string | null): Record<string, unknown> | null {
   }
 }
 
-/** True when the stored text is not usable ticks (corrupt, another version) or was last changed 12 hours ago or more. */
+/** True when the stored text is not usable ticks (corrupt, another version) was last changed 12 hours ago or more, or is dated in the future. */
 export function ticksStale(raw: string | null, now: number): boolean {
   const d = parseTicksObject(raw);
-  return !d || now - (d.at as number) >= TICKS_TTL_MS;
+  const age = d ? now - (d.at as number) : 0;
+  return !d || age < 0 || age >= TICKS_TTL_MS;
 }
 
 /** Stored ticks, or none for corrupt text. Indexes outside the recipe (it was edited since) are dropped. */

@@ -6,8 +6,11 @@ import { noTicks, parseTicks, serialiseTicks, ticksStale, toggled, type Ticks } 
 // shortcut: recipe-page/session-store.ts is the same hook on sessionStorage; share one if a third caller appears.
 const memory = new Map<string, string>();
 const listeners = new Set<() => void>();
+// Keys whose last write threw. Reads for them come from the Map, or a getItem that still works would keep serving the old value.
+const failed = new Set<string>();
 
 function read(key: string): string | null {
+  if (failed.has(key)) return memory.get(key) ?? null;
   try {
     return localStorage.getItem(key);
   } catch {
@@ -19,15 +22,23 @@ function write(key: string, value: string) {
   memory.set(key, value);
   try {
     localStorage.setItem(key, value);
+    failed.delete(key);
   } catch {
-    /* the Map has it */
+    failed.add(key); // the Map has it
   }
   listeners.forEach((l) => l());
 }
 
+// Another tab wrote to localStorage: read again, so this tab does not build on (and then overwrite with) stale state.
+const onStorage = () => listeners.forEach((l) => l());
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
-  return () => void listeners.delete(listener);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) window.removeEventListener("storage", onStorage);
+  };
 };
 
 /** A string kept in localStorage. The server and the hydrating render see `null`, so the HTML never differs from the first client render. */

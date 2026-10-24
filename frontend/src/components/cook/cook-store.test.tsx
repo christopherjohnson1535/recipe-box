@@ -21,4 +21,24 @@ describe("cook store", () => {
     act(() => result.current.clear());
     expect(result.current.ticks.steps.size).toBe(0);
   });
+
+  it("keeps ticks in memory once a write fails, even when reads still work", () => {
+    const stored = JSON.stringify({ v: 1, at: Date.now(), ingredients: [], steps: [0] });
+    vi.stubGlobal("localStorage", { getItem: () => stored, setItem: () => { throw new Error("quota"); } });
+    const { result } = renderHook(() => useCookTicks("write-fails", 2, 2));
+    expect(result.current.ticks.steps).toEqual(new Set([0]));
+    act(() => result.current.toggleStep(1));
+    expect(result.current.ticks.steps).toEqual(new Set([0, 1]));
+    vi.unstubAllGlobals();
+  });
+
+  it("re-reads when another tab changes the ticks", () => {
+    const { result } = renderHook(() => useCookTicks("two-tabs", 3, 3));
+    act(() => result.current.toggleIngredient(0));
+    localStorage.setItem("cook-ticks:two-tabs", JSON.stringify({ v: 1, at: Date.now(), ingredients: [0, 2], steps: [] }));
+    act(() => void window.dispatchEvent(new StorageEvent("storage", { key: "cook-ticks:two-tabs" })));
+    expect(result.current.ticks.ingredients).toEqual(new Set([0, 2]));
+    act(() => result.current.toggleIngredient(1));
+    expect(result.current.ticks.ingredients).toEqual(new Set([0, 1, 2]));
+  });
 });

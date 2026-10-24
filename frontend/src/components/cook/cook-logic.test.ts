@@ -114,6 +114,7 @@ describe("ticks", () => {
     expect(ticksStale(raw, NOW + TICKS_TTL_MS - 1)).toBe(false);
     expect(ticksStale(raw, NOW + TICKS_TTL_MS)).toBe(true);
     expect(ticksStale("{", NOW)).toBe(true);
+    expect(ticksStale(raw, NOW - 1)).toBe(true); // dated in the future (a clock that was wrong)
   });
 
   it("toggles without changing the original", () => {
