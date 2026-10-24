@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [workspace]
-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/postgres"]
-default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/postgres"]
+members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres"]
+default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres"]
 
 [workspace.dependencies]
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "uuid", "chrono", "json", "migrate", "macros", "runtime-tokio", "tls-rustls"] }
@@ -19,6 +19,7 @@ uuid = { version = "1", features = ["v4"] }
 [dependencies]
 recipe-box-domain = { path = "crates/domain" }
 recipe-box-adapter-postgres = { path = "crates/adapters/postgres" }
+recipe-box-adapter-fs-media = { path = "crates/adapters/fs-media" }
 recipe-box-ports = { path = "crates/ports" }
 anyhow = "1"
 argon2 = "0.6"

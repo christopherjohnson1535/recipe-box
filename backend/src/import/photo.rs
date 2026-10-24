@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     error::{AppError, AppResult},
-    routes::media::check_dimensions,
+    media::check_dimensions,
 };
 
 const DECODE_TIMEOUT: Duration = Duration::from_secs(30);
