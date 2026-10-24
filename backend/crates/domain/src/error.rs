@@ -24,6 +24,12 @@ pub enum DomainError {
     SiteBlocked(String),
     #[error("{0}")]
     FetchFailed(String),
+    /// An upload that is not a readable image, or is over the size bounds.
+    #[error("{0}")]
+    UnsupportedMedia(String),
+    /// A feature that is not built yet.
+    #[error("{0}")]
+    NotImplemented(String),
     /// Infrastructure failed (database, disk). The message is for logs, never for the client.
     #[error("{0}")]
     Internal(String),

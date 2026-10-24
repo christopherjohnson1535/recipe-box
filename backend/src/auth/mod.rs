@@ -1,7 +1,4 @@
-//! Passwords (argon2id), DB-backed sessions, and the `CurrentUser` / `AdminUser` extractors.
+//! Outbound ports for sessions and passwords: argon2id hashing and random session tokens.
 
-pub mod extract;
 pub mod password;
 pub mod session;
-
-pub use extract::{AdminUser, CurrentUser};

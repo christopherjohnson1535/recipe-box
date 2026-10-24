@@ -2,5 +2,6 @@
 # produces noise.
 paths-ignore:
   - backend/tests
+  - backend/crates/app/tests
   - backend/crates/ports/src/contract
   - e2e

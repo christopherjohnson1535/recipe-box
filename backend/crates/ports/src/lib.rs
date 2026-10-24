@@ -6,7 +6,12 @@
 //! suite every adapter must pass (docs/adr/0008).
 
 use async_trait::async_trait;
-use domain::{DomainResult, PhotoMode, RecipeDraft, chrono::DateTime, chrono::Utc, url::Url};
+use domain::{
+    DomainResult, PhotoMode, RecipeDraft,
+    chrono::{DateTime, Utc},
+    url::Url,
+    uuid::Uuid,
+};
 
 mod repos;
 
@@ -83,4 +88,33 @@ pub trait PageFetcher: Send + Sync {
     /// `BlockedAddress`. A site that refuses bots (401/403/429/503, a bot-check page) is `SiteBlocked`, any other
     /// failure (timeout, bad status, body over `max_bytes`) is `FetchFailed`.
     async fn fetch(&self, url: &Url, max_bytes: usize) -> DomainResult<FetchedPage>;
+}
+
+/// An uploaded image after [`ImageCodec::encode`]: always a JPEG.
+pub struct EncodedImage {
+    pub jpeg: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    /// The print-style rendition, or `None` when making it failed (that must not fail the upload).
+    pub display: Option<Vec<u8>>,
+}
+
+/// Decodes and re-encodes uploaded images (nothing is served as uploaded) and makes the print-style rendition.
+#[async_trait]
+pub trait ImageCodec: Send + Sync {
+    /// Decodes `data` (JPEG, PNG, WebP, GIF, HEIC) and re-encodes it as JPEG, long edge at most 2400 px, with the
+    /// rendition for image `id`. `UnsupportedMedia` when it is not a readable image or is over the size bounds.
+    async fn encode(&self, id: Uuid, data: Vec<u8>) -> DomainResult<EncodedImage>;
+
+    /// The rendition of an already stored original JPEG.
+    async fn render_display(&self, id: Uuid, jpeg: Vec<u8>) -> DomainResult<Vec<u8>>;
+}
+
+/// Opaque session tokens. Only `digest(token)` is stored.
+pub trait SessionTokens: Send + Sync {
+    /// A new unguessable token, safe to put in a cookie.
+    fn generate(&self) -> String;
+
+    /// What is stored for `token`; the same token always gives the same digest.
+    fn digest(&self, token: &str) -> Vec<u8>;
 }

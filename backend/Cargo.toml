@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [workspace]
-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres"]
-default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres"]
+members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
+default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
 
 [workspace.dependencies]
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "uuid", "chrono", "json", "migrate", "macros", "runtime-tokio", "tls-rustls"] }
@@ -17,16 +17,17 @@ url = "2"
 uuid = { version = "1", features = ["v4"] }
 
 [dependencies]
+recipe-box-app = { path = "crates/app" }
 recipe-box-domain = { path = "crates/domain" }
+recipe-box-adapter-http = { path = "crates/adapters/http" }
 recipe-box-adapter-postgres = { path = "crates/adapters/postgres" }
 recipe-box-adapter-fs-media = { path = "crates/adapters/fs-media" }
 recipe-box-ports = { path = "crates/ports" }
 anyhow = "1"
 argon2 = "0.6"
+async-trait = "0.1"
 axum = { version = "0.8", features = ["macros", "multipart"] }
-axum-extra = { version = "0.12", features = ["cookie"] }
 base64 = "0.23"
-cookie = "0.18" # already pulled in by axum-extra; needed for its re-exported `time::Duration` (Max-Age)
 chrono = { workspace = true, features = ["serde"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 rand = "0.10"
@@ -35,9 +36,7 @@ serde.workspace = true
 serde_json = "1"
 sha2 = "0.11"
 sqlx.workspace = true
-thiserror.workspace = true
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "fs", "process"] }
-tower-http = { version = "0.7", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url.workspace = true

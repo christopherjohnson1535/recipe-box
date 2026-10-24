@@ -4,11 +4,10 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
-    auth::{password, session},
+    HttpState,
+    dto::User,
     error::{AppJson, AppResult, ErrorBody},
-    models::User,
-    state::AppState,
-    validate,
+    extract::session_cookie,
 };
 
 #[derive(serde::Serialize, ToSchema)]
@@ -21,9 +20,9 @@ pub struct SetupStatus {
 #[utoipa::path(get, path = "/api/setup", operation_id = "getSetupStatus", tag = "setup", responses(
     (status = 200, description = "Setup status.", body = SetupStatus),
 ))]
-pub async fn status(State(state): State<AppState>) -> AppResult<Json<SetupStatus>> {
+pub async fn status(State(state): State<HttpState>) -> AppResult<Json<SetupStatus>> {
     Ok(Json(SetupStatus {
-        needs_setup: !state.users.any().await?,
+        needs_setup: state.services.users.needs_setup().await?,
     }))
 }
 
@@ -43,25 +42,15 @@ pub struct SetupBody {
     (status = 403, description = "Setup is already done (`forbidden`).", body = ErrorBody),
 ))]
 pub async fn create_admin(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     jar: CookieJar,
     AppJson(body): AppJson<SetupBody>,
 ) -> AppResult<(StatusCode, CookieJar, Json<User>)> {
-    let username = validate::username(&body.username)?;
-    let display_name = validate::display_name(&body.display_name)?;
-    validate::password(&body.password)?;
-    let hash = password::hash(body.password).await?;
-
-    let user = state
+    let (user, session) = state
+        .services
         .users
-        .create_first_admin(domain::NewUser {
-            username,
-            display_name,
-            password_hash: hash,
-            role: domain::ROLE_ADMIN.into(),
-        })
+        .create_first_admin(&body.username, &body.display_name, body.password)
         .await?;
-
-    let jar = session::start(&state, jar, user.id).await?;
+    let jar = jar.add(session_cookie(&state.config, session));
     Ok((StatusCode::CREATED, jar, Json(user.into())))
 }

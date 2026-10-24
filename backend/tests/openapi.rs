@@ -60,9 +60,12 @@ async fn spec_and_router_list_the_same_operations() {
     let paths = spec["paths"].as_object().unwrap();
 
     // Every path the router registers is in the spec.
-    let source =
-        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/routes/mod.rs"))
-            .unwrap();
+    let source = [
+        "crates/adapters/http/src/routes/mod.rs",
+        "src/routes/mod.rs",
+    ]
+    .map(|f| std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(f)).unwrap())
+    .join("\n");
     let registered: BTreeSet<&str> = source
         .split('"')
         .filter(|s| s.starts_with("/api/") || s.starts_with("/media/"))

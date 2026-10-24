@@ -4,11 +4,10 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
-    auth::{CurrentUser, password, session},
-    error::{AppError, AppJson, AppResult, ErrorBody},
-    models::User,
-    state::AppState,
-    validate,
+    HttpState,
+    dto::User,
+    error::{AppJson, AppResult, ErrorBody},
+    extract::{CurrentUser, removal_cookie, session_cookie, session_token},
 };
 
 #[derive(Deserialize, ToSchema)]
@@ -25,25 +24,16 @@ pub struct LoginBody {
     (status = 401, description = "Wrong username or password; the same answer for both (`unauthenticated`).", body = ErrorBody),
 ))]
 pub async fn login(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     jar: CookieJar,
     AppJson(body): AppJson<LoginBody>,
 ) -> AppResult<(CookieJar, Json<User>)> {
-    // A longer password can never have been set; refuse before any argon2 work.
-    if body.password.chars().count() > validate::MAX_PASSWORD {
-        return Err(AppError::Unauthenticated("Wrong username or password."));
-    }
-    let found = state.users.find_with_hash(body.username.trim()).await?;
-    let (user, hash) = match found {
-        Some((user, hash)) => (Some(user), Some(hash)),
-        None => (None, None),
-    };
-    let ok = password::verify(body.password, hash).await?;
-    let Some(user) = user.filter(|_| ok) else {
-        // Same answer for unknown user and wrong password.
-        return Err(AppError::Unauthenticated("Wrong username or password."));
-    };
-    let jar = session::start(&state, jar, user.id).await?;
+    let (user, session) = state
+        .services
+        .auth
+        .login(&body.username, body.password)
+        .await?;
+    let jar = jar.add(session_cookie(&state.config, session));
     Ok((jar, Json(user.into())))
 }
 
@@ -53,11 +43,11 @@ pub async fn login(
         headers(("Set-Cookie" = String, description = "Clears `rb_session`."))),
 ))]
 pub async fn logout(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     jar: CookieJar,
 ) -> AppResult<(StatusCode, CookieJar)> {
-    let jar = session::end(&state, jar).await?;
-    Ok((StatusCode::NO_CONTENT, jar))
+    state.services.auth.logout(session_token(&jar)).await?;
+    Ok((StatusCode::NO_CONTENT, jar.add(removal_cookie())))
 }
 
 /// The signed-in user.
@@ -65,5 +55,5 @@ pub async fn logout(
     (status = 200, description = "The current user.", body = User),
 ))]
 pub async fn me(CurrentUser(user): CurrentUser) -> Json<User> {
-    Json(user)
+    Json(user.into())
 }
