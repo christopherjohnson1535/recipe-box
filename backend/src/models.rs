@@ -83,6 +83,9 @@ pub struct Recipe {
     pub tags: Vec<String>,
     #[schema(required = true)]
     pub image_url: Option<String>,
+    /// The print-style rendition of the main photo; null when the household setting is off or it is not made yet.
+    #[schema(required = true)]
+    pub image_display_url: Option<String>,
     pub photo_urls: Vec<String>,
     #[schema(required = true)]
     pub created_by: Option<UserRef>,
@@ -104,8 +107,14 @@ pub struct RecipeSummary {
     #[sqlx(skip)]
     #[schema(required = true)]
     pub image_url: Option<String>,
+    /// As on `Recipe`.
+    #[sqlx(skip)]
+    #[schema(required = true)]
+    pub image_display_url: Option<String>,
     #[serde(skip)]
     pub image_file: Option<String>,
+    #[serde(skip)]
+    pub image_display_file: Option<String>,
     pub source_type: SourceType,
     pub updated_at: DateTime<Utc>,
 }
@@ -181,6 +190,9 @@ impl User {
 pub struct Image {
     pub id: Uuid,
     pub url: String,
+    /// The print-style rendition, whatever the household setting says; null if it could not be made.
+    #[schema(required = true)]
+    pub display_url: Option<String>,
     pub width: i32,
     pub height: i32,
 }

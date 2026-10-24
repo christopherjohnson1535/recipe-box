@@ -14,6 +14,7 @@ pub mod imports;
 pub mod media;
 pub mod openapi;
 pub mod recipes;
+pub mod settings;
 pub mod setup;
 pub mod tags;
 pub mod users;
@@ -48,6 +49,7 @@ pub fn router(state: AppState) -> Router {
                 .delete(recipes::remove),
         )
         .route("/api/recipes/{id}/restore", post(recipes::restore))
+        .route("/api/settings", get(settings::get).put(settings::update))
         .route("/api/tags", get(tags::list))
         .route("/media/{file_name}", get(media::serve))
         .route("/api/import/capabilities", get(imports::capabilities))
