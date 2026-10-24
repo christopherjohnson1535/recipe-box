@@ -30,6 +30,33 @@ describe("CookMode", () => {
     expect((screen.getByRole("button", { name: /Back/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("opens on the first step not done when stored ticks load, and then stays put", () => {
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [], steps: [0] }));
+    view();
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Step 2 done" })); // ticking later never moves the step
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy();
+    act(() => {
+      localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [], steps: [0, 1, 2] }));
+      window.dispatchEvent(new StorageEvent("storage", { key: "cook-ticks:r1" }));
+    });
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy(); // another tab's write never moves the step
+    fireEvent.click(screen.getByRole("button", { name: /Back/ }));
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+  });
+
+  it("opens on the last step when every step is done, and on step 1 when none are", () => {
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [], steps: [0, 1, 2] }));
+    const { unmount } = view();
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy();
+    unmount();
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [0], steps: [] }));
+    view();
+    expect(screen.getByText("Step 1 of 3")).toBeTruthy();
+  });
+
   it("moves with the buttons and the arrow keys, and ends on Finish", () => {
     view();
     fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
@@ -257,6 +284,8 @@ describe("CookMode tick-off and views", () => {
     expect(html.match(/<button[^>]*aria-pressed="true"[^>]*>([^<]*)/g)?.map((m) => m.replace(/<[^>]*>/, ""))).toEqual(["One step"]);
     view();
     expect(pressed(ing(/onion/))).toBe("true");
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy(); // step 1 is done, so it opens on step 2
+    fireEvent.click(screen.getByRole("button", { name: /Back/ }));
     expect(pressed(screen.getByRole("button", { name: "Step 1 done" }))).toBe("true");
   });
 
@@ -296,7 +325,7 @@ describe("CookMode tick-off and views", () => {
     view();
     expect(pressed(screen.getByRole("button", { name: "All steps" }))).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "One step" }));
-    expect(screen.getByText("Step 1 of 3")).toBeTruthy();
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy(); // step 1 was ticked, so the reload opens on step 2
   });
 
   it("starts a timer from any step in the list, labelled with that step", () => {

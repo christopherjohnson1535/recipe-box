@@ -13,7 +13,7 @@ import { splitIngredient } from "@/lib/scale";
 import {
   clampStep, cookParts, formatClock, litIngredients, noTimers, railOrder, remainingMs, ringFraction, stepDurations, swipeDirection, timerReducer,
 } from "./cook-logic";
-import { useCookTicks, useCookView } from "./cook-store";
+import { readCookTicks, useCookTicks, useCookView } from "./cook-store";
 import { useVoice } from "./use-voice";
 import { useWakeLock } from "./use-wake-lock";
 
@@ -64,6 +64,18 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
   const [view, setView] = useCookView();
   const all = view === "all";
   const { ticks, toggleIngredient, toggleStep, clear } = useCookTicks(id, ingredients.length, count);
+  // Once, after mount: open on the first step not yet done (a reloaded Home Screen app picks up where the cook was).
+  // Reads the store directly, so a later tick or another tab's write never moves the step.
+  useEffect(() => {
+    const done = readCookTicks(id, ingredients.length, count).steps;
+    if (done.size === 0) return;
+    let first = 0;
+    while (first < count - 1 && done.has(first)) first++;
+    // Not a lazy useState initial: the server cannot read the store, and the first client render must match its HTML.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIndex(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- first load only
+  }, []);
   const wake = useWakeLock();
   const [wakeNoteOpen, setWakeNoteOpen] = useState(false);
   const toolbar = useRef<HTMLDivElement>(null);

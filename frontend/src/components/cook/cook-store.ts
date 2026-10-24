@@ -61,6 +61,12 @@ export function useCookView(): [CookView, (view: CookView) => void] {
   return [raw === "all" ? "all" : "one", set];
 }
 
+/** The stored ticks for one recipe, read once and now (not subscribed): for a decision made on first load. */
+export function readCookTicks(id: string, ingredientCount: number, stepCount: number): Ticks {
+  const raw = read(`cook-ticks:${id}`);
+  return parseTicks(raw !== null && ticksStale(raw, Date.now()) ? null : raw, { ingredients: ingredientCount, steps: stepCount });
+}
+
 /** Ticked ingredients and steps for one recipe (`cook-ticks:<id>`: `{ v: 1, at, ingredients, steps }`). */
 export function useCookTicks(id: string, ingredientCount: number, stepCount: number) {
   const key = `cook-ticks:${id}`;

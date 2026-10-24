@@ -234,12 +234,12 @@ export function CookRail({ children, hiddenCount, anyLit }: { children: ReactNod
 /** One ingredient: a button the cook taps to tick off (claret line through it, muted, as on the recipe page). */
 export function CookRailRow({ quantity, name, lit, ticked, onToggle }: { quantity: string; name: string; lit: boolean; ticked: boolean; onToggle: () => void }) {
   return (
-    <li data-lit={lit} className={cx("shrink-0", lit ? "text-ink" : "text-ink-muted max-lg:group-data-[all=false]/rail:hidden")}>
+    <li data-lit={lit} className={cx("shrink-0 text-small min-[700px]:text-deck", lit ? "text-ink" : "text-ink-muted max-lg:group-data-[all=false]/rail:hidden")}>
       <button
         type="button"
         aria-pressed={ticked}
         onClick={onToggle}
-        className="group flex min-h-control w-full items-baseline gap-3 rounded-full border border-rule px-4 py-1.5 text-left text-small transition-colors duration-150 aria-pressed:text-ink-muted min-[700px]:text-deck lg:rounded-none lg:border-0 lg:border-b lg:px-0 lg:py-3"
+        className="group flex min-h-control w-full items-baseline gap-3 rounded-full border border-rule px-4 py-1.5 text-left transition-colors duration-150 aria-pressed:text-ink-muted lg:rounded-none lg:border-0 lg:border-b lg:px-0 lg:py-3"
       >
         {quantity && (
           <span className="font-semibold text-accent [font-variant-numeric:lining-nums_tabular-nums] group-aria-pressed:text-ink-muted lg:min-w-16">
