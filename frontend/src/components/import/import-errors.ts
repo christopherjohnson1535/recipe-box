@@ -42,6 +42,18 @@ function rule(code: string, mode: ImportMode, serverMessage: string): Rule | und
         offers: ["paste-text"],
       };
     case "no_recipe_found":
+      if (mode === "text")
+        return {
+          title: "No recipe found in that text",
+          message: "A recipe needs a list of ingredients and some steps. Check what you pasted, or type the recipe in.",
+          offers: ["type-in"],
+        };
+      if (mode === "photo")
+        return {
+          title: "No recipe found in those photos",
+          message: "We could not read a recipe in them. Try a closer, clearer photo, or type the recipe in.",
+          offers: ["type-in"],
+        };
       return {
         title: "No recipe found on that page",
         message: "The page does not publish its recipe in a form we can read. Paste the recipe text instead, or type it in.",

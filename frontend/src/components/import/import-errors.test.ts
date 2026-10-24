@@ -75,9 +75,15 @@ describe("explainImportError", () => {
       offers: ["type-in"],
     });
     expect(explainImportError(err("no_recipe_found"), "text")).toMatchObject({
-      title: "No recipe found on that page",
+      title: "No recipe found in that text",
+      message: expect.stringMatching(/ingredients and some steps/),
       offers: ["type-in"],
     });
+    expect(explainImportError(err("no_recipe_found"), "photo")).toMatchObject({
+      title: "No recipe found in those photos",
+      offers: ["type-in"],
+    });
+    expect(explainImportError(err("no_recipe_found"), "link").title).toBe("No recipe found on that page");
     expect(explainImportError(err("ai_error", "The AI service failed."), "text")).toMatchObject({
       title: "The import failed",
       message: "The AI service failed.",
