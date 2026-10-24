@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clampStep, cookParts, formatClock, litIngredients, noTimers, parseVoice, railOrder, remainingMs, ringFraction, stepDurations,
-  swipeDirection, timerReducer,
+  swipeDirection, timerReducer, noTicks, parseTicks, serialiseTicks, ticksStale, toggled, TICKS_TTL_MS,
 } from "./cook-logic";
 
 const LINES = ["1 large onion, diced", "2 carrots, diced", "2 tbsp tomato paste", "2 cups dry red wine"];
@@ -87,5 +87,39 @@ describe("parseVoice", () => {
     expect(parseVoice("put the lid back")).toBeNull();
     expect(parseVoice("stir it next to the pot")).toBeNull();
     expect(parseVoice("is it done, repeat")).toBeNull();
+  });
+});
+
+describe("ticks", () => {
+  const counts = { ingredients: 3, steps: 2 };
+  const NOW = 1_000_000_000;
+
+  it("round-trips, sorted", () => {
+    const raw = serialiseTicks({ ingredients: new Set([2, 0]), steps: new Set([1]) }, NOW);
+    expect(JSON.parse(raw)).toEqual({ v: 1, at: NOW, ingredients: [0, 2], steps: [1] });
+    expect(parseTicks(raw, counts)).toEqual({ ingredients: new Set([0, 2]), steps: new Set([1]) });
+  });
+
+  it("drops indexes outside the recipe and non-integers", () => {
+    const raw = JSON.stringify({ v: 1, at: NOW, ingredients: [0, 3, -1, 1.5, "1"], steps: [5, 1] });
+    expect(parseTicks(raw, counts)).toEqual({ ingredients: new Set([0]), steps: new Set([1]) });
+  });
+
+  it("treats missing, corrupt and other-version text as nothing ticked", () => {
+    for (const raw of [null, "", "{", "[]", "3", '{"v":2,"at":1}', '{"v":1}']) expect(parseTicks(raw, counts)).toBe(noTicks);
+  });
+
+  it("goes stale after 12 hours without a change", () => {
+    const raw = serialiseTicks(noTicks, NOW);
+    expect(ticksStale(raw, NOW + TICKS_TTL_MS - 1)).toBe(false);
+    expect(ticksStale(raw, NOW + TICKS_TTL_MS)).toBe(true);
+    expect(ticksStale("{", NOW)).toBe(true);
+  });
+
+  it("toggles without changing the original", () => {
+    const a = new Set([1]);
+    expect(toggled(a, 2)).toEqual(new Set([1, 2]));
+    expect(toggled(a, 1)).toEqual(new Set());
+    expect(a).toEqual(new Set([1]));
   });
 });
