@@ -6,7 +6,8 @@ use axum::http::StatusCode;
 use common::{TestApp, a_recipe, a_user};
 use recipe_box_api::{
     config::Config,
-    routes::media::{backfill_displays, delete_images, reencode, render_display},
+    media::{backfill_displays, reencode, render_display},
+    routes::media::delete_images,
     state::AppState,
 };
 use serde_json::json;
@@ -156,7 +157,7 @@ async fn backfill_renders_missing_plates_and_skips_unreadable_originals() {
     std::fs::write(&path, &original.bytes).unwrap();
 
     assert_eq!(
-        backfill_displays(app.state.images.as_ref(), &app.media_dir).await,
+        backfill_displays(app.state.images.as_ref(), app.state.media.as_ref()).await,
         1
     );
     let name: Option<String> =
@@ -176,7 +177,7 @@ async fn backfill_renders_missing_plates_and_skips_unreadable_originals() {
     assert_eq!(still_null, 1);
     // Idempotent: nothing new to make, the unreadable one is skipped again.
     assert_eq!(
-        backfill_displays(app.state.images.as_ref(), &app.media_dir).await,
+        backfill_displays(app.state.images.as_ref(), app.state.media.as_ref()).await,
         0
     );
 }
@@ -192,7 +193,7 @@ async fn a_rendition_of_a_deleted_image_is_not_left_behind() {
     )
     .unwrap();
     assert!(
-        !render_display(app.state.images.as_ref(), &app.media_dir, id)
+        !render_display(app.state.images.as_ref(), app.state.media.as_ref(), id)
             .await
             .unwrap()
     );

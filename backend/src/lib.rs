@@ -5,6 +5,7 @@ pub mod clock;
 pub mod config;
 pub mod error;
 pub mod import;
+pub mod media;
 pub mod models;
 pub mod plate;
 pub mod routes;
@@ -50,7 +51,7 @@ pub fn spawn_purge_task(state: AppState) {
 /// Gives photos stored before renditions existed their rendition, in the background.
 pub fn spawn_display_backfill(state: AppState) {
     tokio::spawn(async move {
-        routes::media::backfill_displays(state.images.as_ref(), &state.config.media_dir).await;
+        media::backfill_displays(state.images.as_ref(), state.media.as_ref()).await;
     });
 }
 

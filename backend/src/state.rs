@@ -1,10 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
+use adapter_fs_media::FsMediaStore;
 use adapter_postgres::{
     PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo,
     PgUserRepo,
 };
-use ports::{ImageRepo, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo};
+use ports::{
+    ImageRepo, MediaStore, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+};
 
 use crate::{
     clock::Clock,
@@ -20,6 +23,7 @@ pub struct AppState {
     pub sessions: Arc<dyn SessionRepo>,
     pub settings: Arc<dyn SettingsRepo>,
     pub tags: Arc<dyn TagRepo>,
+    pub media: Arc<dyn MediaStore>,
     pub health: Arc<dyn StorageHealth>,
     pub config: Arc<Config>,
     /// Outbound client. Redirects are off: `import::safe_fetch` must follow them itself, re-checking each hop.
@@ -54,6 +58,7 @@ impl AppState {
             sessions: Arc::new(PgSessionRepo::new(pool.clone(), port_clock.clone())),
             settings: Arc::new(PgSettingsRepo::new(pool.clone(), port_clock)),
             tags: Arc::new(PgTagRepo::new(pool.clone())),
+            media: Arc::new(FsMediaStore::new(config.media_dir.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
             config: Arc::new(config),
             http,
