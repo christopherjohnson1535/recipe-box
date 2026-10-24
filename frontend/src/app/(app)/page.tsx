@@ -11,7 +11,7 @@ import { SpotIcon } from "@/components/ui/SpotIcon";
 import { iconForTag } from "@/components/ui/spot-icons";
 import { issueLine, monthYear, planHome } from "@/components/home/issue";
 import { LocalIssueLine, LocalTicker } from "@/components/home/LocalIssue";
-import { formatMinutes } from "@/lib/recipe";
+import { formatMinutes, plateSrc } from "@/lib/recipe";
 import { RecipeCard } from "@/components/RecipeCard";
 import { NoMatches } from "@/components/search/ResultSummary";
 import { SearchControls } from "@/components/search/SearchControls";
@@ -147,7 +147,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
             kicker={`Cover story${cover.tags.length > 0 ? ` · ${cover.tags.slice(0, 2).join(" · ")}` : ""}`}
             deck={cover.description || undefined}
             meta={formatMinutes(cover.totalMinutes)}
-            imageSrc={cover.imageUrl as string}
+            imageSrc={plateSrc(cover) as string}
             actions={
               <>
                 <ButtonLink href={`/recipes/${cover.id}/cook`}>Start cooking</ButtonLink>

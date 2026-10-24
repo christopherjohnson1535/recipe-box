@@ -5,19 +5,19 @@ import type { Capabilities, Health, Image, Recipe, RecipeDraft, RecipeSummary, T
 // "*/api/..." matches both the browser's relative URLs and server-side absolute ones.
 export const user: User = { id: "u1", username: "chris", displayName: "Chris", role: "admin", createdAt: "2026-01-01T00:00:00Z" };
 export const summary: RecipeSummary = {
-  id: "r1", title: "Soup", description: "", totalMinutes: 30, tags: [], imageUrl: null, sourceType: "manual", updatedAt: "2026-01-01T00:00:00Z",
+  id: "r1", title: "Soup", description: "", totalMinutes: 30, tags: [], imageUrl: null, imageDisplayUrl: null, sourceType: "manual", updatedAt: "2026-01-01T00:00:00Z",
 };
 export const recipe: Recipe = {
   id: "r1", title: "Soup", description: "", ingredients: [], steps: [], servings: null, prepMinutes: null, cookMinutes: null,
   totalMinutes: null, notes: "", sourceUrl: null, sourceName: null, sourceType: "manual", imageId: null, photoImageIds: [], tags: [],
-  imageUrl: null, photoUrls: [], createdBy: null, updatedBy: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
+  imageUrl: null, imageDisplayUrl: null, photoUrls: [], createdBy: null, updatedBy: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
 };
 export const draft: RecipeDraft = {
   title: "Pancakes", description: "", ingredients: [], steps: [], servings: null, prepMinutes: null, cookMinutes: null,
   totalMinutes: null, notes: "", sourceUrl: null, sourceName: null, sourceType: "manual", imageId: null, photoImageIds: [],
   tags: [], imageUrl: null, warnings: [], duplicateOf: null,
 };
-export const image: Image = { id: "i1", url: "/media/i1.jpg", width: 1, height: 1 };
+export const image: Image = { id: "i1", url: "/media/i1.jpg", width: 1, height: 1, displayUrl: null };
 
 export const handlers = [
   http.get("*/api/health", () => HttpResponse.json<Health>({ status: "ok", db: "ok", version: "test" })),

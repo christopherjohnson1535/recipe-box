@@ -16,3 +16,14 @@ export function SidebarLayout({ sidebar, children }: { sidebar: ReactNode; child
     </div>
   );
 }
+
+/** Caption under the lead photo: opens the untouched original at full size in a new tab (PHO-7). */
+export function PlateCaption({ href }: { href: string }) {
+  return (
+    <p className="flex justify-end print:hidden">
+      <a href={href} target="_blank" rel="noopener" className="link inline-flex min-h-control items-center text-small italic">
+        View the original photo
+      </a>
+    </p>
+  );
+}

@@ -44,7 +44,7 @@ export function CoverStory({
         width={1200}
         height={900}
         fetchPriority="high"
-        className="order-first aspect-[4/3] h-auto w-full object-cover lg:order-last lg:aspect-square [filter:var(--photo-filter)]"
+        className="order-first aspect-[4/3] h-auto w-full object-cover lg:order-last lg:aspect-square border border-(--rule-hair) bg-(--panel-bg) [filter:var(--photo-filter)] animate-[fade-in_var(--duration-base)_var(--ease-out)_both]"
       />
     </article>
   );

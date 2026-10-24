@@ -1,5 +1,10 @@
 import { NUMBER, parseNumber } from "./scale";
 
+/** The picture to show on cards, the cover and the recipe page: the print-treated rendition when there is one, else the original. */
+export function plateSrc(r: { imageUrl: string | null; imageDisplayUrl?: string | null }): string | null {
+  return r.imageDisplayUrl ?? r.imageUrl;
+}
+
 /** 75 → "1 hr 15 min". */
 export function formatMinutes(minutes: number | null | undefined): string | null {
   if (minutes == null || minutes <= 0) return null;

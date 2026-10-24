@@ -1,5 +1,5 @@
 import type { RecipeSummary } from "@/lib/api";
-import { formatMinutes } from "@/lib/recipe";
+import { formatMinutes, plateSrc } from "@/lib/recipe";
 import { Badge } from "./ui/Chip";
 import { DotList } from "./ui/DotList";
 import { MagazineCard } from "./ui/MagazineCard";
@@ -26,7 +26,7 @@ export function RecipeCard({ recipe, index }: { recipe: RecipeSummary; index?: n
       }
       time={formatMinutes(recipe.totalMinutes)}
       deck={recipe.description || undefined}
-      imageSrc={recipe.imageUrl}
+      imageSrc={plateSrc(recipe)}
       fallbackIcon={icon}
       index={index}
       morphId={recipe.id}

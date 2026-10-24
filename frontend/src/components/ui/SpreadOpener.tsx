@@ -53,7 +53,7 @@ export function SpreadOpener({ title, kicker, deck, byline, actions, photo, icon
       </div>
       {photo && (
         <Morph name={morphId ? photoName(morphId) : undefined}>
-          <div className="relative aspect-[3/2] overflow-hidden lg:aspect-auto print:hidden">
+          <div className="relative aspect-[3/2] overflow-hidden border border-(--rule-hair) bg-(--panel-bg) lg:aspect-auto print:hidden">
             {/* Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send. */}
             <img
               src={photo.src}

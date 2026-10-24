@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { ServerError } from "@/components/ServerError";
-import { ApiError, type Capabilities, type User } from "@/lib/api";
+import { ApiError, type Capabilities, type Settings, type User } from "@/lib/api";
 import { serverApi } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -21,5 +21,7 @@ export default async function SettingsPage() {
   // The status line is a nicety: if it can't load, the rest of the page still works.
   const capabilities: Capabilities | null = await api.importCapabilities().catch(() => null);
 
-  return <SettingsView me={me} users={users} capabilities={capabilities} />;
+  const settings: Settings | null = me.role === "admin" ? await api.getSettings().catch(() => null) : null;
+
+  return <SettingsView me={me} users={users} capabilities={capabilities} settings={settings} />;
 }
