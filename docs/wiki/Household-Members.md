@@ -20,3 +20,5 @@ Everyone in the household signs in with their own username and password and shar
 - **Reset password** beside a person opens a small form; save and they are signed out everywhere.
 - **Remove** asks "Remove Sam from the household?" first. It is switched off for yourself and for the only admin, with the reason shown under the row.
 - **AI import**: says whether photo import is on and, if not, what still works and how an admin turns it on.
+- **Photo style** (admins only, household setting `plateTreatment`): shows recipe photos with the print style or as
+  taken. Everyone in the household sees the same; originals are never changed, so switching is always safe.

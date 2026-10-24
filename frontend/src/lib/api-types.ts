@@ -248,6 +248,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household settings. */
+        get: operations["getSettings"];
+        /** Changes the household settings. Admin only. */
+        put: operations["updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/setup": {
         parameters: {
             query?: never;
@@ -404,6 +422,8 @@ export interface components {
             version: string;
         };
         Image: {
+            /** @description The print-style rendition, whatever the household setting says; null if it could not be made. */
+            displayUrl: string | null;
             /** Format: int32 */
             height: number;
             /** Format: uuid */
@@ -462,6 +482,8 @@ export interface components {
             description: string;
             /** Format: uuid */
             id: string;
+            /** @description The print-style rendition of the main photo; null when the household setting is off or it is not made yet. */
+            imageDisplayUrl: string | null;
             /** Format: uuid */
             imageId: string | null;
             imageUrl: string | null;
@@ -568,6 +590,8 @@ export interface components {
             description: string;
             /** Format: uuid */
             id: string;
+            /** @description As on `Recipe`. */
+            imageDisplayUrl: string | null;
             imageUrl: string | null;
             sourceType: components["schemas"]["SourceType"];
             tags: string[];
@@ -580,6 +604,10 @@ export interface components {
         SetPasswordBody: {
             currentPassword?: string | null;
             password: string;
+        };
+        Settings: {
+            /** @description Show recipe photos with the print treatment (`imageDisplayUrl`); the originals are always kept. */
+            plateTreatment: boolean;
         };
         SetupBody: {
             displayName: string;
@@ -1653,6 +1681,113 @@ export interface operations {
             };
         };
     };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Settings"];
+            };
+        };
+        responses: {
+            /** @description The settings now in force. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description Missing or unknown field (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not an admin (`forbidden`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Body over the size limit (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     getSetupStatus: {
         parameters: {
             query?: never;
@@ -2057,7 +2192,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `<uuid>.jpg` */
+                /** @description `<uuid>.jpg` (the original) or `<uuid>.display.jpg` (the print-style rendition) */
                 file_name: string;
             };
             cookie?: never;

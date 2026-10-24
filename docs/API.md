@@ -70,7 +70,18 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
 - **Media**: accepts JPEG/PNG/WebP/GIF and HEIC/HEIF (iPhone/iPad photos; decoded by libheif's `heif-convert` in a
   child process with a 30 s limit, binary from `HEIF_CONVERT`). Re-encoded to JPEG q85, EXIF orientation applied, long edge at
   most 2400 px. Images over 10,000 px a side or 40 megapixels are refused (`415 unsupported_media`) before any pixels
-  are decoded. `GET /media/{file_name}` requires a session; `file_name` must match `^[0-9a-f-]{36}\.jpg$`.
+  are decoded. `GET /media/{file_name}` requires a session; `file_name` must match `^[0-9a-f-]{36}(\.display)?\.jpg$`.
+- **Display renditions** (illustrated plates): every stored image also gets `<uuid>.display.jpg`, a deterministic
+  print-style version (centred crop 4:3 for landscape, 1:1 otherwise; long edge at most 1600 px, never upscaled; soft
+  S tone curve, warm paper tint, light grain; JPEG q82). The original `<uuid>.jpg` is never changed and stays viewable
+  full size. `POST /api/media` returns `displayUrl` (null if the rendition could not be made; the upload still
+  succeeds). Photos stored before this existed get theirs from a background task at API start. Recipes and recipe
+  list items carry `imageDisplayUrl`: the main photo's rendition when the household setting `plateTreatment` is on
+  and the rendition exists, else null; `imageUrl` always points at the original. Import drafts carry no
+  `imageDisplayUrl`. Backup export does not include renditions; they are made again after a restore.
+- **Settings**: `GET /api/settings` (any signed-in user) returns `{ "plateTreatment": true }`; `PUT /api/settings`
+  (admin only, `403 forbidden` for a member) takes the same body and returns it. A missing, mistyped or unknown field
+  is `400 validation`. `plateTreatment` defaults to on.
 - **Imports return drafts and never save.** For `import/url`, `sourceUrl` is the final URL after redirects,
   `duplicateOf` the id of a live recipe with the same normalised source URL, and `imageId`/`imageUrl` the stored copy
   of the main photo (if it could not be fetched or decoded, or is over the size limits above, they are null and
