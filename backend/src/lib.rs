@@ -24,9 +24,9 @@ pub fn startup_error_line(e: &anyhow::Error) -> String {
     format!("recipe-box-api: {e}")
 }
 
-/// Runs the embedded migrations in `backend/migrations`.
+/// Runs the embedded migrations (owned by the Postgres adapter crate).
 pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
-    sqlx::migrate!("./migrations").run(pool).await
+    adapter_postgres::migrate(pool).await
 }
 
 /// Hard-deletes recipes soft-deleted more than a day ago and expired sessions.

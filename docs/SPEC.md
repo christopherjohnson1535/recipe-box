@@ -36,7 +36,7 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
   Never cut: input validation, auth checks, SSRF protection, data-loss safety, accessibility.
 - **Backend (Rust):** stable Rust, edition 2024, `axum` 0.8, `tokio`, `sqlx` 0.9 (Postgres, runtime queries with
   `query_as` + `FromRow`; no compile-time `query!` macros so builds don't need a live DB), migrations in
-  `backend/migrations/` run on start. Errors via one `AppError` → JSON `{ "error": { "code", "message" } }`.
+  `backend/crates/adapters/postgres/migrations/` run on start. Errors via one `AppError` → JSON `{ "error": { "code", "message" } }`.
   `cargo fmt`, `cargo clippy -- -D warnings`, `cargo test` must pass.
 - **Frontend:** Next.js 16 App Router, React 19, TypeScript strict, Tailwind 4, `output: "standalone"`.
   Read `frontend/node_modules/next/dist/docs/` before using an API you're unsure of — this Next version differs
@@ -76,7 +76,7 @@ Anything else needs a one-line reason in the agent's report.
 | `API_INTERNAL_URL` | web | `http://api:8080` | runtime proxy target |
 | `PUBLIC_HOSTNAME` | caddy | — | deployed HTTPS |
 
-## Data model (Postgres, `backend/migrations/0001_init.sql`)
+## Data model (Postgres, `backend/crates/adapters/postgres/migrations/0001_init.sql`)
 - `users(id uuid pk, username citext unique, display_name text, password_hash text, role text check in
   ('admin','member'), created_at timestamptz)`
 - `sessions(id uuid pk, user_id fk → users on delete cascade, token_hash bytea unique, created_at, expires_at)` —
