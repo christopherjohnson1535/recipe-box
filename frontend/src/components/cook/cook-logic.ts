@@ -126,3 +126,44 @@ export function parseVoice(transcript: string): "next" | "back" | "repeat" | nul
   if (phrase === "repeat" || phrase === "repeat step") return "repeat";
   return null;
 }
+
+/** Ticks (ingredients and steps) for one recipe; a new cooking session starts clean after this long without a change. */
+export const TICKS_TTL_MS = 12 * 60 * 60 * 1000;
+export type Ticks = { ingredients: ReadonlySet<number>; steps: ReadonlySet<number> };
+export const noTicks: Ticks = { ingredients: new Set(), steps: new Set() };
+
+function parseTicksObject(raw: string | null): Record<string, unknown> | null {
+  try {
+    const data: unknown = raw ? JSON.parse(raw) : null;
+    if (typeof data !== "object" || data === null) return null;
+    const d = data as Record<string, unknown>;
+    return d.v === 1 && typeof d.at === "number" ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when the stored text is not usable ticks (corrupt, another version) was last changed 12 hours ago or more, or is dated in the future. */
+export function ticksStale(raw: string | null, now: number): boolean {
+  const d = parseTicksObject(raw);
+  const age = d ? now - (d.at as number) : 0;
+  return !d || age < 0 || age >= TICKS_TTL_MS;
+}
+
+/** Stored ticks, or none for corrupt text. Indexes outside the recipe (it was edited since) are dropped. */
+export function parseTicks(raw: string | null, counts: { ingredients: number; steps: number }): Ticks {
+  const d = parseTicksObject(raw);
+  if (!d) return noTicks;
+  const keep = (list: unknown, count: number) =>
+    new Set(Array.isArray(list) ? list.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < count) : []);
+  return { ingredients: keep(d.ingredients, counts.ingredients), steps: keep(d.steps, counts.steps) };
+}
+
+export const serialiseTicks = (t: Ticks, now: number) =>
+  JSON.stringify({ v: 1, at: now, ingredients: [...t.ingredients].sort((a, b) => a - b), steps: [...t.steps].sort((a, b) => a - b) });
+
+export function toggled(set: ReadonlySet<number>, i: number): Set<number> {
+  const next = new Set(set);
+  if (!next.delete(i)) next.add(i);
+  return next;
+}

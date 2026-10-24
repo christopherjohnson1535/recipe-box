@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CookMode } from "./CookMode";
 import { EditionController } from "@/components/edition/EditionController";
@@ -10,7 +11,10 @@ const STEPS = ["Cook the onion until soft, about 10 minutes.", "Add the wine and
 const view = () => render(<CookMode id="r1" title="Braised Short Ribs" ingredients={INGREDIENTS} steps={STEPS} />);
 const lit = () => screen.getAllByRole("listitem").filter((li) => li.getAttribute("data-lit") === "true").map((li) => li.textContent);
 
-beforeEach(() => vi.useFakeTimers({ now: FIXED_NOW, toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] }));
+beforeEach(() => {
+  localStorage.clear();
+  vi.useFakeTimers({ now: FIXED_NOW, toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] });
+});
 afterEach(() => {
   delete document.documentElement.dataset.theme;
   document.documentElement.removeAttribute("data-edition-pin");
@@ -24,6 +28,33 @@ describe("CookMode", () => {
     expect(lit()).toEqual([expect.stringContaining("onion")]);
     expect(screen.getByText(/Add the wine and simmer/)).toBeTruthy();
     expect((screen.getByRole("button", { name: /Back/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("opens on the first step not done when stored ticks load, and then stays put", () => {
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [], steps: [0] }));
+    view();
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Step 2 done" })); // ticking later never moves the step
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy();
+    act(() => {
+      localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [], steps: [0, 1, 2] }));
+      window.dispatchEvent(new StorageEvent("storage", { key: "cook-ticks:r1" }));
+    });
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy(); // another tab's write never moves the step
+    fireEvent.click(screen.getByRole("button", { name: /Back/ }));
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+  });
+
+  it("opens on the last step when every step is done, and on step 1 when none are", () => {
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [], steps: [0, 1, 2] }));
+    const { unmount } = view();
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy();
+    unmount();
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [0], steps: [] }));
+    view();
+    expect(screen.getByText("Step 1 of 3")).toBeTruthy();
   });
 
   it("moves with the buttons and the arrow keys, and ends on Finish", () => {
@@ -57,10 +88,10 @@ describe("CookMode", () => {
     act(() => void vi.advanceTimersByTime(60_000));
     expect(screen.getByText("9:00")).toBeTruthy();
     act(() => void vi.advanceTimersByTime(9 * 60_000));
-    expect(screen.getByText("Done")).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "Step 1 · 10 min" })).getByText("Done")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("Timer finished: Step 1 · 10 min");
     fireEvent.click(screen.getByRole("button", { name: /Dismiss timer/ }));
-    expect(screen.queryByText("Done")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Step 1 · 10 min" })).toBeNull();
   });
 
   it("makes and resumes the audio context in a gesture, chimes on it later, and closes it on unmount", () => {
@@ -156,7 +187,7 @@ describe("CookMode", () => {
     const chip = screen.getByRole("button", { name: "Start timer: 10 minutes" });
     fireEvent.click(chip);
     fireEvent.click(chip);
-    expect(screen.getAllByRole("group")).toHaveLength(1);
+    expect(screen.getAllByRole("group", { name: /^Step 1 · / })).toHaveLength(1);
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     expect(fireEvent.click(screen.getByRole("link", { name: /Close/ }))).toBe(false);
     expect(confirm).toHaveBeenCalled();
@@ -226,5 +257,117 @@ describe("CookMode", () => {
     unmount();
     render(<CookMode id="r1" title="T" ingredients={INGREDIENTS} steps={[]} />);
     expect(screen.getByRole("heading", { name: "This recipe has no steps yet" })).toBeTruthy();
+  });
+});
+
+const ing = (name: RegExp) => screen.getByRole("button", { name });
+const pressed = (el: HTMLElement) => el.getAttribute("aria-pressed");
+
+describe("CookMode tick-off and views", () => {
+  it("ticks an ingredient and keeps it across a remount", () => {
+    const { unmount } = view();
+    expect(pressed(ing(/onion/))).toBe("false");
+    fireEvent.click(ing(/onion/));
+    expect(pressed(ing(/onion/))).toBe("true");
+    expect(JSON.parse(localStorage.getItem("cook-ticks:r1") ?? "{}")).toMatchObject({ v: 1, at: FIXED_NOW.getTime(), ingredients: [0], steps: [] });
+    unmount();
+    view();
+    expect(pressed(ing(/onion/))).toBe("true");
+  });
+
+  it("server and hydrating render show nothing ticked, stored state follows after mount", () => {
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [0], steps: [0] }));
+    const html = renderToString(<CookMode id="r1" title="T" ingredients={INGREDIENTS} steps={STEPS} />);
+    expect(html).toContain("onion"); // the real markup rendered, with its ingredient buttons
+    const ssr = new DOMParser().parseFromString(html, "text/html");
+    expect(ssr.querySelectorAll('button[aria-pressed="false"]').length).toBeGreaterThanOrEqual(INGREDIENTS.length);
+    // Only the "One step" view toggle is pressed: no ingredient or step button.
+    expect([...ssr.querySelectorAll('button[aria-pressed="true"]')].map((b) => b.textContent)).toEqual(["One step"]);
+    view();
+    expect(pressed(ing(/onion/))).toBe("true");
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy(); // step 1 is done, so it opens on step 2
+    fireEvent.click(screen.getByRole("button", { name: /Back/ }));
+    expect(pressed(screen.getByRole("button", { name: "Step 1 done" }))).toBe("true");
+  });
+
+  it("ticks a step, shows it in the footer count and clears everything", () => {
+    view();
+    expect(screen.queryByRole("button", { name: "Clear ticks" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Step 1 done" }));
+    expect(pressed(screen.getByRole("button", { name: "Step 1 done" }))).toBe("true");
+    fireEvent.click(ing(/carrots/)); // hidden in portrait until asked, still in the DOM
+    fireEvent.click(screen.getByRole("button", { name: "Clear ticks" }));
+    expect(pressed(screen.getByRole("button", { name: "Step 1 done" }))).toBe("false");
+    expect(pressed(ing(/carrots/))).toBe("false");
+    expect(screen.queryByRole("button", { name: "Clear ticks" })).toBeNull();
+  });
+
+  it("ignores ticks older than 12 hours", () => {
+    localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime() - 12 * 3600_000, ingredients: [0], steps: [] }));
+    view();
+    expect(pressed(ing(/onion/))).toBe("false");
+  });
+
+  it("switches to all steps, remembers it, and leaves the arrow keys alone there", () => {
+    const { unmount } = view();
+    fireEvent.click(screen.getByRole("button", { name: "All steps" }));
+    expect(localStorage.getItem("cook-view")).toBe("all");
+    expect(screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current") === "step")).toHaveLength(1);
+    expect(screen.getAllByRole("listitem").map((li) => li.textContent).join("|")).toContain("Step 3: Serve.");
+    expect(screen.queryByRole("button", { name: /Next step/ })).toBeNull();
+    expect(screen.getByRole("link", { name: "Finish" })).toBeTruthy();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    const current = () => screen.getAllByRole("listitem").find((li) => li.getAttribute("aria-current") === "step")?.textContent;
+    expect(current()).toContain("onion");
+    fireEvent.click(screen.getByRole("button", { name: "Step 1 done" }));
+    expect(current()).toContain("Add the wine");
+    expect(screen.getByText("1 of 3 steps done")).toBeTruthy();
+    unmount();
+    view();
+    expect(pressed(screen.getByRole("button", { name: "All steps" }))).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "One step" }));
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy(); // step 1 was ticked, so the reload opens on step 2
+  });
+
+  it("starts a timer from any step in the list, labelled with that step", () => {
+    view();
+    fireEvent.click(screen.getByRole("button", { name: "All steps" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
+    expect(screen.getByRole("group", { name: "Step 1 · 10 min" })).toBeTruthy();
+  });
+
+  it("still works when storage throws", () => {
+    vi.stubGlobal("localStorage", { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } });
+    render(<CookMode id="r-blocked" title="T" ingredients={INGREDIENTS} steps={STEPS} />); // its own id: the store remembers a failed key
+    fireEvent.click(ing(/wine/));
+    expect(pressed(ing(/wine/))).toBe("true");
+  });
+
+  it("keeps focus in the stage when Clear ticks goes away", () => {
+    view();
+    fireEvent.click(screen.getByRole("button", { name: "Step 1 done" }));
+    const clear = screen.getByRole("button", { name: "Clear ticks" });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(screen.queryByRole("button", { name: "Clear ticks" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("group", { name: "Cook mode controls" }));
+  });
+
+  it("in the all-steps list, ticking a step that is not current leaves the current step alone", () => {
+    view();
+    fireEvent.click(screen.getByRole("button", { name: "All steps" }));
+    fireEvent.click(screen.getByRole("button", { name: "Step 3 done" }));
+    const current = screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current") === "step");
+    expect(current).toHaveLength(1);
+    expect(current[0].textContent).toContain("Cook the onion");
+  });
+
+  it("says the screen may sleep when there is no wake lock, and explains on tap", () => {
+    view();
+    const b = screen.getByRole("button", { name: /Screen may sleep/ });
+    expect(b.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(b);
+    expect(screen.getByText(/secure \(https\) connection/)).toBeTruthy();
+    expect(screen.getByText(/Auto-Lock to Never/)).toBeTruthy();
   });
 });
