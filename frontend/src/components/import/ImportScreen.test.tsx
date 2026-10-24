@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type RecipeDraft } from "@/lib/api";
 import { ImportScreen, type ImportApi } from "./ImportScreen";
@@ -132,7 +132,7 @@ describe("ImportScreen", () => {
     expect(await screen.findByText("Enter a full web address starting with https://")).toBeTruthy();
     const source = screen.getByLabelText(/Where it came from/);
     expect(source.getAttribute("aria-invalid")).toBe("true");
-    expect(document.activeElement).toBe(source);
+    await waitFor(() => expect(document.activeElement).toBe(source));
     expect(screen.getByLabelText("Recipe text").getAttribute("aria-invalid")).toBeNull();
   });
 
@@ -157,12 +157,73 @@ describe("ImportScreen", () => {
     expect(api.importUrl).toHaveBeenCalledTimes(1);
   });
 
-  it("says coming soon for text that the server answers with 501", async () => {
-    render(<ImportScreen api={mockApi({ importText: vi.fn().mockRejectedValue(fail(501, "not_implemented")) })} initialMode="text" />);
-    fireEvent.change(screen.getByLabelText("Recipe text"), { target: { value: "2 eggs. Whisk." } });
-    fireEvent.click(screen.getByRole("button", { name: "Read the text" }));
+  // No import mode answers 501 any more (only export does), so this uses photo as a synthetic stub to keep the generic mapping covered.
+  it("says coming soon for a mode the server answers with 501", async () => {
+    render(<ImportScreen api={mockApi({ importPhoto: vi.fn().mockRejectedValue(fail(501, "not_implemented")) })} initialMode="photo" />);
+    fireEvent.change(screen.getByLabelText("Photos"), { target: { files: [new File(["x"], "page.jpg", { type: "image/jpeg" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Read the photos" }));
     expect(await screen.findByText("Coming soon")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Type it in" }).getAttribute("href")).toBe("/recipes/new");
+  });
+
+  describe("text import answers", () => {
+    const pasted = "2 eggs. Whisk.";
+    const submit = async (error: ApiError) => {
+      render(<ImportScreen api={mockApi({ importText: vi.fn().mockRejectedValue(error) })} initialMode="text" />);
+      fireEvent.change(screen.getByLabelText("Recipe text"), { target: { value: pasted } });
+      fireEvent.click(screen.getByRole("button", { name: "Read the text" }));
+    };
+    const keptText = () => expect((screen.getByLabelText("Recipe text") as HTMLTextAreaElement).value).toBe(pasted);
+
+    it("422 ai_disabled says AI is off and offers typing it in", async () => {
+      await submit(fail(422, "ai_disabled"));
+      expect(await screen.findByText("AI is switched off")).toBeTruthy();
+      expect(screen.getByText("Reading pasted text needs AI, and none is set up. You can type the recipe in instead.")).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Type it in" }).getAttribute("href")).toBe("/recipes/new");
+      keptText();
+    });
+
+    it("422 no_recipe_found says so, without offering to paste again", async () => {
+      await submit(fail(422, "no_recipe_found"));
+      expect(await screen.findByText("No recipe found in that text")).toBeTruthy();
+      expect(screen.getByText(/ingredients and some steps/)).toBeTruthy();
+      expect(screen.queryByText(/that page/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Paste the recipe text instead" })).toBeNull();
+      expect(screen.getByRole("link", { name: "Type it in" })).toBeTruthy();
+      keptText();
+    });
+
+    it("413 too_large says the text is too big and keeps it", async () => {
+      await submit(fail(413, "too_large"));
+      expect(await screen.findByText("That text is too big")).toBeTruthy();
+      expect(screen.getByText(/Text over 1 MB can’t be imported/)).toBeTruthy();
+      keptText();
+    });
+
+    it("502 ai_error shows the server message and lets the user retry", async () => {
+      await submit(fail(502, "ai_error", "The AI service did not answer."));
+      expect(await screen.findByText("The import failed")).toBeTruthy();
+      expect(screen.getByText("The AI service did not answer.")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+      keptText();
+    });
+
+    it("400 validation shows the server message under the text box", async () => {
+      await submit(fail(400, "validation", "text: Paste the recipe text first."));
+      expect(await screen.findByText("Paste the recipe text first.")).toBeTruthy();
+      expect(screen.getByLabelText("Recipe text").getAttribute("aria-invalid")).toBe("true");
+      keptText();
+    });
+  });
+
+  it("shows the AI-fallback warning for a link at the top of the review, before the ingredients", async () => {
+    const warning = "Read from the page text by AI — check it against the page.";
+    render(<ImportScreen api={mockApi({ importUrl: vi.fn().mockResolvedValue(draft({ warnings: [warning] })) })} />);
+    importLink();
+    const note = await screen.findByText(warning);
+    expect(screen.getByText("Check these before saving")).toBeTruthy();
+    const eggs = screen.getAllByText("eggs")[0];
+    expect(note.compareDocumentPosition(eggs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows the stored photos beside an empty form when AI is off, and saves them with the recipe", async () => {
@@ -243,7 +304,9 @@ describe("ImportScreen", () => {
     expect((await screen.findByRole("status")).textContent).toMatch(/Fetching the page/);
     fireEvent.click(screen.getByRole("button", { name: "Stop waiting and edit" }));
     resolve(draft());
-    await Promise.resolve();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     expect(screen.queryByRole("heading", { name: "Check the recipe" })).toBeNull();
     expect(screen.getByLabelText("Recipe link")).toBeTruthy();
   });

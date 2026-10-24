@@ -55,13 +55,40 @@ describe("explainImportError", () => {
 
   it("words too_large for photos and text differently", () => {
     expect(explainImportError(err("too_large"), "photo").title).toMatch(/photo/);
-    expect(explainImportError(err("too_large"), "text").title).toMatch(/text/);
+    const text = explainImportError(err("too_large"), "text");
+    expect(text.title).toMatch(/text/);
+    expect(text.message).toMatch(/over 1 MB/);
+    expect(text.message).not.toMatch(/50,000/);
   });
 
   it("shows 501 as coming soon, naming the mode", () => {
     const p = explainImportError(err("not_implemented"), "photo");
     expect(p).toMatchObject({ tone: "info", title: "Coming soon", offers: ["type-in"] });
     expect(p.message).toMatch(/photos/);
+  });
+
+  it("explains the real text-import answers", () => {
+    expect(explainImportError(err("ai_disabled"), "text")).toMatchObject({
+      title: "AI is switched off",
+      message: "Reading pasted text needs AI, and none is set up. You can type the recipe in instead.",
+      tone: "error",
+      offers: ["type-in"],
+    });
+    expect(explainImportError(err("no_recipe_found"), "text")).toMatchObject({
+      title: "No recipe found in that text",
+      message: expect.stringMatching(/ingredients and some steps/),
+      offers: ["type-in"],
+    });
+    expect(explainImportError(err("no_recipe_found"), "photo")).toMatchObject({
+      title: "No recipe found in those photos",
+      offers: ["type-in"],
+    });
+    expect(explainImportError(err("no_recipe_found"), "link").title).toBe("No recipe found on that page");
+    expect(explainImportError(err("ai_error", "The AI service failed."), "text")).toMatchObject({
+      title: "The import failed",
+      message: "The AI service failed.",
+      offers: ["retry", "type-in"],
+    });
   });
 
   it("carries the stored photo ids from ai_disabled", () => {
