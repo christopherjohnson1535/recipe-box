@@ -63,7 +63,7 @@ function rule(code: string, mode: ImportMode, serverMessage: string): Rule | und
     case "too_large":
       return mode === "photo"
         ? { title: "A photo is too big", message: "Remove the largest photo or take it again at a lower quality, then try again." }
-        : { title: "That text is too long", message: "Paste just the recipe, without the rest of the page." };
+        : { title: "That text is too big", message: "Text over 1 MB can’t be imported. Paste just the recipe, without the rest of the page." };
     case "unsupported_media":
       return { title: "That kind of file can’t be read", message: "Use JPEG, PNG or WebP photos." };
     case "ai_disabled":

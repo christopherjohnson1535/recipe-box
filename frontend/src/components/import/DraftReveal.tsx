@@ -54,13 +54,6 @@ export function DraftReveal({
           sure): check it.
         </Text>
       )}
-      {ingredients.length > 0 && (
-        <DraftList>
-          {ingredients.map((text, i) => (
-            <DraftRow key={i} delay={delays[i]} flagged={flags[i]} text={text} />
-          ))}
-        </DraftList>
-      )}
       {warnings.length > 0 && (
         <DraftNote>
           <ul className="flex flex-col gap-1">
@@ -69,6 +62,13 @@ export function DraftReveal({
             ))}
           </ul>
         </DraftNote>
+      )}
+      {ingredients.length > 0 && (
+        <DraftList>
+          {ingredients.map((text, i) => (
+            <DraftRow key={i} delay={delays[i]} flagged={flags[i]} text={text} />
+          ))}
+        </DraftList>
       )}
     </section>
   );
