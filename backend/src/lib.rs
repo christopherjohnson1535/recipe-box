@@ -6,6 +6,7 @@ pub mod config;
 pub mod error;
 pub mod import;
 pub mod models;
+pub mod plate;
 pub mod routes;
 pub mod state;
 pub mod validate;
@@ -60,6 +61,13 @@ pub fn spawn_purge_task(pool: PgPool, clock: Clock) {
                 tracing::error!(error = %e, "purge failed");
             }
         }
+    });
+}
+
+/// Gives photos stored before renditions existed their rendition, in the background.
+pub fn spawn_display_backfill(pool: PgPool, media_dir: std::path::PathBuf) {
+    tokio::spawn(async move {
+        routes::media::backfill_displays(&pool, &media_dir).await;
     });
 }
 
