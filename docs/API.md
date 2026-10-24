@@ -78,7 +78,7 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   succeeds). Photos stored before this existed get theirs from a background task at API start. Recipes and recipe
   list items carry `imageDisplayUrl`: the main photo's rendition when the household setting `plateTreatment` is on
   and the rendition exists, else null; `imageUrl` always points at the original. Import drafts carry no
-  `imageDisplayUrl`. Backup export does not include renditions; they are made again after a restore.
+  `imageDisplayUrl`. Backup export does not include renditions; images without one get it from the background pass at the next API start.
 - **Settings**: `GET /api/settings` (any signed-in user) returns `{ "plateTreatment": true }`; `PUT /api/settings`
   (admin only, `403 forbidden` for a member) takes the same body and returns it. A missing, mistyped or unknown field
   is `400 validation`. `plateTreatment` defaults to on.
