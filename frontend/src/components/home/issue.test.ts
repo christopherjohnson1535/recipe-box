@@ -3,7 +3,7 @@ import type { RecipeSummary } from "@/lib/api";
 import { issueLine, longDate, monthYear, planHome, seasonOf, toRoman, volumeOf } from "./issue";
 
 const r = (id: string, updatedAt: string, imageUrl: string | null = null): RecipeSummary => ({
-  id, title: `Recipe ${id}`, description: "", totalMinutes: 30, tags: [], imageUrl, sourceType: "manual", updatedAt,
+  id, title: `Recipe ${id}`, description: "", totalMinutes: 30, tags: [], imageUrl, imageDisplayUrl: null, sourceType: "manual", updatedAt,
 });
 const many = (n: number) => Array.from({ length: n }, (_, i) => r(`r${String(i).padStart(2, "0")}`, `2026-0${(i % 9) + 1}-10T00:00:00Z`, null));
 

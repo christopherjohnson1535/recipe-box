@@ -53,7 +53,7 @@ export function MagazineCard({ href, title, kicker, time, deck, imageSrc, fallba
   return (
     <li className="stagger-item" style={{ "--i": Math.min(index, 8) } as CSSProperties}>
       <article className="mag-card group relative flex flex-col gap-3 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-4 has-[a:focus-visible]:outline-(--focus-ring)">
-        <div className="aspect-[4/3] overflow-hidden bg-(--panel-bg)">
+        <div className={"aspect-[4/3] overflow-hidden border border-(--rule-hair) bg-(--panel-bg)"}>
           {imageSrc ? (
             // Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send.
             <Morph name={morphId ? photoName(morphId) : undefined}>
@@ -67,7 +67,7 @@ export function MagazineCard({ href, title, kicker, time, deck, imageSrc, fallba
               />
             </Morph>
           ) : (
-            <div className="flex size-full items-center justify-center border border-(--rule-hair)">
+            <div className="flex size-full items-center justify-center">
               <span className="plate-img">
                 <SpotIcon name={fallbackIcon} size={56} />
               </span>

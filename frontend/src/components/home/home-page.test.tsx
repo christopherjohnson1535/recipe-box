@@ -9,6 +9,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ toString: () => "" }) }
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 
 const r = (id: string, over: Partial<RecipeSummary> = {}): RecipeSummary => ({
+  imageDisplayUrl: null,
   id, title: `Recipe ${id}`, description: "", totalMinutes: 30, tags: [], imageUrl: null, sourceType: "manual", updatedAt: "2026-05-01T00:00:00Z", ...over,
 });
 const withPhoto = r("cover", {

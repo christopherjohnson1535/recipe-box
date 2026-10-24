@@ -67,9 +67,10 @@ pub struct RecipePage {
 const SUMMARY_SELECT: &str = "
     select r.id, r.title, r.description, r.total_minutes, r.source_type, r.updated_at,
            i.file_name as image_file,
+           case when hs.plate_treatment then i.display_file_name end as image_display_file,
            coalesce((select array_agg(t.name::text order by t.name)
                      from recipe_tags rt join tags t on t.id = rt.tag_id where rt.recipe_id = r.id), '{}') as tags
-    from recipes r left join images i on i.id = r.image_id";
+    from recipes r left join images i on i.id = r.image_id cross join household_settings hs";
 
 const LIST_WHERE: &str = "
     where r.deleted_at is null
@@ -165,6 +166,7 @@ pub async fn list(
         .await?;
     for item in &mut items {
         item.image_url = item.image_file.as_deref().map(media_url);
+        item.image_display_url = item.image_display_file.as_deref().map(media_url);
     }
     let count_sql = format!("select count(*) from recipes r {LIST_WHERE}");
     let total: i64 = sqlx::query_scalar(AssertSqlSafe(count_sql))
@@ -419,6 +421,7 @@ struct RecipeRow {
     source_type: SourceType,
     image_id: Option<Uuid>,
     image_file: Option<String>,
+    image_display_file: Option<String>,
     tags: Vec<String>,
     photo_image_ids: Vec<Uuid>,
     photo_files: Vec<String>,
@@ -436,6 +439,7 @@ pub async fn load(pool: &PgPool, id: Uuid) -> AppResult<Option<Recipe>> {
         "select r.id, r.title, r.description, r.ingredients, r.steps, r.servings, r.prep_minutes,
                 r.cook_minutes, r.total_minutes, r.notes, r.source_url, r.source_name, r.source_type,
                 r.image_id, i.file_name as image_file,
+                case when hs.plate_treatment then i.display_file_name end as image_display_file,
                 coalesce((select array_agg(t.name::text order by t.name)
                           from recipe_tags rt join tags t on t.id = rt.tag_id where rt.recipe_id = r.id), '{}') as tags,
                 coalesce((select array_agg(rp.image_id order by rp.position)
@@ -448,6 +452,7 @@ pub async fn load(pool: &PgPool, id: Uuid) -> AppResult<Option<Recipe>> {
                 r.created_at, r.updated_at
          from recipes r
          left join images i on i.id = r.image_id
+         cross join household_settings hs
          left join users cu on cu.id = r.created_by
          left join users uu on uu.id = r.updated_by
          where r.id = $1 and r.deleted_at is null",
@@ -473,6 +478,7 @@ pub async fn load(pool: &PgPool, id: Uuid) -> AppResult<Option<Recipe>> {
         photo_image_ids: r.photo_image_ids,
         tags: r.tags,
         image_url: r.image_file.as_deref().map(media_url),
+        image_display_url: r.image_display_file.as_deref().map(media_url),
         photo_urls: r.photo_files.iter().map(|f| media_url(f)).collect(),
         created_by: user_ref(r.created_by, r.created_by_name),
         updated_by: user_ref(r.updated_by, r.updated_by_name),

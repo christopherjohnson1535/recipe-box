@@ -12,7 +12,7 @@ use utoipa::{
     },
 };
 
-use super::{auth, export, health, imports, media, recipes, setup, tags, users};
+use super::{auth, export, health, imports, media, recipes, settings, setup, tags, users};
 use crate::auth::session::COOKIE_NAME;
 
 #[derive(OpenApi)]
@@ -34,6 +34,8 @@ use crate::auth::session::COOKIE_NAME;
         recipes::update,
         recipes::remove,
         recipes::restore,
+        settings::get,
+        settings::update,
         tags::list,
         media::upload,
         media::serve,

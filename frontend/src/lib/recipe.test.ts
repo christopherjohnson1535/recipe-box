@@ -82,3 +82,12 @@ describe("typographic", () => {
     expect(typographic("'quoted'")).toBe("'quoted'");
   });
 });
+
+describe("plateSrc", () => {
+  it("prefers the display rendition and falls back to the original", async () => {
+    const { plateSrc } = await import("./recipe");
+    expect(plateSrc({ imageUrl: "/media/a.jpg", imageDisplayUrl: "/media/a-plate.jpg" })).toBe("/media/a-plate.jpg");
+    expect(plateSrc({ imageUrl: "/media/a.jpg", imageDisplayUrl: null })).toBe("/media/a.jpg");
+    expect(plateSrc({ imageUrl: null, imageDisplayUrl: null })).toBeNull();
+  });
+});

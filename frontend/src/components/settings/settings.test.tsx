@@ -5,6 +5,7 @@ import { EditionController } from "@/components/edition/EditionController";
 import { AppearanceSection } from "./AppearanceSection";
 import { HouseholdSection } from "./HouseholdSection";
 import { PasswordForm } from "./PasswordForm";
+import { PhotosSection } from "./PhotosSection";
 import { SettingsView } from "./SettingsView";
 
 const refresh = vi.fn();
@@ -238,5 +239,35 @@ describe("AppearanceSection", () => {
   it("is part of the settings page", () => {
     render(<SettingsView me={chris} users={[chris]} capabilities={null} />);
     expect(screen.getByRole("heading", { name: "Appearance" })).toBeTruthy();
+  });
+});
+
+describe("PhotosSection", () => {
+  const label = /^Give every recipe photo the print look/;
+  it("saves the toggle and refreshes", async () => {
+    const updateSettings = vi.fn().mockResolvedValue({ plateTreatment: true });
+    render(<PhotosSection initial={false} api={{ updateSettings } as never} />);
+    fireEvent.click(screen.getByLabelText(label));
+    await waitFor(() => expect(updateSettings).toHaveBeenCalledWith({ plateTreatment: true }));
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect((screen.getByLabelText(label) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("rolls back and shows an error when saving fails", async () => {
+    const updateSettings = vi.fn().mockRejectedValue(new ApiError(500, "internal", "Couldn’t save."));
+    render(<PhotosSection initial={false} api={{ updateSettings } as never} />);
+    fireEvent.click(screen.getByLabelText(label));
+    await screen.findByText("Couldn’t save.");
+    expect((screen.getByLabelText(label) as HTMLInputElement).checked).toBe(false);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("is shown to admins only", () => {
+    const caps = { ai: false, provider: "none" } as const;
+    render(<SettingsView me={chris} users={[chris]} capabilities={caps} settings={{ plateTreatment: true }} />);
+    expect(screen.getByLabelText(label)).toBeTruthy();
+    cleanup();
+    render(<SettingsView me={sam} users={[]} capabilities={caps} settings={{ plateTreatment: true }} />);
+    expect(screen.queryByLabelText(label)).toBeNull();
   });
 });

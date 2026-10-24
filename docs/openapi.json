@@ -1312,6 +1312,136 @@
         ]
       }
     },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "The household settings.",
+        "operationId": "getSettings",
+        "responses": {
+          "200": {
+            "description": "The settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Changes the household settings. Admin only.",
+        "operationId": "updateSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Settings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The settings now in force.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or unknown field (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an admin (`forbidden`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over the size limit (`too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/setup": {
       "get": {
         "tags": [
@@ -1817,7 +1947,7 @@
           {
             "name": "file_name",
             "in": "path",
-            "description": "`<uuid>.jpg`",
+            "description": "`<uuid>.jpg` (the original) or `<uuid>.display.jpg` (the print-style rendition)",
             "required": true,
             "schema": {
               "type": "string"
@@ -2023,10 +2153,18 @@
         "required": [
           "id",
           "url",
+          "displayUrl",
           "width",
           "height"
         ],
         "properties": {
+          "displayUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The print-style rendition, whatever the household setting says; null if it could not be made."
+          },
           "height": {
             "type": "integer",
             "format": "int32"
@@ -2186,6 +2324,7 @@
           "photoImageIds",
           "tags",
           "imageUrl",
+          "imageDisplayUrl",
           "photoUrls",
           "createdBy",
           "updatedBy",
@@ -2220,6 +2359,13 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "imageDisplayUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The print-style rendition of the main photo; null when the household setting is off or it is not made yet."
           },
           "imageId": {
             "type": [
@@ -2593,6 +2739,7 @@
           "totalMinutes",
           "tags",
           "imageUrl",
+          "imageDisplayUrl",
           "sourceType",
           "updatedAt"
         ],
@@ -2603,6 +2750,13 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "imageDisplayUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "As on `Recipe`."
           },
           "imageUrl": {
             "type": [
@@ -2651,6 +2805,19 @@
             "type": "string"
           }
         }
+      },
+      "Settings": {
+        "type": "object",
+        "required": [
+          "plateTreatment"
+        ],
+        "properties": {
+          "plateTreatment": {
+            "type": "boolean",
+            "description": "Show recipe photos with the print treatment (`imageDisplayUrl`); the originals are always kept."
+          }
+        },
+        "additionalProperties": false
       },
       "SetupBody": {
         "type": "object",

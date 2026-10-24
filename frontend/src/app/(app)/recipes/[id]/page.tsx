@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Arrive } from "@/components/ui/Arrive";
-import { Lede, SidebarLayout } from "@/components/ui/Article";
+import { Lede, PlateCaption, SidebarLayout } from "@/components/ui/Article";
 import { ButtonLink } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Chip";
 import { DotList } from "@/components/ui/DotList";
@@ -18,7 +18,7 @@ import { iconForTag } from "@/components/ui/spot-icons";
 import { Text } from "@/components/ui/Text";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type Recipe } from "@/lib/api";
-import { formatMinutes, groupBySection, minuteNumeral } from "@/lib/recipe";
+import { formatMinutes, groupBySection, plateSrc, minuteNumeral } from "@/lib/recipe";
 import { splitIngredient } from "@/lib/scale";
 import { serverApi } from "@/lib/server-api";
 import { bylines } from "@/components/recipe-page/byline";
@@ -105,7 +105,7 @@ export default async function RecipePage({ params }: Params) {
           title={recipe.title}
           deck={deck}
           icon={<SpotIcon name={iconForTag(recipe.tags[0] ?? "")} size={72} />}
-          photo={recipe.imageUrl ? { src: recipe.imageUrl, alt: recipe.title } : undefined}
+          photo={recipe.imageUrl ? { src: plateSrc(recipe) as string, alt: `${recipe.title}, photo` } : undefined}
           byline={
             by.length > 0 || source ? (
               <DotList as="p" stackOnPhone>
@@ -136,6 +136,7 @@ export default async function RecipePage({ params }: Params) {
             </>
           }
         />
+        {recipe.imageUrl && <PlateCaption href={recipe.imageUrl} />}
 
         <NumeralsBand items={numerals} />
 

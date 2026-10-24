@@ -20,6 +20,7 @@ export type Image = Schemas["Image"];
 export type Tag = Schemas["TagCount"];
 export type Health = Schemas["Health"];
 export type Capabilities = Schemas["Capabilities"];
+export type Settings = Schemas["Settings"];
 export type RecipeSort = Schemas["RecipeSort"];
 export type RecipePage = Schemas["RecipePage"];
 export type ImportSummary = Schemas["ImportSummary"];
@@ -128,6 +129,9 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
     deleteUser: (userId: string) => request<void>("DELETE", `/api/users/${id(userId)}`),
     setPassword: (userId: string, password: string, currentPassword?: string) =>
       request<void>("PUT", `/api/users/${id(userId)}/password`, currentPassword === undefined ? { password } : { password, currentPassword }),
+
+    getSettings: () => get<Settings>("/api/settings"),
+    updateSettings: (body: Settings) => request<Settings>("PUT", "/api/settings", body),
 
     exportAll: () => get<Blob>("/api/export"),
     importExport: (file: Blob) => {
