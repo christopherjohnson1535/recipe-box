@@ -143,11 +143,6 @@ jobs:
         run: |
           cargo llvm-cov --workspace --html --output-dir coverage
           cargo llvm-cov report --json --summary-only --output-path coverage-summary.json
-      - name: TEMP coverage diagnostics (remove before merge)
-        working-directory: backend
-        run: |
-          jq -r '.data[0].totals.lines | "::notice::TOTAL lines count=\(.count) covered=\(.covered) pct=\(.percent)"' coverage-summary.json
-          jq -r '.data[0].files[] | select(.filename | test("crates/domain|src/(error|models|lib|validate)\\.rs|routes/recipes\\.rs")) | "::notice::\(.filename | sub(".*/backend/";"")) count=\(.summary.lines.count) covered=\(.summary.lines.covered)"' coverage-summary.json
       - name: Ratchet and summary
         # bash with pipefail: a ratchet failure must fail the job even though its output is piped into tee.
         shell: bash
