@@ -1,30 +1,21 @@
 import { expect, type APIRequestContext, type APIResponse } from "@playwright/test";
 
-// Types follow docs/API.md.
-export type Ingredient = { text: string; section: string | null };
-export type Step = { text: string; section: string | null };
-export type RecipeInput = {
-  title: string;
-  description?: string;
-  ingredients?: Ingredient[];
-  steps?: Step[];
-  servings?: string | null;
-  prepMinutes?: number | null;
-  cookMinutes?: number | null;
-  totalMinutes?: number | null;
-  notes?: string;
-  sourceUrl?: string | null;
-  sourceName?: string | null;
-  imageId?: string | null;
-  tags?: string[];
-};
-export type Recipe = Required<RecipeInput> & { id: string; imageUrl: string | null; createdAt: string; updatedAt: string };
-export type RecipeSummary = { id: string; title: string; tags: string[]; totalMinutes: number | null; imageUrl: string | null };
-export type User = { id: string; username: string; displayName: string; role: "admin" | "member" };
-export type Image = { id: string; url: string; width: number; height: number };
-export type RecipeDraft = RecipeInput & { title: string; imageUrl: string | null; warnings: string[]; duplicateOf: string | null };
-export type ApiError = { error: { code: string; message: string } };
-export type NewUser = { username: string; displayName: string; password: string; role?: "admin" | "member" };
+// Shapes come from the spec generated from the backend (docs/openapi.json), so the suite fails to type-check when
+// the API changes under it. Type-only import: nothing from the frontend is bundled.
+import type { components } from "../../frontend/src/lib/api-types.ts";
+
+type Schemas = components["schemas"];
+export type Ingredient = Schemas["Ingredient"];
+export type Step = Ingredient;
+export type RecipeInput = Schemas["RecipeInput"];
+export type Recipe = Schemas["Recipe"];
+export type RecipeSummary = Schemas["RecipeSummary"];
+export type User = Schemas["User"];
+export type Image = Schemas["Image"];
+export type RecipeDraft = Schemas["RecipeDraft"];
+export type ApiError = Schemas["ErrorBody"];
+/** Create-user body; `role` is left out for setup (the first user is always the admin). */
+export type NewUser = Omit<Schemas["CreateUserBody"], "role"> & { role?: Schemas["CreateUserBody"]["role"] };
 
 /** A small typed client over a Playwright request context whose baseURL is the web origin (like the browser). */
 export class ApiClient {

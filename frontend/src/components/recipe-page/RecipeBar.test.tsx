@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OPENER_ACTIONS_ID } from "@/components/ui/SpreadOpener";
 import { RecipeBar } from "./RecipeBar";
@@ -44,7 +44,6 @@ describe("RecipeBar", () => {
   it("shows without IntersectionObserver", async () => {
     vi.stubGlobal("IntersectionObserver", undefined);
     const bar = setup();
-    await act(() => new Promise((r) => setTimeout(r, 5)));
-    expect(bar.dataset.shown).toBe("true");
+    await waitFor(() => expect(bar.dataset.shown).toBe("true"));
   });
 });
