@@ -2,15 +2,22 @@
 
 use std::time::Instant;
 
+use adapter_html::HtmlPageReader;
 use adapter_http::{
     extract::CurrentUser,
     routes::media::{delete_images, log_rendition_error},
 };
+use adapter_http_fetch::PAGE_MAX_BYTES;
 use app::MediaService;
 use axum::{
     Json,
     extract::{Multipart, State},
 };
+use domain::{
+    AiProvider as Provider, DomainError, MAX_TEXT_INPUT_CHARS, SourceType,
+    source::{cleaned, normalize_url, shown_url},
+};
+use ports::{PageContent, PageReader as _};
 use serde::{Deserialize, Serialize};
 use url::Url;
 use utoipa::ToSchema;
@@ -19,13 +26,7 @@ use uuid::Uuid;
 use super::ImportState;
 use crate::{
     error::{AppError, AppJson, AppResult, ErrorBody},
-    import::{
-        ai::{self, AiProvider as _},
-        jsonld, normalize_url,
-        readable::{MIN_PAGE_CHARS, readable},
-        safe_fetch::{self, PAGE_MAX_BYTES},
-    },
-    models::{Image, RecipeDraft, SourceType},
+    models::{Image, RecipeDraft},
     validate,
 };
 
@@ -88,61 +89,36 @@ pub async fn from_url(
         .ok_or_else(|| {
             AppError::validation("url: enter a full web address starting with http:// or https://.")
         })?;
+    let fetcher = state.app.fetcher();
     let started = Instant::now();
-    let page = safe_fetch::fetch(&state.app.fetch_policy, &requested, PAGE_MAX_BYTES).await?;
-    // Parsing is CPU-bound: off the async workers, and inside what is left of the page's time budget. On a
-    // timeout the blocking thread is abandoned (the pre-checks in `extract` bound how long it can run).
-    let left = state
-        .app
-        .fetch_policy
-        .total_timeout()
-        .saturating_sub(started.elapsed());
+    let page = fetcher.fetch(&requested, PAGE_MAX_BYTES).await?;
+    // Parsing is CPU-bound and runs off the async workers inside what is left of the page's time budget.
+    let left = fetcher.budget().saturating_sub(started.elapsed());
     let final_url = page.final_url.clone();
-    let ai_on = state.app.config.ai_enabled();
-    let parse = tokio::task::spawn_blocking(move || {
-        // shortcut: pages are decoded as UTF-8 (lossy); honour <meta charset> if a non-UTF-8 site turns up.
-        let html = String::from_utf8_lossy(&page.body);
-        if let Some(draft) = jsonld::extract(&html, &page.final_url) {
-            return Parsed::Draft(Box::new(draft));
-        }
-        if !ai_on {
-            return Parsed::Nothing;
-        }
-        let page_text = readable(&html, &page.final_url);
-        let site_name = jsonld::site_name(&html, &page.final_url);
-        Parsed::Text(page_text, site_name)
-    });
-    let parsed = tokio::time::timeout(left, parse)
-        .await
-        .map_err(|_| AppError::FetchFailed("That page took too long to read.".into()))?
-        .map_err(|e| anyhow::anyhow!(e))?;
+    let ai_on = state.app.ai.provider() != Provider::None;
+    let content = HtmlPageReader.read(page, ai_on, left).await?;
     let no_recipe = || {
         AppError::NoRecipeFound(
             "We couldn't find a recipe on that page. You can paste the recipe text instead.".into(),
         )
     };
-    let mut draft = match parsed {
-        Parsed::Draft(d) => *d,
-        Parsed::Nothing => return Err(no_recipe()),
-        Parsed::Text(page_text, site_name) => {
-            if page_text
-                .text
-                .chars()
-                .filter(|c| !c.is_whitespace())
-                .count()
-                < MIN_PAGE_CHARS
-            {
-                return Err(no_recipe());
-            }
+    let mut draft = match content {
+        PageContent::Draft(d) => *d,
+        PageContent::Nothing => return Err(no_recipe()),
+        PageContent::Text {
+            text,
+            image_url,
+            site_name,
+        } => {
             // Outside the page budget: the AI call has its own timeout.
-            let mut d = match state.app.ai.recipe_from_text(&page_text.text).await {
-                Err(AppError::NoRecipeFound(_)) => return Err(no_recipe()),
+            let mut d = match state.app.ai.extract_text(&text).await {
+                Err(DomainError::NoRecipeFound(_)) => return Err(no_recipe()),
                 r => r?,
             };
             d.source_type = SourceType::Link;
-            d.source_url = Some(jsonld::shown_url(&final_url));
+            d.source_url = Some(shown_url(&final_url));
             d.source_name = site_name;
-            d.image_url = page_text.image_url;
+            d.image_url = image_url;
             d.warnings
                 .push("Read from the page text by AI — check it against the page.".into());
             d
@@ -150,21 +126,13 @@ pub async fn from_url(
     };
     draft.duplicate_of = duplicate_of(&state, &[&requested, &final_url]).await?;
     attach_image(&state, user.id, &mut draft).await;
-    Ok(Json(draft))
-}
-
-/// What the blocking parse of a fetched page found.
-enum Parsed {
-    Draft(Box<RecipeDraft>),
-    /// No recipe data; the page's text and site name, for the AI fallback.
-    Text(crate::import::readable::Readable, Option<String>),
-    Nothing,
+    Ok(Json(draft.into()))
 }
 
 /// Id of a live recipe saved from the same page (LNK-5), comparing normalised URLs.
 async fn duplicate_of(state: &ImportState, urls: &[&Url]) -> AppResult<Option<Uuid>> {
     // Credentials and fragments never count: the saved `source_url` has none.
-    let urls: Vec<Url> = urls.iter().map(|u| jsonld::cleaned(u)).collect();
+    let urls: Vec<Url> = urls.iter().map(|u| cleaned(u)).collect();
     let wanted: Vec<String> = urls.iter().map(normalize_url).collect();
     let hosts: Vec<String> = urls
         .iter()
@@ -182,18 +150,17 @@ async fn duplicate_of(state: &ImportState, urls: &[&Url]) -> AppResult<Option<Uu
 
 /// Downloads the page's main photo through the SSRF guard and stores it (re-encoded). A failure only adds a
 /// warning: the recipe is still worth reviewing.
-async fn attach_image(state: &ImportState, user_id: Uuid, draft: &mut RecipeDraft) {
+async fn attach_image(state: &ImportState, user_id: Uuid, draft: &mut domain::RecipeDraft) {
     let Some(remote) = draft.image_url.take() else {
         return;
     };
     let stored = async {
         let url = Url::parse(&remote).map_err(|_| AppError::BlockedAddress)?;
-        let img = safe_fetch::fetch(
-            &state.app.fetch_policy,
-            &url,
-            state.app.config.max_upload_bytes(),
-        )
-        .await?;
+        let img = state
+            .app
+            .fetcher()
+            .fetch(&url, state.app.config.max_upload_bytes())
+            .await?;
         let stored = state.http.services.media.upload(user_id, img.body).await?;
         log_rendition_error(&stored);
         AppResult::Ok(Image::from(stored.image))
@@ -238,19 +205,19 @@ pub async fn from_text(
     // Cleaned first so credentials cannot hide a duplicate.
     let source = validate::source_url(body.source_url.as_deref())?
         .and_then(|u| Url::parse(&u).ok())
-        .map(|u| jsonld::cleaned(&u));
-    let mut draft = state.app.ai.recipe_from_text(&body.text).await?;
-    if body.text.chars().count() > ai::MAX_TEXT_INPUT_CHARS {
+        .map(|u| cleaned(&u));
+    let mut draft = state.app.ai.extract_text(&body.text).await?;
+    if body.text.chars().count() > MAX_TEXT_INPUT_CHARS {
         draft.warnings.push(format!(
             "The text was very long, so only the first {} characters were read.",
-            ai::MAX_TEXT_INPUT_CHARS
+            MAX_TEXT_INPUT_CHARS
         ));
     }
     if let Some(url) = source {
         draft.source_url = Some(url.to_string());
         draft.duplicate_of = duplicate_of(&state, &[&url]).await?;
     }
-    Ok(Json(draft))
+    Ok(Json(draft.into()))
 }
 
 /// What the photos show.
@@ -339,11 +306,11 @@ pub async fn from_photo(
     }
     let ids = ids_of(&images);
     let mode = if dish {
-        ai::PhotoMode::Dish
+        domain::PhotoMode::Dish
     } else {
-        ai::PhotoMode::Recipe
+        domain::PhotoMode::Recipe
     };
-    match state.app.ai.recipe_from_images(&jpegs, mode).await {
+    match state.app.ai.extract_images(&jpegs, mode).await {
         Ok(mut draft) => {
             stored.keep();
             draft.photo_image_ids = ids;
@@ -351,19 +318,21 @@ pub async fn from_photo(
                 draft.image_id = Some(images[0].id);
                 draft.image_url = Some(images[0].url.clone());
             }
-            Ok(Json(draft))
+            Ok(Json(draft.into()))
         }
         // No draft, but the photos are kept so the form can show them next to an empty recipe (PHO-5).
-        Err(error @ (AppError::AiDisabled | AppError::NoRecipeFound(_) | AppError::AiError(_))) => {
+        Err(
+            error @ (DomainError::AiDisabled | DomainError::NoRecipeFound(_) | DomainError::Ai(_)),
+        ) => {
             stored.keep();
             Err(AppError::WithPhotos {
-                error: Box::new(error),
+                error: Box::new(error.into()),
                 photo_image_ids: ids,
             })
         }
         Err(e) => {
             stored.delete().await;
-            Err(e)
+            Err(e.into())
         }
     }
 }

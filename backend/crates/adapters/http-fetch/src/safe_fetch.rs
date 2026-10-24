@@ -1,4 +1,4 @@
-//! The only way the API may fetch a user-supplied URL (SSRF guard, LNK-7).
+//! The only way the application may fetch a user-supplied URL (SSRF guard, LNK-7).
 //!
 //! Per hop: http/https only; the host is resolved here and the hop is refused if ANY address is not global
 //! ([`is_public_ip`]); the request then goes out on a fresh client pinned to exactly those addresses
@@ -14,7 +14,8 @@ use std::{
 use reqwest::{StatusCode, header};
 use url::{Host, Url};
 
-use crate::error::{AppError, AppResult};
+use domain::{DomainError, DomainResult};
+use ports::FetchedPage;
 
 pub const TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;
@@ -97,28 +98,21 @@ impl FetchPolicy {
     }
 }
 
-/// A fetched page: final URL after redirects and the body (≤ the cap).
-pub struct Fetched {
-    pub final_url: Url,
-    pub content_type: Option<String>,
-    pub body: Vec<u8>,
-}
-
 /// Fetches `url` under the rules above; the body is at most `max_bytes`.
-pub async fn fetch(policy: &FetchPolicy, url: &Url, max_bytes: usize) -> AppResult<Fetched> {
+pub async fn fetch(policy: &FetchPolicy, url: &Url, max_bytes: usize) -> DomainResult<FetchedPage> {
     tokio::time::timeout(
         policy.total_timeout(),
         follow(policy, url.clone(), max_bytes),
     )
     .await
     .unwrap_or_else(|_| {
-        Err(AppError::FetchFailed(
+        Err(DomainError::FetchFailed(
             "The site took too long to answer.".into(),
         ))
     })
 }
 
-async fn follow(policy: &FetchPolicy, mut url: Url, max_bytes: usize) -> AppResult<Fetched> {
+async fn follow(policy: &FetchPolicy, mut url: Url, max_bytes: usize) -> DomainResult<FetchedPage> {
     for _ in 0..=MAX_REDIRECTS {
         let mut resp = send(policy, &url).await?;
         let status = resp.status();
@@ -128,7 +122,9 @@ async fn follow(policy: &FetchPolicy, mut url: Url, max_bytes: usize) -> AppResu
                 .get(header::LOCATION)
                 .and_then(|v| v.to_str().ok())
                 .and_then(|loc| url.join(loc).ok())
-                .ok_or_else(|| AppError::FetchFailed("The site sent a broken redirect.".into()))?;
+                .ok_or_else(|| {
+                    DomainError::FetchFailed("The site sent a broken redirect.".into())
+                })?;
             url = next;
             continue;
         }
@@ -142,12 +138,12 @@ async fn follow(policy: &FetchPolicy, mut url: Url, max_bytes: usize) -> AppResu
             return Err(blocked());
         }
         if !status.is_success() {
-            return Err(AppError::FetchFailed(format!(
+            return Err(DomainError::FetchFailed(format!(
                 "The site answered with an error ({}).",
                 status.as_u16()
             )));
         }
-        let too_large = || AppError::FetchFailed("That page is too large to import.".into());
+        let too_large = || DomainError::FetchFailed("That page is too large to import.".into());
         if resp.content_length().is_some_and(|n| n > max_bytes as u64) {
             return Err(too_large());
         }
@@ -158,7 +154,7 @@ async fn follow(policy: &FetchPolicy, mut url: Url, max_bytes: usize) -> AppResu
             .map(str::to_string);
         let mut body = Vec::new();
         while let Some(chunk) = resp.chunk().await.map_err(|_| {
-            AppError::FetchFailed("The connection broke while reading the page.".into())
+            DomainError::FetchFailed("The connection broke while reading the page.".into())
         })? {
             if body.len() + chunk.len() > max_bytes {
                 return Err(too_large());
@@ -171,17 +167,17 @@ async fn follow(policy: &FetchPolicy, mut url: Url, max_bytes: usize) -> AppResu
         if is_html && body.len() <= BOT_PAGE_MAX_BYTES && looks_like_bot_check(&body) {
             return Err(blocked());
         }
-        return Ok(Fetched {
+        return Ok(FetchedPage {
             final_url: url,
             content_type,
             body,
         });
     }
-    Err(AppError::FetchFailed("Too many redirects.".into()))
+    Err(DomainError::FetchFailed("Too many redirects.".into()))
 }
 
-fn blocked() -> AppError {
-    AppError::SiteBlocked("That site does not let us read its pages.".into())
+fn blocked() -> DomainError {
+    DomainError::SiteBlocked("That site does not let us read its pages.".into())
 }
 
 fn looks_like_bot_check(body: &[u8]) -> bool {
@@ -190,26 +186,26 @@ fn looks_like_bot_check(body: &[u8]) -> bool {
 }
 
 /// Vets `url`, then sends one GET pinned to the vetted addresses.
-async fn send(policy: &FetchPolicy, url: &Url) -> AppResult<reqwest::Response> {
+async fn send(policy: &FetchPolicy, url: &Url) -> DomainResult<reqwest::Response> {
     if !matches!(url.scheme(), "http" | "https") {
-        return Err(AppError::BlockedAddress);
+        return Err(DomainError::BlockedAddress);
     }
     let port = url
         .port_or_known_default()
-        .ok_or(AppError::BlockedAddress)?;
+        .ok_or(DomainError::BlockedAddress)?;
     let (domain, addrs): (Option<String>, Vec<SocketAddr>) = match url.host() {
-        None => return Err(AppError::BlockedAddress),
+        None => return Err(DomainError::BlockedAddress),
         Some(Host::Ipv4(ip)) => (None, vec![SocketAddr::new(ip.into(), port)]),
         Some(Host::Ipv6(ip)) => (None, vec![SocketAddr::new(ip.into(), port)]),
         Some(Host::Domain(d)) => {
             let found = tokio::net::lookup_host((d, port))
                 .await
-                .map_err(|_| AppError::FetchFailed("That address could not be found.".into()))?;
+                .map_err(|_| DomainError::FetchFailed("That address could not be found.".into()))?;
             (Some(d.to_string()), found.collect())
         }
     };
     if addrs.is_empty() {
-        return Err(AppError::FetchFailed(
+        return Err(DomainError::FetchFailed(
             "That address could not be found.".into(),
         ));
     }
@@ -218,7 +214,7 @@ async fn send(policy: &FetchPolicy, url: &Url) -> AppResult<reqwest::Response> {
         .iter()
         .any(|a| !policy.allows(*a) && !(exempt && !never_exempt(a.ip())))
     {
-        return Err(AppError::BlockedAddress);
+        return Err(DomainError::BlockedAddress);
     }
     let mut headers = header::HeaderMap::new();
     headers.insert(
@@ -240,12 +236,14 @@ async fn send(policy: &FetchPolicy, url: &Url) -> AppResult<reqwest::Response> {
     if let Some(d) = &domain {
         builder = builder.resolve_to_addrs(d, &addrs);
     }
-    let client = builder.build().map_err(|e| AppError::Internal(e.into()))?;
+    let client = builder
+        .build()
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     client
         .get(url.clone())
         .send()
         .await
-        .map_err(|_| AppError::FetchFailed("Could not reach that site.".into()))
+        .map_err(|_| DomainError::FetchFailed("Could not reach that site.".into()))
 }
 
 /// Addresses that stay blocked even for the `IMPORT_ALLOW_HOST` host: link-local, unspecified, multicast and the
@@ -374,7 +372,7 @@ mod tests {
         let url = Url::parse("http://169.254.169.254/latest/meta-data/").unwrap();
         assert!(matches!(
             fetch(&policy, &url, 1024).await,
-            Err(AppError::BlockedAddress)
+            Err(DomainError::BlockedAddress)
         ));
     }
 
@@ -482,7 +480,7 @@ mod tests {
                 .await
                 .err()
                 .unwrap_or_else(|| panic!("{u} was fetched"));
-            assert!(matches!(err, AppError::BlockedAddress), "{u}: {err:?}");
+            assert!(matches!(err, DomainError::BlockedAddress), "{u}: {err:?}");
         }
     }
 
@@ -496,7 +494,7 @@ mod tests {
             .await
             .err()
             .unwrap();
-        assert!(matches!(err, AppError::FetchFailed(_)), "{err:?}");
+        assert!(matches!(err, DomainError::FetchFailed(_)), "{err:?}");
         // ...and every other internal address stays blocked, including the same host on another port.
         for u in [
             "http://127.0.0.1:10/",
@@ -510,7 +508,7 @@ mod tests {
                 .await
                 .err()
                 .unwrap_or_else(|| panic!("{u} was fetched"));
-            assert!(matches!(err, AppError::BlockedAddress), "{u}: {err:?}");
+            assert!(matches!(err, DomainError::BlockedAddress), "{u}: {err:?}");
         }
     }
 
