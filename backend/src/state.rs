@@ -1,6 +1,7 @@
-use std::sync::Arc;
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use adapter_fs_media::FsMediaStore;
+use adapter_html::HtmlPageReader;
 use adapter_http_fetch::HttpPageFetcher;
 use adapter_postgres::{
     PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo,
@@ -9,7 +10,7 @@ use adapter_postgres::{
 use app::{Deps, Services};
 use ports::{
     ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo, SessionRepo, SettingsRepo,
-    StorageHealth, TagRepo, UserRepo,
+    StorageHealth, TagRepo, TaskSpawner, UserRepo,
 };
 
 use crate::{
@@ -19,6 +20,15 @@ use crate::{
     import::{ai::Ai, safe_fetch::FetchPolicy},
     media::ImageCrateCodec,
 };
+
+/// Runs cleanup tasks on the tokio runtime.
+struct TokioSpawner;
+
+impl TaskSpawner for TokioSpawner {
+    fn spawn(&self, task: Pin<Box<dyn Future<Output = ()> + Send + 'static>>) {
+        tokio::spawn(task);
+    }
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -59,6 +69,11 @@ impl AppState {
             tokens: Arc::new(RandomTokens),
             codec: Arc::new(ImageCrateCodec),
             clock: Arc::new(self.clock.clone()),
+            extractor: self.ai.clone(),
+            fetcher: self.fetcher(),
+            reader: Arc::new(HtmlPageReader),
+            spawner: Arc::new(TokioSpawner),
+            max_upload_bytes: self.config.max_upload_bytes(),
             session_days: self.config.session_days,
         }
     }

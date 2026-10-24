@@ -1,0 +1,227 @@
+//! Import routes: capabilities, link, text and photo. Thin: the rules are in `app::ImportService`; this reads the
+//! request, maps the result and logs what the service reports.
+
+use app::{ImportNotes, Imported};
+use axum::{
+    Json,
+    extract::{Multipart, State},
+};
+use domain::PhotoMode as Mode;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use super::media::log_rendition;
+use crate::{
+    HttpState,
+    dto::{RecipeDraft, media_url},
+    error::{AppError, AppJson, AppResult, ErrorBody},
+    extract::CurrentUser,
+};
+
+#[derive(Serialize, ToSchema)]
+pub struct Capabilities {
+    ai: bool,
+    provider: AiProvider,
+}
+
+/// Mirrors the values `AI_PROVIDER` accepts (checked in `Config::from_env`).
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+enum AiProvider {
+    None,
+    Anthropic,
+}
+
+/// What the server can do, so the UI can hide AI features.
+#[utoipa::path(get, path = "/api/import/capabilities", operation_id = "getImportCapabilities", tag = "import", security(("session" = [])), responses(
+    (status = 200, description = "Whether an AI provider is configured.", body = Capabilities),
+))]
+pub async fn capabilities(
+    State(state): State<HttpState>,
+    _user: CurrentUser,
+) -> Json<Capabilities> {
+    let c = state.services.imports.capabilities();
+    Json(Capabilities {
+        ai: c.ai,
+        provider: match c.provider {
+            domain::AiProvider::Anthropic => AiProvider::Anthropic,
+            domain::AiProvider::None => AiProvider::None,
+        },
+    })
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct ImportUrlBody {
+    url: String,
+}
+
+/// Reads a recipe from a web page (LNK-1/2/5/7). Returns a draft; saves nothing. A page with no recipe data goes to
+/// the AI as plain text when AI is on (LNK-3).
+#[utoipa::path(post, path = "/api/import/url", operation_id = "importFromUrl", tag = "import", security(("session" = [])), request_body = ImportUrlBody, responses(
+    (status = 200, description = "The draft. `sourceUrl` is the final URL after redirects.", body = RecipeDraft),
+    (status = 400, description = "Not an http(s) address (`validation`).", body = ErrorBody),
+    (status = 422, description = "No recipe on the page (`no_recipe_found`), or the address is not public (`blocked_address`).", body = ErrorBody),
+    (status = 502, description = "The site refused us (`site_blocked`), the fetch failed or timed out (`fetch_failed`), or the AI fallback failed (`ai_error`).", body = ErrorBody),
+))]
+pub async fn from_url(
+    State(state): State<HttpState>,
+    CurrentUser(user): CurrentUser,
+    AppJson(body): AppJson<ImportUrlBody>,
+) -> AppResult<Json<RecipeDraft>> {
+    let imported = state.services.imports.from_url(user.id, &body.url).await?;
+    Ok(Json(finish(imported)))
+}
+
+/// Logs what the service reports, then fills `image_url` (an address is HTTP's business) from the stored image.
+fn finish(imported: Imported) -> RecipeDraft {
+    let Imported {
+        mut draft,
+        images,
+        notes,
+    } = imported;
+    log(&notes);
+    if let Some(image) = images.iter().find(|i| Some(i.id) == draft.image_id) {
+        draft.image_url = Some(media_url(&image.file_name));
+    }
+    draft.into()
+}
+
+fn log(notes: &ImportNotes) {
+    for (id, e) in &notes.rendition_errors {
+        log_rendition(*id, e);
+    }
+    if let Some((image, e)) = &notes.skipped_image {
+        tracing::info!(error = %e, image = %image, "import image skipped");
+    }
+    if notes.cleanup_failed {
+        tracing::warn!("could not delete images of a failed request");
+    }
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTextBody {
+    text: String,
+    source_url: Option<String>,
+}
+
+/// Reads a recipe from pasted text with AI (LNK-3/4). Returns a draft; saves nothing and never fetches `sourceUrl`.
+#[utoipa::path(post, path = "/api/import/text", operation_id = "importFromText", tag = "import", security(("session" = [])), request_body = ImportTextBody, responses(
+    (status = 200, description = "The draft. `sourceType` is `text`; `sourceUrl` is the given address without credentials or fragment.", body = RecipeDraft),
+    (status = 400, description = "Empty text or a bad `sourceUrl` (`validation`).", body = ErrorBody),
+    (status = 422, description = "No recipe in the text (`no_recipe_found`), or no AI provider (`ai_disabled`).", body = ErrorBody),
+    (status = 502, description = "The AI provider failed (`ai_error`).", body = ErrorBody),
+))]
+pub async fn from_text(
+    State(state): State<HttpState>,
+    _user: CurrentUser,
+    AppJson(body): AppJson<ImportTextBody>,
+) -> AppResult<Json<RecipeDraft>> {
+    let draft = state
+        .services
+        .imports
+        .from_text(&body.text, body.source_url.as_deref())
+        .await?;
+    Ok(Json(draft.into()))
+}
+
+/// What the photos show.
+#[derive(ToSchema)]
+#[schema(rename_all = "lowercase")]
+#[allow(dead_code)] // schema only
+pub enum PhotoMode {
+    /// A cookbook page, card or screenshot of a recipe.
+    Recipe,
+    /// A photo of a finished dish.
+    Dish,
+}
+
+/// Multipart body of `POST /api/import/photo`.
+#[derive(ToSchema)]
+#[allow(dead_code)] // schema only; the handler reads the multipart stream itself
+pub struct PhotoForm {
+    /// 1 to 6 images (repeat the field).
+    #[schema(value_type = Vec<String>, format = Binary)]
+    files: Vec<Vec<u8>>,
+    mode: PhotoMode,
+}
+
+/// Most photos in one import (PHO-3).
+pub const MAX_PHOTOS: usize = 6;
+
+/// Reads a recipe from photos (PHO-2–5). Returns a draft with `photoImageIds` set.
+#[utoipa::path(post, path = "/api/import/photo", operation_id = "importFromPhoto", tag = "import", security(("session" = [])),
+    request_body(content = PhotoForm, content_type = "multipart/form-data"), responses(
+    (status = 200, description = "The draft. `photoImageIds` lists the stored photos in upload order; in `dish` mode `imageId` is the first.", body = RecipeDraft),
+    (status = 400, description = "No files, more than 6, or a bad `mode` (`validation`).", body = ErrorBody),
+    (status = 413, description = "A file is over `MAX_UPLOAD_MB` (`too_large`).", body = ErrorBody),
+    (status = 415, description = "A file is not an image we can read, including a HEIC the server cannot decode (`unsupported_media`). Nothing is kept.", body = ErrorBody),
+    (status = 422, description = "No AI provider (`ai_disabled`) or no recipe in the photos (`no_recipe_found`). The photos stay stored and `error.photoImageIds` lists them.", body = ErrorBody),
+    (status = 502, description = "The AI provider failed (`ai_error`). The photos stay stored and `error.photoImageIds` lists them.", body = ErrorBody),
+))]
+pub async fn from_photo(
+    State(state): State<HttpState>,
+    CurrentUser(user): CurrentUser,
+    mut multipart: Multipart,
+) -> AppResult<Json<RecipeDraft>> {
+    let (mut files, mut mode) = (Vec::new(), None);
+    while let Some(field) = multipart.next_field().await? {
+        match field.name() {
+            Some("files") => {
+                if files.len() == MAX_PHOTOS {
+                    return Err(AppError::validation("files: send at most 6 photos."));
+                }
+                // Stop reading as soon as the file is over the limit, not after buffering all of it.
+                let data = read_capped(field, state.config.max_upload_bytes).await?;
+                files.push(data.ok_or(AppError::TooLarge)?);
+            }
+            Some("mode") => {
+                let bytes = read_capped(field, 16).await?;
+                let bad = || AppError::validation("mode: use recipe or dish.");
+                mode = Some(String::from_utf8(bytes.ok_or_else(bad)?).map_err(|_| bad())?);
+            }
+            _ => {}
+        }
+    }
+    if files.is_empty() {
+        return Err(AppError::validation("files: send 1 to 6 photos."));
+    }
+    let mode = match mode.as_deref() {
+        None | Some("recipe") => Mode::Recipe,
+        Some("dish") => Mode::Dish,
+        Some(_) => return Err(AppError::validation("mode: use recipe or dish.")),
+    };
+    match state
+        .services
+        .imports
+        .from_photos(user.id, files, mode)
+        .await
+    {
+        Ok(imported) => Ok(Json(finish(imported))),
+        Err(f) => {
+            log(&f.notes);
+            Err(match f.kept {
+                Some(photo_image_ids) => AppError::WithPhotos {
+                    error: Box::new(f.error.into()),
+                    photo_image_ids,
+                },
+                None => f.error.into(),
+            })
+        }
+    }
+}
+
+/// Reads a multipart field chunk by chunk; `None` as soon as it is longer than `limit` bytes.
+async fn read_capped(
+    mut field: axum::extract::multipart::Field<'_>,
+    limit: usize,
+) -> AppResult<Option<Vec<u8>>> {
+    let mut out = Vec::new();
+    while let Some(chunk) = field.chunk().await? {
+        if out.len() + chunk.len() > limit {
+            return Ok(None);
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Ok(Some(out))
+}
