@@ -18,7 +18,7 @@ dish photos), search them, and cook from an iPad (installable PWA, cooking mode,
 |---|---|---|---|
 | API | Rust, axum 0.8, sqlx 0.9 (Postgres), tokio | `backend/` | `just check-backend` |
 | Web | Next.js 16 App Router, React 19, TS strict, Tailwind 4 | `frontend/` | `just check-frontend` |
-| DB | Postgres 16 | container `db` | migrations in `backend/migrations/`, run on API start |
+| DB | Postgres 16 | container `db` | migrations in `backend/crates/adapters/postgres/migrations/`, run on API start |
 | Containers | `docker-compose.yml` (db, api, web, optional caddy) | root, `deploy/` | CI `compose` job boots the stack |
 
 `just check` runs both trees' format, lint, type and test checks plus `just audit` (cargo deny + npm audit; a tool

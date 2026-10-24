@@ -7,7 +7,6 @@ use axum::{
     extract::{Multipart, State},
 };
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -141,7 +140,7 @@ pub async fn from_url(
             d
         }
     };
-    draft.duplicate_of = duplicate_of(&state.pool, &[&requested, &final_url]).await?;
+    draft.duplicate_of = duplicate_of(&state, &[&requested, &final_url]).await?;
     attach_image(&state, user.id, &mut draft).await;
     Ok(Json(draft))
 }
@@ -155,23 +154,18 @@ enum Parsed {
 }
 
 /// Id of a live recipe saved from the same page (LNK-5), comparing normalised URLs.
-async fn duplicate_of(pool: &PgPool, urls: &[&Url]) -> AppResult<Option<Uuid>> {
+async fn duplicate_of(state: &AppState, urls: &[&Url]) -> AppResult<Option<Uuid>> {
     // Credentials and fragments never count: the saved `source_url` has none.
     let urls: Vec<Url> = urls.iter().map(|u| jsonld::cleaned(u)).collect();
     let wanted: Vec<String> = urls.iter().map(normalize_url).collect();
-    let patterns: Vec<String> = urls
+    let hosts: Vec<String> = urls
         .iter()
         .filter_map(|u| u.host_str())
-        .map(|h| format!("%{h}%"))
+        .map(str::to_string)
         .collect();
-    // shortcut: normalises in Rust over every live recipe from the same host (prefiltered by ILIKE); store a
-    // normalised column with an index if one host ever has thousands of recipes.
-    let rows: Vec<(Uuid, String)> = sqlx::query_as(
-        "select id, source_url from recipes where deleted_at is null and source_url ilike any($1) order by created_at",
-    )
-    .bind(patterns)
-    .fetch_all(pool)
-    .await?;
+    // shortcut: normalises in Rust over every live recipe from the same host (prefiltered by the repository);
+    // store a normalised column with an index if one host ever has thousands of recipes.
+    let rows = state.recipes.live_source_urls(&hosts).await?;
     Ok(rows
         .into_iter()
         .find(|(_, saved)| Url::parse(saved).is_ok_and(|u| wanted.contains(&normalize_url(&u))))
@@ -240,7 +234,7 @@ pub async fn from_text(
     }
     if let Some(url) = source {
         draft.source_url = Some(url.to_string());
-        draft.duplicate_of = duplicate_of(&state.pool, &[&url]).await?;
+        draft.duplicate_of = duplicate_of(&state, &[&url]).await?;
     }
     Ok(Json(draft))
 }

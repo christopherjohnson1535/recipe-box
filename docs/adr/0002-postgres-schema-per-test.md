@@ -6,7 +6,7 @@ Status: Accepted (shared harness implementation tracked in #45) · Date: 2026-10
 Search needs full-text queries over titles, ingredients and notes, and the household data is relational. Backend integration tests need a real database, run in parallel, and must not interfere with each other or with a developer's data.
 
 ## Decision
-Postgres 16 is the only database (migrations in `backend/migrations/`, run on API start). Each backend integration test creates its own schema and media directory, runs the migrations in it, and removes both afterwards. Tests connect through `TEST_DATABASE_URL`.
+Postgres 16 is the only database (migrations in `backend/crates/adapters/postgres/migrations/`, run on API start). Each backend integration test creates its own schema and media directory, runs the migrations in it, and removes both afterwards. Tests connect through `TEST_DATABASE_URL`.
 
 Today each test file sets this up with its own `ctx()` helper, cleans up with an explicit `cleanup().await`, and skips silently when `TEST_DATABASE_URL` is unset. Issue #45 tracks replacing that with one shared harness that removes the schema in a drop guard and falls back to testcontainers instead of skipping.
 

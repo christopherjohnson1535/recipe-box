@@ -6,7 +6,7 @@ map: [`docs/SPEC.md`](../docs/SPEC.md).
 ## Run locally
 
 Needs Rust (pinned in `../rust-toolchain.toml`; rustup installs it on first `cargo` run) and Postgres 16. The role must be allowed to create the `citext` extension (or create it
-once yourself: `create extension citext;`). Migrations in `migrations/` run on start.
+once yourself: `create extension citext;`). Migrations in `crates/adapters/postgres/migrations/` run on start.
 
 ```sh
 createdb recipes
@@ -52,7 +52,8 @@ role needs `create` on that database (and the `citext` extension, created in `pu
 ## Layout
 
 - `src/main.rs` — config, tracing, pool, migrations, purge task, graceful shutdown (SIGTERM / Ctrl-C).
-- `src/lib.rs` — module tree, `migrate`, hourly `purge` (recipes deleted > 1 day, expired sessions).
+- `crates/adapters/postgres/` — the Postgres adapter: repositories, row structs, `migrations/` and `migrate()`.
+- `src/lib.rs` — module tree, `migrate` (delegates to the adapter), hourly `purge` (recipes deleted > 1 day, expired sessions).
 - `src/routes/*` — one file per area; `router()` in `routes/mod.rs`.
 - `src/auth/*` — argon2id passwords, DB sessions (cookie `rb_session`, SHA-256 of the token stored),
   `CurrentUser` / `AdminUser` extractors.

@@ -14,7 +14,7 @@ use crate::{
     error::{AppError, AppJson, AppPath, AppResult, ErrorBody},
     models::{User, role_schema},
     state::AppState,
-    user_columns, validate,
+    validate,
 };
 
 /// All users, ordered by display name. Admin only.
@@ -23,14 +23,8 @@ use crate::{
     (status = 403, description = "Not an admin (`forbidden`).", body = ErrorBody),
 ))]
 pub async fn list(State(state): State<AppState>, _admin: AdminUser) -> AppResult<Json<Vec<User>>> {
-    let users = sqlx::query_as::<_, User>(concat!(
-        "select ",
-        user_columns!(),
-        " from users order by lower(display_name), username"
-    ))
-    .fetch_all(&state.pool)
-    .await?;
-    Ok(Json(users))
+    let users = state.users.list().await?;
+    Ok(Json(users.into_iter().map(Into::into).collect()))
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -62,23 +56,16 @@ pub async fn create(
         return Err(AppError::validation("role: `admin` or `member`."));
     }
     let hash = password::hash(body.password).await?;
-    let user = sqlx::query_as::<_, User>(concat!(
-        "insert into users (username, display_name, password_hash, role) values ($1, $2, $3, $4) returning ",
-        user_columns!()
-    ))
-    .bind(&username)
-    .bind(&display_name)
-    .bind(&hash)
-    .bind(&body.role)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| match &e {
-        sqlx::Error::Database(d) if d.is_unique_violation() => {
-            AppError::Conflict("That username is already taken.".into())
-        }
-        _ => e.into(),
-    })?;
-    Ok((StatusCode::CREATED, Json(user)))
+    let user = state
+        .users
+        .create(domain::NewUser {
+            username,
+            display_name,
+            password_hash: hash,
+            role: body.role,
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(user.into())))
 }
 
 /// Removes a user. Not yourself, not the last admin.
@@ -99,28 +86,7 @@ pub async fn remove(
     if id == admin.id {
         return Err(AppError::Forbidden("You can't remove yourself.".into()));
     }
-    let mut tx = state.pool.begin().await?;
-    // Locks every admin row plus the target, so concurrent deletes can't both pass the last-admin check.
-    let rows: Vec<(Uuid, String)> = sqlx::query_as(
-        "select id, role from users where role = 'admin' or id = $1 order by id for update",
-    )
-    .bind(id)
-    .fetch_all(&mut *tx)
-    .await?;
-    let Some((_, role)) = rows.iter().find(|(rid, _)| *rid == id) else {
-        return Err(AppError::NotFound("No such user.".into()));
-    };
-    let admins = rows.iter().filter(|(_, r)| r == "admin").count();
-    if role == "admin" && admins <= 1 {
-        return Err(AppError::Forbidden(
-            "You can't remove the last admin.".into(),
-        ));
-    }
-    sqlx::query("delete from users where id = $1")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    tx.commit().await?;
+    state.users.remove(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -155,13 +121,7 @@ pub async fn set_password(
     }
     validate::password(&body.password)?;
 
-    let mut tx = state.pool.begin().await?;
-    let current: Option<String> =
-        sqlx::query_scalar("select password_hash from users where id = $1 for update")
-            .bind(id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let Some(current) = current else {
+    let Some(current) = state.users.password_hash(id).await? else {
         return Err(AppError::NotFound("No such user.".into()));
     };
     if own {
@@ -169,20 +129,26 @@ pub async fn set_password(
         if given.chars().count() > validate::MAX_PASSWORD {
             return Err(AppError::Unauthenticated("Wrong username or password."));
         }
-        if !password::verify(given, Some(current)).await? {
+        if !password::verify(given, Some(current.clone())).await? {
             return Err(AppError::Unauthenticated("Wrong username or password."));
         }
     }
     let hash = password::hash(body.password).await?;
-    sqlx::query("update users set password_hash = $2 where id = $1")
-        .bind(id)
-        .bind(&hash)
-        .execute(&mut *tx)
-        .await?;
     let keep = own
         .then(|| jar.get(COOKIE_NAME).map(|c| session::hash_token(c.value())))
         .flatten();
-    session::end_for_user(&mut tx, id, keep).await?;
-    tx.commit().await?;
+    // The hash the caller verified against must still be the stored one; an admin reset checks nothing.
+    match state
+        .users
+        .set_password_hash(id, &hash, own.then_some(current.as_str()), keep.as_deref())
+        .await
+    {
+        // Someone else changed this password after we verified against it: to the caller that is a wrong
+        // current password, as it was when the second request waited on the row lock.
+        Err(domain::DomainError::Conflict(_)) if own => {
+            return Err(AppError::Unauthenticated("Wrong username or password."));
+        }
+        r => r?,
+    }
     Ok(StatusCode::NO_CONTENT)
 }

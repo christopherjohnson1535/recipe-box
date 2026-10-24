@@ -16,9 +16,8 @@ pub struct Ingredient {
 /// Same shape as [`Ingredient`].
 pub type Step = Ingredient;
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, sqlx::Type, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "lowercase")]
-#[sqlx(type_name = "text", rename_all = "lowercase")]
 pub enum SourceType {
     #[default]
     Manual,
@@ -95,7 +94,7 @@ pub struct Recipe {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RecipeSummary {
     pub id: Uuid,
@@ -104,17 +103,11 @@ pub struct RecipeSummary {
     #[schema(required = true)]
     pub total_minutes: Option<i32>,
     pub tags: Vec<String>,
-    #[sqlx(skip)]
     #[schema(required = true)]
     pub image_url: Option<String>,
     /// As on `Recipe`.
-    #[sqlx(skip)]
     #[schema(required = true)]
     pub image_display_url: Option<String>,
-    #[serde(skip)]
-    pub image_file: Option<String>,
-    #[serde(skip)]
-    pub image_display_file: Option<String>,
     pub source_type: SourceType,
     pub updated_at: DateTime<Utc>,
 }
@@ -152,7 +145,7 @@ pub struct RecipeDraft {
     pub duplicate_of: Option<Uuid>,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: Uuid,
@@ -161,14 +154,6 @@ pub struct User {
     #[schema(schema_with = role_schema)]
     pub role: String,
     pub created_at: DateTime<Utc>,
-}
-
-/// Select list for [`User`] as a literal for `concat!`; `username` is citext, so it is cast for decoding.
-#[macro_export]
-macro_rules! user_columns {
-    () => {
-        "id, username::text as username, display_name, role, created_at"
-    };
 }
 
 /// `role` is a text column; the schema lists the two values the API accepts and returns.
@@ -206,6 +191,78 @@ pub fn media_url(file_name: &str) -> String {
 #[schema(value_type = String, format = Binary)]
 #[allow(dead_code)] // schema only
 pub struct BinaryFile(Vec<u8>);
+
+impl From<domain::User> for User {
+    fn from(u: domain::User) -> Self {
+        Self {
+            id: u.id,
+            username: u.username,
+            display_name: u.display_name,
+            role: u.role,
+            created_at: u.created_at,
+        }
+    }
+}
+
+/// The plate-treatment rendition's URL, hidden when the household setting is off.
+fn display_url(file: Option<&str>, plate_treatment: bool) -> Option<String> {
+    file.filter(|_| plate_treatment).map(media_url)
+}
+
+impl Recipe {
+    /// The API shape of a stored recipe. `plate_treatment` is the household setting: when off, the rendition is
+    /// hidden (the repository returns it whenever one exists).
+    pub fn from_domain(r: domain::Recipe, plate_treatment: bool) -> Self {
+        let user_ref = |u: Option<domain::UserRef>| {
+            u.map(|u| UserRef {
+                id: u.id,
+                display_name: u.display_name,
+            })
+        };
+        Self {
+            id: r.id,
+            title: r.title,
+            description: r.description,
+            ingredients: r.ingredients.into_iter().map(Into::into).collect(),
+            steps: r.steps.into_iter().map(Into::into).collect(),
+            servings: r.servings,
+            prep_minutes: r.prep_minutes,
+            cook_minutes: r.cook_minutes,
+            total_minutes: r.total_minutes,
+            notes: r.notes,
+            source_url: r.source_url,
+            source_name: r.source_name,
+            source_type: r.source_type.into(),
+            image_id: r.image_id,
+            photo_image_ids: r.photo_image_ids,
+            tags: r.tags,
+            image_url: r.image_file.as_deref().map(media_url),
+            image_display_url: display_url(r.image_display_file.as_deref(), plate_treatment),
+            photo_urls: r.photo_files.iter().map(|f| media_url(f)).collect(),
+            created_by: user_ref(r.created_by),
+            updated_by: user_ref(r.updated_by),
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+impl RecipeSummary {
+    /// As [`Recipe::from_domain`].
+    pub fn from_domain(r: domain::RecipeSummary, plate_treatment: bool) -> Self {
+        Self {
+            id: r.id,
+            title: r.title,
+            description: r.description,
+            total_minutes: r.total_minutes,
+            tags: r.tags,
+            image_url: r.image_file.as_deref().map(media_url),
+            image_display_url: display_url(r.image_display_file.as_deref(), plate_treatment),
+            source_type: r.source_type.into(),
+            updated_at: r.updated_at,
+        }
+    }
+}
 
 // Conversions to and from the domain types; only what the routes need (validation of a recipe body).
 // The DTOs above mirror the domain types until the services phase (#91) removes the duplication.

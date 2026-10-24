@@ -155,7 +155,10 @@ async fn backfill_renders_missing_plates_and_skips_unreadable_originals() {
     let path = app.media_dir.join(format!("{good}.jpg"));
     std::fs::write(&path, &original.bytes).unwrap();
 
-    assert_eq!(backfill_displays(&app.pool, &app.media_dir).await, 1);
+    assert_eq!(
+        backfill_displays(app.state.images.as_ref(), &app.media_dir).await,
+        1
+    );
     let name: Option<String> =
         sqlx::query_scalar("select display_file_name from images where id = $1")
             .bind(good)
@@ -172,7 +175,10 @@ async fn backfill_renders_missing_plates_and_skips_unreadable_originals() {
             .unwrap();
     assert_eq!(still_null, 1);
     // Idempotent: nothing new to make, the unreadable one is skipped again.
-    assert_eq!(backfill_displays(&app.pool, &app.media_dir).await, 0);
+    assert_eq!(
+        backfill_displays(app.state.images.as_ref(), &app.media_dir).await,
+        0
+    );
 }
 
 #[tokio::test]
@@ -185,7 +191,11 @@ async fn a_rendition_of_a_deleted_image_is_not_left_behind() {
         reencode(&png()).unwrap().bytes,
     )
     .unwrap();
-    assert!(!render_display(&app.pool, &app.media_dir, id).await.unwrap());
+    assert!(
+        !render_display(app.state.images.as_ref(), &app.media_dir, id)
+            .await
+            .unwrap()
+    );
     assert!(!app.media_dir.join(format!("{id}.display.jpg")).exists());
 }
 

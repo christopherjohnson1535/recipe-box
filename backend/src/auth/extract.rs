@@ -2,7 +2,7 @@ use axum::{extract::FromRequestParts, http::request::Parts};
 use axum_extra::extract::cookie::CookieJar;
 
 use super::session::{COOKIE_NAME, hash_token};
-use crate::{error::AppError, models::User, state::AppState, user_columns};
+use crate::{error::AppError, models::User, state::AppState};
 
 /// The signed-in user; rejects with 401 `unauthenticated` when the session is missing or expired.
 #[derive(Debug, Clone)]
@@ -21,17 +21,12 @@ impl FromRequestParts<AppState> for CurrentUser {
     ) -> Result<Self, Self::Rejection> {
         let jar = CookieJar::from_headers(&parts.headers);
         let token = jar.get(COOKIE_NAME).ok_or(AppError::SIGN_IN)?;
-        let user = sqlx::query_as::<_, User>(concat!(
-            "select ",
-            user_columns!(),
-            " from users where id = (select user_id from sessions where token_hash = $1 and expires_at > $2)"
-        ))
-        .bind(hash_token(token.value()))
-        .bind(state.clock.now())
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or(AppError::SIGN_IN)?;
-        Ok(Self(user))
+        let user = state
+            .sessions
+            .user_for_token(&hash_token(token.value()))
+            .await?
+            .ok_or(AppError::SIGN_IN)?;
+        Ok(Self(user.into()))
     }
 }
 

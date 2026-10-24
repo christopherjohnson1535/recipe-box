@@ -13,7 +13,11 @@ pub mod anthropic;
 use std::{
     path::PathBuf,
     str::FromStr,
-    sync::{OnceLock, mpsc},
+    sync::{
+        OnceLock,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
 };
 
 use axum::{
@@ -153,12 +157,16 @@ impl Res {
 
 pub struct TestApp {
     pub router: Router,
+    /// The state the router was built from (its repositories share the app's database and clock).
+    pub state: AppState,
     pub pool: PgPool,
     /// Shared with the app: move time with `clock.advance(..)`.
     pub clock: Clock,
     pub media_dir: PathBuf,
     /// The admin's session cookie after `spawn_as_admin()`, otherwise empty.
     pub cookie: String,
+    /// Whether a recipe was saved through `send` yet (see there).
+    saved_recipe: AtomicBool,
     guard: Guard,
 }
 
@@ -221,7 +229,7 @@ impl TestApp {
             .connect_with(opts)
             .await
             .unwrap();
-        recipe_box_api::migrate(&pool).await.unwrap();
+        adapter_postgres::migrate(&pool).await.unwrap();
         std::fs::create_dir_all(&media_dir).unwrap();
 
         let config = Config {
@@ -236,17 +244,18 @@ impl TestApp {
             max_upload_mb: 2,
         };
         let clock = Clock::fixed(epoch());
-        let mut state = AppState::new(pool.clone(), config).unwrap();
-        state.clock = clock.clone();
+        let mut state = AppState::with_clock(pool.clone(), config, clock.clone()).unwrap();
         tweak(&mut state);
-        let router = recipe_box_api::router(state);
+        let router = recipe_box_api::router(state.clone());
 
         Self {
             router,
+            state,
             pool,
             clock,
             media_dir,
             cookie: String::new(),
+            saved_recipe: AtomicBool::new(false),
             guard,
         }
     }
@@ -259,6 +268,20 @@ impl TestApp {
     // ---- requests ------------------------------------------------------------------------------------------
 
     pub async fn send(&self, req: Request<Body>) -> Res {
+        // Why the clock moves at all: the test clock is frozen and repositories stamp `created_at` from it, so
+        // consecutive saves would share one timestamp and "newest first" would fall back to the random ids. (The
+        // database's `now()` used to give each row its own stamp.) Production uses the system clock, where ties
+        // are only possible within one microsecond and are broken by id as before.
+        // The repositories stamp `created_at` from the fixed clock (the database's `now()` used to). Recipes saved
+        // one after another would tie, and "newest first" would fall back to random ids; so the clock moves one
+        // microsecond before every save after the first. A lone save still happens at exactly the clock's time, and
+        // the time rules (which move the clock by exact amounts) only compare against stamps taken after this.
+        if req.method() == Method::POST
+            && req.uri().path() == "/api/recipes"
+            && self.saved_recipe.swap(true, Ordering::SeqCst)
+        {
+            self.clock.advance(chrono::Duration::microseconds(1));
+        }
         let res = self.router.clone().oneshot(req).await.unwrap();
         let status = res.status();
         let header_of = |name| {

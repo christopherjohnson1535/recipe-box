@@ -11,7 +11,7 @@ use image::{
     DynamicImage, ImageDecoder, ImageReader, RgbImage, codecs::jpeg::JpegEncoder,
     imageops::FilterType,
 };
-use sqlx::PgPool;
+use ports::ImageRepo;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -109,19 +109,18 @@ pub async fn store_jpeg(
             .map(|()| display_name),
         None => None,
     };
-    let inserted = sqlx::query(
-        "insert into images (id, file_name, display_file_name, width, height, bytes, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7)",
-    )
-    .bind(id)
-    .bind(&file_name)
-    .bind(&display_name)
-    .bind(jpeg.width as i32)
-    .bind(jpeg.height as i32)
-    .bind(jpeg.bytes.len() as i32)
-    .bind(user_id)
-    .execute(&state.pool)
-    .await;
+    let inserted = state
+        .images
+        .add(domain::Image {
+            id,
+            file_name: file_name.clone(),
+            display_file_name: display_name.clone(),
+            width: jpeg.width as i32,
+            height: jpeg.height as i32,
+            bytes: jpeg.bytes.len() as i32,
+            created_by: Some(user_id),
+        })
+        .await;
     if let Err(e) = inserted {
         let _ = tokio::fs::remove_file(&path).await;
         let _ = tokio::fs::remove_file(&display_path).await;
@@ -139,12 +138,7 @@ pub async fn store_jpeg(
 
 /// Deletes images stored by a request that then failed (row and file); best effort.
 pub async fn delete_images(state: &AppState, ids: &[Uuid]) {
-    if sqlx::query("delete from images where id = any($1)")
-        .bind(ids)
-        .execute(&state.pool)
-        .await
-        .is_err()
-    {
+    if state.images.delete(ids).await.is_err() {
         tracing::warn!("could not delete images of a failed request");
         return;
     }
@@ -227,7 +221,7 @@ fn display_jpeg(original: &[u8], id: Uuid) -> AppResult<Vec<u8>> {
 
 /// Makes and stores the rendition of one image whose original is on disk, if it has none yet. Returns false when
 /// the image row is gone (or was rendered meanwhile) and the file just written was removed again.
-pub async fn render_display(pool: &PgPool, media_dir: &Path, id: Uuid) -> AppResult<bool> {
+pub async fn render_display(images: &dyn ImageRepo, media_dir: &Path, id: Uuid) -> AppResult<bool> {
     let original = tokio::fs::read(media_dir.join(format!("{id}.jpg")))
         .await
         .map_err(|e| anyhow!("read original of {id}: {e}"))?;
@@ -238,48 +232,27 @@ pub async fn render_display(pool: &PgPool, media_dir: &Path, id: Uuid) -> AppRes
     tokio::fs::write(media_dir.join(&name), bytes)
         .await
         .map_err(|e| anyhow!("write {name}: {e}"))?;
-    let updated = sqlx::query(
-        "update images set display_file_name = $2 where id = $1 and display_file_name is null",
-    )
-    .bind(id)
-    .bind(&name)
-    .execute(pool)
-    .await?
-    .rows_affected();
-    if updated == 1 {
+    if images.set_display_file(id, &name).await? {
         return Ok(true);
     }
-    // The row was deleted meanwhile, or a concurrent run already points at this same file: keep it only then.
-    let in_use: bool = sqlx::query_scalar(
-        "select exists(select 1 from images where id = $1 and display_file_name = $2)",
-    )
-    .bind(id)
-    .bind(&name)
-    .fetch_one(pool)
-    .await?;
-    if !in_use {
-        let _ = tokio::fs::remove_file(media_dir.join(&name)).await;
-    }
+    // The row was deleted meanwhile, or already has another rendition: the file just written is an orphan.
+    let _ = tokio::fs::remove_file(media_dir.join(&name)).await;
     Ok(false)
 }
 
 /// Gives every image without a rendition one, one at a time; returns how many were made. An image that cannot be
 /// read is logged and skipped (it is tried again on the next start). Safe to run on every start.
-pub async fn backfill_displays(pool: &PgPool, media_dir: &Path) -> u64 {
-    let ids: Vec<Uuid> =
-        match sqlx::query_scalar("select id from images where display_file_name is null")
-            .fetch_all(pool)
-            .await
-        {
-            Ok(ids) => ids,
-            Err(e) => {
-                tracing::error!(error = %e, "display backfill: could not list images");
-                return 0;
-            }
-        };
+pub async fn backfill_displays(images: &dyn ImageRepo, media_dir: &Path) -> u64 {
+    let ids = match images.without_display_file().await {
+        Ok(ids) => ids,
+        Err(e) => {
+            tracing::error!(error = %e, "display backfill: could not list images");
+            return 0;
+        }
+    };
     let mut made = 0;
     for id in ids {
-        match render_display(pool, media_dir, id).await {
+        match render_display(images, media_dir, id).await {
             Ok(true) => made += 1,
             Ok(false) => {}
             Err(e) => tracing::warn!(%id, error = ?e, "display backfill: skipped an image"),

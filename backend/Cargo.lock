@@ -2396,6 +2396,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "recipe-box-adapter-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "recipe-box-domain",
+ "recipe-box-ports",
+ "serde",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "recipe-box-api"
 version = "0.1.0"
 dependencies = [
@@ -2410,7 +2422,9 @@ dependencies = [
  "http-body-util",
  "image",
  "rand 0.10.3",
+ "recipe-box-adapter-postgres",
  "recipe-box-domain",
+ "recipe-box-ports",
  "reqwest",
  "scraper",
  "serde",

@@ -1,0 +1,19 @@
+[package]
+name = "recipe-box-adapter-postgres"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "adapter_postgres"
+
+[dependencies]
+async-trait = "0.1"
+recipe-box-domain = { path = "../../domain" }
+recipe-box-ports = { path = "../../ports" }
+serde.workspace = true
+sqlx.workspace = true
+
+[dev-dependencies]
+recipe-box-ports = { path = "../../ports", features = ["contract"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
