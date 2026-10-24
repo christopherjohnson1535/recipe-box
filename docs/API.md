@@ -72,8 +72,9 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   most 2400 px. Images over 10,000 px a side or 40 megapixels are refused (`415 unsupported_media`) before any pixels
   are decoded. `GET /media/{file_name}` requires a session; `file_name` must match `^[0-9a-f-]{36}(\.display)?\.jpg$`.
 - **Display renditions** (illustrated plates): every stored image also gets `<uuid>.display.jpg`, a deterministic
-  print-style version (centred crop 4:3 for landscape, 1:1 otherwise; long edge at most 1600 px, never upscaled; soft
-  S tone curve, warm paper tint, light grain; JPEG q82). The original `<uuid>.jpg` is never changed and stays viewable
+  print-style version (centred crop 4:3 for landscape, 1:1 otherwise; long edge at most 1600 px, never upscaled; levels
+  and midtones normalised toward one house look, colour cast partly neutralised, saturation muted, then a soft S tone
+  curve, warm paper tint and light grain; JPEG q82). The original `<uuid>.jpg` is never changed and stays viewable
   full size. `POST /api/media` returns `displayUrl` (null if the rendition could not be made; the upload still
   succeeds). Photos stored before this existed get theirs from a background task at API start. Recipes and recipe
   list items carry `imageDisplayUrl`: the main photo's rendition when the household setting `plateTreatment` is on
