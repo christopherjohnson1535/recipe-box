@@ -41,8 +41,6 @@ pub struct AppState {
     pub media: Arc<dyn MediaStore>,
     pub health: Arc<dyn StorageHealth>,
     pub config: Arc<Config>,
-    /// The outbound fetcher; use [`AppState::fetcher`], which applies `fetch_policy`.
-    fetcher: HttpPageFetcher,
     /// Which addresses link import may fetch. Public only; tests may widen it for their local server.
     pub fetch_policy: FetchPolicy,
     /// "Now" for every time rule. `Clock::System` in production; tests use a fixed one. The repositories hold
@@ -78,9 +76,9 @@ impl AppState {
         }
     }
 
-    /// The page fetcher under the CURRENT `fetch_policy` (tests change the policy after `new`).
+    /// The page fetcher, built from the CURRENT `fetch_policy` (tests change the policy after `new`).
     pub fn fetcher(&self) -> Arc<dyn PageFetcher> {
-        Arc::new(self.fetcher.with_policy(self.fetch_policy.clone()))
+        Arc::new(HttpPageFetcher::new(self.fetch_policy.clone()))
     }
 
     pub fn services(&self) -> Services {
@@ -105,7 +103,6 @@ impl AppState {
             media: Arc::new(FsMediaStore::new(config.media_dir.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
             config: Arc::new(config),
-            fetcher: HttpPageFetcher::default(),
             fetch_policy: FetchPolicy::default(),
             clock,
             ai,

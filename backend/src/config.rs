@@ -63,10 +63,6 @@ impl Config {
         })
     }
 
-    pub fn ai_enabled(&self) -> bool {
-        self.ai_provider != "none"
-    }
-
     pub fn max_upload_bytes(&self) -> usize {
         self.max_upload_mb * 1024 * 1024
     }

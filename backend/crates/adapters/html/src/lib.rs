@@ -50,6 +50,6 @@ impl PageReader for HtmlPageReader {
         tokio::time::timeout(budget, parse)
             .await
             .map_err(|_| DomainError::FetchFailed("That page took too long to read.".into()))?
-            .map_err(|e| DomainError::Internal(e.to_string()))
+            .map_err(DomainError::internal)
     }
 }

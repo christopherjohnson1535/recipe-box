@@ -301,7 +301,7 @@ impl RecipeExtractor for AnthropicProvider {
             let img = img.clone();
             let jpeg = tokio::task::spawn_blocking(move || shrink(&img))
                 .await
-                .map_err(|e| DomainError::Internal(e.to_string()))??;
+                .map_err(DomainError::internal)??;
             content.push(json!({
                 "type": "image",
                 "source": { "type": "base64", "media_type": "image/jpeg", "data": STANDARD.encode(jpeg) },
@@ -334,7 +334,7 @@ impl RecipeExtractor for AnthropicProvider {
 
 /// JPEG bytes with the long edge at most [`MAX_IMAGE_EDGE`]; smaller images pass through untouched.
 fn shrink(bytes: &[u8]) -> DomainResult<Vec<u8>> {
-    let img = image::load_from_memory(bytes).map_err(|e| DomainError::Internal(e.to_string()))?;
+    let img = image::load_from_memory(bytes).map_err(DomainError::internal)?;
     if img.width().max(img.height()) <= MAX_IMAGE_EDGE {
         return Ok(bytes.to_vec());
     }
@@ -349,7 +349,7 @@ fn shrink(bytes: &[u8]) -> DomainResult<Vec<u8>> {
         .write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(
             &mut out, 85,
         ))
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::internal)?;
     Ok(out)
 }
 

@@ -19,7 +19,6 @@ use ports::FetchedPage;
 
 pub const TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;
-pub use domain::PAGE_MAX_BYTES;
 /// Bot-check interstitials are small; a big page that mentions a captcha is a real page.
 const BOT_PAGE_MAX_BYTES: usize = 100 * 1024;
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \
@@ -235,9 +234,7 @@ async fn send(policy: &FetchPolicy, url: &Url) -> DomainResult<reqwest::Response
     if let Some(d) = &domain {
         builder = builder.resolve_to_addrs(d, &addrs);
     }
-    let client = builder
-        .build()
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let client = builder.build().map_err(DomainError::internal)?;
     client
         .get(url.clone())
         .send()

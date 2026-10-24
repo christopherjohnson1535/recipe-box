@@ -7,5 +7,3 @@
 pub mod ai;
 pub mod photo;
 pub mod safe_fetch;
-
-pub use domain::source::normalize_url;

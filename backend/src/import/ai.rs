@@ -62,7 +62,8 @@ impl RecipeExtractor for Ai {
     }
 }
 
-/// Any [`RecipeExtractor`], answering with the API's types.
+/// Any [`RecipeExtractor`], answering with the API's types. A seam for the integration tests only (they call
+/// `recipe_from_text` on the provider); production code uses [`RecipeExtractor`]. Do not build on it.
 pub trait AiProvider: Send + Sync {
     /// `images` are already-decoded JPEG bytes, in page order.
     fn recipe_from_images(

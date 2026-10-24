@@ -39,6 +39,19 @@ impl DomainError {
     pub fn validation(msg: impl Into<String>) -> Self {
         Self::Validation(msg.into())
     }
+
+    /// `Internal` carrying the whole chain of `e` and its sources ("outer: inner: root"), so the log keeps what
+    /// an `anyhow` error would have shown.
+    pub fn internal(e: impl std::error::Error) -> Self {
+        let mut message = e.to_string();
+        let mut source = e.source();
+        while let Some(s) = source {
+            message.push_str(": ");
+            message.push_str(&s.to_string());
+            source = s.source();
+        }
+        Self::Internal(message)
+    }
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;
