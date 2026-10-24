@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type RecipeDraft } from "@/lib/api";
 import { ImportScreen, type ImportApi } from "./ImportScreen";
@@ -132,7 +132,7 @@ describe("ImportScreen", () => {
     expect(await screen.findByText("Enter a full web address starting with https://")).toBeTruthy();
     const source = screen.getByLabelText(/Where it came from/);
     expect(source.getAttribute("aria-invalid")).toBe("true");
-    expect(document.activeElement).toBe(source);
+    await waitFor(() => expect(document.activeElement).toBe(source));
     expect(screen.getByLabelText("Recipe text").getAttribute("aria-invalid")).toBeNull();
   });
 
@@ -185,9 +185,18 @@ describe("ImportScreen", () => {
 
     it("422 no_recipe_found says so, without offering to paste again", async () => {
       await submit(fail(422, "no_recipe_found"));
-      expect(await screen.findByText("No recipe found on that page")).toBeTruthy();
+      expect(await screen.findByText("No recipe found in that text")).toBeTruthy();
+      expect(screen.getByText(/ingredients and some steps/)).toBeTruthy();
+      expect(screen.queryByText(/that page/)).toBeNull();
       expect(screen.queryByRole("button", { name: "Paste the recipe text instead" })).toBeNull();
       expect(screen.getByRole("link", { name: "Type it in" })).toBeTruthy();
+      keptText();
+    });
+
+    it("413 too_large says the text is too big and keeps it", async () => {
+      await submit(fail(413, "too_large"));
+      expect(await screen.findByText("That text is too big")).toBeTruthy();
+      expect(screen.getByText(/Text over 1 MB can’t be imported/)).toBeTruthy();
       keptText();
     });
 
@@ -295,7 +304,9 @@ describe("ImportScreen", () => {
     expect((await screen.findByRole("status")).textContent).toMatch(/Fetching the page/);
     fireEvent.click(screen.getByRole("button", { name: "Stop waiting and edit" }));
     resolve(draft());
-    await Promise.resolve();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     expect(screen.queryByRole("heading", { name: "Check the recipe" })).toBeNull();
     expect(screen.getByLabelText("Recipe link")).toBeTruthy();
   });
