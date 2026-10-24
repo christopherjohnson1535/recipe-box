@@ -2,5 +2,5 @@
 *                       @christopherjohnson1535
 /.github/               @christopherjohnson1535
 /backend/crates/adapters/postgres/migrations/ @christopherjohnson1535
-/backend/src/import/safe_fetch.rs @christopherjohnson1535
+/backend/crates/adapters/http-fetch/ @christopherjohnson1535
 /SECURITY.md            @christopherjohnson1535

@@ -31,7 +31,7 @@ Self-hosters should update by pulling `main` or the newest release and rebuildin
 In scope, because they protect the household's data:
 - **Authentication and sessions**: login, setup, the `rb_session` cookie, session expiry, admin-only routes,
   anything reachable without a session that should not be.
-- **Link import and `safe_fetch`** (`backend/src/import/safe_fetch.rs`): server-side request forgery, reaching
+- **Link import and `safe_fetch`** (`backend/crates/adapters/http-fetch/src/safe_fetch.rs`): server-side request forgery, reaching
   private or loopback addresses, redirect handling, size and time limits.
 - **Image uploads**: decoding and re-encoding, oversized or malformed files, path handling in the media store.
 - **Household data**: one household member reading, changing or deleting data they should not, and leaking
