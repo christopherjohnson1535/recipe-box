@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Children, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { Children, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from "react";
 import { pinEdition, unpinEdition } from "@/lib/edition";
 import { cx } from "./cx";
 
@@ -92,8 +92,12 @@ export function CookProgress({ count, current, done }: { count: number; current:
 }
 
 /** The row under the progress bar: view switch on the left, wake-lock status and "Clear ticks" on the right, a note beneath. */
-export function CookToolbar({ children }: { children: ReactNode }) {
-  return <div className="mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">{children}</div>;
+export function CookToolbar({ children, ref }: { children: ReactNode; ref?: Ref<HTMLDivElement> }) {
+  return (
+    <div ref={ref} role="group" aria-label="Cook mode controls" tabIndex={-1} className="mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 outline-none">
+      {children}
+    </div>
+  );
 }
 
 /** "One step / All steps": two pressed-state buttons in a pill, 44px each. */
@@ -123,9 +127,9 @@ export function CookViewToggle({ all, onChange }: { all: boolean; onChange: (all
  * Screen wake-lock status. While the lock is held it is a plain note; otherwise a 44px button that opens a short
  * explanation (`note`), shown on its own line under the toolbar.
  */
-export function CookWakeStatus({ on, note }: { on: boolean; note: ReactNode }) {
-  const [open, setOpen] = useState(false);
+export function CookWakeStatus({ on, checking, open, onToggle }: { on: boolean; checking?: boolean; open: boolean; onToggle: () => void }) {
   const dot = <span aria-hidden="true" className={cx("size-3 shrink-0 rounded-full border", on ? "border-accent bg-accent" : "border-ink-muted")} />;
+  if (checking) return null; // nothing to say until the first request answers
   if (on) {
     return (
       <p className="label inline-flex min-h-control items-center gap-2 text-ink-muted">
@@ -134,22 +138,24 @@ export function CookWakeStatus({ on, note }: { on: boolean; note: ReactNode }) {
     );
   }
   return (
-    <>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls="cook-wake-note"
-        onClick={() => setOpen((o) => !o)}
-        className="label inline-flex min-h-control items-center gap-2 rounded-control px-2 whitespace-nowrap text-ink-muted hover:text-ink"
-      >
-        {dot}Screen may sleep
-      </button>
-      {open && (
-        <p id="cook-wake-note" className="order-last w-full text-small text-ink-muted italic">
-          {note}
-        </p>
-      )}
-    </>
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={open ? "cook-wake-note" : undefined}
+      onClick={onToggle}
+      className="label inline-flex min-h-control items-center gap-2 rounded-control px-2 whitespace-nowrap text-ink-muted hover:text-ink"
+    >
+      {dot}Screen may sleep
+    </button>
+  );
+}
+
+/** The wake-lock explanation, a direct child of the toolbar so it spans the whole row. */
+export function CookWakeNote({ children }: { children: ReactNode }) {
+  return (
+    <p id="cook-wake-note" className="order-last w-full text-small text-ink-muted italic">
+      {children}
+    </p>
   );
 }
 
@@ -240,7 +246,9 @@ export function CookRailRow({ quantity, name, lit, ticked, onToggle }: { quantit
             <span className="strike">{quantity}</span>
           </span>
         )}
-        <span className="strike">{name}</span>
+        <span className="min-w-0 [overflow-wrap:anywhere]">
+          <span className="strike">{name}</span>
+        </span>
         {lit && <span className="sr-only"> (used in this step)</span>}
       </button>
     </li>

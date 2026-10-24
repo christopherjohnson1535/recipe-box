@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } 
 import {
   CookColumns, CookFooter, CookLive, CookMention, CookPill, CookPillLink, CookProgress, CookRail, CookRailRow, CookStage,
   CookStepItem, CookStepList, CookStepText, CookTextButton, CookTick, CookTimer, CookTimerButton, CookTimers, CookToolbar,
-  CookTopBar, CookViewToggle, CookVoiceToggle, CookWakeStatus,
+  CookTopBar, CookViewToggle, CookVoiceToggle, CookWakeNote, CookWakeStatus,
 } from "@/components/ui/CookKit";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ButtonLink } from "@/components/ui/Button";
@@ -65,6 +65,8 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
   const all = view === "all";
   const { ticks, toggleIngredient, toggleStep, clear } = useCookTicks(id, ingredients.length, count);
   const wake = useWakeLock();
+  const [wakeNoteOpen, setWakeNoteOpen] = useState(false);
+  const toolbar = useRef<HTMLDivElement>(null);
   // The same words twice in a row get a trailing no-break space, so it is a new change and a screen reader says them again.
   const announce = useCallback((text: string) => setLive((l) => ({ text: l.text === text ? `${text}\u00a0` : text })), []);
   const go = useCallback(
@@ -169,8 +171,8 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
   }
 
   const renderStep = (at: number): ReactNode => {
-  const parts = cookParts(steps[at], ingredients);
-  return parts.map((part, i) => {
+    const parts = cookParts(steps[at], ingredients);
+    return parts.map((part, i) => {
       if (part.kind === "ingredient") return <CookMention key={i}>{part.text}</CookMention>;
       if (part.kind === "timer") {
         const d = stepDurations(part.text)[0];
@@ -212,19 +214,28 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
         {voice.supported && <CookVoiceToggle listening={voice.listening} onClick={voice.toggle} />}
       </CookTopBar>
       <CookProgress count={count} current={index} done={ticks.steps} />
-      <CookToolbar>
+      <CookToolbar ref={toolbar}>
         <CookViewToggle all={all} onChange={(on) => setView(on ? "all" : "one")} />
         <div className="flex flex-wrap items-center gap-x-2">
-          {(ticks.ingredients.size > 0 || ticks.steps.size > 0) && <CookTextButton onClick={clear}>Clear ticks</CookTextButton>}
-          <CookWakeStatus
-            on={wake === "on"}
-            note={
-              wake === "unsupported"
-                ? "This browser cannot keep the screen awake. On an iPad, use the Home Screen app (iPadOS 18.4 or later), or set Auto-Lock to Never in Settings while you cook."
-                : "The screen could not be kept awake just now. On an iPad, use the Home Screen app (iPadOS 18.4 or later), or set Auto-Lock to Never in Settings while you cook."
-            }
-          />
+          {(ticks.ingredients.size > 0 || ticks.steps.size > 0) && (
+            <CookTextButton
+              onClick={() => {
+                clear();
+                toolbar.current?.focus(); // the button goes away; keep focus inside the stage
+              }}
+            >
+              Clear ticks
+            </CookTextButton>
+          )}
+          <CookWakeStatus on={wake === "on"} checking={wake === "checking"} open={wakeNoteOpen} onToggle={() => setWakeNoteOpen((o) => !o)} />
         </div>
+        {wakeNoteOpen && wake !== "on" && wake !== "checking" && (
+          <CookWakeNote>
+            {wake === "unsupported"
+              ? "Keeping the screen awake needs a secure (https) connection, and on an iPad the Home Screen app on iPadOS 18.4 or later. Otherwise, set Auto-Lock to Never in Settings while you cook."
+              : "The screen could not be kept awake just now. On an iPad, use the Home Screen app (iPadOS 18.4 or later), or set Auto-Lock to Never in Settings while you cook."}
+          </CookWakeNote>
+        )}
       </CookToolbar>
       <CookColumns
         rail={
@@ -255,8 +266,8 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
                       pressed={ticks.steps.has(i)}
                       aria-label={`Step ${i + 1} done`}
                       onClick={() => {
-                        // Ticking a step makes the next one current.
-                        if (!ticks.steps.has(i)) setIndex(clampStep(i + 1, count));
+                        // Ticking the current step makes the next one current; any other step leaves the list where it is.
+                        if (i === index && !ticks.steps.has(i)) setIndex(clampStep(i + 1, count));
                         toggleStep(i);
                       }}
                     >

@@ -251,7 +251,10 @@ describe("CookMode tick-off and views", () => {
   it("server and hydrating render show nothing ticked, stored state follows after mount", () => {
     localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [0], steps: [0] }));
     const html = renderToString(<CookMode id="r1" title="T" ingredients={INGREDIENTS} steps={STEPS} />);
-    expect(html).not.toMatch(/aria-pressed="true" class="group/);
+    expect(html).toContain("onion"); // the real markup rendered, with its ingredient buttons
+    expect(html.match(/<button[^>]*aria-pressed="false"/g)?.length).toBeGreaterThanOrEqual(INGREDIENTS.length);
+    // Only the "One step" view toggle is pressed: no ingredient or step button.
+    expect(html.match(/<button[^>]*aria-pressed="true"[^>]*>([^<]*)/g)?.map((m) => m.replace(/<[^>]*>/, ""))).toEqual(["One step"]);
     view();
     expect(pressed(ing(/onion/))).toBe("true");
     expect(pressed(screen.getByRole("button", { name: "Step 1 done" }))).toBe("true");
@@ -305,9 +308,28 @@ describe("CookMode tick-off and views", () => {
 
   it("still works when storage throws", () => {
     vi.stubGlobal("localStorage", { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } });
-    view();
+    render(<CookMode id="r-blocked" title="T" ingredients={INGREDIENTS} steps={STEPS} />); // its own id: the store remembers a failed key
     fireEvent.click(ing(/wine/));
     expect(pressed(ing(/wine/))).toBe("true");
+  });
+
+  it("keeps focus in the stage when Clear ticks goes away", () => {
+    view();
+    fireEvent.click(screen.getByRole("button", { name: "Step 1 done" }));
+    const clear = screen.getByRole("button", { name: "Clear ticks" });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(screen.queryByRole("button", { name: "Clear ticks" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("group", { name: "Cook mode controls" }));
+  });
+
+  it("in the all-steps list, ticking a step that is not current leaves the current step alone", () => {
+    view();
+    fireEvent.click(screen.getByRole("button", { name: "All steps" }));
+    fireEvent.click(screen.getByRole("button", { name: "Step 3 done" }));
+    const current = screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current") === "step");
+    expect(current).toHaveLength(1);
+    expect(current[0].textContent).toContain("Cook the onion");
   });
 
   it("says the screen may sleep when there is no wake lock, and explains on tap", () => {
@@ -315,6 +337,7 @@ describe("CookMode tick-off and views", () => {
     const b = screen.getByRole("button", { name: /Screen may sleep/ });
     expect(b.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(b);
+    expect(screen.getByText(/secure \(https\) connection/)).toBeTruthy();
     expect(screen.getByText(/Auto-Lock to Never/)).toBeTruthy();
   });
 });
