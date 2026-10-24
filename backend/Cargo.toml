@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [workspace]
-members = [".", "crates/domain"]
-default-members = [".", "crates/domain"]
+members = [".", "crates/domain", "crates/ports", "crates/adapters/memory"]
+default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory"]
 
 [workspace.dependencies]
 chrono = "0.4"

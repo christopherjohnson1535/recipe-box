@@ -1,4 +1,6 @@
-# Test fixtures hold made-up keys and passwords on purpose; scanning them only produces noise.
+# Test fixtures (incl. the storage contract suite) hold made-up keys and passwords on purpose; scanning them only
+# produces noise.
 paths-ignore:
   - backend/tests
+  - backend/crates/ports/src/contract
   - e2e

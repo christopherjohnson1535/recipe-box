@@ -55,7 +55,7 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
 - Backend: axum, axum-extra (cookies), tokio, tower-http (trace, limit, cors not needed), sqlx (postgres, uuid,
   chrono, json, migrate, runtime-tokio, tls-rustls), serde, serde_json, uuid, chrono, argon2, rand, thiserror,
   anyhow, tracing, tracing-subscriber, reqwest (rustls, stream), scraper, url, image, base64, sha2 (session token
-  hashing). Dev: tokio test, tower (ServiceExt), http-body-util.
+  hashing), async-trait (async methods in the dyn-compatible port traits, so services can hold `Arc<dyn Port>`). Dev: tokio test, tower (ServiceExt), http-body-util.
 - Frontend: next, react, react-dom, tailwindcss, @fontsource-variable/*, vitest, @testing-library/react, jsdom,
   eslint-config-next, serwist (PWA, when KIT-4/5 land).
 Anything else needs a one-line reason in the agent's report.

@@ -21,6 +21,20 @@ fn clean(s: &str) -> String {
     s.replace('\0', "").trim().to_string()
 }
 
+/// Whether `name` is a file name the media store accepts: `^[0-9a-f-]{36}(\.display)?\.jpg$` (a lower-case
+/// uuid-shaped stem, `.jpg`, or `.display.jpg` for the rendition). It also keeps names inside the media folder.
+pub fn media_file_name(name: &str) -> bool {
+    let stem = name
+        .strip_suffix(".jpg")
+        .map(|s| s.strip_suffix(".display").unwrap_or(s));
+    stem.is_some_and(|stem| {
+        stem.len() == 36
+            && stem
+                .bytes()
+                .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'-'))
+    })
+}
+
 /// Trims and lower-cases; 3–40 chars of `[a-z0-9_.-]`.
 pub fn username(raw: &str) -> DomainResult<String> {
     let u = raw.trim().to_lowercase();
@@ -165,6 +179,19 @@ pub fn recipe(input: RecipeInput) -> DomainResult<RecipeInput> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn media_names_follow_the_stored_pattern() {
+        let id = "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f";
+        assert!(media_file_name(&format!("{id}.jpg")));
+        assert!(media_file_name(&format!("{id}.display.jpg")));
+        for bad in [".", "", ".jpg", "a b", "a\0", "a.jpg", "../x.jpg"] {
+            assert!(!media_file_name(bad), "{bad:?}");
+        }
+        assert!(!media_file_name(&format!("{}.jpg", id.to_uppercase())));
+        assert!(!media_file_name(&format!("{id}.png")));
+        assert!(!media_file_name(&format!("{id}.display.display.jpg")));
+    }
 
     #[test]
     fn username_rules() {

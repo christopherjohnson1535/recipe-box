@@ -4,6 +4,12 @@ pub mod error;
 pub mod model;
 pub mod validate;
 
+// The value types other crates share. Ports and adapters name them through here, so `domain` is the one place
+// that decides their versions and they need no dependency of their own.
+pub use chrono;
+pub use url;
+pub use uuid;
+
 use chrono::Duration;
 
 pub use error::{DomainError, DomainResult};

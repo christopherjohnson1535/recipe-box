@@ -158,8 +158,20 @@ impl IntoResponse for AppError {
 
 impl From<domain::DomainError> for AppError {
     fn from(e: domain::DomainError) -> Self {
+        use domain::DomainError as D;
         match e {
-            domain::DomainError::Validation(m) => Self::Validation(m),
+            D::Validation(m) => Self::Validation(m),
+            D::NotFound(m) => Self::NotFound(m),
+            D::Conflict(m) => Self::Conflict(m),
+            D::Forbidden(m) => Self::Forbidden(m),
+            D::Unauthenticated(m) => Self::Unauthenticated(m),
+            D::AiDisabled => Self::AiDisabled,
+            D::Ai(m) => Self::AiError(m),
+            D::NoRecipeFound(m) => Self::NoRecipeFound(m),
+            D::BlockedAddress => Self::BlockedAddress,
+            D::SiteBlocked(m) => Self::SiteBlocked(m),
+            D::FetchFailed(m) => Self::FetchFailed(m),
+            D::Internal(m) => Self::Internal(anyhow::anyhow!(m)),
         }
     }
 }
@@ -239,5 +251,39 @@ mod tests {
         let e = AppError::from(domain::DomainError::validation("title: required"));
         assert!(matches!(&e, AppError::Validation(m) if m == "title: required"));
         assert_eq!(e.into_response().status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn domain_unauthenticated_keeps_its_message() {
+        let e = AppError::from(domain::DomainError::Unauthenticated("Please sign in."));
+        assert_eq!(e.to_string(), "Please sign in.");
+    }
+
+    #[test]
+    fn every_domain_error_keeps_its_status_and_code() {
+        use domain::DomainError as D;
+        let m = || "m".to_string();
+        for (e, status, code) in [
+            (D::Validation(m()), 400, "validation"),
+            (D::NotFound(m()), 404, "not_found"),
+            (D::Conflict(m()), 409, "conflict"),
+            (D::Forbidden(m()), 403, "forbidden"),
+            (
+                D::Unauthenticated("Wrong username or password."),
+                401,
+                "unauthenticated",
+            ),
+            (D::AiDisabled, 422, "ai_disabled"),
+            (D::Ai(m()), 502, "ai_error"),
+            (D::NoRecipeFound(m()), 422, "no_recipe_found"),
+            (D::BlockedAddress, 422, "blocked_address"),
+            (D::SiteBlocked(m()), 502, "site_blocked"),
+            (D::FetchFailed(m()), 502, "fetch_failed"),
+            (D::Internal(m()), 500, "internal"),
+        ] {
+            let (s, c) = AppError::from(e).status_and_code();
+            let c = serde_json::to_value(c).unwrap();
+            assert_eq!((s.as_u16(), c.as_str().unwrap()), (status, code));
+        }
     }
 }

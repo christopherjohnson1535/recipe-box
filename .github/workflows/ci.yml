@@ -54,12 +54,17 @@ jobs:
           workspaces: backend
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
-      - name: Domain crate has no infrastructure dependencies
+      - name: Domain and ports crates have no infrastructure dependencies
         run: |
-          if cargo tree -p recipe-box-domain -e normal --prefix none | grep -E '^(axum|sqlx|reqwest|tokio|utoipa|hyper)( |$)'; then
-            echo "::error::domain crate depends on infrastructure"
-            exit 1
-          fi
+          set -euo pipefail
+          for crate in recipe-box-domain recipe-box-ports; do
+            # A failing `cargo tree` (typo'd crate name) must fail the step, not pass the guard.
+            cargo tree -p "$crate" -e normal --prefix none > "$RUNNER_TEMP/tree.txt"
+            if grep -E '^(axum|sqlx|reqwest|tokio|utoipa|hyper)( |$)' "$RUNNER_TEMP/tree.txt"; then
+              echo "::error::$crate depends on infrastructure"
+              exit 1
+            fi
+          done
       - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
         with:
           tool: cargo-nextest
