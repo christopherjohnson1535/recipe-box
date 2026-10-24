@@ -29,3 +29,6 @@ Thumbs.db
 __pycache__/
 backend/coverage/
 backend/coverage-summary.json
+
+# factory run notes (reviews, FIXES ledger, smoke tables) live in the session scratch folder
+docs/review/

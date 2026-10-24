@@ -21,11 +21,11 @@ Start Postgres, the API (`backend/target/release/recipe-box-api` or `cargo run`)
 (standalone: copy `public` and `.next/static` into `.next/standalone`, then `node server.js` with
 `API_INTERNAL_URL`), or `docker compose up -d --build` where Docker is available.
 Seed: `POST /api/setup`, then a handful of recipes with photos, tags, sections and long text.
-Exercise through the web port with curl and record a table (request · status · note) in `docs/review/FINAL*.md`:
+Exercise through the web port with curl and record a table (request · status · note) in `<SCRATCH_DIR>/FINAL.md`:
 health; setup once then 403; login/logout; recipe CRUD, delete + restore, restore after the window → 409; tags;
 media upload + auth on `/media`; each import endpoint (success, `site_blocked`, `blocked_address`,
 `ai_disabled`); admin routes as a member → 403; unknown pages 404; signed-out pages redirect to `/login`.
-`docs/review/SCAFFOLD.md` is an example.
+The table goes in the PR description; the file is not committed.
 
 ## 3. Screenshots — and look at them
 `python3 scripts/factory/shoot.py <base-url> <out-dir> <recipe-id>` signs in (`SHOOT_USER`/`SHOOT_PASSWORD`) and

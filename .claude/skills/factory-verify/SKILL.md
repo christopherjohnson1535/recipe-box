@@ -27,7 +27,8 @@ Only R5 builds. Every finding: ID, Must/Should/Nice, file:line, failing case, sm
 - **Wave B (after A):** UI fixes (R4/V*) owning `frontend/src/app/**`, `frontend/src/components/**`; shared-code
   dedupe with the hard rule "API response shapes and status codes unchanged". Name one builder per tree.
 - Route cross-owner items: if a fixer is still running, `SendMessage` it the extra item; otherwise queue it.
-- Ledger: every finding ends as one line in `docs/review/FIXES.md` (fixed — how / skipped — why).
+- Ledger: every finding ends as one line in `<SCRATCH_DIR>/FIXES.md` (fixed — how / skipped — why). Not committed;
+  the Must/Should lines go in the PR description.
 
 ## Gate
 All Musts fixed; Shoulds fixed or skipped with a reason the owner would accept; full checks pass. Then

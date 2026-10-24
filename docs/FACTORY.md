@@ -19,7 +19,7 @@ How this project is built, end to end, by an orchestrator and a team of agents. 
 | 1 Requirements | `factory-requirements` | `docs/REQUIREMENTS.md` |
 | 2 Plan | `factory-plan` | `docs/SPEC.md`, `docs/API.md`, agent preambles (`docs/agents/`) |
 | 3 Build | `factory-build` | code + tests, one commit set per agent |
-| 4 Verify | `factory-verify` | run notes and `FIXES.md` (working files, not committed) |
+| 4 Verify | `factory-verify` | reviewer notes and the `FIXES.md` ledger in the run folder |
 | 5 Test | `factory-test` | `FINAL*.md` in the run folder, screenshots |
 | 6 Design QA | `factory-design-qa` | `design-audit.md` in the run folder, before/after screenshots |
 | 7 Ship | `factory-ship` | PR / push to GitHub, owner's copy updated, owner report |
@@ -33,12 +33,13 @@ How this project is built, end to end, by an orchestrator and a team of agents. 
 ## Where run notes go
 Reviewer findings, the `FIXES.md` ledger, smoke tables and design audits are working notes, not documentation.
 They are not committed: keep them out of the repo and paste the key findings into the PR description instead.
-Keep `docs/` for current documentation only. <!-- the factory skills in .claude/skills/ still say docs/review/; update them to match -->
+The run folder is `<SCRATCH_DIR>` in the skills and templates: the session's scratchpad, outside the repo.
+Keep `docs/` for current documentation only; `docs/review/` is gitignored so stray notes can't be committed.
 
 ## Principles
 - The orchestrator plans, briefs, routes and checks; agents write code.
 - File ownership is how agents work in parallel without collisions; one named builder per round.
-- Reviewers and fixers are different agents; every finding ends in the FIXES.md ledger.
+- Reviewers and fixers are different agents; every finding ends in the FIXES.md ledger and, if Must/Should, in the PR description.
 - Look at the rendered app before calling anything done.
 
 ## Example run (how the scaffold was built)
