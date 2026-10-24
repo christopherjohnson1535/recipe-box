@@ -77,9 +77,34 @@ export function subscribeEdition(onChange: () => void): () => void {
   };
 }
 
+/** Set by `pinEdition` on <html>; a page can show one edition whatever the clock or the person chose. */
+export const PIN_ATTRIBUTE = "data-edition-pin";
+
+/** Runs at the top of a page that pins the evening edition, so even a hard load never paints day first. */
+export const PIN_EVENING_SCRIPT = `(function(){var r=document.documentElement;r.setAttribute("${PIN_ATTRIBUTE}","evening");r.dataset.theme="evening"})()`;
+
+function pinnedEdition(doc: Document): Edition | null {
+  const v = doc.documentElement.getAttribute(PIN_ATTRIBUTE);
+  return v === "day" || v === "evening" ? v : null;
+}
+
+/** Shows `edition` (data-theme and theme-color metas) until `unpinEdition`, however the clock or the preference changes. */
+export function pinEdition(doc: Document, edition: Edition): void {
+  doc.documentElement.setAttribute(PIN_ATTRIBUTE, edition);
+  applyEdition(doc, new Date(), false);
+}
+
+/** Drops the pin and recomputes the person's edition now, rather than restoring a value saved earlier. */
+export function unpinEdition(doc: Document, now: Date, deviceDark: boolean): Edition {
+  doc.documentElement.removeAttribute(PIN_ATTRIBUTE);
+  return applyEdition(doc, now, deviceDark);
+}
+
 /** Sets data-theme (or removes it for `device`) and the theme-color metas. Returns the edition now showing. */
 export function applyEdition(doc: Document, now: Date, deviceDark: boolean): Edition {
-  const pref = getEditionPreference();
+  // A page can pin an edition (cook mode is always evening): every re-apply path comes through here, so the pin holds.
+  const pinned = pinnedEdition(doc);
+  const pref = pinned ?? getEditionPreference();
   const edition = resolveEdition(pref, now, deviceDark);
   if (pref === "device") delete doc.documentElement.dataset.theme;
   else doc.documentElement.dataset.theme = edition;
