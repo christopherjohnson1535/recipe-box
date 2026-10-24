@@ -229,7 +229,7 @@ impl TestApp {
             .connect_with(opts)
             .await
             .unwrap();
-        recipe_box_api::migrate(&pool).await.unwrap();
+        adapter_postgres::migrate(&pool).await.unwrap();
         std::fs::create_dir_all(&media_dir).unwrap();
 
         let config = Config {
@@ -268,6 +268,10 @@ impl TestApp {
     // ---- requests ------------------------------------------------------------------------------------------
 
     pub async fn send(&self, req: Request<Body>) -> Res {
+        // Why the clock moves at all: the test clock is frozen and repositories stamp `created_at` from it, so
+        // consecutive saves would share one timestamp and "newest first" would fall back to the random ids. (The
+        // database's `now()` used to give each row its own stamp.) Production uses the system clock, where ties
+        // are only possible within one microsecond and are broken by id as before.
         // The repositories stamp `created_at` from the fixed clock (the database's `now()` used to). Recipes saved
         // one after another would tie, and "newest first" would fall back to random ids; so the clock moves one
         // microsecond before every save after the first. A lone save still happens at exactly the clock's time, and

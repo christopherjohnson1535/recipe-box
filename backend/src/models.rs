@@ -204,6 +204,11 @@ impl From<domain::User> for User {
     }
 }
 
+/// The plate-treatment rendition's URL, hidden when the household setting is off.
+fn display_url(file: Option<&str>, plate_treatment: bool) -> Option<String> {
+    file.filter(|_| plate_treatment).map(media_url)
+}
+
 impl Recipe {
     /// The API shape of a stored recipe. `plate_treatment` is the household setting: when off, the rendition is
     /// hidden (the repository returns it whenever one exists).
@@ -232,11 +237,7 @@ impl Recipe {
             photo_image_ids: r.photo_image_ids,
             tags: r.tags,
             image_url: r.image_file.as_deref().map(media_url),
-            image_display_url: r
-                .image_display_file
-                .as_deref()
-                .filter(|_| plate_treatment)
-                .map(media_url),
+            image_display_url: display_url(r.image_display_file.as_deref(), plate_treatment),
             photo_urls: r.photo_files.iter().map(|f| media_url(f)).collect(),
             created_by: user_ref(r.created_by),
             updated_by: user_ref(r.updated_by),
@@ -256,11 +257,7 @@ impl RecipeSummary {
             total_minutes: r.total_minutes,
             tags: r.tags,
             image_url: r.image_file.as_deref().map(media_url),
-            image_display_url: r
-                .image_display_file
-                .as_deref()
-                .filter(|_| plate_treatment)
-                .map(media_url),
+            image_display_url: display_url(r.image_display_file.as_deref(), plate_treatment),
             source_type: r.source_type.into(),
             updated_at: r.updated_at,
         }

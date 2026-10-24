@@ -12,8 +12,6 @@ pub mod state;
 
 use std::time::Duration;
 
-use sqlx::PgPool;
-
 use state::AppState;
 
 pub use domain::{PURGE_AFTER, validate};
@@ -22,11 +20,6 @@ pub use routes::router;
 /// The single line printed when startup fails: `recipe-box-api: <message>`.
 pub fn startup_error_line(e: &anyhow::Error) -> String {
     format!("recipe-box-api: {e}")
-}
-
-/// Runs the embedded migrations (owned by the Postgres adapter crate).
-pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
-    adapter_postgres::migrate(pool).await
 }
 
 /// Hard-deletes recipes soft-deleted more than a day ago and expired sessions.

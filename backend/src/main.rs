@@ -29,7 +29,7 @@ async fn run() -> anyhow::Result<()> {
         .connect(&config.database_url)
         .await
         .map_err(|e| anyhow::anyhow!("can't reach the database: {}", db_reason(&e)))?;
-    recipe_box_api::migrate(&pool).await?;
+    adapter_postgres::migrate(&pool).await?;
 
     let bind_addr = config.bind_addr.clone();
     let allow_host = std::env::var("IMPORT_ALLOW_HOST").unwrap_or_default();

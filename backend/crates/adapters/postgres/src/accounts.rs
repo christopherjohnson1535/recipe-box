@@ -65,7 +65,6 @@ impl PgUserRepo {
 
 #[async_trait]
 impl UserRepo for PgUserRepo {
-    // From routes/setup.rs `status`.
     async fn any(&self) -> DomainResult<bool> {
         sqlx::query_scalar("select exists (select 1 from users)")
             .fetch_one(&self.pool)
@@ -73,7 +72,6 @@ impl UserRepo for PgUserRepo {
             .map_err(db)
     }
 
-    // From routes/users.rs `create`.
     async fn create(&self, new: NewUser) -> DomainResult<User> {
         let sql = format!(
             "insert into users (username, display_name, password_hash, role, created_at)
@@ -94,7 +92,7 @@ impl UserRepo for PgUserRepo {
         Ok(row.into())
     }
 
-    // From routes/setup.rs `create_admin`: the table lock serialises concurrent setups.
+    // The table lock serialises concurrent setups.
     async fn create_first_admin(&self, new: NewUser) -> DomainResult<User> {
         let mut tx = self.pool.begin().await.map_err(db)?;
         sqlx::query("lock table users in share row exclusive mode")
@@ -124,7 +122,6 @@ impl UserRepo for PgUserRepo {
         Ok(row.into())
     }
 
-    // From routes/users.rs `list`.
     async fn list(&self) -> DomainResult<Vec<User>> {
         let sql =
             format!("select {USER_COLUMNS} from users order by lower(display_name), username");
@@ -135,7 +132,7 @@ impl UserRepo for PgUserRepo {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    // From routes/auth.rs `login`. The caller trims the username, as the route did.
+    // The caller trims the username, as the route did.
     async fn find_with_hash(&self, username: &str) -> DomainResult<Option<(User, String)>> {
         let sql =
             format!("select {USER_COLUMNS}, password_hash from users where username = $1::citext");
@@ -155,7 +152,7 @@ impl UserRepo for PgUserRepo {
             .map_err(db)
     }
 
-    // From routes/users.rs `set_password` + auth/session.rs `end_for_user`. The row lock makes the compare and the
+    // The row lock makes the compare and the
     // write one step, so of two changes made against the same hash exactly one wins.
     async fn set_password_hash(
         &self,
@@ -196,7 +193,7 @@ impl UserRepo for PgUserRepo {
         tx.commit().await.map_err(db)
     }
 
-    // From routes/users.rs `remove`: locks every admin row plus the target, so concurrent removals can't both
+    // Locks every admin row plus the target, so concurrent removals can't both
     // pass the last-admin check.
     async fn remove(&self, id: Uuid) -> DomainResult<()> {
         let mut tx = self.pool.begin().await.map_err(db)?;
@@ -238,7 +235,6 @@ impl PgSessionRepo {
 
 #[async_trait]
 impl SessionRepo for PgSessionRepo {
-    // From auth/session.rs `start`.
     async fn create(
         &self,
         user_id: Uuid,
@@ -264,7 +260,6 @@ impl SessionRepo for PgSessionRepo {
         Ok(())
     }
 
-    // From auth/extract.rs `CurrentUser`.
     async fn user_for_token(&self, token_hash: &[u8]) -> DomainResult<Option<User>> {
         let sql = format!(
             "select {USER_COLUMNS} from users
@@ -279,7 +274,6 @@ impl SessionRepo for PgSessionRepo {
         Ok(row.map(Into::into))
     }
 
-    // From auth/session.rs `end`.
     async fn delete(&self, token_hash: &[u8]) -> DomainResult<()> {
         sqlx::query("delete from sessions where token_hash = $1")
             .bind(token_hash)
@@ -313,7 +307,6 @@ impl PgSettingsRepo {
 
 #[async_trait]
 impl SettingsRepo for PgSettingsRepo {
-    // From routes/settings.rs.
     async fn get(&self) -> DomainResult<Settings> {
         let plate_treatment = sqlx::query_scalar("select plate_treatment from household_settings")
             .fetch_one(&self.pool)
@@ -353,7 +346,6 @@ struct TagRow {
 
 #[async_trait]
 impl TagRepo for PgTagRepo {
-    // From routes/tags.rs.
     async fn list_in_use(&self) -> DomainResult<Vec<TagCount>> {
         let rows = sqlx::query_as::<_, TagRow>(
             "select t.name::text as name, count(*) as count
@@ -388,7 +380,6 @@ impl PgStorageHealth {
 
 #[async_trait]
 impl StorageHealth for PgStorageHealth {
-    // From routes/health.rs.
     async fn ping(&self) -> DomainResult<()> {
         sqlx::query("select 1")
             .execute(&self.pool)

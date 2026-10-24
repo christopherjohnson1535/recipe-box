@@ -19,7 +19,6 @@ impl PgImageRepo {
 
 #[async_trait]
 impl ImageRepo for PgImageRepo {
-    // From routes/media.rs `store_image`.
     async fn add(&self, image: Image) -> DomainResult<()> {
         sqlx::query(
             "insert into images (id, file_name, display_file_name, width, height, bytes, created_by, created_at)
@@ -39,7 +38,6 @@ impl ImageRepo for PgImageRepo {
         Ok(())
     }
 
-    // From routes/media.rs `delete_images`.
     async fn delete(&self, ids: &[Uuid]) -> DomainResult<()> {
         sqlx::query("delete from images where id = any($1)")
             .bind(ids)
@@ -49,7 +47,7 @@ impl ImageRepo for PgImageRepo {
         Ok(())
     }
 
-    // From routes/media.rs `render_display`. A row that already points at exactly this file also answers `true`
+    // A row that already points at exactly this file also answers `true`
     // (a concurrent run chose the same name): the caller must not delete a file a row refers to.
     async fn set_display_file(&self, id: Uuid, file_name: &str) -> DomainResult<bool> {
         let updated = sqlx::query(
@@ -74,7 +72,6 @@ impl ImageRepo for PgImageRepo {
         .map_err(db)
     }
 
-    // From routes/media.rs `backfill_displays`.
     async fn without_display_file(&self) -> DomainResult<Vec<Uuid>> {
         sqlx::query_scalar("select id from images where display_file_name is null order by id")
             .fetch_all(&self.pool)

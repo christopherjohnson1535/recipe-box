@@ -138,9 +138,17 @@ pub async fn set_password(
         .then(|| jar.get(COOKIE_NAME).map(|c| session::hash_token(c.value())))
         .flatten();
     // The hash the caller verified against must still be the stored one; an admin reset checks nothing.
-    state
+    match state
         .users
         .set_password_hash(id, &hash, own.then_some(current.as_str()), keep.as_deref())
-        .await?;
+        .await
+    {
+        // Someone else changed this password after we verified against it: to the caller that is a wrong
+        // current password, as it was when the second request waited on the row lock.
+        Err(domain::DomainError::Conflict(_)) if own => {
+            return Err(AppError::Unauthenticated("Wrong username or password."));
+        }
+        r => r?,
+    }
     Ok(StatusCode::NO_CONTENT)
 }
