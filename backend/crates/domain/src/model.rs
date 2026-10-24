@@ -112,6 +112,7 @@ pub struct RecipeSummary {
 }
 
 /// What an import returns; never saved by the import itself.
+#[derive(Debug, Clone, Default)]
 pub struct RecipeDraft {
     pub title: String,
     pub description: String,
@@ -146,7 +147,7 @@ pub struct Image {
 }
 
 /// What a photo is a photo of.
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PhotoMode {
     /// A written or printed recipe.
     Recipe,

@@ -264,8 +264,7 @@ impl From<domain::RecipeSummary> for RecipeSummary {
 }
 
 // Conversions to and from the domain types. The DTOs carry `ToSchema` (the domain has no OpenAPI dependency), so
-// they stay separate types; the mapping lives here and nowhere else. `Ingredient`, `SourceType` and `RecipeDraft`
-// are also what the import code builds, until the import ports (#92) move that behind the domain types.
+// they stay separate types; the mapping lives here and nowhere else.
 
 impl From<Ingredient> for domain::Ingredient {
     fn from(i: Ingredient) -> Self {
@@ -303,6 +302,31 @@ impl From<domain::SourceType> for SourceType {
             domain::SourceType::Link => Self::Link,
             domain::SourceType::Photo => Self::Photo,
             domain::SourceType::Text => Self::Text,
+        }
+    }
+}
+
+impl From<domain::RecipeDraft> for RecipeDraft {
+    fn from(d: domain::RecipeDraft) -> Self {
+        Self {
+            title: d.title,
+            description: d.description,
+            ingredients: d.ingredients.into_iter().map(Into::into).collect(),
+            steps: d.steps.into_iter().map(Into::into).collect(),
+            servings: d.servings,
+            prep_minutes: d.prep_minutes,
+            cook_minutes: d.cook_minutes,
+            total_minutes: d.total_minutes,
+            notes: d.notes,
+            source_url: d.source_url,
+            source_name: d.source_name,
+            source_type: d.source_type.into(),
+            image_id: d.image_id,
+            photo_image_ids: d.photo_image_ids,
+            tags: d.tags,
+            image_url: d.image_url,
+            warnings: d.warnings,
+            duplicate_of: d.duplicate_of,
         }
     }
 }

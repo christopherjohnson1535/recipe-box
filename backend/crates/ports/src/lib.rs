@@ -5,9 +5,11 @@
 //! them. Each trait states its contract in rustdoc. The `contract` feature adds `contract`, the behavioural test
 //! suite every adapter must pass (docs/adr/0008).
 
+use std::{future::Future, pin::Pin, time::Duration};
+
 use async_trait::async_trait;
 use domain::{
-    DomainResult, PhotoMode, RecipeDraft,
+    AiProvider, DomainResult, PhotoMode, RecipeDraft,
     chrono::{DateTime, Utc},
     url::Url,
     uuid::Uuid,
@@ -60,6 +62,9 @@ pub trait MediaStore: Send + Sync {
 /// Turns photos or text into a recipe draft (the AI provider). Drafts are never saved by the port.
 #[async_trait]
 pub trait RecipeExtractor: Send + Sync {
+    /// Which provider is configured. Anything but [`AiProvider::None`] means AI features are on.
+    fn provider(&self) -> AiProvider;
+
     /// `images` are decoded JPEG bytes in page order. Fails with `AiDisabled` when no provider is configured,
     /// `NoRecipeFound` when the input holds no recipe and `Ai` when the provider fails.
     async fn extract_images(
@@ -88,6 +93,45 @@ pub trait PageFetcher: Send + Sync {
     /// `BlockedAddress`. A site that refuses bots (401/403/429/503, a bot-check page) is `SiteBlocked`, any other
     /// failure (timeout, bad status, body over `max_bytes`) is `FetchFailed`.
     async fn fetch(&self, url: &Url, max_bytes: usize) -> DomainResult<FetchedPage>;
+
+    /// The whole time budget for reading one page: fetching it and parsing it. [`PageFetcher::fetch`] keeps to it
+    /// on its own; the caller hands what is left to [`PageReader::read`].
+    fn budget(&self) -> Duration;
+}
+
+/// What [`PageReader::read`] found on a page.
+pub enum PageContent {
+    /// The page holds a recipe (JSON-LD or microdata), as a link-sourced draft with `source_url` and `image_url`.
+    Draft(Box<RecipeDraft>),
+    /// No recipe data; the readable text for the AI fallback.
+    Text {
+        text: String,
+        /// `og:image`, absolute http(s) only.
+        image_url: Option<String>,
+        site_name: Option<String>,
+    },
+    /// No recipe data, and the text was not asked for.
+    Nothing,
+}
+
+/// Reads a fetched page. Parsing is CPU-bound, so an implementation runs it off the async workers.
+#[async_trait]
+pub trait PageReader: Send + Sync {
+    /// The recipe the page's markup holds, if any; else, when `want_text`, the page's readable text (for the AI
+    /// fallback); else [`PageContent::Nothing`]. Takes at most `budget`, otherwise `FetchFailed("That page took
+    /// too long to read.")`.
+    async fn read(
+        &self,
+        page: FetchedPage,
+        want_text: bool,
+        budget: Duration,
+    ) -> DomainResult<PageContent>;
+}
+
+/// Runs work that must finish even when the request that started it is dropped (a client that disconnects).
+pub trait TaskSpawner: Send + Sync {
+    /// Starts `task` on the runtime and returns at once; nothing waits for it.
+    fn spawn(&self, task: Pin<Box<dyn Future<Output = ()> + Send + 'static>>);
 }
 
 /// An uploaded image after [`ImageCodec::encode`]: always a JPEG.
