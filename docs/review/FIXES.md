@@ -35,3 +35,34 @@ INT-10 — fixed: moot, compact chip labels removed (chips show the step's own w
 INT-11 — skipped: nice; grouping at ≥ 1,000 now done, the 0.4 → ⅜ rounding is the documented eighths behaviour
 INT-12 — fixed: a leading "(14 oz)" is skipped when naming an ingredient so "1 (14 oz) can tomatoes" links; "1 can (14 oz) tomatoes" already works
 INT-13 — fixed: the words are real text once, no duplicate label
+O41-01 fixed — the timer chip and the punctuation after it sit in one nowrap span; the leading punctuation moves out of the next text part
+O41-02 fixed — cook-logic `cookParts`: first word of a two-word name ("garlic") is lit and underlined in the step, with a test; mentions.ts untouched, same gap remains on the recipe page (follow-up)
+O41-03 fixed — portrait chips are one row of lit ingredients only, with "+N more" / "All ingredients (N)" to expand
+O41-04 fixed — checked with Playwright on a phone: scrollY 0, Close at top 16px, nothing scrolled on load; the earlier scroll was the click on an off-screen chip (cause was O41-03/06)
+O41-05 fixed — pills are nowrap, flex-1 on a phone, next-step preview hidden below 640px
+O41-06 fixed — stage is an h-dvh flex column: top bar, scrolling step, timers strip, footer; nothing sits under the footer
+O41-07 fixed — landscape columns scroll on their own above the footer
+O41-08 fixed — grid 26fr/44fr/26fr, step centred vertically (my-auto)
+O41-09 fixed — timer label "Step 2 · 12 min", hidden on a phone ring
+O41-10 fixed — ring track uses stroke-rule-strong; the arc depletes with ringFraction (unchanged)
+R41-01 fixed — edition pin (data-edition-pin) honoured by applyEdition, so every re-apply path and the theme-color metas stay evening; unpin recomputes (lib/edition.ts, tests in edition.test.ts and CookMode.test.tsx)
+R41-02 fixed — PIN_EVENING_SCRIPT inline at the top of the cook page plus useLayoutEffect pin on client navigation
+R41-03 fixed — AudioContext created and resumed on first pointerdown/keydown, reused by the chime, closed on unmount; test
+R41-04 fixed — touch handlers on the stage root; ignored from controls, multi-touch and after touchcancel; test
+R41-05 fixed — CookStage is role=dialog aria-modal labelled "Cooking mode", focused on mount, siblings of its ancestors set inert and restored on unmount; test
+R41-06 fixed — only not-allowed/service-not-allowed stop voice; other errors fall through to restart
+R41-07 fixed — restart after 300 ms (cleared on cleanup), give up after more than 5 restarts within 5 s
+R41-08 fixed — parseVoice accepts only one or two words after dropping filler (please, go, okay, that); tests
+R41-09 fixed — an identical announcement gets a trailing no-break space so it is read again; test
+R41-10 fixed — step changes announce "Step n of N: text" in the polite region; test
+R41-11 fixed — a done timer flashes for 10 s then stays claret; the 600 ms re-render stops with the flashing
+R41-12 fixed — a timer with the same label and length started under 1.5 s ago is ignored; test
+R41-13 fixed — Close asks window.confirm while a timer runs; timers are not persisted (confirm is the smaller fix); test
+R41-14 fixed — held keys and defaultPrevented ignored; field/slider/contenteditable targets skipped; test
+R41-15 fixed — rings for up to three timers (the second and third smaller), compact rows after
+R41-16 fixed — added tests: edition survives events and unmount, chime unlock/close, voice result/error/restart/cleanup, input keys, swipe cases, double tap, dialog/inert
+R41-17 fixed — step text is 40px from 700px
+R41-18 fixed — recipe title is an h1
+R41-19 skipped — nice, harmless
+R41-20 skipped — nice, would add a repeat timer with caps
+R41-21 skipped — nice, route loading state is outside this change

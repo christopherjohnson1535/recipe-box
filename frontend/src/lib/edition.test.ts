@@ -8,6 +8,10 @@ import {
   getEditionPreference,
   msUntilNextSwitch,
   parsePreference,
+  PIN_ATTRIBUTE,
+  PIN_EVENING_SCRIPT,
+  pinEdition,
+  unpinEdition,
   resolveEdition,
   setEditionPreference,
   type EditionPreference,
@@ -18,6 +22,7 @@ const at = (h: number, m = 0, s = 0) => new Date(2026, 9, 23, h, m, s);
 afterEach(() => {
   localStorage.clear();
   document.documentElement.removeAttribute("data-theme");
+  document.documentElement.removeAttribute(PIN_ATTRIBUTE);
   document.head.innerHTML = "";
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -177,5 +182,36 @@ describe("applyEdition", () => {
     expect(applyEdition(document, at(12), true)).toBe("evening");
     expect(document.documentElement.dataset.theme).toBeUndefined();
     expect(colours(list)).toEqual(["#fbf8f1", "#16130f"]);
+  });
+});
+
+describe("pinning an edition", () => {
+  const metaColour = () => document.querySelector<HTMLMetaElement>("meta")?.content;
+
+  it("holds against every re-apply, theme-color included, and unpin recomputes the person's edition", () => {
+    document.head.innerHTML = '<meta name="theme-color" content="#fbf8f1">';
+    pinEdition(document, "evening");
+    expect(document.documentElement.dataset.theme).toBe("evening");
+    expect(metaColour()).toBe("#16130f");
+    localStorage.setItem(EDITION_KEY, "day");
+    expect(applyEdition(document, at(10), false)).toBe("evening");
+    expect(document.documentElement.dataset.theme).toBe("evening");
+    expect(unpinEdition(document, at(10), false)).toBe("day");
+    expect(document.documentElement.dataset.theme).toBe("day");
+    expect(metaColour()).toBe("#fbf8f1");
+    expect(document.documentElement.hasAttribute(PIN_ATTRIBUTE)).toBe(false);
+  });
+
+  it("unpin follows the clock as it is now, not as it was when pinned", () => {
+    pinEdition(document, "evening");
+    expect(unpinEdition(document, at(20), false)).toBe("evening");
+    pinEdition(document, "evening");
+    expect(unpinEdition(document, at(7), false)).toBe("day");
+  });
+
+  it("the inline script pins evening before React runs", () => {
+    new Function(PIN_EVENING_SCRIPT)();
+    expect(document.documentElement.dataset.theme).toBe("evening");
+    expect(applyEdition(document, at(12), false)).toBe("evening");
   });
 });
