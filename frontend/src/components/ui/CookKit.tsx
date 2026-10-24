@@ -77,14 +77,112 @@ export function CookVoiceToggle({ listening, ...rest }: { listening: boolean } &
   );
 }
 
-/** One segment per step: done steps in ink, the current one in claret, the rest as a hairline. Decorative. */
-export function CookProgress({ count, current }: { count: number; current: number }) {
+/** One segment per step: ticked steps in ink, steps passed but not ticked in muted ink, the current one in claret, the rest as a hairline. Decorative. */
+export function CookProgress({ count, current, done }: { count: number; current: number; done: ReadonlySet<number> }) {
   return (
     <div aria-hidden="true" className="mt-3 flex gap-2">
       {Array.from({ length: count }, (_, i) => (
-        <span key={i} className={cx("h-1.5 flex-1 transition-colors duration-150", i < current ? "bg-ink" : i === current ? "bg-accent" : "bg-rule")} />
+        <span
+          key={i}
+          className={cx("h-1.5 flex-1 transition-colors duration-150", i === current ? "bg-accent" : done.has(i) ? "bg-ink" : i < current ? "bg-ink-muted" : "bg-rule")}
+        />
       ))}
     </div>
+  );
+}
+
+/** The row under the progress bar: view switch on the left, wake-lock status and "Clear ticks" on the right, a note beneath. */
+export function CookToolbar({ children }: { children: ReactNode }) {
+  return <div className="mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">{children}</div>;
+}
+
+/** "One step / All steps": two pressed-state buttons in a pill, 44px each. */
+export function CookViewToggle({ all, onChange }: { all: boolean; onChange: (all: boolean) => void }) {
+  const button = (on: boolean, label: string, value: boolean) => (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => onChange(value)}
+      className={cx(
+        "label inline-flex min-h-control min-w-28 items-center justify-center px-4 whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-4px]",
+        on ? "bg-(--button-primary-bg) text-(--button-primary-fg)" : "text-ink hover:text-accent",
+      )}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="View" className="flex overflow-hidden rounded-full border border-(--button-secondary-border)">
+      {button(!all, "One step", false)}
+      {button(all, "All steps", true)}
+    </div>
+  );
+}
+
+/**
+ * Screen wake-lock status. While the lock is held it is a plain note; otherwise a 44px button that opens a short
+ * explanation (`note`), shown on its own line under the toolbar.
+ */
+export function CookWakeStatus({ on, note }: { on: boolean; note: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const dot = <span aria-hidden="true" className={cx("size-3 shrink-0 rounded-full border", on ? "border-accent bg-accent" : "border-ink-muted")} />;
+  if (on) {
+    return (
+      <p className="label inline-flex min-h-control items-center gap-2 text-ink-muted">
+        {dot}Screen stays on
+      </p>
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="cook-wake-note"
+        onClick={() => setOpen((o) => !o)}
+        className="label inline-flex min-h-control items-center gap-2 rounded-control px-2 whitespace-nowrap text-ink-muted hover:text-ink"
+      >
+        {dot}Screen may sleep
+      </button>
+      {open && (
+        <p id="cook-wake-note" className="order-last w-full text-small text-ink-muted italic">
+          {note}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Quiet text button, 44px tall ("Clear ticks"). */
+export function CookTextButton(props: Omit<ComponentProps<"button">, "type" | "className">) {
+  return (
+    <button
+      type="button"
+      className="label inline-flex min-h-control items-center rounded-control px-2 text-ink-muted underline underline-offset-4 transition-colors duration-150 hover:text-ink"
+      {...props}
+    />
+  );
+}
+
+/** A tick box with a label, pressed when done. 44px tall. */
+export function CookTick({ pressed, children, ...rest }: { pressed: boolean } & Omit<ComponentProps<"button">, "type" | "className" | "aria-pressed">) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      className="group label inline-flex min-h-control shrink-0 items-center gap-3 rounded-control px-2 text-ink hover:text-accent"
+      {...rest}
+    >
+      <span
+        aria-hidden="true"
+        className="grid size-6 place-items-center rounded-[2px] border-[1.5px] border-ink-muted transition-colors duration-150 group-aria-pressed:border-(--button-primary-bg) group-aria-pressed:bg-(--button-primary-bg)"
+      >
+        <svg viewBox="0 0 12 12" className="hidden size-4 group-aria-pressed:block" fill="none" stroke="var(--button-primary-fg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
+        </svg>
+      </span>
+      {children}
+    </button>
   );
 }
 
@@ -127,29 +225,76 @@ export function CookRail({ children, hiddenCount, anyLit }: { children: ReactNod
   );
 }
 
-export function CookRailRow({ quantity, name, lit }: { quantity: string; name: string; lit: boolean }) {
+/** One ingredient: a button the cook taps to tick off (claret line through it, muted, as on the recipe page). */
+export function CookRailRow({ quantity, name, lit, ticked, onToggle }: { quantity: string; name: string; lit: boolean; ticked: boolean; onToggle: () => void }) {
   return (
-    <li
-      data-lit={lit}
-      className={cx(
-        "flex shrink-0 items-baseline gap-3 rounded-full border border-rule px-4 py-1.5 text-small transition-colors duration-150 lg:rounded-none lg:border-0 lg:border-b lg:px-0 lg:py-3 lg:text-deck",
-        lit ? "text-ink" : "text-ink-muted max-lg:group-data-[all=false]/rail:hidden",
-      )}
-    >
-      {quantity && <span className="font-semibold text-accent [font-variant-numeric:lining-nums_tabular-nums] lg:min-w-16">{quantity}</span>}
-      <span>{name}</span>
-      {lit && <span className="sr-only"> (used in this step)</span>}
+    <li data-lit={lit} className={cx("shrink-0", lit ? "text-ink" : "text-ink-muted max-lg:group-data-[all=false]/rail:hidden")}>
+      <button
+        type="button"
+        aria-pressed={ticked}
+        onClick={onToggle}
+        className="group flex min-h-control w-full items-baseline gap-3 rounded-full border border-rule px-4 py-1.5 text-left text-small transition-colors duration-150 aria-pressed:text-ink-muted min-[700px]:text-deck lg:rounded-none lg:border-0 lg:border-b lg:px-0 lg:py-3"
+      >
+        {quantity && (
+          <span className="font-semibold text-accent [font-variant-numeric:lining-nums_tabular-nums] group-aria-pressed:text-ink-muted lg:min-w-16">
+            <span className="strike">{quantity}</span>
+          </span>
+        )}
+        <span className="strike">{name}</span>
+        {lit && <span className="sr-only"> (used in this step)</span>}
+      </button>
     </li>
   );
 }
 
-/** The step itself: kicker, then the text at 40px on an iPad (28px on a phone). */
-export function CookStepText({ label, children }: { label: string; children: ReactNode }) {
+/** The step itself: kicker (with an optional action such as the Done toggle beside it), then the text at 40px on an iPad (28px on a phone). */
+export function CookStepText({ label, action, children }: { label: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="my-auto select-none">
-      <p className="label mb-4 text-accent">{label}</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4">
+        <p className="label text-accent">{label}</p>
+        {action}
+      </div>
       <p className="font-display text-[1.75rem] leading-[1.25] text-balance text-ink min-[700px]:text-[2.5rem] [overflow-wrap:anywhere]">{children}</p>
     </div>
+  );
+}
+
+/** The all-steps view: every step in order. */
+export function CookStepList({ children }: { children: ReactNode }) {
+  return <ol className="flex flex-col">{children}</ol>;
+}
+
+/**
+ * One step in the list, 24px text (28px from 700px) with its numeral and a tick on the right. The current step has a claret
+ * bar on its left and scrolls into view when it becomes current; a done step is muted.
+ */
+export function CookStepItem({ number, current, done, tick, children }: { number: number; current: boolean; done: boolean; tick: ReactNode; children: ReactNode }) {
+  const ref = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (current) ref.current?.scrollIntoView?.({ block: "center" });
+  }, [current]);
+  return (
+    <li
+      ref={ref}
+      aria-current={current ? "step" : undefined}
+      className={cx(
+        "grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 border-b border-rule border-l-4 py-5 pl-3 transition-colors duration-150 min-[700px]:grid-cols-[3.5rem_minmax(0,1fr)]",
+        current ? "border-l-accent" : "border-l-transparent",
+        done ? "text-ink-muted" : "text-ink",
+      )}
+    >
+      <span aria-hidden="true" className="font-display text-numeral text-accent [font-variant-numeric:lining-nums_tabular-nums]">
+        {number}
+      </span>
+      <div className="flex flex-col items-start gap-2">
+        <p className="font-display text-[1.5rem] leading-[1.3] [overflow-wrap:anywhere] min-[700px]:text-[1.75rem]">
+          <span className="sr-only">Step {number}: </span>
+          {children}
+        </p>
+        {tick}
+      </div>
+    </li>
   );
 }
 
@@ -277,10 +422,12 @@ export function CookLive({ children }: { children?: ReactNode }) {
 
 /** Bottom bar: the preview of the next step on the left, Back and Next pills on the right. */
 /** `next` is the text of the following step, or undefined on the last one. */
-export function CookFooter({ next, children }: { next?: string; children: ReactNode }) {
+export function CookFooter({ next, summary, children }: { next?: string; /** Replaces the next-step preview (the all-steps view). */ summary?: string; children: ReactNode }) {
   return (
     <footer className="-mx-6 flex shrink-0 items-center justify-between gap-4 border-t border-rule bg-paper px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:-mx-12 lg:px-12 lg:py-4">
-      <p className="hidden min-w-0 flex-1 text-small sm:block text-ink-muted lg:text-deck [overflow-wrap:anywhere]">{next === undefined ? (
+      <p className="hidden min-w-0 flex-1 text-small sm:block text-ink-muted lg:text-deck [overflow-wrap:anywhere]">{summary !== undefined ? (
+          summary
+        ) : next === undefined ? (
           "Last step"
         ) : (
           <>
