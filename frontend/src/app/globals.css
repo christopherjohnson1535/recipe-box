@@ -78,6 +78,13 @@ body {
   overflow-x: clip;
 }
 
+/* viewport-fit=cover (layout.tsx) draws under the iOS home indicator and landscape sensor housing: keep normal flow clear of them.
+   Fixed elements (CookKit, Toast, FloatingBar) handle their own insets. */
+body {
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 body {
   background: var(--color-paper);
   color: var(--color-ink);

@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import webManifest from "@/app/manifest";
 import { PAPER } from "@/lib/edition";
 
 const dir = join(__dirname);
@@ -226,7 +227,7 @@ describe("design tokens", () => {
       layout.match(new RegExp(`prefers-color-scheme: ${scheme}\\)",\\s*color: "(#[0-9a-f]{6})"`))?.[1];
     expect(themeColor("light")).toBe(hex("day", "--color-paper"));
     expect(themeColor("dark")).toBe(hex("evening", "--color-paper"));
-    const manifest = JSON.parse(readFileSync(join(dir, "../../public/manifest.webmanifest"), "utf8"));
+    const manifest = webManifest();
     expect(manifest.background_color).toBe(hex("day", "--color-paper"));
     expect(manifest.theme_color).toBe(hex("day", "--color-paper"));
   });

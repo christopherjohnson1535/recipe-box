@@ -13,11 +13,19 @@ export const metadata: Metadata = {
   description: "Your household’s recipes, ready to cook from.",
   applicationName: "Recipe Box",
   manifest: "/manifest.webmanifest",
-  icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }], apple: "/apple-touch-icon.png" },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  other: { "apple-mobile-web-app-capable": "yes" }, // Next 16 emits only mobile-web-app-capable; older iOS wants the apple- name
   appleWebApp: { capable: true, title: "Recipe Box", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
+  viewportFit: "cover", // lets env(safe-area-inset-*) report the iOS home indicator; see the safe-area block in globals.css
   // Matches --color-paper in src/styles/themes/day.css and evening.css; EditionController rewrites it for a chosen edition.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fbf8f1" },
