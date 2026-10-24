@@ -20,9 +20,11 @@ export function SidebarLayout({ sidebar, children }: { sidebar: ReactNode; child
 /** Caption under the lead photo: opens the untouched original at full size in a new tab (PHO-7). */
 export function PlateCaption({ href }: { href: string }) {
   return (
-    <p className="flex justify-end print:hidden">
-      <a href={href} target="_blank" rel="noopener" className="link inline-flex min-h-control items-center text-small italic">
+    // -mt-8 cancels most of the 40px gap the article's column puts above it, so the caption sits just under the plate.
+    <p className="-mt-8 flex justify-end lg:mt-0 print:hidden">
+      <a href={href} target="_blank" rel="noopener" className="link inline-flex min-h-control items-start pt-2 text-small italic">
         View the original photo
+        <span className="sr-only"> (opens in a new tab)</span>
       </a>
     </p>
   );

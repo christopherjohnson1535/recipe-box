@@ -12,6 +12,7 @@ type Props = { initial: boolean; api?: Pick<Api, "updateSettings"> };
 /** Admin only: whether every recipe photo is shown with the print treatment. Originals are always kept. */
 export function PhotosSection({ initial, api = browserApi }: Props) {
   const [on, setOn] = useState(initial);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -19,12 +20,15 @@ export function PhotosSection({ initial, api = browserApi }: Props) {
     const before = on;
     setOn(next); // optimistic
     setError(null);
+    setSaving(true);
     try {
       await api.updateSettings({ plateTreatment: next });
       router.refresh();
     } catch (e) {
       setOn(before);
       setError(e instanceof ApiError ? e.message : "Couldn’t save that. Try again.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -37,8 +41,9 @@ export function PhotosSection({ initial, api = browserApi }: Props) {
       <Checkbox
         checked={on}
         onChange={(next) => void toggle(next)}
-        label="Print treatment for recipe photos"
-        hint="Gives every photo the same paper-and-ink finish. Originals are always kept."
+        disabled={saving}
+        label="Give every recipe photo the print look"
+        hint="One paper-and-ink finish for the whole household. Originals are always kept; tap View the original photo on a recipe to see one."
       />
     </section>
   );

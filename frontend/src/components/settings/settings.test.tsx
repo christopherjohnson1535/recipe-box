@@ -243,7 +243,7 @@ describe("AppearanceSection", () => {
 });
 
 describe("PhotosSection", () => {
-  const label = /^Print treatment for recipe photos/;
+  const label = /^Give every recipe photo the print look/;
   it("saves the toggle and refreshes", async () => {
     const updateSettings = vi.fn().mockResolvedValue({ plateTreatment: true });
     render(<PhotosSection initial={false} api={{ updateSettings } as never} />);

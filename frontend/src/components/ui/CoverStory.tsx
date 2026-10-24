@@ -1,4 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { FadeImage } from "./FadeImage";
 
 /**
  * The home page's cover: kicker, a very large headline (an h2: the page's h1 is a visually hidden "Recipes" beside it), italic deck, a meta line and buttons on the
@@ -38,13 +39,13 @@ export function CoverStory({
         <div className="mt-2 flex flex-wrap gap-3 max-sm:[&>*]:w-full print:hidden">{actions}</div>
       </div>
       {/* Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send. */}
-      <img
+      <FadeImage
         src={imageSrc}
         alt=""
         width={1200}
         height={900}
         fetchPriority="high"
-        className="order-first aspect-[4/3] h-auto w-full object-cover lg:order-last lg:aspect-square border border-(--rule-hair) bg-(--panel-bg) [filter:var(--photo-filter)] animate-[fade-in_var(--duration-base)_var(--ease-out)_both]"
+        className="order-first aspect-[4/3] h-auto w-full object-cover lg:order-last lg:aspect-square border border-(--rule-hair) bg-(--panel-bg) [filter:var(--photo-filter)]"
       />
     </article>
   );

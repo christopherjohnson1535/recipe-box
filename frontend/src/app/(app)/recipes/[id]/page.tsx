@@ -105,7 +105,7 @@ export default async function RecipePage({ params }: Params) {
           title={recipe.title}
           deck={deck}
           icon={<SpotIcon name={iconForTag(recipe.tags[0] ?? "")} size={72} />}
-          photo={recipe.imageUrl ? { src: plateSrc(recipe) as string, alt: recipe.title } : undefined}
+          photo={recipe.imageUrl ? { src: plateSrc(recipe) as string, alt: `${recipe.title}, photo` } : undefined}
           byline={
             by.length > 0 || source ? (
               <DotList as="p" stackOnPhone>

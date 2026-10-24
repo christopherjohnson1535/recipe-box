@@ -12,7 +12,7 @@ describe("recipe spread plate", () => {
       </>,
     );
     expect(container.querySelector("img")?.getAttribute("src")).toBe("/media/plate.jpg");
-    const link = screen.getByRole("link", { name: "View the original photo" });
+    const link = screen.getByRole("link", { name: /^View the original photo/ });
     expect(link.getAttribute("href")).toBe("/media/original.jpg");
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toContain("noopener");
