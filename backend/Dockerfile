@@ -27,16 +27,18 @@ RUN set -eux; \
 WORKDIR /app
 # Dependency layer: build against dummy sources so it stays cached until Cargo.toml/Cargo.lock change.
 COPY Cargo.toml Cargo.lock ./
+COPY crates/domain/Cargo.toml crates/domain/Cargo.toml
 RUN . /env.sh \
-    && mkdir src benches && echo 'fn main() {}' > src/main.rs && touch src/lib.rs \
+    && mkdir src benches crates/domain/src && echo 'fn main() {}' > src/main.rs && touch src/lib.rs crates/domain/src/lib.rs \
     && echo 'fn main() {}' > benches/search.rs \
     && cargo build --release --locked \
-    && rm -rf src
+    && rm -rf src crates/domain/src
 COPY migrations migrations
 COPY src src
-# COPY keeps the context's mtimes, which can be older than the dummy build; touch so cargo rebuilds our crate.
+COPY crates crates
+# COPY keeps the context's mtimes, which can be older than the dummy build; touch so cargo rebuilds our crates.
 RUN . /env.sh \
-    && touch src/main.rs src/lib.rs \
+    && touch src/main.rs src/lib.rs crates/domain/src/lib.rs \
     && cargo build --release --locked \
     && cp "target/$CARGO_BUILD_TARGET/release/recipe-box-api" /recipe-box-api
 

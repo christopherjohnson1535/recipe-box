@@ -156,6 +156,14 @@ impl IntoResponse for AppError {
     }
 }
 
+impl From<domain::DomainError> for AppError {
+    fn from(e: domain::DomainError) -> Self {
+        match e {
+            domain::DomainError::Validation(m) => Self::Validation(m),
+        }
+    }
+}
+
 impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
         Self::Internal(e.into())
@@ -221,3 +229,15 @@ pub struct AppQuery<T>(pub T);
 pub struct AppPath<T>(pub T);
 
 pub type AppResult<T> = Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn domain_validation_maps_to_400() {
+        let e = AppError::from(domain::DomainError::validation("title: required"));
+        assert!(matches!(&e, AppError::Validation(m) if m == "title: required"));
+        assert_eq!(e.into_response().status(), StatusCode::BAD_REQUEST);
+    }
+}

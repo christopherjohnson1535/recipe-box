@@ -9,15 +9,14 @@ pub mod models;
 pub mod plate;
 pub mod routes;
 pub mod state;
-pub mod validate;
 
 use std::time::Duration;
 
-use chrono::Duration as ChronoDuration;
 use sqlx::PgPool;
 
 use clock::Clock;
 
+pub use domain::{PURGE_AFTER, validate};
 pub use routes::router;
 
 /// The single line printed when startup fails: `recipe-box-api: <message>`.
@@ -29,9 +28,6 @@ pub fn startup_error_line(e: &anyhow::Error) -> String {
 pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
     sqlx::migrate!("./migrations").run(pool).await
 }
-
-/// Soft-deleted recipes are hard-deleted once they are older than this.
-pub const PURGE_AFTER: ChronoDuration = ChronoDuration::days(1);
 
 /// Hard-deletes recipes soft-deleted more than a day ago and expired sessions.
 pub async fn purge(pool: &PgPool, clock: &Clock) -> Result<(), sqlx::Error> {
