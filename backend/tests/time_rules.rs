@@ -110,7 +110,7 @@ async fn purge_recipe_edges() {
             .await;
         ctx.delete(&format!("/api/recipes/{id}"), &ctx.cookie).await;
         ctx.clock.advance(after);
-        recipe_box_api::purge(&ctx.pool, &ctx.clock).await.unwrap();
+        recipe_box_api::purge(&ctx.state).await.unwrap();
         let left: i64 = sqlx::query_scalar("select count(*) from recipes")
             .fetch_one(&ctx.pool)
             .await
@@ -129,7 +129,7 @@ async fn purge_session_edges() {
     ] {
         let ctx = TestApp::spawn_as_admin().await;
         ctx.clock.advance(after);
-        recipe_box_api::purge(&ctx.pool, &ctx.clock).await.unwrap();
+        recipe_box_api::purge(&ctx.state).await.unwrap();
         let left: i64 = sqlx::query_scalar("select count(*) from sessions")
             .fetch_one(&ctx.pool)
             .await
