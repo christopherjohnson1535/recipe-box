@@ -41,7 +41,7 @@ export function CookStage({ children, ...rest }: { children: ReactNode } & Omit<
       aria-modal="true"
       aria-label="Cooking mode"
       tabIndex={-1}
-      className="fixed inset-x-0 top-0 z-50 flex h-dvh touch-pan-y flex-col bg-paper px-6 pt-[max(1rem,env(safe-area-inset-top))] text-ink outline-none lg:px-12 print:hidden"
+      className="fixed inset-x-0 top-0 z-50 flex h-dvh touch-pan-y flex-col bg-paper pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] text-ink outline-none lg:pl-[max(3rem,env(safe-area-inset-left))] lg:pr-[max(3rem,env(safe-area-inset-right))] print:hidden"
       {...rest}
     >
       {children}
@@ -432,7 +432,7 @@ export function CookLive({ children }: { children?: ReactNode }) {
 /** `next` is the text of the following step, or undefined on the last one. */
 export function CookFooter({ next, summary, children }: { next?: string; /** Replaces the next-step preview (the all-steps view). */ summary?: string; children: ReactNode }) {
   return (
-    <footer className="-mx-6 flex shrink-0 items-center justify-between gap-4 border-t border-rule bg-paper px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:-mx-12 lg:px-12 lg:py-4">
+    <footer className="-ml-[max(1.5rem,env(safe-area-inset-left))] -mr-[max(1.5rem,env(safe-area-inset-right))] flex shrink-0 items-center justify-between gap-4 border-t border-rule bg-paper pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:-ml-[max(3rem,env(safe-area-inset-left))] lg:-mr-[max(3rem,env(safe-area-inset-right))] lg:pl-[max(3rem,env(safe-area-inset-left))] lg:pr-[max(3rem,env(safe-area-inset-right))] lg:py-4">
       <p className="hidden min-w-0 flex-1 text-small sm:block text-ink-muted lg:text-deck [overflow-wrap:anywhere]">{summary !== undefined ? (
           summary
         ) : next === undefined ? (

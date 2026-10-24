@@ -28,7 +28,7 @@ export function SaveStamp() {
         <div
           key={stamp.seq}
           aria-hidden="true"
-          className="pointer-events-none fixed right-4 bottom-24 z-40 print:hidden sm:right-8 sm:bottom-28"
+          className="pointer-events-none fixed right-[max(1rem,env(safe-area-inset-right))] bottom-24 z-40 print:hidden sm:right-[max(2rem,env(safe-area-inset-right))] sm:bottom-28"
         >
           <div className="stamp-run -rotate-[8deg] text-(--stamp-fg)">
             <div className="grid size-36 place-items-center rounded-full border-[3px] border-(--stamp-fg) sm:size-44">

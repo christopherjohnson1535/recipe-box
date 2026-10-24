@@ -1,8 +1,17 @@
 # Using on iPad
 
 ## Add to Home Screen
-Open Recipe Box in Safari over **HTTPS**, tap Share → **Add to Home Screen**. It then opens full screen like an app.
-(HTTPS is required — see [[Deploying]].)
+1. Open Recipe Box in **Safari** at its **HTTPS** address. Home Screen apps, the wake lock and offline all need a secure
+   address: use Tailscale serve or the Caddy profile (see [[Deploying]]).
+2. Tap **Share** → **Add to Home Screen** → **Add**. The icon is a cream R on claret.
+3. Open it from the Home Screen. It launches **standalone**: full screen with no Safari address bar or tabs, and it keeps
+   its own place in the app switcher. Links to other sites open in Safari.
+
+The status bar at the top stays the normal system one and sits above the page, which starts just below it. Content also
+stays clear of the Home indicator along the bottom edge.
+
+Installed apps do not follow Safari's tabs: sign in again if you are asked to, and if you change the server address, remove
+the icon and add it again. Long-press the icon for shortcuts (**Import a recipe**, **Write a recipe**).
 
 ## Cooking mode
 Open a recipe → **Start cooking**. Cooking mode is always dark (the evening edition), in large type you can read from across the counter.

@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
  */
 export function FloatingBar({ status, shortStatus, href, action, shown = true }: { status: ReactNode; shortStatus: ReactNode; href: string; action: string; shown?: boolean }) {
   return (
-    <div data-shown={shown} aria-hidden={!shown || undefined} inert={!shown} className="floating-bar pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
+    <div data-shown={shown} aria-hidden={!shown || undefined} inert={!shown} className="floating-bar pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
       <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-full border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-6 text-(--bar-fg)">
         <p role="status" className="label min-w-0 whitespace-nowrap">
           <span className="sm:hidden">{shortStatus}</span>
