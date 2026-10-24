@@ -1,8 +1,8 @@
 //! The one source of "now" for every time rule (restore window, session expiry, purge).
 //!
 //! Production uses [`Clock::System`]. Tests use [`Clock::fixed`] and move it with [`Clock::advance`], so edges like
-//! "exactly at the window" are testable. Rules pass `clock.now()` to SQL as a bound parameter; they never call
-//! the database's `now()`.
+//! "exactly at the window" are testable. The repositories are built with it (as a `ports::Clock`) and stamp rows
+//! with it; nothing calls the database's `now()`.
 
 use std::sync::{Arc, Mutex};
 
@@ -38,6 +38,12 @@ impl Clock {
                 *t += by;
             }
         }
+    }
+}
+
+impl ports::Clock for Clock {
+    fn now(&self) -> DateTime<Utc> {
+        Clock::now(self)
     }
 }
 

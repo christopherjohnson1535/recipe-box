@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use sqlx::PgPool;
 
-use clock::Clock;
+use state::AppState;
 
 pub use domain::{PURGE_AFTER, validate};
 pub use routes::router;
@@ -30,30 +30,24 @@ pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
 }
 
 /// Hard-deletes recipes soft-deleted more than a day ago and expired sessions.
-pub async fn purge(pool: &PgPool, clock: &Clock) -> Result<(), sqlx::Error> {
-    let now = clock.now();
+pub async fn purge(state: &AppState) -> domain::DomainResult<()> {
     // shortcut: image files of purged recipes stay on disk, add an orphan-image sweep if storage matters.
-    let recipes = sqlx::query("delete from recipes where deleted_at < $1")
-        .bind(now - PURGE_AFTER)
-        .execute(pool)
-        .await?
-        .rows_affected();
-    let sessions = sqlx::query("delete from sessions where expires_at < $1")
-        .bind(now)
-        .execute(pool)
-        .await?
-        .rows_affected();
+    let recipes = state
+        .recipes
+        .purge_deleted_before(state.clock.now() - PURGE_AFTER)
+        .await?;
+    let sessions = state.sessions.purge_expired().await?;
     tracing::info!(recipes, sessions, "purge done");
     Ok(())
 }
 
 /// Runs [`purge`] now and then every hour.
-pub fn spawn_purge_task(pool: PgPool, clock: Clock) {
+pub fn spawn_purge_task(state: AppState) {
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(Duration::from_secs(3600));
         loop {
             tick.tick().await;
-            if let Err(e) = purge(&pool, &clock).await {
+            if let Err(e) = purge(&state).await {
                 tracing::error!(error = %e, "purge failed");
             }
         }
@@ -61,9 +55,9 @@ pub fn spawn_purge_task(pool: PgPool, clock: Clock) {
 }
 
 /// Gives photos stored before renditions existed their rendition, in the background.
-pub fn spawn_display_backfill(pool: PgPool, media_dir: std::path::PathBuf) {
+pub fn spawn_display_backfill(state: AppState) {
     tokio::spawn(async move {
-        routes::media::backfill_displays(&pool, &media_dir).await;
+        routes::media::backfill_displays(state.images.as_ref(), &state.config.media_dir).await;
     });
 }
 

@@ -2424,6 +2424,7 @@ dependencies = [
  "rand 0.10.3",
  "recipe-box-adapter-postgres",
  "recipe-box-domain",
+ "recipe-box-ports",
  "reqwest",
  "scraper",
  "serde",

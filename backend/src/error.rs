@@ -176,12 +176,6 @@ impl From<domain::DomainError> for AppError {
     }
 }
 
-impl From<sqlx::Error> for AppError {
-    fn from(e: sqlx::Error) -> Self {
-        Self::Internal(e.into())
-    }
-}
-
 impl From<JsonRejection> for AppError {
     fn from(r: JsonRejection) -> Self {
         match r.status() {

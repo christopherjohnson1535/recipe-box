@@ -2,7 +2,6 @@ use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use cookie::time;
 use sha2::{Digest, Sha256};
-use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{error::AppResult, state::AppState};
@@ -23,15 +22,10 @@ pub async fn start(state: &AppState, jar: CookieJar, user_id: Uuid) -> AppResult
     let config = &state.config;
     let token = new_token();
     let expires_at = state.clock.now() + chrono::Duration::days(config.session_days);
-    sqlx::query(
-        "insert into sessions (user_id, token_hash, expires_at)
-         values ($1, $2, $3)",
-    )
-    .bind(user_id)
-    .bind(hash_token(&token))
-    .bind(expires_at)
-    .execute(&state.pool)
-    .await?;
+    state
+        .sessions
+        .create(user_id, hash_token(&token), expires_at)
+        .await?;
     let cookie = Cookie::build((COOKIE_NAME, token))
         .path("/")
         .http_only(true)
@@ -42,33 +36,14 @@ pub async fn start(state: &AppState, jar: CookieJar, user_id: Uuid) -> AppResult
 }
 
 /// Deletes the session behind the cookie (if any) and clears the cookie.
-pub async fn end(pool: &PgPool, jar: CookieJar) -> AppResult<CookieJar> {
+pub async fn end(state: &AppState, jar: CookieJar) -> AppResult<CookieJar> {
     if let Some(c) = jar.get(COOKIE_NAME) {
-        sqlx::query("delete from sessions where token_hash = $1")
-            .bind(hash_token(c.value()))
-            .execute(pool)
-            .await?;
+        state.sessions.delete(&hash_token(c.value())).await?;
     }
     // `jar.remove` sends nothing for a cookie the request did not carry; always send the expiry.
     let mut gone = Cookie::build(COOKIE_NAME).path("/").build();
     gone.make_removal();
     Ok(jar.add(gone))
-}
-
-/// Ends every session of `user_id`, except the one with `keep` (a token hash) when given.
-pub async fn end_for_user(
-    conn: &mut sqlx::PgConnection,
-    user_id: Uuid,
-    keep: Option<Vec<u8>>,
-) -> AppResult<()> {
-    sqlx::query(
-        "delete from sessions where user_id = $1 and ($2::bytea is null or token_hash <> $2)",
-    )
-    .bind(user_id)
-    .bind(keep)
-    .execute(conn)
-    .await?;
-    Ok(())
 }
 
 #[cfg(test)]

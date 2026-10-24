@@ -19,6 +19,7 @@ uuid = { version = "1", features = ["v4"] }
 [dependencies]
 recipe-box-domain = { path = "crates/domain" }
 recipe-box-adapter-postgres = { path = "crates/adapters/postgres" }
+recipe-box-ports = { path = "crates/ports" }
 anyhow = "1"
 argon2 = "0.6"
 axum = { version = "0.8", features = ["macros", "multipart"] }
