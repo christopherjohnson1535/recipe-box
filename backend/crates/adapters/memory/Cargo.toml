@@ -9,10 +9,8 @@ name = "adapter_memory"
 
 [dependencies]
 async-trait = "0.1"
-chrono.workspace = true
 recipe-box-domain = { path = "../../domain" }
 recipe-box-ports = { path = "../../ports" }
-uuid.workspace = true
 
 [dev-dependencies]
 recipe-box-ports = { path = "../../ports", features = ["contract"] }

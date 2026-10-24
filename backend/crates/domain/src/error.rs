@@ -9,6 +9,9 @@ pub enum DomainError {
     Conflict(String),
     #[error("{0}")]
     Forbidden(String),
+    /// Not signed in, or the credentials given are wrong. The message is a fixed sentence shown to the client.
+    #[error("{0}")]
+    Unauthenticated(&'static str),
     #[error("This needs an AI provider, and none is configured.")]
     AiDisabled,
     #[error("{0}")]
@@ -37,6 +40,12 @@ pub type DomainResult<T> = Result<T, DomainError>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unauthenticated_message_is_displayed() {
+        let e = DomainError::Unauthenticated("Wrong username or password.");
+        assert_eq!(e.to_string(), "Wrong username or password.");
+    }
 
     #[test]
     fn validation_message_is_displayed() {

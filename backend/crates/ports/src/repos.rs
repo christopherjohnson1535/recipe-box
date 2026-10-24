@@ -1,12 +1,12 @@
 //! Storage ports. Each method is atomic: it either does everything it says or leaves nothing behind.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use domain::{
     DomainResult, Image, NewUser, Page, Recipe, RecipeInput, RecipeSummary, SearchQuery, Settings,
     TagCount, User,
+    chrono::{DateTime, Utc},
+    uuid::Uuid,
 };
-use uuid::Uuid;
 
 /// Recipes with their tags and photo links. Soft-deleted recipes are invisible to everything except
 /// [`RecipeRepo::restore`] and [`RecipeRepo::purge_deleted_before`].
@@ -19,7 +19,9 @@ pub trait RecipeRepo: Send + Sync {
     /// `Validation` when `image_id` or a photo id names no image; nothing is saved then.
     async fn create(&self, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe>;
 
-    /// A live recipe, or `None` when there is none (never existed, deleted, purged).
+    /// A live recipe, or `None` when there is none (never existed, deleted, purged). Image fields are file names
+    /// as stored: the household `plate_treatment` setting that decides whether `image_display_file` is shown is
+    /// applied by the service, not here.
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>>;
 
     /// Replaces every field, the tags and the photo links of a live recipe as one unit (a full replace, not a
@@ -40,7 +42,9 @@ pub trait RecipeRepo: Send + Sync {
     /// [`domain::PURGE_AFTER`]), with their tag and photo links. Returns how many were removed.
     async fn purge_deleted_before(&self, cutoff: DateTime<Utc>) -> DomainResult<u64>;
 
-    /// Live recipes matching `query`, one page, with `total` counting all matches. `query` is normalised first
+    /// Live recipes matching `query`, one page, with `total` counting all matches. Summaries carry the stored
+    /// image file names; the household `plate_treatment` setting that gates `image_display_file` is applied by the
+    /// service, not here. `query` is normalised first
     /// ([`SearchQuery::normalized`]: NUL bytes dropped, blanks mean no filter, the tag lower-cased). What counts as
     /// a match, from the product point of view (the storage engine decides how):
     ///
@@ -64,6 +68,12 @@ pub trait RecipeRepo: Send + Sync {
     /// `total_minutes` ascending with unknown times last; each ends by title (`Time`) and id so the order is
     /// total. An explicit sort beats relevance. `offset` and `limit` page the ordered list.
     async fn search(&self, query: SearchQuery) -> DomainResult<Page<RecipeSummary>>;
+
+    /// `(id, source_url)` of live recipes whose `source_url` contains any of `hosts`, ignoring case, oldest
+    /// first (`created_at`, then id). It is the prefilter for the duplicate-import check (LNK-5): the caller
+    /// compares the normalised URLs itself. Recipes with no `source_url` and deleted ones never appear; an
+    /// empty `hosts` gives an empty list. A host is plain text, never a pattern (`%` and `_` are ordinary).
+    async fn live_source_urls(&self, hosts: &[String]) -> DomainResult<Vec<(Uuid, String)>>;
 }
 
 /// Image rows: the metadata of files held by the [`crate::MediaStore`]. Recipes link to them by id.
@@ -106,12 +116,16 @@ pub trait UserRepo: Send + Sync {
     /// A user's password hash, or `None` when there is no such user.
     async fn password_hash(&self, id: Uuid) -> DomainResult<Option<String>>;
 
-    /// Sets the password hash and ends the user's sessions, except the one whose token hash is `keep_session`,
-    /// as one unit. `NotFound` when there is no such user.
+    /// Compare-and-set: sets the password hash and ends the user's sessions, except the one whose token hash is
+    /// `keep_session`, as one unit. With `expected` of `Some(h)` the change happens only if the stored hash is
+    /// still `h` (the hash the caller verified the current password against); if it changed in between, nothing
+    /// is changed and the result is `Conflict`, so of two concurrent changes exactly one wins. `None` skips the
+    /// check (an admin resetting someone's password). `NotFound` when there is no such user.
     async fn set_password_hash(
         &self,
         id: Uuid,
         hash: &str,
+        expected: Option<&str>,
         keep_session: Option<&[u8]>,
     ) -> DomainResult<()>;
 
@@ -124,7 +138,8 @@ pub trait UserRepo: Send + Sync {
 /// Sign-in sessions. Only the SHA-256 of the cookie token is stored (`token_hash`).
 #[async_trait]
 pub trait SessionRepo: Send + Sync {
-    /// Starts a session for an existing user, valid until `expires_at`.
+    /// Starts a session for an existing user, valid until `expires_at`. `NotFound` when there is no such user,
+    /// `Conflict` when `token_hash` already belongs to a session (the existing one is left as it was).
     async fn create(
         &self,
         user_id: Uuid,
@@ -156,4 +171,11 @@ pub trait SettingsRepo: Send + Sync {
 pub trait TagRepo: Send + Sync {
     /// Tags carried by at least one live recipe, with how many, ordered by name.
     async fn list_in_use(&self) -> DomainResult<Vec<TagCount>>;
+}
+
+/// A liveness probe of the storage behind the other repositories (the health check).
+#[async_trait]
+pub trait StorageHealth: Send + Sync {
+    /// Succeeds when the storage answers a trivial query; `Internal` when it does not.
+    async fn ping(&self) -> DomainResult<()>;
 }

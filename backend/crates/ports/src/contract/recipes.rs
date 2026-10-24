@@ -2,12 +2,10 @@
 
 use std::sync::Arc;
 
-use chrono::Duration;
 use domain::{
     DomainError, Image, Ingredient, PURGE_AFTER, RESTORE_WINDOW_MINUTES, RecipeInput, SearchQuery,
-    Sort, SourceType,
+    Sort, SourceType, chrono::Duration, uuid::Uuid,
 };
-use uuid::Uuid;
 
 use super::{Capabilities, Ctx, Stack, ms, skip};
 use crate::Clock;
@@ -18,6 +16,8 @@ pub async fn recipe_repo<F: Fn(Arc<dyn Clock>) -> Stack>(make: F, caps: Capabili
     update_replaces_everything(&make).await;
     unknown_images_are_refused(&make).await;
     delete_hides_the_recipe(&make).await;
+    deleting_stamps_the_clock(&make).await;
+    live_source_urls_prefilter(&make).await;
     restore_window_edges(&make).await;
     purge_edges(&make).await;
     ingredient_and_title_matches(&make).await;
@@ -358,6 +358,92 @@ async fn delete_hides_the_recipe<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
         let r = c.s.recipes.soft_delete(again).await;
         assert!(matches!(r, Err(DomainError::NotFound(_))), "{r:?}");
     }
+}
+
+async fn deleting_stamps_the_clock<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    // The delete time is the clock's now at the moment of the delete: not the creation time, not the epoch.
+    // `purge_deleted_before` removes recipes deleted strictly before its cutoff, so it pins the stamp to the ms.
+    let c = Ctx::new(make).await;
+    let id = c.add("Stamped", &["salt"], None, &["t"]).await;
+    c.clock.advance(Duration::minutes(5));
+    let deleted_at = c.clock.now();
+    c.s.recipes.soft_delete(id).await.unwrap();
+    assert!(c.s.recipes.get(id).await.unwrap().is_none());
+    let hits = c.s.recipes.search(SearchQuery::default()).await.unwrap();
+    assert_eq!((hits.total, hits.items.len()), (0, 0), "gone from search");
+    assert_eq!(
+        c.s.recipes.purge_deleted_before(deleted_at).await.unwrap(),
+        0,
+        "deleted at the cutoff is not before it"
+    );
+    assert_eq!(
+        c.s.recipes
+            .purge_deleted_before(deleted_at + ms(1))
+            .await
+            .unwrap(),
+        1,
+        "stamped with the clock's now"
+    );
+}
+
+async fn live_source_urls_prefilter<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let mut ids = Vec::new();
+    for (title, url) in [
+        ("Old", Some("https://Example.com/a")),
+        ("Other site", Some("https://other.org/b")),
+        ("No source", None),
+        ("New", Some("https://www.example.com/c?x=1")),
+        ("Deleted", Some("https://example.com/d")),
+    ] {
+        c.clock.advance(Duration::seconds(1));
+        let r =
+            c.s.recipes
+                .create(
+                    c.user,
+                    RecipeInput {
+                        title: title.into(),
+                        source_url: url.map(String::from),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+        ids.push(r.id);
+    }
+    c.s.recipes.soft_delete(ids[4]).await.unwrap();
+    let hosts = |h: &[&str]| h.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+    let found =
+        c.s.recipes
+            .live_source_urls(&hosts(&["EXAMPLE.com"]))
+            .await
+            .unwrap();
+    assert_eq!(
+        found,
+        [
+            (ids[0], "https://Example.com/a".to_string()),
+            (ids[3], "https://www.example.com/c?x=1".to_string()),
+        ],
+        "case-insensitive, oldest first, no deleted, no recipe without a source"
+    );
+    let two =
+        c.s.recipes
+            .live_source_urls(&hosts(&["other.org", "nowhere.net"]))
+            .await
+            .unwrap();
+    assert_eq!(two.iter().map(|r| r.0).collect::<Vec<_>>(), [ids[1]]);
+    assert!(
+        c.s.recipes.live_source_urls(&[]).await.unwrap().is_empty(),
+        "no hosts, no rows"
+    );
+    assert!(
+        c.s.recipes
+            .live_source_urls(&hosts(&["%", "_"]))
+            .await
+            .unwrap()
+            .is_empty(),
+        "a host is text, not a pattern"
+    );
 }
 
 async fn restore_window_edges<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {

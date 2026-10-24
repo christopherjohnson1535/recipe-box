@@ -17,14 +17,18 @@ mod recipes;
 
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Duration, Utc};
-use domain::{NewUser, ROLE_ADMIN, RecipeInput};
-use uuid::Uuid;
+use domain::{
+    NewUser, ROLE_ADMIN, RecipeInput,
+    chrono::{DateTime, Duration, Utc},
+    uuid::Uuid,
+};
 
-use crate::{Clock, ImageRepo, RecipeRepo, SessionRepo, SettingsRepo, TagRepo, UserRepo};
+use crate::{
+    Clock, ImageRepo, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+};
 
 pub use accounts::{image_repo, session_repo, settings_repo, tag_repo, user_repo};
-pub use infra::{media_store, password_hasher};
+pub use infra::{media_store, password_hasher, storage_health};
 pub use recipes::recipe_repo;
 
 /// The repositories of one adapter, sharing one backing store (recipes reference users and images) and built
@@ -36,6 +40,7 @@ pub struct Stack {
     pub sessions: Arc<dyn SessionRepo>,
     pub settings: Arc<dyn SettingsRepo>,
     pub tags: Arc<dyn TagRepo>,
+    pub health: Arc<dyn StorageHealth>,
 }
 
 /// Search features an adapter may not offer. A flag set to `false` skips the cases that need it, visibly.

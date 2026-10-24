@@ -12,16 +12,16 @@ use std::{
 };
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use domain::{
     DomainError, DomainResult, Image, NewUser, Page, RESTORE_WINDOW_MINUTES, ROLE_ADMIN, Recipe,
     RecipeInput, RecipeSummary, SearchQuery, Settings, Sort, TagCount, User, UserRef,
+    chrono::{DateTime, Duration, Utc},
+    uuid::Uuid,
 };
 use ports::{
-    Clock, ImageRepo, MediaStore, PasswordHasher, RecipeRepo, SessionRepo, SettingsRepo, TagRepo,
-    UserRepo,
+    Clock, ImageRepo, MediaStore, PasswordHasher, RecipeRepo, SessionRepo, SettingsRepo,
+    StorageHealth, TagRepo, UserRepo,
 };
-use uuid::Uuid;
 
 struct StoredUser {
     user: User,
@@ -219,8 +219,7 @@ impl RecipeRepo for MemoryStore {
     }
 
     async fn restore(&self, id: Uuid) -> DomainResult<Recipe> {
-        let earliest =
-            self.clock.now() - chrono::Duration::minutes(i64::from(RESTORE_WINDOW_MINUTES));
+        let earliest = self.clock.now() - Duration::minutes(i64::from(RESTORE_WINDOW_MINUTES));
         let mut s = self.lock();
         let r = s.recipes.get_mut(&id).ok_or_else(not_found)?;
         if let Some(deleted_at) = r.deleted_at {
@@ -293,6 +292,31 @@ impl RecipeRepo for MemoryStore {
                 .map(|(r, _)| s.summary(r))
                 .collect(),
         })
+    }
+
+    async fn live_source_urls(&self, hosts: &[String]) -> DomainResult<Vec<(Uuid, String)>> {
+        let hosts: Vec<String> = hosts.iter().map(|h| h.to_lowercase()).collect();
+        let s = self.lock();
+        let mut rows: Vec<(&StoredRecipe, &String)> = s
+            .recipes
+            .values()
+            .filter(|r| r.deleted_at.is_none())
+            .filter_map(|r| r.input.source_url.as_ref().map(|u| (r, u)))
+            .filter(|(_, u)| {
+                let u = u.to_lowercase();
+                hosts.iter().any(|h| u.contains(h.as_str()))
+            })
+            .collect();
+        rows.sort_by_key(|(r, _)| (r.created_at, r.id));
+        Ok(rows.into_iter().map(|(r, u)| (r.id, u.clone())).collect())
+    }
+}
+
+#[async_trait]
+impl StorageHealth for MemoryStore {
+    async fn ping(&self) -> DomainResult<()> {
+        drop(self.lock());
+        Ok(())
     }
 }
 
@@ -415,13 +439,20 @@ impl UserRepo for MemoryStore {
         &self,
         id: Uuid,
         hash: &str,
+        expected: Option<&str>,
         keep_session: Option<&[u8]>,
     ) -> DomainResult<()> {
         let mut s = self.lock();
-        s.users
+        let user = s
+            .users
             .get_mut(&id)
-            .ok_or_else(|| DomainError::NotFound("No such user.".into()))?
-            .password_hash = hash.to_string();
+            .ok_or_else(|| DomainError::NotFound("No such user.".into()))?;
+        if expected.is_some_and(|e| e != user.password_hash) {
+            return Err(DomainError::Conflict(
+                "The password changed in the meantime.".into(),
+            ));
+        }
+        user.password_hash = hash.to_string();
         s.sessions
             .retain(|token, (user, _)| *user != id || Some(token.as_slice()) == keep_session);
         Ok(())
@@ -471,9 +502,14 @@ impl SessionRepo for MemoryStore {
         token_hash: Vec<u8>,
         expires_at: DateTime<Utc>,
     ) -> DomainResult<()> {
-        self.lock()
-            .sessions
-            .insert(token_hash, (user_id, expires_at));
+        let mut s = self.lock();
+        if !s.users.contains_key(&user_id) {
+            return Err(DomainError::NotFound("No such user.".into()));
+        }
+        if s.sessions.contains_key(&token_hash) {
+            return Err(DomainError::Conflict("That session already exists.".into()));
+        }
+        s.sessions.insert(token_hash, (user_id, expires_at));
         Ok(())
     }
 
@@ -537,7 +573,7 @@ pub struct MemoryMedia {
 }
 
 fn check_name(name: &str) -> DomainResult<()> {
-    if name.is_empty() || name.contains(['/', '\\']) || name.contains("..") {
+    if !domain::validate::media_file_name(name) {
         return Err(DomainError::validation("name: not a plain file name."));
     }
     Ok(())

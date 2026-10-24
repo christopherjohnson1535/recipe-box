@@ -2,20 +2,20 @@
 //!
 //! Every port is a dyn-compatible `async-trait` trait, so services can hold `Arc<dyn Port>`, and returns
 //! [`DomainResult`]: an adapter maps its own errors (SQL, disk, HTTP) into [`domain::DomainError`] and never leaks
-//! them. Each trait states its contract in rustdoc. The `contract` feature adds [`contract`], the behavioural test
+//! them. Each trait states its contract in rustdoc. The `contract` feature adds `contract`, the behavioural test
 //! suite every adapter must pass (docs/adr/0008).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use domain::{DomainResult, PhotoMode, RecipeDraft};
-use url::Url;
+use domain::{DomainResult, PhotoMode, RecipeDraft, chrono::DateTime, chrono::Utc, url::Url};
 
 mod repos;
 
 #[cfg(feature = "contract")]
 pub mod contract;
 
-pub use repos::{ImageRepo, RecipeRepo, SessionRepo, SettingsRepo, TagRepo, UserRepo};
+pub use repos::{
+    ImageRepo, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+};
 
 /// The one source of "now" for every time rule (restore window, session expiry, purge). Repositories are built
 /// with a clock and stamp rows with it; nothing else may read the wall clock, so tests can move time.
@@ -35,9 +35,11 @@ pub trait PasswordHasher: Send + Sync {
     async fn verify(&self, password: String, hash: Option<String>) -> DomainResult<bool>;
 }
 
-/// Where image files live (a directory, object storage). Blobs are addressed by flat file names such as
-/// `<uuid>.jpg`; a name with a path separator or `..` is rejected with `Validation`. Nothing is served as uploaded:
-/// callers store what they have already re-encoded.
+/// Where image files live (a directory, object storage). Blobs are addressed by flat file names, and only the
+/// names the application writes are valid: `^[0-9a-f-]{36}(\.display)?\.jpg$` (see
+/// [`domain::validate::media_file_name`]). Any other name (empty, `.`, `..`, a path, upper case, a space, a NUL)
+/// is rejected with `Validation` by `put`, `get` and `delete` alike, so an adapter can never be looser than the
+/// route that serves files. Nothing is served as uploaded: callers store what they have already re-encoded.
 #[async_trait]
 pub trait MediaStore: Send + Sync {
     /// Stores `bytes` under `name`, replacing any blob already there.
@@ -66,7 +68,6 @@ pub trait RecipeExtractor: Send + Sync {
 }
 
 /// A page fetched by a [`PageFetcher`].
-#[derive(Debug, Clone)]
 pub struct FetchedPage {
     /// The address after redirects.
     pub final_url: Url,

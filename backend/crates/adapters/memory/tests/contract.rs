@@ -15,6 +15,7 @@ fn stack(clock: Arc<dyn Clock>) -> Stack {
         images: store.clone(),
         users: store.clone(),
         sessions: store.clone(),
+        health: store.clone(),
         settings: store.clone(),
         tags: store,
     }
@@ -54,13 +55,19 @@ async fn the_fake_hasher_meets_the_contract() {
     contract::password_hasher(FakePasswordHasher::default()).await;
 }
 
+#[tokio::test]
+async fn storage_answers_its_ping() {
+    let s = stack(Arc::new(contract::ManualClock::default()));
+    contract::storage_health(&*s.health).await;
+}
+
 #[test]
 fn the_manual_clock_moves_only_when_told() {
     let clock = contract::ManualClock::default();
     assert_eq!(clock.now(), contract::epoch());
-    clock.advance(chrono::Duration::seconds(5));
+    clock.advance(domain::chrono::Duration::seconds(5));
     assert_eq!(
         clock.now(),
-        contract::epoch() + chrono::Duration::seconds(5)
+        contract::epoch() + domain::chrono::Duration::seconds(5)
     );
 }

@@ -56,8 +56,11 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - name: Domain and ports crates have no infrastructure dependencies
         run: |
+          set -euo pipefail
           for crate in recipe-box-domain recipe-box-ports; do
-            if cargo tree -p "$crate" -e normal --prefix none | grep -E '^(axum|sqlx|reqwest|tokio|utoipa|hyper)( |$)'; then
+            # A failing `cargo tree` (typo'd crate name) must fail the step, not pass the guard.
+            cargo tree -p "$crate" -e normal --prefix none > "$RUNNER_TEMP/tree.txt"
+            if grep -E '^(axum|sqlx|reqwest|tokio|utoipa|hyper)( |$)' "$RUNNER_TEMP/tree.txt"; then
               echo "::error::$crate depends on infrastructure"
               exit 1
             fi

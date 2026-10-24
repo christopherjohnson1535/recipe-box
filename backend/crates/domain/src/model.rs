@@ -24,7 +24,7 @@ pub enum SourceType {
     Text,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct RecipeInput {
     pub title: String,
     pub description: String,
@@ -67,7 +67,7 @@ pub struct UserRef {
 
 /// A live recipe as stored. Image fields are file names; the household `plate_treatment` setting is not applied
 /// here (`image_display_file` is the rendition whenever one exists).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Recipe {
     pub id: Uuid,
     pub title: String,
@@ -98,7 +98,6 @@ pub struct Recipe {
 }
 
 /// One row of a recipe list.
-#[derive(Debug, Clone)]
 pub struct RecipeSummary {
     pub id: Uuid,
     pub title: String,
@@ -113,7 +112,6 @@ pub struct RecipeSummary {
 }
 
 /// What an import returns; never saved by the import itself.
-#[derive(Debug, Clone, Default)]
 pub struct RecipeDraft {
     pub title: String,
     pub description: String,
@@ -137,7 +135,6 @@ pub struct RecipeDraft {
 }
 
 /// A stored image: the original and, once made, its print-style rendition.
-#[derive(Debug, Clone)]
 pub struct Image {
     pub id: Uuid,
     pub file_name: String,
@@ -149,7 +146,7 @@ pub struct Image {
 }
 
 /// What a photo is a photo of.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub enum PhotoMode {
     /// A written or printed recipe.
     Recipe,
@@ -157,7 +154,6 @@ pub enum PhotoMode {
     Dish,
 }
 
-#[derive(Debug, Clone)]
 pub struct NewUser {
     pub username: String,
     pub display_name: String,
@@ -167,7 +163,7 @@ pub struct NewUser {
 }
 
 /// A tag and the number of live recipes that use it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct TagCount {
     pub name: String,
     pub count: i64,
@@ -180,7 +176,7 @@ pub struct Settings {
 }
 
 /// Order of search results.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum Sort {
     /// Best match first when there is search text, otherwise [`Sort::Newest`].
     #[default]
@@ -192,7 +188,6 @@ pub enum Sort {
     Time,
 }
 
-#[derive(Debug, Clone, PartialEq)]
 pub struct SearchQuery {
     pub text: Option<String>,
     /// Exact tag name, case-insensitive.
@@ -228,7 +223,6 @@ impl SearchQuery {
 }
 
 /// One page of a list; `total` counts every match, not just this page.
-#[derive(Debug, Clone)]
 pub struct Page<T> {
     pub items: Vec<T>,
     pub total: i64,

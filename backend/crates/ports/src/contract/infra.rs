@@ -2,30 +2,47 @@
 
 use domain::DomainError;
 
-use crate::{MediaStore, PasswordHasher};
+use crate::{MediaStore, PasswordHasher, StorageHealth};
+
+/// A storage that answers must ping fine.
+pub async fn storage_health(h: &dyn StorageHealth) {
+    h.ping().await.expect("a working storage answers its ping");
+}
 
 /// `make` gives a new, empty store each time it is called.
 pub async fn media_store<M: MediaStore>(make: impl Fn() -> M) {
     let m = make();
-    assert_eq!(m.get("a.jpg").await.unwrap(), None, "nothing stored yet");
-    m.put("a.jpg", vec![1, 2, 3]).await.unwrap();
-    assert_eq!(m.get("a.jpg").await.unwrap(), Some(vec![1, 2, 3]));
-    m.put("a.jpg", vec![9]).await.unwrap();
-    assert_eq!(m.get("a.jpg").await.unwrap(), Some(vec![9]), "put replaces");
-    m.put("b.jpg", vec![]).await.unwrap();
+    const A: &str = "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.jpg";
+    const B: &str = "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e50.display.jpg";
+    assert_eq!(m.get(A).await.unwrap(), None, "nothing stored yet");
+    m.put(A, vec![1, 2, 3]).await.unwrap();
+    assert_eq!(m.get(A).await.unwrap(), Some(vec![1, 2, 3]));
+    m.put(A, vec![9]).await.unwrap();
+    assert_eq!(m.get(A).await.unwrap(), Some(vec![9]), "put replaces");
+    m.put(B, vec![]).await.unwrap();
     assert_eq!(
-        m.get("b.jpg").await.unwrap(),
+        m.get(B).await.unwrap(),
         Some(vec![]),
         "an empty blob is not a missing one"
     );
-    m.delete("a.jpg").await.unwrap();
-    assert_eq!(m.get("a.jpg").await.unwrap(), None);
-    assert!(m.get("b.jpg").await.unwrap().is_some(), "other blobs stay");
-    m.delete("a.jpg")
-        .await
-        .expect("deleting a missing blob is fine");
+    m.delete(A).await.unwrap();
+    assert_eq!(m.get(A).await.unwrap(), None);
+    assert!(m.get(B).await.unwrap().is_some(), "other blobs stay");
+    m.delete(A).await.expect("deleting a missing blob is fine");
 
-    for bad in ["", "../a.jpg", "dir/a.jpg", "dir\\a.jpg", ".."] {
+    // The name rule is part of the contract: `^[0-9a-f-]{36}(\.display)?\.jpg$`, nothing else.
+    let id = "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f";
+    let upper = format!("{}.jpg", id.to_uppercase());
+    let png = format!("{id}.png");
+    let twice = format!("{id}.display.display.jpg");
+    let nul = format!("{id}\0.jpg");
+    let traversal = format!("../{id}.jpg");
+    let nested = format!("dir/{id}.jpg");
+    let windows = format!("dir\\{id}.jpg");
+    for bad in [
+        "", ".", "..", ".jpg", "a b", "a\0", "C:x", "a.jpg", &upper, &png, &twice, &nul,
+        &traversal, &nested, &windows,
+    ] {
         let put = m.put(bad, vec![1]).await;
         assert!(
             matches!(put, Err(DomainError::Validation(_))),

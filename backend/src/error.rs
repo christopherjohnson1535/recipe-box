@@ -164,6 +164,7 @@ impl From<domain::DomainError> for AppError {
             D::NotFound(m) => Self::NotFound(m),
             D::Conflict(m) => Self::Conflict(m),
             D::Forbidden(m) => Self::Forbidden(m),
+            D::Unauthenticated(m) => Self::Unauthenticated(m),
             D::AiDisabled => Self::AiDisabled,
             D::Ai(m) => Self::AiError(m),
             D::NoRecipeFound(m) => Self::NoRecipeFound(m),
@@ -253,6 +254,12 @@ mod tests {
     }
 
     #[test]
+    fn domain_unauthenticated_keeps_its_message() {
+        let e = AppError::from(domain::DomainError::Unauthenticated("Please sign in."));
+        assert_eq!(e.to_string(), "Please sign in.");
+    }
+
+    #[test]
     fn every_domain_error_keeps_its_status_and_code() {
         use domain::DomainError as D;
         let m = || "m".to_string();
@@ -261,6 +268,11 @@ mod tests {
             (D::NotFound(m()), 404, "not_found"),
             (D::Conflict(m()), 409, "conflict"),
             (D::Forbidden(m()), 403, "forbidden"),
+            (
+                D::Unauthenticated("Wrong username or password."),
+                401,
+                "unauthenticated",
+            ),
             (D::AiDisabled, 422, "ai_disabled"),
             (D::Ai(m()), 502, "ai_error"),
             (D::NoRecipeFound(m()), 422, "no_recipe_found"),

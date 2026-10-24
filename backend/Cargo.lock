@@ -2390,11 +2390,9 @@ name = "recipe-box-adapter-memory"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "chrono",
  "recipe-box-domain",
  "recipe-box-ports",
  "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -2446,10 +2444,7 @@ name = "recipe-box-ports"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "chrono",
  "recipe-box-domain",
- "url",
- "uuid",
 ]
 
 [[package]]
