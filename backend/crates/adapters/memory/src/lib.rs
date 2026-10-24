@@ -19,8 +19,8 @@ use domain::{
     uuid::Uuid,
 };
 use ports::{
-    Clock, ImageRepo, MediaStore, PasswordHasher, RecipeRepo, SessionRepo, SettingsRepo,
-    StorageHealth, TagRepo, UserRepo,
+    Clock, EncodedImage, ImageCodec, ImageRepo, MediaStore, PasswordHasher, RecipeRepo,
+    SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo, UserRepo,
 };
 
 struct StoredUser {
@@ -607,6 +607,14 @@ impl MediaStore for MemoryMedia {
 #[derive(Default)]
 pub struct FakePasswordHasher {
     count: AtomicU64,
+    verifies: AtomicU64,
+}
+
+impl FakePasswordHasher {
+    /// How many times `verify` ran (a test of "no hashing work happened").
+    pub fn verify_count(&self) -> u64 {
+        self.verifies.load(Ordering::SeqCst)
+    }
 }
 
 #[async_trait]
@@ -619,10 +627,61 @@ impl PasswordHasher for FakePasswordHasher {
     }
 
     async fn verify(&self, password: String, hash: Option<String>) -> DomainResult<bool> {
+        self.verifies.fetch_add(1, Ordering::SeqCst);
         Ok(hash
             .as_deref()
             .and_then(|h| h.strip_prefix("fake$"))
             .and_then(|h| h.split_once('$'))
             .is_some_and(|(_, stored)| stored == password))
+    }
+}
+
+/// Tokens `token-0`, `token-1`, ... whose digest is their bytes: deterministic, not secure.
+#[derive(Default)]
+pub struct FakeSessionTokens {
+    count: AtomicU64,
+}
+
+impl SessionTokens for FakeSessionTokens {
+    fn generate(&self) -> String {
+        format!("token-{}", self.count.fetch_add(1, Ordering::SeqCst))
+    }
+
+    fn digest(&self, token: &str) -> Vec<u8> {
+        token.as_bytes().to_vec()
+    }
+}
+
+/// An image "codec" for tests: the JPEG is the input as is (empty input is "not an image"), 1 px high and as wide
+/// as the input is long, and the rendition is the input behind `display:`.
+#[derive(Default)]
+pub struct FakeImageCodec {
+    /// Makes `encode` return no rendition, as a failed one would.
+    pub display_fails: bool,
+}
+
+#[async_trait]
+impl ImageCodec for FakeImageCodec {
+    async fn encode(&self, id: Uuid, data: Vec<u8>) -> DomainResult<EncodedImage> {
+        if data.is_empty() {
+            return Err(DomainError::UnsupportedMedia(
+                "That file is not an image we can read (JPEG, PNG, WebP or GIF).".into(),
+            ));
+        }
+        let display = if self.display_fails {
+            None
+        } else {
+            Some(self.render_display(id, data.clone()).await?)
+        };
+        Ok(EncodedImage {
+            width: data.len() as u32,
+            height: 1,
+            jpeg: data,
+            display,
+        })
+    }
+
+    async fn render_display(&self, _id: Uuid, jpeg: Vec<u8>) -> DomainResult<Vec<u8>> {
+        Ok([b"display:".as_slice(), &jpeg].concat())
     }
 }

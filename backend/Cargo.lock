@@ -2455,6 +2455,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "recipe-box-app"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "recipe-box-adapter-memory",
+ "recipe-box-domain",
+ "recipe-box-ports",
+ "tokio",
+]
+
+[[package]]
 name = "recipe-box-domain"
 version = "0.1.0"
 dependencies = [

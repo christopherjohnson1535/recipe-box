@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [workspace]
-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres"]
-default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres"]
+members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app"]
+default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app"]
 
 [workspace.dependencies]
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "uuid", "chrono", "json", "migrate", "macros", "runtime-tokio", "tls-rustls"] }
