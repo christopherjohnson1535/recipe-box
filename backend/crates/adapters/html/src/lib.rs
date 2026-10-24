@@ -10,7 +10,7 @@ use ports::{FetchedPage, PageContent, PageReader};
 pub mod jsonld;
 pub mod readable;
 
-use readable::{MIN_PAGE_CHARS, readable};
+use readable::readable;
 
 /// The [`PageReader`] for HTML pages.
 #[derive(Clone, Copy, Debug, Default)]
@@ -18,8 +18,6 @@ pub struct HtmlPageReader;
 
 #[async_trait]
 impl PageReader for HtmlPageReader {
-    /// A page whose readable text has fewer than [`MIN_PAGE_CHARS`] non-whitespace characters is `Nothing`: there
-    /// is not enough there for the AI to read.
     async fn read(
         &self,
         page: FetchedPage,
@@ -38,9 +36,6 @@ impl PageReader for HtmlPageReader {
                 return PageContent::Nothing;
             }
             let text = readable(&html, &page.final_url);
-            if text.text.chars().filter(|c| !c.is_whitespace()).count() < MIN_PAGE_CHARS {
-                return PageContent::Nothing;
-            }
             PageContent::Text {
                 site_name: jsonld::site_name(&html, &page.final_url),
                 text: text.text,

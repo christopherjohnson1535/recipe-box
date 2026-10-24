@@ -30,6 +30,12 @@ pub const ROLE_ADMIN: &str = "admin";
 /// Longest pasted or scraped text an AI import reads; the import service warns when the text is longer.
 pub const MAX_TEXT_INPUT_CHARS: usize = 50_000;
 
+/// Fewest non-whitespace characters of page text worth sending to the AI; a page with less has no recipe to read.
+pub const MIN_PAGE_CHARS: usize = 200;
+
+/// Most photos in one import (PHO-3).
+pub const MAX_PHOTOS: usize = 6;
+
 /// Largest web page a link import reads (5 MB).
 pub const PAGE_MAX_BYTES: usize = 5 * 1024 * 1024;
 

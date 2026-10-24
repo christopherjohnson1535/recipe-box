@@ -6,7 +6,7 @@ use axum::{
     Json,
     extract::{Multipart, State},
 };
-use domain::PhotoMode as Mode;
+use domain::{MAX_PHOTOS, PhotoMode as Mode};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -145,9 +145,6 @@ pub struct PhotoForm {
     files: Vec<Vec<u8>>,
     mode: PhotoMode,
 }
-
-/// Most photos in one import (PHO-3).
-pub const MAX_PHOTOS: usize = 6;
 
 /// Reads a recipe from photos (PHO-2–5). Returns a draft with `photoImageIds` set.
 #[utoipa::path(post, path = "/api/import/photo", operation_id = "importFromPhoto", tag = "import", security(("session" = [])),

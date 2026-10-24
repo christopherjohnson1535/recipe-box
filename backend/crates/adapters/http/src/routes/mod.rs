@@ -38,7 +38,7 @@ where
     let photos = Router::new()
         .route("/api/import/photo", post(imports::from_photo))
         .layer(DefaultBodyLimit::max(
-            imports::MAX_PHOTOS * config.max_upload_bytes + (64 << 10),
+            domain::MAX_PHOTOS * config.max_upload_bytes + (64 << 10),
         ));
     Router::new()
         .route("/api/health", get(health::health))

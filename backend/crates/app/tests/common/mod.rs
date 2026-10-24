@@ -1,12 +1,18 @@
 //! Fakes for the import ports: scripted, and recording what they were asked.
 
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Mutex, time::Duration};
+use std::{collections::HashMap, sync::Mutex, time::Duration};
 
+use std::sync::Arc;
+
+use adapter_memory::MemoryStore;
 use async_trait::async_trait;
-use domain::{AiProvider, DomainError, DomainResult, PhotoMode, RecipeDraft, url::Url};
-use ports::{FetchedPage, PageContent, PageFetcher, PageReader, RecipeExtractor, TaskSpawner};
-
-type Task = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+use domain::{
+    AiProvider, DomainError, DomainResult, Image, PhotoMode, RecipeDraft, url::Url, uuid::Uuid,
+};
+use ports::{
+    FetchedPage, ImageRepo, PageContent, PageFetcher, PageReader, RecipeExtractor, SpawnedTask,
+    TaskSpawner,
+};
 
 /// Pages by address. An address that is not scripted is `FetchFailed("unreachable")`.
 #[derive(Default)]
@@ -133,7 +139,7 @@ impl RecipeExtractor for FakeExtractor {
 /// Holds spawned tasks until the test runs them.
 #[derive(Default)]
 pub struct CollectingSpawner {
-    tasks: Mutex<Vec<Task>>,
+    tasks: Mutex<Vec<(&'static str, SpawnedTask)>>,
 }
 
 impl CollectingSpawner {
@@ -141,16 +147,41 @@ impl CollectingSpawner {
         self.tasks.lock().unwrap().len()
     }
 
-    pub async fn run_all(&self) {
-        let tasks: Vec<Task> = self.tasks.lock().unwrap().drain(..).collect();
-        for t in tasks {
-            t.await;
+    /// Runs every held task; each one's label and result, in spawn order.
+    pub async fn run_all(&self) -> Vec<(&'static str, DomainResult<()>)> {
+        let tasks: Vec<_> = self.tasks.lock().unwrap().drain(..).collect();
+        let mut done = Vec::new();
+        for (what, t) in tasks {
+            done.push((what, t.await));
         }
+        done
     }
 }
 
 impl TaskSpawner for CollectingSpawner {
-    fn spawn(&self, task: Task) {
-        self.tasks.lock().unwrap().push(task);
+    fn spawn(&self, what: &'static str, task: SpawnedTask) {
+        self.tasks.lock().unwrap().push((what, task));
+    }
+}
+
+/// The in-memory image repository whose `delete` always fails (a cleanup that cannot finish).
+pub struct UndeletableImages(pub Arc<MemoryStore>);
+
+#[async_trait]
+impl ImageRepo for UndeletableImages {
+    async fn add(&self, image: Image) -> DomainResult<()> {
+        self.0.add(image).await
+    }
+
+    async fn delete(&self, _: &[Uuid]) -> DomainResult<()> {
+        Err(DomainError::Internal("delete failed".into()))
+    }
+
+    async fn set_display_file(&self, id: Uuid, file_name: &str) -> DomainResult<bool> {
+        self.0.set_display_file(id, file_name).await
+    }
+
+    async fn without_display_file(&self) -> DomainResult<Vec<Uuid>> {
+        self.0.without_display_file().await
     }
 }

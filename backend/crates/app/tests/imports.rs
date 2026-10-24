@@ -9,14 +9,19 @@ use adapter_memory::{
     FakeImageCodec, FakePasswordHasher, FakeSessionTokens, MemoryMedia, MemoryStore,
 };
 use app::{Deps, Services};
-use common::{CollectingSpawner, FakeExtractor, FakeFetcher, FakeReader, draft};
+use common::{CollectingSpawner, FakeExtractor, FakeFetcher, FakeReader, UndeletableImages, draft};
 use domain::{
     AiProvider, DomainError, DomainResult, PhotoMode, RecipeInput, SourceType, uuid::Uuid,
 };
-use ports::{PageContent, contract::ManualClock};
+use ports::{ImageRepo, PageContent, contract::ManualClock};
 
 const UPLOAD_CAP: usize = 1 << 20;
 const PAGE: &str = "https://example.com/soup";
+
+/// Page text with enough characters (300 non-whitespace) to be worth an AI call.
+fn long_text() -> String {
+    "Boil water. ".repeat(30)
+}
 
 struct World {
     services: Services,
@@ -34,6 +39,14 @@ impl World {
     }
 
     fn with(extractor: FakeExtractor) -> Self {
+        Self::with_images(extractor, |store| store)
+    }
+
+    /// Like [`World::with`], with the image repository wrapped by `images`.
+    fn with_images(
+        extractor: FakeExtractor,
+        images: impl FnOnce(Arc<MemoryStore>) -> Arc<dyn ImageRepo>,
+    ) -> Self {
         let clock = Arc::new(ManualClock::new());
         let store = Arc::new(MemoryStore::new(clock.clone()));
         let media = Arc::new(MemoryMedia::default());
@@ -43,7 +56,7 @@ impl World {
         let spawner = Arc::new(CollectingSpawner::default());
         let services = Services::new(Deps {
             recipes: store.clone(),
-            images: store.clone(),
+            images: images(store.clone()),
             users: store.clone(),
             sessions: store.clone(),
             settings: store.clone(),
@@ -127,7 +140,7 @@ async fn url_without_recipe_data_falls_back_to_ai_text() {
     w.fetcher
         .page(PAGE, "https://example.com/soup?a=1#frag", b"<html>");
     w.reader.says(Ok(PageContent::Text {
-        text: "Boil water.".into(),
+        text: long_text(),
         image_url: None,
         site_name: Some("Example".into()),
     }));
@@ -149,7 +162,31 @@ async fn url_without_recipe_data_falls_back_to_ai_text() {
         d.warnings,
         ["Read from the page text by AI — check it against the page."]
     );
-    assert_eq!(*w.extractor.seen_text.lock().unwrap(), ["Boil water."]);
+    assert_eq!(*w.extractor.seen_text.lock().unwrap(), [long_text()]);
+}
+
+#[tokio::test]
+async fn page_text_too_short_for_a_recipe_is_not_sent_to_the_ai() {
+    let msg = "We couldn't find a recipe on that page. You can paste the recipe text instead.";
+    // 199 non-whitespace characters (spaces do not count) is one short; 200 goes through.
+    for (count, sent) in [(199, false), (200, true)] {
+        let w = World::new();
+        w.fetcher.page(PAGE, PAGE, b"<html>");
+        w.reader.says(Ok(PageContent::Text {
+            text: "x ".repeat(count),
+            image_url: None,
+            site_name: None,
+        }));
+        let r = w.services.imports.from_url(w.user, PAGE).await;
+        assert_eq!(
+            w.extractor.seen_text.lock().unwrap().len(),
+            usize::from(sent)
+        );
+        match sent {
+            true => assert!(r.is_ok()),
+            false => assert!(matches!(r, Err(DomainError::NoRecipeFound(m)) if m == msg)),
+        }
+    }
 }
 
 #[tokio::test]
@@ -168,7 +205,7 @@ async fn url_with_ai_off_or_no_recipe_in_the_text_is_no_recipe_found() {
     let w = World::with(ai);
     w.fetcher.page(PAGE, PAGE, b"<html>");
     w.reader.says(Ok(PageContent::Text {
-        text: "Hello.".into(),
+        text: long_text(),
         image_url: None,
         site_name: None,
     }));
@@ -345,6 +382,38 @@ fn photos(n: usize) -> Vec<Vec<u8>> {
 }
 
 #[tokio::test]
+async fn no_photos_or_too_many_are_a_validation_error_and_nothing_is_stored() {
+    for (n, message) in [
+        (0, "files: send 1 to 6 photos."),
+        (7, "files: send at most 6 photos."),
+    ] {
+        for mode in [PhotoMode::Recipe, PhotoMode::Dish] {
+            let w = World::new();
+            let f = w
+                .services
+                .imports
+                .from_photos(w.user, photos(n), mode)
+                .await
+                .err()
+                .unwrap();
+            assert!(matches!(&f.error, DomainError::Validation(m) if m == message));
+            assert!(f.kept.is_none());
+            assert!(w.media.names().is_empty());
+            assert!(w.extractor.seen_images.lock().unwrap().is_empty());
+        }
+    }
+    // Six is the most.
+    let w = World::new();
+    assert!(
+        w.services
+            .imports
+            .from_photos(w.user, photos(6), PhotoMode::Recipe)
+            .await
+            .is_ok()
+    );
+}
+
+#[tokio::test]
 async fn photos_are_stored_and_kept_with_the_draft() {
     let w = World::new();
     let got = w
@@ -445,6 +514,31 @@ async fn photos_of_a_dropped_request_are_deleted_by_the_spawner() {
     }
     assert_eq!(w.media.names().len(), 4, "still there until the task runs");
     assert_eq!(w.spawner.spawned(), 1);
-    w.spawner.run_all().await;
+    let done = w.spawner.run_all().await;
     assert!(w.media.names().is_empty());
+    assert!(matches!(done.as_slice(), [(_, Ok(()))]));
+}
+
+#[tokio::test]
+async fn a_failed_cleanup_of_a_dropped_request_is_reported_to_the_spawner() {
+    let mut x = FakeExtractor::on();
+    x.hang = true;
+    let w = World::with_images(x, |store| Arc::new(UndeletableImages(store)));
+    let import = w
+        .services
+        .imports
+        .from_photos(w.user, photos(2), PhotoMode::Recipe);
+    tokio::select! {
+        biased;
+        _ = import => unreachable!("the AI never answers"),
+        _ = async {} => {}
+    }
+    let done = w.spawner.run_all().await;
+    assert!(
+        matches!(
+            done.as_slice(),
+            [("could not delete images of a failed request", Err(_))]
+        ),
+        "the spawner logs what the task returns"
+    );
 }

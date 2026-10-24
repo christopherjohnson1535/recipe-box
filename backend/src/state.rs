@@ -1,4 +1,4 @@
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 use adapter_fs_media::FsMediaStore;
 use adapter_html::HtmlPageReader;
@@ -10,7 +10,7 @@ use adapter_postgres::{
 use app::{Deps, Services};
 use ports::{
     ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo, SessionRepo, SettingsRepo,
-    StorageHealth, TagRepo, TaskSpawner, UserRepo,
+    SpawnedTask, StorageHealth, TagRepo, TaskSpawner, UserRepo,
 };
 
 use crate::{
@@ -25,8 +25,12 @@ use crate::{
 struct TokioSpawner;
 
 impl TaskSpawner for TokioSpawner {
-    fn spawn(&self, task: Pin<Box<dyn Future<Output = ()> + Send + 'static>>) {
-        tokio::spawn(task);
+    fn spawn(&self, what: &'static str, task: SpawnedTask) {
+        tokio::spawn(async move {
+            if let Err(e) = task.await {
+                tracing::warn!(error = %e, "{what}");
+            }
+        });
     }
 }
 

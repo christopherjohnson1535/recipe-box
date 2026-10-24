@@ -5,8 +5,8 @@ use std::{sync::Arc, time::Instant};
 
 use async_trait::async_trait;
 use domain::{
-    AiProvider, DomainError, DomainResult, Image, MAX_TEXT_INPUT_CHARS, PAGE_MAX_BYTES, PhotoMode,
-    RecipeDraft, SourceType,
+    AiProvider, DomainError, DomainResult, Image, MAX_PHOTOS, MAX_TEXT_INPUT_CHARS, MIN_PAGE_CHARS,
+    PAGE_MAX_BYTES, PhotoMode, RecipeDraft, SourceType,
     source::{cleaned, normalize_url, shown_url},
     url::Url,
     uuid::Uuid,
@@ -127,6 +127,10 @@ impl ImportService {
                 image_url,
                 site_name,
             } => {
+                // Too little text to hold a recipe: not worth an AI call.
+                if text.chars().filter(|c| !c.is_whitespace()).count() < MIN_PAGE_CHARS {
+                    return Err(no_recipe());
+                }
                 // Outside the page budget: the AI call has its own timeout.
                 let mut d = match self.extractor.extract_text(&text).await {
                     Err(DomainError::NoRecipeFound(_)) => return Err(no_recipe()),
@@ -181,13 +185,26 @@ impl ImportService {
 
     /// Reads a recipe from photos (PHO-2–5): stores each (re-encoded) and sends them to the AI. The photos are
     /// kept when the AI cannot make a draft of them (`AiDisabled`, `NoRecipeFound`, `Ai`) and deleted again on any
-    /// other failure, including when the caller drops this future (a client that disconnects).
+    /// other failure, including when the caller drops this future (a client that disconnects). `Validation` for
+    /// no photos or more than [`MAX_PHOTOS`]; nothing is stored then.
     pub async fn from_photos(
         &self,
         user_id: Uuid,
         files: Vec<Vec<u8>>,
         mode: PhotoMode,
     ) -> Result<Imported, PhotoFailure> {
+        let too_few_or_many = match files.len() {
+            0 => Some("files: send 1 to 6 photos."),
+            n if n > MAX_PHOTOS => Some("files: send at most 6 photos."),
+            _ => None,
+        };
+        if let Some(message) = too_few_or_many {
+            return Err(PhotoFailure {
+                error: DomainError::validation(message),
+                kept: None,
+                notes: ImportNotes::default(),
+            });
+        }
         let (mut images, mut jpegs, mut notes) = (Vec::new(), Vec::new(), ImportNotes::default());
         let mut stored = StoredGuard::new(&self.media, &self.spawner);
         for data in files {
@@ -335,10 +352,19 @@ impl Drop for StoredGuard {
     fn drop(&mut self) {
         if self.armed && !self.ids.is_empty() {
             let (media, ids) = (self.media.clone(), std::mem::take(&mut self.ids));
-            // Nobody is left to log a failure here.
-            self.spawner.spawn(Box::pin(async move {
-                media.delete_images(&ids).await;
-            }));
+            // Nobody is left to see the result, so the spawner logs a failure. A rendition warning for these photos
+            // is not logged: they are gone, and every completed path logs its own.
+            self.spawner.spawn(
+                "could not delete images of a failed request",
+                Box::pin(async move {
+                    match media.delete_images(&ids).await {
+                        true => Ok(()),
+                        false => Err(DomainError::Internal(
+                            "the image rows could not be deleted".into(),
+                        )),
+                    }
+                }),
+            );
         }
     }
 }
