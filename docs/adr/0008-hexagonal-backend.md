@@ -6,17 +6,17 @@ Status: Proposed · Date: 2026-10-24
 The backend is one crate in which the layers are tangled. SQL lives in route handlers (`routes/recipes.rs` alone has about 33 sqlx calls). Domain types derive `sqlx::FromRow`, `sqlx::Type` and `utoipa::ToSchema`, and `error.rs` converts `sqlx::Error`. Media calls `tokio::fs` directly from the routes. `AppState` holds a concrete `PgPool` and `reqwest::Client`, so nothing can be swapped. This matters because we want a new storage (another database, object storage for photos), new inbound interfaces (CLI, gRPC, jobs) that reuse the same use cases, and language SDKs generated from a stable OpenAPI contract. Today each of those means touching every route.
 
 ## Decision
-Make `backend/Cargo.toml` a Cargo workspace. The dependency rule is adapters → app → ports → domain, never the reverse. The compiler enforces it, and a `cargo tree` check in CI fails if `domain`, `ports` or `app` pull in axum, sqlx, reqwest or `tokio::fs`.
+Make `backend/Cargo.toml` a Cargo workspace. The dependency rule is adapters → app → ports → domain, never the reverse. The compiler enforces it. A `cargo tree` check in the CI backend job already fails if `domain` depends on axum, sqlx, reqwest, tokio, utoipa or hyper; it will be extended to `ports` and `app` as those crates appear.
 
 | Crate | Holds | May depend on |
 |---|---|---|
-| `domain` | Recipe, User, Image, validation, time rules, `DomainError` | serde, chrono, uuid, thiserror |
+| `domain` | Recipe, User, Image, validation, time rules, `DomainError` | chrono, uuid, thiserror, url; serde only if a domain type ever needs it (none does today) |
 | `ports` | Outbound traits: `RecipeRepo`, `UserRepo`, `SessionRepo`, `MediaStore`, `RecipeExtractor`, `PageFetcher`, `Clock`, ... | `domain` |
 | `app` | Use-case services (recipes, imports, media, auth, export, maintenance) | `domain`, `ports` |
 | `adapters-*` | Inbound `http` (routes, DTOs, OpenAPI); outbound `postgres`, `fs-media`, `anthropic`, `http-fetch`, `memory` | layers above plus their own infra crates |
 | `server` | `main.rs`: config, wiring, router, background tasks | everything |
 
-Errors are split: `DomainError` (not found, validation, conflict, forbidden) lives in `domain`; `AppError`, status codes and the error body live in the HTTP adapter, with `From<DomainError>`.
+Errors are split: `DomainError` lives in `domain`. It starts with `Validation` and gains variants (not found, conflict, forbidden) as later phases need them; `AppError`, status codes and the error body live in the HTTP adapter, with `From<DomainError>`.
 
 Search is described in domain terms (`SearchQuery { text, tag, sort, limit, offset }` returning a page of summaries) and each `RecipeRepo` adapter decides how. The cases in `backend/tests/search.rs` become a storage contract suite every adapter must pass. A separate `SearchIndex` port (Tantivy, Meilisearch) is deferred until a second storage exists.
 

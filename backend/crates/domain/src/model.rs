@@ -1,23 +1,20 @@
 //! Domain types. JSON shape and OpenAPI schemas live on the HTTP types in the API crate's `models.rs`.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::ROLE_ADMIN;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ingredient {
     pub text: String,
-    #[serde(default)]
     pub section: Option<String>,
 }
 
 /// Same shape as [`Ingredient`].
 pub type Step = Ingredient;
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum SourceType {
     #[default]
     Manual,
@@ -26,8 +23,7 @@ pub enum SourceType {
     Text,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[derive(Debug, Clone, Default)]
 pub struct RecipeInput {
     pub title: String,
     pub description: String,
@@ -46,15 +42,13 @@ pub struct RecipeInput {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct UserRef {
     pub id: Uuid,
     pub display_name: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct Recipe {
     pub id: Uuid,
     pub title: String,
@@ -82,8 +76,7 @@ pub struct Recipe {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct RecipeSummary {
     pub id: Uuid,
     pub title: String,
@@ -92,17 +85,14 @@ pub struct RecipeSummary {
     pub tags: Vec<String>,
     pub image_url: Option<String>,
     pub image_display_url: Option<String>,
-    #[serde(skip)]
     pub image_file: Option<String>,
-    #[serde(skip)]
     pub image_display_file: Option<String>,
     pub source_type: SourceType,
     pub updated_at: DateTime<Utc>,
 }
 
 /// What an import returns; never saved by it.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default)]
 pub struct RecipeDraft {
     pub title: String,
     pub description: String,
@@ -124,8 +114,7 @@ pub struct RecipeDraft {
     pub duplicate_of: Option<Uuid>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -140,8 +129,7 @@ impl User {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct Image {
     pub id: Uuid,
     pub url: String,
@@ -149,4 +137,30 @@ pub struct Image {
     pub display_url: Option<String>,
     pub width: i32,
     pub height: i32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn user(role: &str) -> User {
+        User {
+            id: Uuid::nil(),
+            username: "u".into(),
+            display_name: "U".into(),
+            role: role.into(),
+            created_at: DateTime::<Utc>::UNIX_EPOCH,
+        }
+    }
+
+    #[test]
+    fn is_admin_only_for_admin_role() {
+        assert!(user(ROLE_ADMIN).is_admin());
+        assert!(!user("member").is_admin());
+    }
+
+    #[test]
+    fn source_type_defaults_to_manual() {
+        assert_eq!(SourceType::default(), SourceType::Manual);
+    }
 }

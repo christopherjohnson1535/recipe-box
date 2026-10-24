@@ -9,7 +9,6 @@ name = "domain"
 
 [dependencies]
 chrono.workspace = true
-serde.workspace = true
 thiserror.workspace = true
 url.workspace = true
 uuid.workspace = true

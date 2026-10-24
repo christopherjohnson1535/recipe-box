@@ -9,11 +9,11 @@ members = [".", "crates/domain"]
 default-members = [".", "crates/domain"]
 
 [workspace.dependencies]
-chrono = { version = "0.4", features = ["serde"] }
+chrono = "0.4"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 url = "2"
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dependencies]
 recipe-box-domain = { path = "crates/domain" }
@@ -23,7 +23,7 @@ axum = { version = "0.8", features = ["macros", "multipart"] }
 axum-extra = { version = "0.12", features = ["cookie"] }
 base64 = "0.23"
 cookie = "0.18" # already pulled in by axum-extra; needed for its re-exported `time::Duration` (Max-Age)
-chrono.workspace = true
+chrono = { workspace = true, features = ["serde"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 rand = "0.10"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json"] }
@@ -37,7 +37,7 @@ tower-http = { version = "0.7", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url.workspace = true
-uuid.workspace = true
+uuid = { workspace = true, features = ["serde"] }
 scraper = "0.29.0"
 utoipa = { version = "6", features = ["chrono", "uuid"] }
 

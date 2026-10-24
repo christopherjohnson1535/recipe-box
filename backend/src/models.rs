@@ -175,7 +175,7 @@ macro_rules! user_columns {
 pub fn role_schema() -> utoipa::openapi::Object {
     utoipa::openapi::Object::builder()
         .schema_type(utoipa::openapi::Type::String)
-        .enum_values(Some(["admin", "member"]))
+        .enum_values(Some([domain::ROLE_ADMIN, "member"]))
         .build()
 }
 
@@ -208,6 +208,7 @@ pub fn media_url(file_name: &str) -> String {
 pub struct BinaryFile(Vec<u8>);
 
 // Conversions to and from the domain types; only what the routes need (validation of a recipe body).
+// The DTOs above mirror the domain types until the services phase (#91) removes the duplication.
 
 impl From<Ingredient> for domain::Ingredient {
     fn from(i: Ingredient) -> Self {
@@ -290,5 +291,89 @@ impl From<domain::RecipeInput> for RecipeInput {
             photo_image_ids: r.photo_image_ids,
             tags: r.tags,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_type_round_trips() {
+        for (api, dom) in [
+            (SourceType::Manual, domain::SourceType::Manual),
+            (SourceType::Link, domain::SourceType::Link),
+            (SourceType::Photo, domain::SourceType::Photo),
+            (SourceType::Text, domain::SourceType::Text),
+        ] {
+            assert_eq!(domain::SourceType::from(api), dom);
+            assert_eq!(SourceType::from(dom), api);
+        }
+    }
+
+    #[test]
+    fn ingredient_round_trips() {
+        let api = Ingredient {
+            text: "flour".into(),
+            section: Some("dough".into()),
+        };
+        let dom = domain::Ingredient::from(api.clone());
+        assert_eq!(dom.text, "flour");
+        assert_eq!(dom.section.as_deref(), Some("dough"));
+        assert_eq!(Ingredient::from(dom), api);
+    }
+
+    #[test]
+    fn recipe_input_round_trips() {
+        let id = Uuid::new_v4();
+        let api = RecipeInput {
+            title: "Soup".into(),
+            description: "d".into(),
+            ingredients: vec![Ingredient {
+                text: "a".into(),
+                section: None,
+            }],
+            steps: vec![Ingredient {
+                text: "b".into(),
+                section: Some("s".into()),
+            }],
+            servings: Some("4".into()),
+            prep_minutes: Some(1),
+            cook_minutes: Some(2),
+            total_minutes: Some(3),
+            notes: "n".into(),
+            source_url: Some("https://x.test".into()),
+            source_name: Some("X".into()),
+            source_type: SourceType::Link,
+            image_id: Some(id),
+            photo_image_ids: vec![id],
+            tags: vec!["t".into()],
+        };
+        let dom = domain::RecipeInput::from(api.clone());
+        assert_eq!(dom.title, "Soup");
+        assert_eq!(dom.source_type, domain::SourceType::Link);
+        assert_eq!(dom.photo_image_ids, vec![id]);
+        let back = RecipeInput::from(dom);
+        assert_eq!(back.title, api.title);
+        assert_eq!(back.ingredients, api.ingredients);
+        assert_eq!(back.steps, api.steps);
+        assert_eq!(back.source_type, SourceType::Link);
+        assert_eq!(back.image_id, Some(id));
+        assert_eq!(back.total_minutes, Some(3));
+        assert_eq!(back.tags, api.tags);
+    }
+
+    #[test]
+    fn user_is_admin_uses_domain_role() {
+        let mut u = User {
+            id: Uuid::nil(),
+            username: "u".into(),
+            display_name: "U".into(),
+            role: domain::ROLE_ADMIN.into(),
+            created_at: DateTime::<Utc>::UNIX_EPOCH,
+        };
+        assert!(u.is_admin());
+        u.role = "member".into();
+        assert!(!u.is_admin());
     }
 }
