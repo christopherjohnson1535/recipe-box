@@ -225,8 +225,9 @@ fn display_jpeg(original: &[u8], id: Uuid) -> AppResult<Vec<u8>> {
     encode_jpeg(&plate, DISPLAY_QUALITY)
 }
 
-/// Makes and stores the rendition of one image whose original is on disk, if it has none yet.
-pub async fn render_display(pool: &PgPool, media_dir: &Path, id: Uuid) -> AppResult<()> {
+/// Makes and stores the rendition of one image whose original is on disk, if it has none yet. Returns false when
+/// the image row is gone (or was rendered meanwhile) and the file just written was removed again.
+pub async fn render_display(pool: &PgPool, media_dir: &Path, id: Uuid) -> AppResult<bool> {
     let original = tokio::fs::read(media_dir.join(format!("{id}.jpg")))
         .await
         .map_err(|e| anyhow!("read original of {id}: {e}"))?;
@@ -237,14 +238,29 @@ pub async fn render_display(pool: &PgPool, media_dir: &Path, id: Uuid) -> AppRes
     tokio::fs::write(media_dir.join(&name), bytes)
         .await
         .map_err(|e| anyhow!("write {name}: {e}"))?;
-    sqlx::query(
+    let updated = sqlx::query(
         "update images set display_file_name = $2 where id = $1 and display_file_name is null",
     )
     .bind(id)
     .bind(&name)
     .execute(pool)
+    .await?
+    .rows_affected();
+    if updated == 1 {
+        return Ok(true);
+    }
+    // The row was deleted meanwhile, or a concurrent run already points at this same file: keep it only then.
+    let in_use: bool = sqlx::query_scalar(
+        "select exists(select 1 from images where id = $1 and display_file_name = $2)",
+    )
+    .bind(id)
+    .bind(&name)
+    .fetch_one(pool)
     .await?;
-    Ok(())
+    if !in_use {
+        let _ = tokio::fs::remove_file(media_dir.join(&name)).await;
+    }
+    Ok(false)
 }
 
 /// Gives every image without a rendition one, one at a time; returns how many were made. An image that cannot be
@@ -264,7 +280,8 @@ pub async fn backfill_displays(pool: &PgPool, media_dir: &Path) -> u64 {
     let mut made = 0;
     for id in ids {
         match render_display(pool, media_dir, id).await {
-            Ok(()) => made += 1,
+            Ok(true) => made += 1,
+            Ok(false) => {}
             Err(e) => tracing::warn!(%id, error = ?e, "display backfill: skipped an image"),
         }
     }

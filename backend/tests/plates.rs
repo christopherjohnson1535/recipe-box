@@ -4,7 +4,11 @@ mod common;
 
 use axum::http::StatusCode;
 use common::{TestApp, a_recipe, a_user};
-use recipe_box_api::routes::media::{backfill_displays, reencode};
+use recipe_box_api::{
+    config::Config,
+    routes::media::{backfill_displays, delete_images, reencode, render_display},
+    state::AppState,
+};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -169,4 +173,56 @@ async fn backfill_renders_missing_plates_and_skips_unreadable_originals() {
     assert_eq!(still_null, 1);
     // Idempotent: nothing new to make, the unreadable one is skipped again.
     assert_eq!(backfill_displays(&app.pool, &app.media_dir).await, 0);
+}
+
+#[tokio::test]
+async fn a_rendition_of_a_deleted_image_is_not_left_behind() {
+    let app = TestApp::spawn_as_admin().await;
+    let id = Uuid::new_v4();
+    // The original is on disk but its row is gone (deleted while the backfill was rendering).
+    std::fs::write(
+        app.media_dir.join(format!("{id}.jpg")),
+        reencode(&png()).unwrap().bytes,
+    )
+    .unwrap();
+    assert!(!render_display(&app.pool, &app.media_dir, id).await.unwrap());
+    assert!(!app.media_dir.join(format!("{id}.display.jpg")).exists());
+}
+
+#[tokio::test]
+async fn deleting_images_removes_the_original_and_the_rendition() {
+    let app = TestApp::spawn_as_admin().await;
+    let image = upload(&app).await;
+    assert_eq!(std::fs::read_dir(&app.media_dir).unwrap().count(), 2);
+    let config = Config {
+        database_url: String::new(),
+        media_dir: app.media_dir.clone(),
+        bind_addr: "127.0.0.1:0".into(),
+        cookie_secure: false,
+        session_days: 30,
+        ai_provider: "none".into(),
+        anthropic_api_key: None,
+        ai_model: "test".into(),
+        max_upload_mb: 2,
+    };
+    let state = AppState::new(app.pool.clone(), config).unwrap();
+    let id: Uuid = image["id"].as_str().unwrap().parse().unwrap();
+    delete_images(&state, &[id]).await;
+    assert_eq!(std::fs::read_dir(&app.media_dir).unwrap().count(), 0);
+    let rows: i64 = sqlx::query_scalar("select count(*) from images")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0);
+}
+
+#[tokio::test]
+async fn an_unknown_rendition_is_not_found() {
+    let app = TestApp::spawn_as_admin().await;
+    app.get(
+        &format!("/media/{}.display.jpg", Uuid::new_v4()),
+        &app.cookie,
+    )
+    .await
+    .assert_error(StatusCode::NOT_FOUND, "not_found");
 }
