@@ -9,7 +9,7 @@ export function ToastRegion({ children }: { children?: ReactNode }) {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-gutter pb-[max(1rem,env(safe-area-inset-bottom))] print:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 pl-[max(var(--gutter),env(safe-area-inset-left))] pr-[max(var(--gutter),env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] print:hidden"
     >
       {children}
     </div>
