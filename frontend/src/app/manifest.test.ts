@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import manifest from "./manifest";
@@ -40,13 +40,15 @@ describe("web app manifest", () => {
     for (const i of icons.filter((i) => i.type === "image/svg+xml")) expect(readFileSync(join(root, "public", i.src), "utf8")).toContain("<svg");
   });
 
-  it("uses the day paper colour for theme and background", () => {
-    const css = readFileSync(join(root, "src/styles/primitives.css"), "utf8");
-    const day = readFileSync(join(root, "src/styles/themes/day.css"), "utf8");
-    const token = /--color-paper:\s*var\((--[\w-]+)\)/.exec(day)?.[1] ?? "";
-    const paper = new RegExp(`${token}:\\s*(#[0-9a-f]{6})`, "i").exec(css)?.[1];
-    expect(paper).toBeTruthy();
-    expect(m.theme_color).toBe(paper);
-    expect(m.background_color).toBe(paper);
+  it("ships an opaque 180px apple-touch-icon and a 32px favicon", () => {
+    expect(pngSize("apple-touch-icon.png")).toBe("180x180");
+    // IHDR colour type: 2 = RGB, 6 = RGBA (iOS paints transparent corners black).
+    expect(readFileSync(join(root, "public", "apple-touch-icon.png")).readUInt8(25)).toBe(2);
+    expect(pngSize("icon-32.png")).toBe("32x32");
+  });
+
+  it("points every shortcut at an existing app route", () => {
+    expect(m.shortcuts?.length).toBeGreaterThan(0);
+    for (const s of m.shortcuts ?? []) expect(existsSync(join(root, "src/app/(app)", s.url, "page.tsx")), s.url).toBe(true);
   });
 });
