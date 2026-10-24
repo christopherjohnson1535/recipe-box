@@ -42,6 +42,11 @@ for (const [stack, metrics] of Object.entries(current)) {
     rows.push(`| ${stack} | ${metric} | ${was}% | ${now}% | ${delta >= 0 ? "+" : ""}${delta} | ${bad ? "FAIL" : "ok"} |`);
   }
 }
+if (process.env.GITHUB_ACTIONS) {
+  // A notice shows the numbers on the PR's checks page without opening the job log.
+  const flat = Object.entries(current).flatMap(([s, m]) => Object.entries(m).map(([k, v]) => `${s} ${k} ${v}%`));
+  console.error(`::notice title=Coverage::${flat.join(", ")}`);
+}
 console.log(["## Coverage", "", "| Stack | Metric | Baseline | Now | Change | |", "|---|---|---|---|---|---|", ...rows].join("\n"));
 if (failed) {
   console.log(`\nCoverage dropped by more than ${TOLERANCE} points. Add tests, or see docs on raising/lowering the baseline.`);
