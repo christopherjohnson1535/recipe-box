@@ -12,8 +12,8 @@ use utoipa::{
     },
 };
 
-use super::{auth, export, health, imports, media, recipes, settings, setup, tags, users};
-use crate::auth::session::COOKIE_NAME;
+use super::{auth, export, health, media, recipes, settings, setup, tags, users};
+use crate::extract::COOKIE_NAME;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -39,10 +39,6 @@ use crate::auth::session::COOKIE_NAME;
         tags::list,
         media::upload,
         media::serve,
-        imports::capabilities,
-        imports::from_url,
-        imports::from_text,
-        imports::from_photo,
         users::list,
         users::create,
         users::remove,
@@ -51,9 +47,8 @@ use crate::auth::session::COOKIE_NAME;
         export::import_zip,
     ),
     components(schemas(recipes::RecipeSort)), // only named in a query parameter's `value_type`
-    modifiers(&Session, &CommonErrors, &ExtensibleErrorCode),
 )]
-pub struct ApiDoc;
+struct ApiDoc;
 
 /// The `rb_session` cookie, referenced by every operation that needs a signed-in user.
 struct Session;
@@ -142,12 +137,23 @@ fn add_error(op: &mut Operation, status: &str, description: &str) {
         .or_insert_with(|| response.into());
 }
 
+/// The spec: this crate's paths plus `extra` (the server's own routes), then the modifiers, which therefore apply
+/// to all of them. `version` is the server's.
+pub fn spec(extra: Spec, version: &str) -> Spec {
+    let mut spec = ApiDoc::openapi();
+    spec.merge(extra);
+    let modifiers: [&dyn Modify; 3] = [&Session, &CommonErrors, &ExtensibleErrorCode];
+    for m in modifiers {
+        m.modify(&mut spec);
+    }
+    spec.info.version = version.to_string();
+    spec
+}
+
 /// The spec as pretty JSON with a trailing newline. Keys are sorted (serde_json without `preserve_order`), so
 /// the output is byte-for-byte stable.
-pub fn json() -> String {
-    let mut spec = ApiDoc::openapi();
-    spec.info.version = env!("CARGO_PKG_VERSION").to_string();
-    let mut out = serde_json::to_string_pretty(&spec).expect("spec serializes");
+pub fn json(extra: Spec, version: &str) -> String {
+    let mut out = serde_json::to_string_pretty(&spec(extra, version)).expect("spec serializes");
     out.push('\n');
     out
 }

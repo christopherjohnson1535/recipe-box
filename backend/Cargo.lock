@@ -2396,6 +2396,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "recipe-box-adapter-http"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "axum-extra",
+ "chrono",
+ "cookie",
+ "recipe-box-app",
+ "recipe-box-domain",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tower-http 0.7.1",
+ "tracing",
+ "utoipa",
+ "uuid",
+]
+
+[[package]]
 name = "recipe-box-adapter-memory"
 version = "0.1.0"
 dependencies = [
@@ -2423,17 +2443,18 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "async-trait",
  "axum",
- "axum-extra",
  "base64 0.23.1",
  "chrono",
- "cookie",
  "futures-util",
  "http-body-util",
  "image",
  "rand 0.10.3",
  "recipe-box-adapter-fs-media",
+ "recipe-box-adapter-http",
  "recipe-box-adapter-postgres",
+ "recipe-box-app",
  "recipe-box-domain",
  "recipe-box-ports",
  "reqwest",
@@ -2443,10 +2464,8 @@ dependencies = [
  "sha2 0.11.1",
  "sqlx",
  "testcontainers-modules",
- "thiserror",
  "tokio",
  "tower",
- "tower-http 0.7.1",
  "tracing",
  "tracing-subscriber",
  "url",

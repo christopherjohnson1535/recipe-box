@@ -2,7 +2,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::state::AppState;
+use crate::HttpState;
 
 #[derive(Serialize, ToSchema)]
 pub struct Health {
@@ -16,9 +16,9 @@ pub struct Health {
     (status = 200, description = "API and database are up.", body = Health),
     (status = 503, description = "The database check failed (`db` is `error`).", body = Health),
 ))]
-pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<Health>) {
-    let version = env!("CARGO_PKG_VERSION");
-    match state.health.ping().await {
+pub async fn health(State(state): State<HttpState>) -> (StatusCode, Json<Health>) {
+    let version = state.config.version;
+    match state.services.maintenance.ping().await {
         Ok(_) => (
             StatusCode::OK,
             Json(Health {

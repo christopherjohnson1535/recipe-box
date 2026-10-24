@@ -1,15 +1,14 @@
 use axum::{Json, extract::State, http::StatusCode};
-use domain::{SearchQuery, Sort};
+use domain::Sort;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{
-    auth::CurrentUser,
+    HttpState,
+    dto::{Recipe, RecipeInput, RecipeSummary},
     error::{AppError, AppJson, AppPath, AppQuery, AppResult, ErrorBody},
-    models::{Recipe, RecipeInput, RecipeSummary},
-    state::AppState,
-    validate,
+    extract::CurrentUser,
 };
 
 /// Sort orders for `GET /api/recipes`; the handler matches the raw string, so anything else is a 400.
@@ -65,16 +64,10 @@ pub struct RecipePage {
     (status = 400, description = "Bad `limit`, `offset` or `sort` (`validation`).", body = ErrorBody),
 ))]
 pub async fn list(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     _user: CurrentUser,
     AppQuery(q): AppQuery<ListQuery>,
 ) -> AppResult<Json<RecipePage>> {
-    if !(1..=200).contains(&q.limit) {
-        return Err(AppError::validation("limit: 1–200."));
-    }
-    if q.offset < 0 {
-        return Err(AppError::validation("offset: must be 0 or more."));
-    }
     // Ranked by relevance when searching and no sort was asked for.
     let sort = match q.sort.as_deref() {
         None => Sort::Default,
@@ -84,22 +77,12 @@ pub async fn list(
         _ => return Err(AppError::validation("sort: newest, title or time.")),
     };
     let page = state
+        .services
         .recipes
-        .search(SearchQuery {
-            text: q.q,
-            tag: q.tag,
-            sort,
-            limit: q.limit,
-            offset: q.offset,
-        })
+        .search(q.q, q.tag, sort, q.limit, q.offset)
         .await?;
-    let plate = plate_treatment(&state).await?;
     Ok(Json(RecipePage {
-        items: page
-            .items
-            .into_iter()
-            .map(|r| RecipeSummary::from_domain(r, plate))
-            .collect(),
+        items: page.items.into_iter().map(Into::into).collect(),
         total: page.total,
     }))
 }
@@ -110,13 +93,12 @@ pub async fn list(
     (status = 400, description = "Invalid field or unknown image id (`validation`).", body = ErrorBody),
 ))]
 pub async fn create(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     CurrentUser(user): CurrentUser,
     AppJson(input): AppJson<RecipeInput>,
 ) -> AppResult<(StatusCode, Json<Recipe>)> {
-    let input = validate::recipe(input.into())?;
-    let recipe = state.recipes.create(user.id, input).await?;
-    Ok((StatusCode::CREATED, Json(response(&state, recipe).await?)))
+    let recipe = state.services.recipes.create(user.id, input.into()).await?;
+    Ok((StatusCode::CREATED, Json(recipe.into())))
 }
 
 /// One live recipe.
@@ -127,12 +109,11 @@ pub async fn create(
     (status = 404, description = "No such recipe, or deleted (`not_found`).", body = ErrorBody),
 ))]
 pub async fn get(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     _user: CurrentUser,
     AppPath(id): AppPath<Uuid>,
 ) -> AppResult<Json<Recipe>> {
-    let recipe = state.recipes.get(id).await?.ok_or_else(not_found)?;
-    Ok(Json(response(&state, recipe).await?))
+    Ok(Json(state.services.recipes.get(id).await?.into()))
 }
 
 /// Replaces every field of a live recipe.
@@ -143,14 +124,17 @@ pub async fn get(
     (status = 404, description = "No such recipe, or deleted (`not_found`).", body = ErrorBody),
 ))]
 pub async fn update(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     CurrentUser(user): CurrentUser,
     AppPath(id): AppPath<Uuid>,
     AppJson(input): AppJson<RecipeInput>,
 ) -> AppResult<Json<Recipe>> {
-    let input = validate::recipe(input.into())?;
-    let recipe = state.recipes.update(id, user.id, input).await?;
-    Ok(Json(response(&state, recipe).await?))
+    let recipe = state
+        .services
+        .recipes
+        .update(id, user.id, input.into())
+        .await?;
+    Ok(Json(recipe.into()))
 }
 
 /// Soft delete; the row is purged a day later.
@@ -161,11 +145,11 @@ pub async fn update(
     (status = 404, description = "No such recipe, or already deleted (`not_found`).", body = ErrorBody),
 ))]
 pub async fn remove(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     _user: CurrentUser,
     AppPath(id): AppPath<Uuid>,
 ) -> AppResult<StatusCode> {
-    state.recipes.soft_delete(id).await?;
+    state.services.recipes.delete(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -178,24 +162,9 @@ pub async fn remove(
     (status = 409, description = "Deleted too long ago (`conflict`).", body = ErrorBody),
 ))]
 pub async fn restore(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     _user: CurrentUser,
     AppPath(id): AppPath<Uuid>,
 ) -> AppResult<Json<Recipe>> {
-    let recipe = state.recipes.restore(id).await?;
-    Ok(Json(response(&state, recipe).await?))
-}
-
-fn not_found() -> AppError {
-    AppError::NotFound("Recipe not found.".into())
-}
-
-/// Whether recipe responses show the print-style rendition (the household setting); the repositories return it
-/// whenever one exists.
-async fn plate_treatment(state: &AppState) -> AppResult<bool> {
-    Ok(state.settings.get().await?.plate_treatment)
-}
-
-async fn response(state: &AppState, recipe: domain::Recipe) -> AppResult<Recipe> {
-    Ok(Recipe::from_domain(recipe, plate_treatment(state).await?))
+    Ok(Json(state.services.recipes.restore(id).await?.into()))
 }

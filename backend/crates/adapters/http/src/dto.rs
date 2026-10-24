@@ -164,12 +164,6 @@ pub fn role_schema() -> utoipa::openapi::Object {
         .build()
 }
 
-impl User {
-    pub fn is_admin(&self) -> bool {
-        self.role == domain::ROLE_ADMIN
-    }
-}
-
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Image {
@@ -204,15 +198,21 @@ impl From<domain::User> for User {
     }
 }
 
-/// The plate-treatment rendition's URL, hidden when the household setting is off.
-fn display_url(file: Option<&str>, plate_treatment: bool) -> Option<String> {
-    file.filter(|_| plate_treatment).map(media_url)
+impl From<domain::Image> for Image {
+    fn from(i: domain::Image) -> Self {
+        Self {
+            id: i.id,
+            url: media_url(&i.file_name),
+            display_url: i.display_file_name.as_deref().map(media_url),
+            width: i.width,
+            height: i.height,
+        }
+    }
 }
 
-impl Recipe {
-    /// The API shape of a stored recipe. `plate_treatment` is the household setting: when off, the rendition is
-    /// hidden (the repository returns it whenever one exists).
-    pub fn from_domain(r: domain::Recipe, plate_treatment: bool) -> Self {
+impl From<domain::Recipe> for Recipe {
+    /// `image_display_file` is already hidden by the service when the household setting is off.
+    fn from(r: domain::Recipe) -> Self {
         let user_ref = |u: Option<domain::UserRef>| {
             u.map(|u| UserRef {
                 id: u.id,
@@ -237,7 +237,7 @@ impl Recipe {
             photo_image_ids: r.photo_image_ids,
             tags: r.tags,
             image_url: r.image_file.as_deref().map(media_url),
-            image_display_url: display_url(r.image_display_file.as_deref(), plate_treatment),
+            image_display_url: r.image_display_file.as_deref().map(media_url),
             photo_urls: r.photo_files.iter().map(|f| media_url(f)).collect(),
             created_by: user_ref(r.created_by),
             updated_by: user_ref(r.updated_by),
@@ -247,9 +247,8 @@ impl Recipe {
     }
 }
 
-impl RecipeSummary {
-    /// As [`Recipe::from_domain`].
-    pub fn from_domain(r: domain::RecipeSummary, plate_treatment: bool) -> Self {
+impl From<domain::RecipeSummary> for RecipeSummary {
+    fn from(r: domain::RecipeSummary) -> Self {
         Self {
             id: r.id,
             title: r.title,
@@ -257,15 +256,16 @@ impl RecipeSummary {
             total_minutes: r.total_minutes,
             tags: r.tags,
             image_url: r.image_file.as_deref().map(media_url),
-            image_display_url: display_url(r.image_display_file.as_deref(), plate_treatment),
+            image_display_url: r.image_display_file.as_deref().map(media_url),
             source_type: r.source_type.into(),
             updated_at: r.updated_at,
         }
     }
 }
 
-// Conversions to and from the domain types; only what the routes need (validation of a recipe body).
-// The DTOs above mirror the domain types until the services phase (#91) removes the duplication.
+// Conversions to and from the domain types. The DTOs carry `ToSchema` (the domain has no OpenAPI dependency), so
+// they stay separate types; the mapping lives here and nowhere else. `Ingredient`, `SourceType` and `RecipeDraft`
+// are also what the import code builds, until the import ports (#92) move that behind the domain types.
 
 impl From<Ingredient> for domain::Ingredient {
     fn from(i: Ingredient) -> Self {
@@ -329,28 +329,6 @@ impl From<RecipeInput> for domain::RecipeInput {
     }
 }
 
-impl From<domain::RecipeInput> for RecipeInput {
-    fn from(r: domain::RecipeInput) -> Self {
-        Self {
-            title: r.title,
-            description: r.description,
-            ingredients: r.ingredients.into_iter().map(Into::into).collect(),
-            steps: r.steps.into_iter().map(Into::into).collect(),
-            servings: r.servings,
-            prep_minutes: r.prep_minutes,
-            cook_minutes: r.cook_minutes,
-            total_minutes: r.total_minutes,
-            notes: r.notes,
-            source_url: r.source_url,
-            source_name: r.source_name,
-            source_type: r.source_type.into(),
-            image_id: r.image_id,
-            photo_image_ids: r.photo_image_ids,
-            tags: r.tags,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn recipe_input_round_trips() {
+    fn recipe_input_maps_every_field() {
         let id = Uuid::new_v4();
         let api = RecipeInput {
             title: "Soup".into(),
@@ -410,27 +388,10 @@ mod tests {
         assert_eq!(dom.title, "Soup");
         assert_eq!(dom.source_type, domain::SourceType::Link);
         assert_eq!(dom.photo_image_ids, vec![id]);
-        let back = RecipeInput::from(dom);
-        assert_eq!(back.title, api.title);
-        assert_eq!(back.ingredients, api.ingredients);
-        assert_eq!(back.steps, api.steps);
-        assert_eq!(back.source_type, SourceType::Link);
-        assert_eq!(back.image_id, Some(id));
-        assert_eq!(back.total_minutes, Some(3));
-        assert_eq!(back.tags, api.tags);
-    }
-
-    #[test]
-    fn user_is_admin_uses_domain_role() {
-        let mut u = User {
-            id: Uuid::nil(),
-            username: "u".into(),
-            display_name: "U".into(),
-            role: domain::ROLE_ADMIN.into(),
-            created_at: DateTime::<Utc>::UNIX_EPOCH,
-        };
-        assert!(u.is_admin());
-        u.role = "member".into();
-        assert!(!u.is_admin());
+        assert_eq!(dom.ingredients[0].text, "a");
+        assert_eq!(dom.steps[0].section.as_deref(), Some("s"));
+        assert_eq!(dom.image_id, Some(id));
+        assert_eq!(dom.total_minutes, Some(3));
+        assert_eq!(dom.tags, api.tags);
     }
 }

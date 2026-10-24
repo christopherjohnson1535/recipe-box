@@ -3,11 +3,13 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use super::not_implemented;
-use crate::models::BinaryFile;
+use axum::{extract::State, http::StatusCode};
+
 use crate::{
-    auth::AdminUser,
-    error::{AppError, ErrorBody},
+    HttpState,
+    dto::BinaryFile,
+    error::{AppResult, ErrorBody},
+    extract::AdminUser,
 };
 
 /// Result of importing a backup zip.
@@ -33,8 +35,12 @@ pub struct ImportExportForm {
     (status = 403, description = "Not an admin (`forbidden`).", body = ErrorBody),
     (status = 501, description = "Not built yet (`not_implemented`); every call returns this today.", body = ErrorBody),
 ))]
-pub async fn export_zip(_admin: AdminUser) -> AppError {
-    not_implemented("Export")
+pub async fn export_zip(
+    State(state): State<HttpState>,
+    _admin: AdminUser,
+) -> AppResult<StatusCode> {
+    state.services.export.export()?;
+    Ok(StatusCode::OK)
 }
 
 /// Restores a backup zip, skipping recipes whose id exists. Admin only.
@@ -46,6 +52,10 @@ pub async fn export_zip(_admin: AdminUser) -> AppError {
     (status = 413, description = "Upload over `MAX_UPLOAD_MB` (`too_large`).", body = ErrorBody),
     (status = 501, description = "Not built yet (`not_implemented`); every call returns this today.", body = ErrorBody),
 ))]
-pub async fn import_zip(_admin: AdminUser) -> AppError {
-    not_implemented("Importing an export")
+pub async fn import_zip(
+    State(state): State<HttpState>,
+    _admin: AdminUser,
+) -> AppResult<StatusCode> {
+    state.services.export.import_backup()?;
+    Ok(StatusCode::OK)
 }

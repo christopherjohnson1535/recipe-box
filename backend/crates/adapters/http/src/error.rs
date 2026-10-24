@@ -171,6 +171,8 @@ impl From<domain::DomainError> for AppError {
             D::BlockedAddress => Self::BlockedAddress,
             D::SiteBlocked(m) => Self::SiteBlocked(m),
             D::FetchFailed(m) => Self::FetchFailed(m),
+            D::UnsupportedMedia(m) => Self::UnsupportedMedia(m),
+            D::NotImplemented(m) => Self::NotImplemented(m),
             D::Internal(m) => Self::Internal(anyhow::anyhow!(m)),
         }
     }
@@ -273,6 +275,8 @@ mod tests {
             (D::BlockedAddress, 422, "blocked_address"),
             (D::SiteBlocked(m()), 502, "site_blocked"),
             (D::FetchFailed(m()), 502, "fetch_failed"),
+            (D::UnsupportedMedia(m()), 415, "unsupported_media"),
+            (D::NotImplemented(m()), 501, "not_implemented"),
             (D::Internal(m()), 500, "internal"),
         ] {
             let (s, c) = AppError::from(e).status_and_code();

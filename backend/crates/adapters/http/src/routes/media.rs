@@ -4,16 +4,13 @@ use axum::{
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use domain::validate::media_file_name;
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 use crate::{
-    auth::CurrentUser,
+    HttpState,
+    dto::{BinaryFile, Image},
     error::{AppError, AppPath, AppResult, ErrorBody},
-    media,
-    models::{BinaryFile, Image},
-    state::AppState,
+    extract::CurrentUser,
 };
 
 /// Multipart body of `POST /api/media`.
@@ -34,7 +31,7 @@ pub struct UploadForm {
     (status = 415, description = "Not a readable image, or over 10,000 px a side or 40 megapixels (`unsupported_media`).", body = ErrorBody),
 ))]
 pub async fn upload(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     CurrentUser(user): CurrentUser,
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<Image>)> {
@@ -46,30 +43,11 @@ pub async fn upload(
         }
     }
     let data = data.ok_or_else(|| AppError::validation("file: missing."))?;
-    if data.len() > state.config.max_upload_bytes() {
+    if data.len() > state.config.max_upload_bytes {
         return Err(AppError::TooLarge);
     }
-    let image = store_image(&state, user.id, data.to_vec()).await?;
-    Ok((StatusCode::CREATED, Json(image)))
-}
-
-/// Decodes, re-encodes and stores an uploaded image, returning its row. Shared with photo import.
-pub async fn store_image(state: &AppState, user_id: Uuid, data: Vec<u8>) -> AppResult<Image> {
-    Ok(store_jpeg(state, user_id, data).await?.0)
-}
-
-/// Like [`store_image`], also returning the stored JPEG bytes (photo import sends them to the AI provider).
-pub async fn store_jpeg(
-    state: &AppState,
-    user_id: Uuid,
-    data: Vec<u8>,
-) -> AppResult<(Image, Vec<u8>)> {
-    media::store_jpeg(state.images.as_ref(), state.media.as_ref(), user_id, data).await
-}
-
-/// Deletes images stored by a request that then failed (row and file); best effort.
-pub async fn delete_images(state: &AppState, ids: &[Uuid]) {
-    media::delete_images(state.images.as_ref(), state.media.as_ref(), ids).await
+    let image = state.services.media.upload(user.id, data.to_vec()).await?;
+    Ok((StatusCode::CREATED, Json(image.into())))
 }
 
 /// A stored image.
@@ -80,18 +58,11 @@ pub async fn delete_images(state: &AppState, ids: &[Uuid]) {
     (status = 404, description = "No such image (`not_found`).", body = ErrorBody),
 ))]
 pub async fn serve(
-    State(state): State<AppState>,
+    State(state): State<HttpState>,
     _user: CurrentUser,
     AppPath(file_name): AppPath<String>,
 ) -> AppResult<impl IntoResponse> {
-    if !media_file_name(&file_name) {
-        return Err(AppError::NotFound("Image not found.".into()));
-    }
-    let bytes = state
-        .media
-        .get(&file_name)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Image not found.".into()))?;
+    let bytes = state.services.media.get(&file_name).await?;
     Ok((
         [
             (header::CONTENT_TYPE, "image/jpeg"),
@@ -102,33 +73,4 @@ pub async fn serve(
         ],
         bytes,
     ))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn file_name_rule() {
-        assert!(media_file_name("0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.jpg"));
-        assert!(!media_file_name("0B6A4B0E-3A8E-4A8F-9A5E-2F1F3C1D2E4F.jpg"));
-        assert!(!media_file_name("../../../../../../../../etc/passwd.jpg"));
-        assert!(!media_file_name("0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.png"));
-        assert!(!media_file_name(".jpg"));
-        assert!(media_file_name(
-            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.jpg"
-        ));
-        for bad in [
-            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.png",
-            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.display.jpg",
-            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.Display.jpg",
-            "../0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.jpg",
-            "../../../../../../../../etc/passwd.display.jpg",
-            "..%2f..%2fx.display.jpg",
-            ".display.jpg",
-            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4.display.jpg",
-        ] {
-            assert!(!media_file_name(bad), "{bad}");
-        }
-    }
 }
