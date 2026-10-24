@@ -279,9 +279,10 @@ describe("CookMode tick-off and views", () => {
     localStorage.setItem("cook-ticks:r1", JSON.stringify({ v: 1, at: FIXED_NOW.getTime(), ingredients: [0], steps: [0] }));
     const html = renderToString(<CookMode id="r1" title="T" ingredients={INGREDIENTS} steps={STEPS} />);
     expect(html).toContain("onion"); // the real markup rendered, with its ingredient buttons
-    expect(html.match(/<button[^>]*aria-pressed="false"/g)?.length).toBeGreaterThanOrEqual(INGREDIENTS.length);
+    const ssr = new DOMParser().parseFromString(html, "text/html");
+    expect(ssr.querySelectorAll('button[aria-pressed="false"]').length).toBeGreaterThanOrEqual(INGREDIENTS.length);
     // Only the "One step" view toggle is pressed: no ingredient or step button.
-    expect(html.match(/<button[^>]*aria-pressed="true"[^>]*>([^<]*)/g)?.map((m) => m.replace(/<[^>]*>/, ""))).toEqual(["One step"]);
+    expect([...ssr.querySelectorAll('button[aria-pressed="true"]')].map((b) => b.textContent)).toEqual(["One step"]);
     view();
     expect(pressed(ing(/onion/))).toBe("true");
     expect(screen.getByText("Step 2 of 3")).toBeTruthy(); // step 1 is done, so it opens on step 2
