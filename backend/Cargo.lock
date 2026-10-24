@@ -2386,6 +2386,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "recipe-box-adapter-memory"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "recipe-box-domain",
+ "recipe-box-ports",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "recipe-box-api"
 version = "0.1.0"
 dependencies = [
@@ -2425,6 +2437,17 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "thiserror",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "recipe-box-ports"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "recipe-box-domain",
  "url",
  "uuid",
 ]

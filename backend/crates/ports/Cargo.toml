@@ -1,0 +1,19 @@
+[package]
+name = "recipe-box-ports"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "ports"
+
+[features]
+# The storage contract suite (`ports::contract`). Adapters enable it as a dev-dependency feature.
+contract = []
+
+[dependencies]
+async-trait = "0.1"
+chrono.workspace = true
+recipe-box-domain = { path = "../domain" }
+url.workspace = true
+uuid.workspace = true
