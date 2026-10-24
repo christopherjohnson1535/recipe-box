@@ -8,7 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Heading } from "@/components/ui/Heading";
 import { Pending } from "@/components/ui/Pending";
 import { PhotoGallery } from "@/components/ui/PhotoPicker";
-import { DomainCard, ScanStage } from "@/components/ui/Darkroom";
+import { DomainCard, ScanHeading, ScanStage } from "@/components/ui/Darkroom";
 import { Tabs } from "@/components/ui/Tabs";
 import { Text } from "@/components/ui/Text";
 import { showSaveStamp } from "@/components/ui/save-stamp-store";
@@ -258,23 +258,25 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
     const duplicate = review.duplicateOf && !seenDuplicate;
     const card = review.from === "link" ? hostCard(review.initial.sourceUrl ?? "", review.initial.sourceName) : null;
     const boxes = review.regions.filter((r) => r.photo === 0);
-    const gallery = photos.length > 0 && (
-      <>
-        <Heading level={3} size="label">
-          Your {photos.length === 1 ? "photo" : `photos (${photos.length})`}
-        </Heading>
-        <PhotoGallery photos={photos} strip />
-      </>
-    );
-    // Boxes are drawn only when the provider returned regions; otherwise the plain gallery stays.
+    const more = photos.slice(1);
+    // The first photo stays on the dark stage beside the draft (boxes drawn only when the provider returned regions);
+    // any further photos sit under it as a strip.
     const side =
-      boxes.length > 0 && photos.length > 0 ? (
-        <ScanStage src={photos[0].src} alt={photos[0].alt} caption="Found on your page" scanning={false} regions={boxes} />
+      photos.length > 0 ? (
+        <>
+          <ScanStage src={photos[0].src} alt={photos[0].alt} caption={boxes.length > 0 ? "Found on your page" : "Your photo"} scanning={false} regions={boxes} />
+          {more.length > 0 && (
+            <>
+              <Heading level={3} size="label">
+                More photos ({more.length})
+              </Heading>
+              <PhotoGallery photos={more} strip />
+            </>
+          )}
+        </>
       ) : card ? (
         <DomainCard {...card} />
-      ) : (
-        gallery || null
-      );
+      ) : null;
     const reveal = review.byHand ? null : (
       <DraftReveal title={review.initial.title} ingredients={review.initial.ingredients?.map((i) => i.text) ?? []} confidence={review.confidence} warnings={review.warnings} />
     );
@@ -346,7 +348,13 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
 
   // A dark stage beside the form while a request is in flight: the photo and its scan (AI on), or the site's card.
   const wait = hostCard(url);
-  const stage = busy === "photo" && !aiOff && files[0] ? <PhotoScan file={files[0]} /> : busy === "link" && mode === "link" && wait ? <DomainCard {...wait} /> : null;
+  const scene = busy === "photo" && mode === "photo" && !aiOff && files[0] ? <PhotoScan file={files[0]} /> : busy === "link" && mode === "link" && wait ? <DomainCard {...wait} /> : null;
+  const stage = scene && (
+    <div className="flex flex-col gap-6">
+      <ScanHeading />
+      {scene}
+    </div>
+  );
   const here = problem && problem.from === mode ? problem.value : null;
   const fieldError = here?.field && here.fieldId !== "import-source" ? here.message : undefined;
   const sourceError = here?.field && here.fieldId === "import-source" ? here.message : undefined;

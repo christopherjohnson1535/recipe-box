@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Heading } from "@/components/ui/Heading";
-import { DraftList, DraftNote, DraftRow } from "@/components/ui/Darkroom";
+import { DraftKicker, DraftList, DraftNote, DraftRow, DraftTitle } from "@/components/ui/Darkroom";
 import { Text } from "@/components/ui/Text";
 import {
   flaggedRows,
-  PREVIEW_ROWS,
   prefersReducedMotion,
   staggerDelays,
   LOW_CONFIDENCE,
@@ -39,9 +37,8 @@ export function DraftReveal({
   warnings: string[];
 }) {
   const typed = useTyped(title);
-  const shown = ingredients.slice(0, PREVIEW_ROWS);
-  const flags = flaggedRows(confidence.ingredients, shown.length);
-  const delays = staggerDelays(shown.length);
+  const flags = flaggedRows(confidence.ingredients, ingredients.length);
+  const delays = staggerDelays(ingredients.length);
   const lowTitle = (confidence.title ?? 1) < LOW_CONFIDENCE;
   return (
     <section aria-label="What was found" className="flex flex-col gap-5">
@@ -49,36 +46,26 @@ export function DraftReveal({
         Draft ready: {ingredients.length}{" "}
         {ingredients.length === 1 ? "ingredient" : "ingredients"} found.
       </p>
-      <Text variant="meta">Draft, not saved yet</Text>
-      <Heading level={3} size="title">
-        <span className="sr-only">{title}</span>
-        <span aria-hidden="true">{typed}</span>
-      </Heading>
+      <DraftKicker>Draft · not saved yet</DraftKicker>
+      <DraftTitle title={title} typed={typed} />
       {lowTitle && (
         <Text variant="small">
           The title is uncertain (under {Math.round(LOW_CONFIDENCE * 100)}%
           sure): check it.
         </Text>
       )}
-      {shown.length > 0 && (
+      {ingredients.length > 0 && (
         <DraftList>
-          {shown.map((text, i) => (
-            <DraftRow key={i} delay={delays[i]} flagged={flags[i]}>
-              {text}
-            </DraftRow>
+          {ingredients.map((text, i) => (
+            <DraftRow key={i} delay={delays[i]} flagged={flags[i]} text={text} />
           ))}
         </DraftList>
-      )}
-      {ingredients.length > shown.length && (
-        <Text variant="small">
-          and {ingredients.length - shown.length} more in the form below.
-        </Text>
       )}
       {warnings.length > 0 && (
         <DraftNote>
           <ul className="flex flex-col gap-1">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
+            {warnings.map((w, i) => (
+              <li key={i}>{w}</li>
             ))}
           </ul>
         </DraftNote>

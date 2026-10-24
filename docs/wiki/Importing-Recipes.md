@@ -16,7 +16,7 @@ Every import gives you a **draft** to check and fix before it is saved. Open **I
 - The original photos stay with the form while you check or type (beside it on wide screens, a scrollable strip above it on phones and iPad portrait).
 
 - The import page has three tabs: **Photo**, **Link** and **Paste text**. While a photo is read you see it tilted on a dark background with a scan line sweeping over it; a link shows the site's name instead. Then the recipe fills in beside it: the title types in and the ingredients slide in one by one.
-- Anything the reader was unsure of is marked with a **?** on a mustard-tinted row, and warnings (such as a smudged oven temperature) appear in a note with a mustard rule. Check those before you save. If your device is set to reduce motion, nothing sweeps, types or slides.
+- Anything the reader was unsure of is marked with a **?** on a mustard-tinted row (every doubtful row is marked, however long the list), and warnings (such as a smudged oven temperature) appear in a note with a mustard rule. Check those before you save. If your device is set to reduce motion, nothing sweeps, types or slides.
 
 **If AI is switched off**
 - Photo: the photos are kept and shown next to an empty recipe, so you can type it in.

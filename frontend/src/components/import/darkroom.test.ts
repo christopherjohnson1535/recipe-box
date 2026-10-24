@@ -19,8 +19,13 @@ describe("darkroom logic", () => {
       { x: 0.1, y: 0.2, w: 0.3, h: 0.4, photo: 0, label: "title" },
     ]);
   });
-  it("staggers 120 ms apart", () => {
+  it("drops boxes that run off the photo, have no size, or sit on a bad photo index", () => {
+    const ok = { x: 0.1, y: 0.1, w: 0.5, h: 0.5 };
+    expect(readRegions({ regions: [{ x: 0.9, y: 0.9, w: 0.5, h: 0.5 }, { x: 0, y: 0, w: 0, h: 0 }, { ...ok, photo: -1 }, { ...ok, photo: 1.5 }, { ...ok, photo: NaN }, { ...ok, photo: 1 }] }).map((r) => r.photo)).toEqual([0, 0, 0, 1]);
+  });
+  it("staggers 120 ms apart, and stops staggering after 12 rows", () => {
     expect(staggerDelays(3)).toEqual([0, 120, 240]);
+    expect(staggerDelays(20)[19]).toBe(12 * 120);
   });
   it("makes a domain card without fetching anything", () => {
     expect(hostCard("https://www.example.com/a/b")).toEqual({ name: "example.com", host: "example.com" });

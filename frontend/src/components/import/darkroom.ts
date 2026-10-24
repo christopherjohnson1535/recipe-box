@@ -6,8 +6,8 @@
 export const LOW_CONFIDENCE = 0.6;
 /** Gap between ingredient rows arriving (`--stagger-step` in docs/UI.md). */
 export const STAGGER_MS = 120;
-/** Longest preview list; the form below holds the rest. */
-export const PREVIEW_ROWS = 12;
+/** Rows past this slide in together with the last staggered one, so a long list does not take seconds to arrive. */
+export const STAGGER_ROWS = 12;
 
 export type Confidence = { title?: number; ingredients?: number[] };
 /** A box on a photo, as fractions (0 to 1) of its width and height. `photo` is the index in upload order (default 0). */
@@ -44,7 +44,11 @@ export function readRegions(draft: unknown): Region[] {
       !isScore(r.x) ||
       !isScore(r.y) ||
       !isScore(r.w) ||
-      !isScore(r.h)
+      !isScore(r.h) ||
+      r.w <= 0 ||
+      r.h <= 0 ||
+      r.x + r.w > 1.001 ||
+      r.y + r.h > 1.001
     )
       return [];
     return [
@@ -53,7 +57,7 @@ export function readRegions(draft: unknown): Region[] {
         y: r.y,
         w: r.w,
         h: r.h,
-        photo: typeof r.photo === "number" ? r.photo : 0,
+        photo: Number.isInteger(r.photo) && (r.photo as number) >= 0 ? (r.photo as number) : 0,
         label: typeof r.label === "string" ? r.label : undefined,
       },
     ];
@@ -68,7 +72,7 @@ export const flaggedRows = (
   Array.from({ length: rows }, (_, i) => (scores?.[i] ?? 1) < LOW_CONFIDENCE);
 
 export const staggerDelays = (rows: number, step = STAGGER_MS): number[] =>
-  Array.from({ length: rows }, (_, i) => i * step);
+  Array.from({ length: rows }, (_, i) => Math.min(i, STAGGER_ROWS) * step);
 
 /** The card shown where a photo would be for a link import: site name and host, never a favicon fetch. */
 export function hostCard(

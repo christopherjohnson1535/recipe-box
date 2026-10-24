@@ -15,7 +15,7 @@ primitives            semantic (per theme)          component                   
 | Layer | File | What it holds | Who may read it |
 |---|---|---|---|
 | 1. Primitives | `frontend/src/styles/primitives.css` | Raw hex values named by what they look like (`--cream-50`, `--umber-900`, `--claret-700`, print inks `--mustard-500`, `--fern-700`, `--tomato-600`) | Theme files only |
-| 2. Semantic | `frontend/src/styles/themes/day.css`, `evening.css` | What a colour means: `--color-paper`, `--color-ink`, `--color-ink-muted`, `--color-rule`, `--color-rule-strong`, `--color-accent`, `--color-accent-hover`, `--color-on-accent`, `--color-danger`, `--color-focus` | ui components (as `bg-paper`, `text-ink`...), component tokens, `globals.css` base styles |
+| 2. Semantic | `frontend/src/styles/themes/day.css`, `evening.css` | What a colour means: `--color-paper`, `--color-ink`, `--color-ink-muted`, `--color-rule`, `--color-rule-strong`, `--color-accent`, `--color-accent-hover`, `--color-on-accent`, `--color-danger`, `--color-focus`, `--color-attention`, `--color-on-attention`, `--color-stage`, `--color-on-stage` | ui components (as `bg-paper`, `text-ink`...), component tokens, `globals.css` base styles |
 | 3. Component | `frontend/src/styles/components.css` | One decision inside one component: `--button-primary-bg`, `--input-border`, `--chip-underline-selected`, `--panel-bg`, `--numeral-fg`, `--focus-ring`... | `frontend/src/components/ui/*` only, written as Tailwind arbitrary values: `bg-(--button-primary-bg)` |
 
 Pages and app components (`src/app/**`, `src/components/*.tsx`) never touch colour, type or borders. They compose

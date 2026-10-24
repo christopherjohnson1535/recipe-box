@@ -1,29 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { DomainCard, DraftNote, DraftRow, ScanStage } from "./Darkroom";
+import { DomainCard, DraftNote, DraftRow, DraftTitle, ScanStage } from "./Darkroom";
 
-const lum = (hex: string) => {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const contrast = (a: string, b: string) => {
-  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-};
-// Blend of 28% mustard over a paper colour (the flagged-row wash).
-const wash = (paper: string) =>
-  "#" +
-  [1, 3, 5].map((i) => Math.round(0.28 * parseInt("d9a21b".slice(i - 1, i + 1), 16) + 0.72 * parseInt(paper.slice(i, i + 2), 16)).toString(16).padStart(2, "0")).join("");
-
-describe("darkroom colours", () => {
-  it("text on the mustard ink and its wash is at least 4.5:1", () => {
-    expect(contrast("#1a1714", "#d9a21b")).toBeGreaterThanOrEqual(4.5); // ? badge: day ink on mustard
-    expect(contrast("#1a1714", wash("#fbf8f1"))).toBeGreaterThanOrEqual(4.5); // day ink on wash over day paper
-    expect(contrast("#efe8da", wash("#16130f"))).toBeGreaterThanOrEqual(4.5); // evening ink on wash over evening paper
-    expect(contrast("#efe8da", "#241f19")).toBeGreaterThanOrEqual(4.5); // stage caption on the dark ground
-    expect(contrast("#d9a21b", "#241f19")).toBeGreaterThanOrEqual(3); // scan line and boxes on the dark ground
-  });
-});
+// Contrast of the attention and stage tokens is checked in src/styles/tokens.test.ts, from the real token files.
 
 describe("Darkroom pieces", () => {
   it("draws the scan line only when scanning, and one box per region", () => {
@@ -38,17 +17,25 @@ describe("Darkroom pieces", () => {
     render(
       <>
         <ul>
-          <DraftRow delay={240} flagged>
-            1 cup
-          </DraftRow>
+          <DraftRow delay={240} flagged text="1 cup flour" />
+          <DraftRow delay={0} flagged={false} text="a pinch of salt" />
         </ul>
         <DraftNote>smudged</DraftNote>
         <DomainCard name="Example" host="example.com" />
       </>,
     );
     expect(screen.getByRole("img", { name: /low confidence/i })).toBeTruthy();
-    expect(screen.getByText("1 cup").closest("li")?.style.animationDelay).toBe("240ms");
+    expect(screen.getByText("flour").closest("li")?.style.animationDelay).toBe("240ms");
+    expect(screen.getByText("1 cup").className).toContain("tabular-nums"); // quantity column
+    expect(screen.getAllByRole("img", { name: /low confidence/i })).toHaveLength(1); // the other row has a tick, not a flag
     expect(screen.getByText("smudged")).toBeTruthy();
     expect(screen.getByText("example.com")).toBeTruthy();
+  });
+  it("gives screen readers the whole title while it types, and reserves its space", () => {
+    const { container } = render(<DraftTitle title="Apple crumble" typed="App" />);
+    expect(container.querySelector(".sr-only")?.textContent).toBe("Apple crumble");
+    const typed = container.querySelector('[aria-hidden="true"]');
+    expect(typed?.textContent).toBe("Apple crumble");
+    expect(typed?.querySelector(".invisible")?.textContent).toBe("le crumble");
   });
 });
