@@ -31,6 +31,7 @@ async fn run() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("can't reach the database: {}", db_reason(&e)))?;
     recipe_box_api::migrate(&pool).await?;
     recipe_box_api::spawn_purge_task(pool.clone(), recipe_box_api::clock::Clock::System);
+    recipe_box_api::spawn_display_backfill(pool.clone(), config.media_dir.clone());
 
     let bind_addr = config.bind_addr.clone();
     let allow_host = std::env::var("IMPORT_ALLOW_HOST").unwrap_or_default();

@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{io::Cursor, path::Path};
 
 use anyhow::anyhow;
 use axum::{
@@ -8,8 +8,10 @@ use axum::{
     response::IntoResponse,
 };
 use image::{
-    DynamicImage, ImageDecoder, ImageReader, codecs::jpeg::JpegEncoder, imageops::FilterType,
+    DynamicImage, ImageDecoder, ImageReader, RgbImage, codecs::jpeg::JpegEncoder,
+    imageops::FilterType,
 };
+use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -18,11 +20,13 @@ use crate::{
     error::{AppError, AppPath, AppResult, ErrorBody},
     import::photo,
     models::{BinaryFile, Image, media_url},
+    plate,
     state::AppState,
 };
 
 pub const MAX_EDGE: u32 = 2400;
 const JPEG_QUALITY: u8 = 85;
+const DISPLAY_QUALITY: u8 = 82;
 /// Decode bounds (S-01): per side, total pixels, and bytes the decoder may allocate.
 const MAX_SIDE_PX: u32 = 10_000;
 const MAX_PIXELS: u64 = 40_000_000;
@@ -79,20 +83,39 @@ pub async fn store_jpeg(
     if photo::is_heic(&data) {
         data = photo::heic_to_png(&data).await?;
     }
-    let jpeg = tokio::task::spawn_blocking(move || reencode(&data))
-        .await
-        .map_err(|e| anyhow!(e))??;
     let id = Uuid::new_v4();
+    let (jpeg, display) = tokio::task::spawn_blocking(move || {
+        let jpeg = reencode(&data)?;
+        // A rendition that fails must not fail the upload: the original is what matters.
+        let display = display_jpeg(&jpeg.bytes, id)
+            .map_err(|e| tracing::warn!(%id, error = ?e, "could not make the display rendition"))
+            .ok();
+        AppResult::Ok((jpeg, display))
+    })
+    .await
+    .map_err(|e| anyhow!(e))??;
     let file_name = format!("{id}.jpg");
     let path = state.config.media_dir.join(&file_name);
     tokio::fs::write(&path, &jpeg.bytes)
         .await
         .map_err(|e| anyhow!("write {}: {e}", path.display()))?;
+    let display_name = format!("{id}.display.jpg");
+    let display_path = state.config.media_dir.join(&display_name);
+    let display_name = match display {
+        Some(bytes) => tokio::fs::write(&display_path, bytes)
+            .await
+            .map_err(|e| tracing::warn!(%id, error = %e, "could not write the display rendition"))
+            .ok()
+            .map(|()| display_name),
+        None => None,
+    };
     let inserted = sqlx::query(
-        "insert into images (id, file_name, width, height, bytes, created_by) values ($1, $2, $3, $4, $5, $6)",
+        "insert into images (id, file_name, display_file_name, width, height, bytes, created_by)
+         values ($1, $2, $3, $4, $5, $6, $7)",
     )
     .bind(id)
     .bind(&file_name)
+    .bind(&display_name)
     .bind(jpeg.width as i32)
     .bind(jpeg.height as i32)
     .bind(jpeg.bytes.len() as i32)
@@ -101,11 +124,13 @@ pub async fn store_jpeg(
     .await;
     if let Err(e) = inserted {
         let _ = tokio::fs::remove_file(&path).await;
+        let _ = tokio::fs::remove_file(&display_path).await;
         return Err(e.into());
     }
     let image = Image {
         id,
         url: media_url(&file_name),
+        display_url: display_name.as_deref().map(media_url),
         width: jpeg.width as i32,
         height: jpeg.height as i32,
     };
@@ -124,7 +149,9 @@ pub async fn delete_images(state: &AppState, ids: &[Uuid]) {
         return;
     }
     for id in ids {
-        let _ = tokio::fs::remove_file(state.config.media_dir.join(format!("{id}.jpg"))).await;
+        for name in [format!("{id}.jpg"), format!("{id}.display.jpg")] {
+            let _ = tokio::fs::remove_file(state.config.media_dir.join(name)).await;
+        }
     }
 }
 
@@ -144,8 +171,8 @@ pub fn check_dimensions(w: u32, h: u32) -> AppResult<()> {
     Ok(())
 }
 
-/// JPEG/PNG/WebP/GIF in → EXIF-oriented, long edge ≤ [`MAX_EDGE`], JPEG q85 out.
-pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
+/// Decodes within the bounds above and applies the EXIF orientation.
+fn decode(data: &[u8]) -> AppResult<DynamicImage> {
     let unsupported = || {
         AppError::UnsupportedMedia(
             "That file is not an image we can read (JPEG, PNG, WebP or GIF).".into(),
@@ -166,25 +193,88 @@ pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
     let orientation = decoder.orientation().map_err(|_| unsupported())?;
     let mut img = DynamicImage::from_decoder(decoder).map_err(|_| unsupported())?;
     img.apply_orientation(orientation);
+    Ok(img)
+}
+
+fn encode_jpeg(rgb: &RgbImage, quality: u8) -> AppResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    JpegEncoder::new_with_quality(&mut bytes, quality)
+        .encode_image(rgb)
+        .map_err(|e| anyhow!("encode jpeg: {e}"))?;
+    Ok(bytes)
+}
+
+/// JPEG/PNG/WebP/GIF in → EXIF-oriented, long edge ≤ [`MAX_EDGE`], JPEG q85 out.
+pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
+    let mut img = decode(data)?;
     if img.width().max(img.height()) > MAX_EDGE {
         img = img.resize(MAX_EDGE, MAX_EDGE, FilterType::CatmullRom);
     }
     // shortcut: transparent pixels flatten to their stored colour (often black), composite onto white if users mind.
     let rgb = img.to_rgb8();
-    let mut bytes = Vec::new();
-    JpegEncoder::new_with_quality(&mut bytes, JPEG_QUALITY)
-        .encode_image(&rgb)
-        .map_err(|e| anyhow!("encode jpeg: {e}"))?;
     Ok(Jpeg {
-        bytes,
+        bytes: encode_jpeg(&rgb, JPEG_QUALITY)?,
         width: rgb.width(),
         height: rgb.height(),
     })
 }
 
+/// The print-style rendition (JPEG q82) of a stored original; the seed comes from the image id.
+fn display_jpeg(original: &[u8], id: Uuid) -> AppResult<Vec<u8>> {
+    let plate = plate::render_plate(&decode(original)?.to_rgb8(), plate::seed_for(id));
+    encode_jpeg(&plate, DISPLAY_QUALITY)
+}
+
+/// Makes and stores the rendition of one image whose original is on disk, if it has none yet.
+pub async fn render_display(pool: &PgPool, media_dir: &Path, id: Uuid) -> AppResult<()> {
+    let original = tokio::fs::read(media_dir.join(format!("{id}.jpg")))
+        .await
+        .map_err(|e| anyhow!("read original of {id}: {e}"))?;
+    let bytes = tokio::task::spawn_blocking(move || display_jpeg(&original, id))
+        .await
+        .map_err(|e| anyhow!(e))??;
+    let name = format!("{id}.display.jpg");
+    tokio::fs::write(media_dir.join(&name), bytes)
+        .await
+        .map_err(|e| anyhow!("write {name}: {e}"))?;
+    sqlx::query(
+        "update images set display_file_name = $2 where id = $1 and display_file_name is null",
+    )
+    .bind(id)
+    .bind(&name)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Gives every image without a rendition one, one at a time; returns how many were made. An image that cannot be
+/// read is logged and skipped (it is tried again on the next start). Safe to run on every start.
+pub async fn backfill_displays(pool: &PgPool, media_dir: &Path) -> u64 {
+    let ids: Vec<Uuid> =
+        match sqlx::query_scalar("select id from images where display_file_name is null")
+            .fetch_all(pool)
+            .await
+        {
+            Ok(ids) => ids,
+            Err(e) => {
+                tracing::error!(error = %e, "display backfill: could not list images");
+                return 0;
+            }
+        };
+    let mut made = 0;
+    for id in ids {
+        match render_display(pool, media_dir, id).await {
+            Ok(()) => made += 1,
+            Err(e) => tracing::warn!(%id, error = ?e, "display backfill: skipped an image"),
+        }
+    }
+    tracing::info!(made, "display backfill done");
+    made
+}
+
 /// A stored image.
 #[utoipa::path(get, path = "/media/{file_name}", operation_id = "getMedia", tag = "media", security(("session" = [])),
-    params(("file_name" = String, Path, description = "`<uuid>.jpg`")), responses(
+    params(("file_name" = String, Path, description = "`<uuid>.jpg` (the original) or `<uuid>.display.jpg` (the print-style rendition)")), responses(
     (status = 200, description = "The JPEG.", content_type = "image/jpeg", body = BinaryFile,
         headers(("Cache-Control" = String, description = "`private, max-age=31536000, immutable`"))),
     (status = 404, description = "No such image (`not_found`).", body = ErrorBody),
@@ -216,9 +306,12 @@ pub async fn serve(
     ))
 }
 
-/// `^[0-9a-f-]{36}\.jpg$` — also keeps paths inside `MEDIA_DIR`.
+/// `^[0-9a-f-]{36}(\.display)?\.jpg$` — also keeps paths inside `MEDIA_DIR`.
 fn valid_file_name(name: &str) -> bool {
-    name.strip_suffix(".jpg").is_some_and(|stem| {
+    let stem = name
+        .strip_suffix(".jpg")
+        .map(|s| s.strip_suffix(".display").unwrap_or(s));
+    stem.is_some_and(|stem| {
         stem.len() == 36
             && stem
                 .bytes()
@@ -237,6 +330,21 @@ mod tests {
         assert!(!valid_file_name("../../../../../../../../etc/passwd.jpg"));
         assert!(!valid_file_name("0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.png"));
         assert!(!valid_file_name(".jpg"));
+        assert!(valid_file_name(
+            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.jpg"
+        ));
+        for bad in [
+            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.png",
+            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.display.jpg",
+            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.Display.jpg",
+            "../0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4f.display.jpg",
+            "../../../../../../../../etc/passwd.display.jpg",
+            "..%2f..%2fx.display.jpg",
+            ".display.jpg",
+            "0b6a4b0e-3a8e-4a8f-9a5e-2f1f3c1d2e4.display.jpg",
+        ] {
+            assert!(!valid_file_name(bad), "{bad}");
+        }
     }
 
     /// A PNG header (valid CRCs) claiming `w`x`h`; the pixel data is absent, so only the bounds can reject it.
