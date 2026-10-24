@@ -1,6 +1,6 @@
 # 0008. Hexagonal (ports and adapters) backend
 
-Status: Proposed · Date: 2026-10-24
+Status: Accepted · Date: 2026-10-24
 
 ## Context
 The backend is one crate in which the layers are tangled. SQL lives in route handlers (`routes/recipes.rs` alone has about 33 sqlx calls). Domain types derive `sqlx::FromRow`, `sqlx::Type` and `utoipa::ToSchema`, and `error.rs` converts `sqlx::Error`. Media calls `tokio::fs` directly from the routes. `AppState` holds a concrete `PgPool` and `reqwest::Client`, so nothing can be swapped. This matters because we want a new storage (another database, object storage for photos), new inbound interfaces (CLI, gRPC, jobs) that reuse the same use cases, and language SDKs generated from a stable OpenAPI contract. Today each of those means touching every route.
