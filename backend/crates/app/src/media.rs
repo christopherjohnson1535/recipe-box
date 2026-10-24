@@ -13,6 +13,15 @@ pub(crate) fn display_name(id: Uuid) -> String {
     format!("{id}.display.jpg")
 }
 
+/// A stored upload. `rendition_error` is why the display rendition could not be written (the image is kept
+/// without one and the backfill retries); the caller logs it, this crate does not.
+pub struct Stored {
+    pub image: Image,
+    /// The stored (re-encoded) JPEG; photo import sends it to the AI provider.
+    pub jpeg: Vec<u8>,
+    pub rendition_error: Option<DomainError>,
+}
+
 /// Uploaded images: the row in the [`ImageRepo`], the files in the [`MediaStore`].
 #[derive(Clone)]
 pub struct MediaService {
@@ -30,25 +39,27 @@ impl MediaService {
         }
     }
 
-    /// Re-encodes and stores an upload and returns its row. `UnsupportedMedia` for a non-image.
-    pub async fn upload(&self, user_id: Uuid, data: Vec<u8>) -> DomainResult<Image> {
-        Ok(self.store_jpeg(user_id, data).await?.0)
-    }
-
-    /// Like [`MediaService::upload`], also returning the stored JPEG (photo import sends it to the AI provider).
+    /// Re-encodes and stores an upload and returns it with its row. `UnsupportedMedia` for a non-image.
     ///
-    /// A rendition that could not be made or written leaves the image without one (the original is what
-    /// matters; the backfill retries); it is not reported. If the row cannot be saved, both files are removed
-    /// again and the error returned.
-    pub async fn store_jpeg(&self, user_id: Uuid, data: Vec<u8>) -> DomainResult<(Image, Vec<u8>)> {
+    /// A rendition that could not be made leaves the image without one (the original is what matters; the
+    /// backfill retries); one that could not be written is reported in [`Stored::rendition_error`]. If the row
+    /// cannot be saved, both files are removed again and the error returned.
+    pub async fn upload(&self, user_id: Uuid, data: Vec<u8>) -> DomainResult<Stored> {
         let id = Uuid::new_v4();
         let encoded = self.codec.encode(id, data).await?;
         let file_name = original_name(id);
         self.media.put(&file_name, encoded.jpeg.clone()).await?;
+        let mut rendition_error = None;
         let display_file_name = match encoded.display {
             Some(bytes) => {
                 let name = display_name(id);
-                self.media.put(&name, bytes).await.ok().map(|()| name)
+                match self.media.put(&name, bytes).await {
+                    Ok(()) => Some(name),
+                    Err(e) => {
+                        rendition_error = Some(e);
+                        None
+                    }
+                }
             }
             None => None,
         };
@@ -66,19 +77,25 @@ impl MediaService {
             let _ = self.media.delete(&display_name(id)).await;
             return Err(e);
         }
-        Ok((make(), encoded.jpeg))
+        Ok(Stored {
+            image: make(),
+            jpeg: encoded.jpeg,
+            rendition_error,
+        })
     }
 
-    /// Deletes images stored by a request that then failed (row and files). Best effort: nothing is reported.
-    pub async fn delete_images(&self, ids: &[Uuid]) {
+    /// Deletes images stored by a request that then failed (row and files). Best effort; `false` when the rows
+    /// could not be deleted (the files are then kept), which the caller logs.
+    pub async fn delete_images(&self, ids: &[Uuid]) -> bool {
         if self.images.delete(ids).await.is_err() {
-            return;
+            return false;
         }
         for id in ids {
             for name in [original_name(*id), display_name(*id)] {
                 let _ = self.media.delete(&name).await;
             }
         }
+        true
     }
 
     /// The bytes of a stored file. A name the store would not hold, or a missing file: `NotFound`.

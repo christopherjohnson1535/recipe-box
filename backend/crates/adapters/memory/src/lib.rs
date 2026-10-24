@@ -572,6 +572,21 @@ pub struct MemoryMedia {
     blobs: Mutex<HashMap<String, Vec<u8>>>,
 }
 
+impl MemoryMedia {
+    /// The stored file names, sorted (a test of "no orphan files").
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .blobs
+            .lock()
+            .expect("media lock")
+            .keys()
+            .cloned()
+            .collect();
+        names.sort();
+        names
+    }
+}
+
 fn check_name(name: &str) -> DomainResult<()> {
     if !domain::validate::media_file_name(name) {
         return Err(DomainError::validation("name: not a plain file name."));
@@ -608,12 +623,18 @@ impl MediaStore for MemoryMedia {
 pub struct FakePasswordHasher {
     count: AtomicU64,
     verifies: AtomicU64,
+    verifies_without_hash: AtomicU64,
 }
 
 impl FakePasswordHasher {
     /// How many times `verify` ran (a test of "no hashing work happened").
     pub fn verify_count(&self) -> u64 {
         self.verifies.load(Ordering::SeqCst)
+    }
+
+    /// How many of those got no stored hash (the unknown-user path, which must still do the work).
+    pub fn verify_without_hash_count(&self) -> u64 {
+        self.verifies_without_hash.load(Ordering::SeqCst)
     }
 }
 
@@ -628,6 +649,9 @@ impl PasswordHasher for FakePasswordHasher {
 
     async fn verify(&self, password: String, hash: Option<String>) -> DomainResult<bool> {
         self.verifies.fetch_add(1, Ordering::SeqCst);
+        if hash.is_none() {
+            self.verifies_without_hash.fetch_add(1, Ordering::SeqCst);
+        }
         Ok(hash
             .as_deref()
             .and_then(|h| h.strip_prefix("fake$"))

@@ -20,7 +20,7 @@ use ports::{
 
 pub use auth::{AuthService, NewSession};
 pub use maintenance::{BackfillReport, Maintenance, PurgeReport};
-pub use media::MediaService;
+pub use media::{MediaService, Stored};
 pub use recipes::{RecipeService, SettingsService, TagService};
 pub use users::UserService;
 

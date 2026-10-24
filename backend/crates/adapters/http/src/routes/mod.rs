@@ -5,7 +5,7 @@ use axum::{
 };
 use tower_http::trace::TraceLayer;
 
-use crate::{HttpState, error::AppError};
+use crate::{HttpConfig, HttpState, error::AppError};
 
 pub mod auth;
 pub mod export;
@@ -21,9 +21,9 @@ pub mod users;
 /// Body limit for JSON routes (1 MB); see docs/API.md.
 pub const JSON_BODY_LIMIT: usize = 1 << 20;
 
-/// Every route of this crate, each under its body limit. Add more routes with `.merge` (under their own limits),
+/// Every route of this crate, each under its body limit (uploads: `config.max_upload_bytes`). Add more routes with `.merge` (under their own limits),
 /// then call [`finish`].
-pub fn routes<S>(max_upload_bytes: usize) -> Router<S>
+pub fn routes<S>(config: &HttpConfig) -> Router<S>
 where
     HttpState: FromRef<S>,
     S: Clone + Send + Sync + 'static,
@@ -32,7 +32,7 @@ where
     let uploads = Router::new()
         .route("/api/media", post(media::upload))
         .route("/api/import/export", post(export::import_zip))
-        .layer(DefaultBodyLimit::max(max_upload_bytes));
+        .layer(DefaultBodyLimit::max(config.max_upload_bytes));
     Router::new()
         .route("/api/health", get(health::health))
         .route("/api/setup", get(setup::status).post(setup::create_admin))

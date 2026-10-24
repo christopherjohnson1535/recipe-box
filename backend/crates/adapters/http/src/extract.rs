@@ -1,3 +1,4 @@
+use app::NewSession;
 use axum::{
     extract::{FromRef, FromRequestParts},
     http::request::Parts,
@@ -10,14 +11,14 @@ use crate::{HttpConfig, HttpState, error::AppError};
 
 pub const COOKIE_NAME: &str = "rb_session";
 
-/// The `rb_session` cookie for a new session.
-pub fn session_cookie(config: &HttpConfig, token: String) -> Cookie<'static> {
-    Cookie::build((COOKIE_NAME, token))
+/// The `rb_session` cookie for a new session; it lives as long as the session row (`Max-Age` in seconds).
+pub fn session_cookie(config: &HttpConfig, session: NewSession) -> Cookie<'static> {
+    Cookie::build((COOKIE_NAME, session.token))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
         .secure(config.cookie_secure)
-        .max_age(time::Duration::days(config.session_days))
+        .max_age(time::Duration::seconds(session.lifetime.num_seconds()))
         .build()
 }
 
@@ -76,5 +77,52 @@ where
             return Err(AppError::Forbidden("Only an admin can do that.".into()));
         }
         Ok(Self(user))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use domain::chrono::{Duration, Utc};
+
+    use super::*;
+
+    fn session() -> NewSession {
+        NewSession {
+            token: "tok".into(),
+            expires_at: Utc::now(),
+            lifetime: Duration::days(30),
+        }
+    }
+
+    fn config(cookie_secure: bool) -> HttpConfig {
+        HttpConfig {
+            cookie_secure,
+            max_upload_bytes: 1,
+            version: "test",
+        }
+    }
+
+    #[test]
+    fn the_session_cookie_has_the_agreed_attributes() {
+        let c = session_cookie(&config(false), session()).to_string();
+        assert_eq!(
+            c,
+            "rb_session=tok; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000"
+        );
+    }
+
+    #[test]
+    fn the_secure_flag_follows_the_config() {
+        let on = session_cookie(&config(true), session()).to_string();
+        assert!(on.contains("; Secure"), "{on}");
+        let off = session_cookie(&config(false), session()).to_string();
+        assert!(!off.contains("Secure"), "{off}");
+    }
+
+    #[test]
+    fn the_removal_cookie_clears_rb_session_everywhere() {
+        let c = removal_cookie().to_string();
+        assert!(c.starts_with("rb_session=;"), "{c}");
+        assert!(c.contains("Path=/") && c.contains("Max-Age=0"), "{c}");
     }
 }

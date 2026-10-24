@@ -6,11 +6,12 @@ use adapter_memory::{
     FakeImageCodec, FakePasswordHasher, FakeSessionTokens, MemoryMedia, MemoryStore,
 };
 use app::{Deps, Services};
+use async_trait::async_trait;
+use domain::Image;
 use domain::{
-    DomainError, DomainResult, Recipe, RecipeInput, Settings, Sort, User, chrono::Duration,
-    uuid::Uuid,
+    DomainError, DomainResult, Recipe, RecipeInput, Settings, User, chrono::Duration, uuid::Uuid,
 };
-use ports::{Clock, PasswordHasher, UserRepo, contract::ManualClock};
+use ports::{Clock, ImageRepo, MediaStore, PasswordHasher, UserRepo, contract::ManualClock};
 
 struct World {
     clock: Arc<ManualClock>,
@@ -81,9 +82,30 @@ fn is_wrong_login<T>(r: DomainResult<T>) -> bool {
 }
 
 #[tokio::test]
+async fn search_reports_limit_then_offset_then_sort() {
+    let s = World::new().services();
+    let search = |sort, limit, offset| s.recipes.search(None, None, sort, limit, offset);
+    assert!(is_validation(
+        search(Some("bogus"), 0, 0).await,
+        "limit: 1–200."
+    ));
+    assert!(is_validation(
+        search(Some("bogus"), 1, -1).await,
+        "offset: must be 0 or more."
+    ));
+    assert!(is_validation(
+        search(Some("bogus"), 1, 0).await,
+        "sort: newest, title or time."
+    ));
+    for ok in [None, Some("newest"), Some("title"), Some("time")] {
+        assert!(search(ok, 1, 0).await.is_ok(), "{ok:?}");
+    }
+}
+
+#[tokio::test]
 async fn search_checks_limit_then_offset() {
     let s = World::new().services();
-    let search = |limit, offset| s.recipes.search(None, None, Sort::Default, limit, offset);
+    let search = |limit, offset| s.recipes.search(None, None, None, limit, offset);
     assert!(is_validation(search(0, 0).await, "limit: 1–200."));
     assert!(is_validation(search(201, 0).await, "limit: 1–200."));
     assert!(is_validation(search(0, -1).await, "limit: 1–200."));
@@ -128,7 +150,7 @@ async fn unknown_image_id_is_a_validation_error() {
 async fn plate_rule_hides_the_rendition_everywhere_when_off() {
     let s = World::new().services();
     let u = user(&s, "ann", "admin").await;
-    let img = s.media.upload(u.id, b"jpeg".to_vec()).await.unwrap();
+    let img = s.media.upload(u.id, b"jpeg".to_vec()).await.unwrap().image;
     let with_image = || RecipeInput {
         image_id: Some(img.id),
         ..input("Soup")
@@ -136,7 +158,7 @@ async fn plate_rule_hides_the_rendition_everywhere_when_off() {
     let shown = |r: &Recipe| r.image_display_file.is_some();
     let r = s.recipes.create(u.id, with_image()).await.unwrap();
     assert!(shown(&r) && shown(&s.recipes.get(r.id).await.unwrap()));
-    let listed = || s.recipes.search(None, None, Sort::Default, 10, 0);
+    let listed = || s.recipes.search(None, None, None, 10, 0);
     assert!(
         listed().await.unwrap().items[0]
             .image_display_file
@@ -212,6 +234,8 @@ async fn unknown_user_and_wrong_password_look_the_same() {
     ));
     assert!(is_wrong_login(s.auth.login("bob", PASSWORD.into()).await));
     assert_eq!(w.hasher.verify_count(), 2);
+    // Only "bob" is unknown: his login still verifies, against no hash (the dummy-work path).
+    assert_eq!(w.hasher.verify_without_hash_count(), 1);
     // Case and padding in the username do not matter; the session lasts `session_days`.
     let (u, session) = s.auth.login("  ANN ", PASSWORD.into()).await.unwrap();
     assert_eq!(session.expires_at, w.clock.now() + Duration::days(30));
@@ -229,6 +253,19 @@ async fn logout_ends_only_that_session() {
     s.auth.logout(Some(&a.token)).await.unwrap();
     assert!(s.auth.current_user(&a.token).await.unwrap().is_none());
     assert!(s.auth.current_user(&b.token).await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn a_session_is_gone_once_its_lifetime_has_passed() {
+    let w = World::new();
+    let s = w.services();
+    user(&s, "ann", "admin").await;
+    let (_, session) = s.auth.login("ann", PASSWORD.into()).await.unwrap();
+    assert_eq!(session.lifetime, Duration::days(30));
+    w.clock.advance(Duration::days(30) - Duration::seconds(1));
+    assert!(s.auth.current_user(&session.token).await.unwrap().is_some());
+    w.clock.advance(Duration::seconds(2));
+    assert!(s.auth.current_user(&session.token).await.unwrap().is_none());
 }
 
 #[tokio::test]
@@ -420,7 +457,7 @@ async fn a_lost_race_on_an_own_password_change_is_a_wrong_password() {
 async fn media_names_are_checked_and_files_are_found() {
     let s = World::new().services();
     let u = user(&s, "ann", "admin").await;
-    let img = s.media.upload(u.id, b"jpeg".to_vec()).await.unwrap();
+    let img = s.media.upload(u.id, b"jpeg".to_vec()).await.unwrap().image;
     assert_eq!(s.media.get(&img.file_name).await.unwrap(), b"jpeg");
     let missing = format!("{}.jpg", Uuid::new_v4());
     for bad in ["../x.jpg", "x.png", "", missing.as_str()] {
@@ -450,7 +487,8 @@ async fn upload_refuses_non_images_and_survives_a_failed_rendition() {
         .media
         .upload(u.id, b"jpeg".to_vec())
         .await
-        .unwrap();
+        .unwrap()
+        .image;
     assert!(img.display_file_name.is_none());
 }
 
@@ -458,7 +496,7 @@ async fn upload_refuses_non_images_and_survives_a_failed_rendition() {
 async fn delete_images_removes_row_and_files() {
     let s = World::new().services();
     let u = user(&s, "ann", "admin").await;
-    let img = s.media.upload(u.id, b"jpeg".to_vec()).await.unwrap();
+    let img = s.media.upload(u.id, b"jpeg".to_vec()).await.unwrap().image;
     s.media.delete_images(&[img.id]).await;
     assert!(s.media.get(&img.file_name).await.is_err());
     assert!(is_validation(
@@ -487,7 +525,8 @@ async fn backfill_renders_the_missing_displays() {
         .media
         .upload(u.id, b"jpeg".to_vec())
         .await
-        .unwrap();
+        .unwrap()
+        .image;
     w.deps.codec = Arc::new(FakeImageCodec::default());
     let m = w.services().maintenance;
     let report = m.backfill_displays().await.unwrap();
@@ -537,4 +576,125 @@ async fn export_is_not_built() {
     assert!(
         matches!(s.export.import_backup(), Err(DomainError::NotImplemented(m)) if m == "Importing an export is not built yet.")
     );
+}
+
+/// The image repository with switches for the calls that must fail.
+struct FlakyImages {
+    inner: Arc<MemoryStore>,
+    fail_add: bool,
+    fail_delete: bool,
+}
+
+#[async_trait]
+impl ImageRepo for FlakyImages {
+    async fn add(&self, image: Image) -> DomainResult<()> {
+        if self.fail_add {
+            return Err(DomainError::Internal("add failed".into()));
+        }
+        self.inner.add(image).await
+    }
+
+    async fn delete(&self, ids: &[Uuid]) -> DomainResult<()> {
+        if self.fail_delete {
+            return Err(DomainError::Internal("delete failed".into()));
+        }
+        self.inner.delete(ids).await
+    }
+
+    async fn set_display_file(&self, id: Uuid, file_name: &str) -> DomainResult<bool> {
+        self.inner.set_display_file(id, file_name).await
+    }
+
+    async fn without_display_file(&self) -> DomainResult<Vec<Uuid>> {
+        self.inner.without_display_file().await
+    }
+}
+
+/// A media store that refuses to write renditions (`*.display.jpg`).
+struct NoRenditions(Arc<MemoryMedia>);
+
+#[async_trait]
+impl MediaStore for NoRenditions {
+    async fn put(&self, name: &str, bytes: Vec<u8>) -> DomainResult<()> {
+        if name.ends_with(".display.jpg") {
+            return Err(DomainError::Internal("disk full".into()));
+        }
+        self.0.put(name, bytes).await
+    }
+
+    async fn get(&self, name: &str) -> DomainResult<Option<Vec<u8>>> {
+        self.0.get(name).await
+    }
+
+    async fn delete(&self, name: &str) -> DomainResult<()> {
+        self.0.delete(name).await
+    }
+}
+
+fn world_with_media() -> (World, Arc<MemoryMedia>) {
+    let mut w = World::new();
+    let media = Arc::new(MemoryMedia::default());
+    w.deps.media = media.clone();
+    (w, media)
+}
+
+#[tokio::test]
+async fn a_failed_row_insert_removes_both_files_and_returns_the_error() {
+    let (mut w, media) = world_with_media();
+    let u = user(&w.services(), "ann", "admin").await;
+    w.deps.images = Arc::new(FlakyImages {
+        inner: w.store.clone(),
+        fail_add: true,
+        fail_delete: false,
+    });
+    let r = w.services().media.upload(u.id, b"jpeg".to_vec()).await;
+    assert!(matches!(r, Err(DomainError::Internal(m)) if m == "add failed"));
+    assert!(media.names().is_empty(), "{:?}", media.names());
+}
+
+#[tokio::test]
+async fn a_rendition_that_cannot_be_written_is_reported_and_the_original_kept() {
+    let (mut w, media) = world_with_media();
+    let u = user(&w.services(), "ann", "admin").await;
+    w.deps.media = Arc::new(NoRenditions(media.clone()));
+    let stored = w
+        .services()
+        .media
+        .upload(u.id, b"jpeg".to_vec())
+        .await
+        .unwrap();
+    assert!(stored.image.display_file_name.is_none());
+    assert!(matches!(&stored.rendition_error, Some(DomainError::Internal(m)) if m == "disk full"));
+    assert_eq!(media.names(), std::slice::from_ref(&stored.image.file_name));
+    // A rendition that was written is not an error.
+    let (w2, _) = world_with_media();
+    let ok = w2
+        .services()
+        .media
+        .upload(u.id, b"jpeg".to_vec())
+        .await
+        .unwrap();
+    assert!(ok.rendition_error.is_none() && ok.image.display_file_name.is_some());
+}
+
+#[tokio::test]
+async fn delete_images_says_when_the_rows_could_not_be_deleted() {
+    let (mut w, media) = world_with_media();
+    let u = user(&w.services(), "ann", "admin").await;
+    let id = w
+        .services()
+        .media
+        .upload(u.id, b"jpeg".to_vec())
+        .await
+        .unwrap()
+        .image
+        .id;
+    w.deps.images = Arc::new(FlakyImages {
+        inner: w.store.clone(),
+        fail_add: false,
+        fail_delete: true,
+    });
+    assert!(!w.services().media.delete_images(&[id]).await);
+    assert_eq!(media.names().len(), 2, "files are kept when the rows stay");
+    assert!(World::new().services().media.delete_images(&[id]).await);
 }

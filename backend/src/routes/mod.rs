@@ -32,7 +32,6 @@ pub fn router(state: AppState) -> Router {
         services: state.services().into(),
         config: HttpConfig {
             cookie_secure: state.config.cookie_secure,
-            session_days: state.config.session_days,
             max_upload_bytes: upload_limit,
             version: env!("CARGO_PKG_VERSION"),
         },
@@ -48,6 +47,6 @@ pub fn router(state: AppState) -> Router {
         .layer(DefaultBodyLimit::max(
             imports::MAX_PHOTOS * upload_limit + (64 << 10),
         ));
-    let routes = adapter_http::routes(upload_limit).merge(json).merge(photos);
+    let routes = adapter_http::routes(&http.config).merge(json).merge(photos);
     adapter_http::finish(routes, ImportState { app: state, http })
 }

@@ -1,5 +1,4 @@
 use axum::{Json, extract::State, http::StatusCode};
-use domain::Sort;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -7,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     HttpState,
     dto::{Recipe, RecipeInput, RecipeSummary},
-    error::{AppError, AppJson, AppPath, AppQuery, AppResult, ErrorBody},
+    error::{AppJson, AppPath, AppQuery, AppResult, ErrorBody},
     extract::CurrentUser,
 };
 
@@ -68,18 +67,10 @@ pub async fn list(
     _user: CurrentUser,
     AppQuery(q): AppQuery<ListQuery>,
 ) -> AppResult<Json<RecipePage>> {
-    // Ranked by relevance when searching and no sort was asked for.
-    let sort = match q.sort.as_deref() {
-        None => Sort::Default,
-        Some("newest") => Sort::Newest,
-        Some("title") => Sort::Title,
-        Some("time") => Sort::Time,
-        _ => return Err(AppError::validation("sort: newest, title or time.")),
-    };
     let page = state
         .services
         .recipes
-        .search(q.q, q.tag, sort, q.limit, q.offset)
+        .search(q.q, q.tag, q.sort.as_deref(), q.limit, q.offset)
         .await?;
     Ok(Json(RecipePage {
         items: page.items.into_iter().map(Into::into).collect(),

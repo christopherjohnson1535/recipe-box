@@ -14,11 +14,13 @@ use crate::Deps;
 pub(crate) const WRONG_LOGIN: DomainError =
     DomainError::Unauthenticated("Wrong username or password.");
 
-/// A session just started: `token` goes in the cookie (it is not stored), valid until `expires_at`.
+/// A session just started: `token` goes in the cookie (it is not stored), valid until `expires_at`, which is
+/// `lifetime` from now (the cookie's Max-Age).
 #[derive(Debug, Clone)]
 pub struct NewSession {
     pub token: String,
     pub expires_at: DateTime<Utc>,
+    pub lifetime: Duration,
 }
 
 /// Sign-in, sign-out and session lookup.
@@ -69,11 +71,16 @@ impl AuthService {
     /// Starts a session for an existing user, valid for `session_days`.
     pub async fn start_session(&self, user_id: Uuid) -> DomainResult<NewSession> {
         let token = self.tokens.generate();
-        let expires_at = self.clock.now() + Duration::days(self.session_days);
+        let lifetime = Duration::days(self.session_days);
+        let expires_at = self.clock.now() + lifetime;
         self.sessions
             .create(user_id, self.tokens.digest(&token), expires_at)
             .await?;
-        Ok(NewSession { token, expires_at })
+        Ok(NewSession {
+            token,
+            expires_at,
+            lifetime,
+        })
     }
 
     /// Ends the session behind `token`, if there is one. Never fails for a missing session.

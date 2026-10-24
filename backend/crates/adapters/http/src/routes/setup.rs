@@ -51,6 +51,6 @@ pub async fn create_admin(
         .users
         .create_first_admin(&body.username, &body.display_name, body.password)
         .await?;
-    let jar = jar.add(session_cookie(&state.config, session.token));
+    let jar = jar.add(session_cookie(&state.config, session));
     Ok((StatusCode::CREATED, jar, Json(user.into())))
 }

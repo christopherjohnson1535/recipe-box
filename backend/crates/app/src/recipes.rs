@@ -35,12 +35,13 @@ impl RecipeService {
         Ok(recipe)
     }
 
-    /// `limit` must be 1–200 and `offset` 0 or more (checked in that order).
+    /// `limit` must be 1–200, `offset` 0 or more, and `sort` (as sent) `newest`, `title` or `time`; none means
+    /// relevance when there is search text, else newest. Checked in that order: the first failure is reported.
     pub async fn search(
         &self,
         text: Option<String>,
         tag: Option<String>,
-        sort: Sort,
+        sort: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> DomainResult<Page<RecipeSummary>> {
@@ -50,6 +51,13 @@ impl RecipeService {
         if offset < 0 {
             return Err(DomainError::validation("offset: must be 0 or more."));
         }
+        let sort = match sort {
+            None => Sort::Default,
+            Some("newest") => Sort::Newest,
+            Some("title") => Sort::Title,
+            Some("time") => Sort::Time,
+            Some(_) => return Err(DomainError::validation("sort: newest, title or time.")),
+        };
         let mut page = self
             .recipes
             .search(SearchQuery {

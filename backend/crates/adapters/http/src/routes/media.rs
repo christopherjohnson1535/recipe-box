@@ -1,3 +1,4 @@
+use app::{MediaService, Stored};
 use axum::{
     Json,
     extract::{Multipart, State},
@@ -5,6 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::{
     HttpState,
@@ -12,6 +14,21 @@ use crate::{
     error::{AppError, AppPath, AppResult, ErrorBody},
     extract::CurrentUser,
 };
+
+/// Logs a rendition that could not be written (the app crate reports it, this adapter logs). Every caller of
+/// `MediaService::upload` calls this.
+pub fn log_rendition_error(stored: &Stored) {
+    if let Some(e) = &stored.rendition_error {
+        tracing::warn!(id = %stored.image.id, error = %e, "could not write the display rendition");
+    }
+}
+
+/// `MediaService::delete_images`, logging when the rows could not be deleted.
+pub async fn delete_images(media: &MediaService, ids: &[Uuid]) {
+    if !media.delete_images(ids).await {
+        tracing::warn!("could not delete images of a failed request");
+    }
+}
 
 /// Multipart body of `POST /api/media`.
 #[derive(ToSchema)]
@@ -46,8 +63,9 @@ pub async fn upload(
     if data.len() > state.config.max_upload_bytes {
         return Err(AppError::TooLarge);
     }
-    let image = state.services.media.upload(user.id, data.to_vec()).await?;
-    Ok((StatusCode::CREATED, Json(image.into())))
+    let stored = state.services.media.upload(user.id, data.to_vec()).await?;
+    log_rendition_error(&stored);
+    Ok((StatusCode::CREATED, Json(stored.image.into())))
 }
 
 /// A stored image.

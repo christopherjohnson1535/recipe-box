@@ -2,7 +2,10 @@
 
 use std::time::Instant;
 
-use adapter_http::extract::CurrentUser;
+use adapter_http::{
+    extract::CurrentUser,
+    routes::media::{delete_images, log_rendition_error},
+};
 use app::MediaService;
 use axum::{
     Json,
@@ -191,8 +194,9 @@ async fn attach_image(state: &ImportState, user_id: Uuid, draft: &mut RecipeDraf
             state.app.config.max_upload_bytes(),
         )
         .await?;
-        let image = state.http.services.media.upload(user_id, img.body).await?;
-        AppResult::Ok(Image::from(image))
+        let stored = state.http.services.media.upload(user_id, img.body).await?;
+        log_rendition_error(&stored);
+        AppResult::Ok(Image::from(stored.image))
     }
     .await;
     match stored {
@@ -320,11 +324,12 @@ pub async fn from_photo(
     let media = &state.http.services.media;
     let mut stored = StoredGuard::new(media);
     for data in files {
-        match media.store_jpeg(user.id, data).await {
-            Ok((image, jpeg)) => {
-                stored.ids.push(image.id);
-                images.push(Image::from(image));
-                jpegs.push(jpeg);
+        match media.upload(user.id, data).await {
+            Ok(s) => {
+                log_rendition_error(&s);
+                stored.ids.push(s.image.id);
+                images.push(Image::from(s.image));
+                jpegs.push(s.jpeg);
             }
             Err(e) => {
                 stored.delete().await;
@@ -402,7 +407,7 @@ impl StoredGuard {
     /// Deletes the photos now (so the caller's response comes after they are gone).
     async fn delete(mut self) {
         self.armed = false;
-        self.media.delete_images(&self.ids).await;
+        delete_images(&self.media, &self.ids).await;
     }
 }
 
@@ -410,7 +415,7 @@ impl Drop for StoredGuard {
     fn drop(&mut self) {
         if self.armed && !self.ids.is_empty() {
             let (media, ids) = (self.media.clone(), std::mem::take(&mut self.ids));
-            tokio::spawn(async move { media.delete_images(&ids).await });
+            tokio::spawn(async move { delete_images(&media, &ids).await });
         }
     }
 }

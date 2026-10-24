@@ -33,7 +33,7 @@ pub async fn login(
         .auth
         .login(&body.username, body.password)
         .await?;
-    let jar = jar.add(session_cookie(&state.config, session.token));
+    let jar = jar.add(session_cookie(&state.config, session));
     Ok((jar, Json(user.into())))
 }
 

@@ -22,8 +22,6 @@ pub use routes::{finish, openapi, routes};
 pub struct HttpConfig {
     /// `Secure` flag of the session cookie.
     pub cookie_secure: bool,
-    /// Max-Age of the session cookie, in days.
-    pub session_days: i64,
     /// Largest accepted upload (`MAX_UPLOAD_MB`).
     pub max_upload_bytes: usize,
     /// Reported by `/api/health` and in the OpenAPI spec.
