@@ -1,0 +1,14 @@
+[package]
+name = "recipe-box-domain"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "domain"
+
+[dependencies]
+chrono.workspace = true
+thiserror.workspace = true
+url.workspace = true
+uuid.workspace = true
