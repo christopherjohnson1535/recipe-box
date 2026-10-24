@@ -18,6 +18,10 @@
   --color-on-accent: var(--umber-950);
   --color-danger: var(--claret-200);
   --color-focus: var(--claret-200);
+  --color-attention: var(--mustard-500);
+  --color-on-attention: var(--stone-950);
+  --color-stage: var(--umber-900);
+  --color-on-stage: var(--umber-50);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,5 +39,9 @@
     --color-on-accent: var(--umber-950);
     --color-danger: var(--claret-200);
     --color-focus: var(--claret-200);
+    --color-attention: var(--mustard-500);
+    --color-on-attention: var(--stone-950);
+    --color-stage: var(--umber-900);
+    --color-on-stage: var(--umber-50);
   }
 }

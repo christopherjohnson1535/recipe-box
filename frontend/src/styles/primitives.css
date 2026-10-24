@@ -25,8 +25,8 @@
   --claret-700: #9b1c1c;
   --claret-800: #7e1414;
 
-  /* Print inks for illustration (spot icons, stamps). No semantic token uses them yet; contrast notes are in
-     tokens.test.ts and docs/UI.md. */
+  /* Print inks for illustration (spot icons, stamps). Mustard is now named by --color-attention (and the
+     darkroom); contrast notes are in tokens.test.ts and docs/UI.md. */
   --mustard-500: #d9a21b;
   --fern-700: #3f6b45;
   --tomato-600: #d2492a;
