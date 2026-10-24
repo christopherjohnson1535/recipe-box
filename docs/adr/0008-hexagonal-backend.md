@@ -20,6 +20,10 @@ Errors are split: `DomainError` lives in `domain`. It starts with `Validation` a
 
 Search is described in domain terms (`SearchQuery { text, tag, sort, limit, offset }` returning a page of summaries) and each `RecipeRepo` adapter decides how. The cases in `backend/tests/search.rs` become a storage contract suite every adapter must pass. A separate `SearchIndex` port (Tantivy, Meilisearch) is deferred until a second storage exists.
 
+Ports are `async-trait` traits so services can hold `Arc<dyn Port>`, and they return `DomainError` (adapters map their own errors into it; no `sqlx::Error` crosses a port). Besides the crates above, `ports` holds a `contract` feature: the storage contract suite (`ports::contract`), which each adapter runs in its own tests. It uses a manual clock, so it never reads the wall clock, and a `Capabilities` struct lets an adapter that cannot support a case (phrase search, boolean operators) say so; the suite then prints what it skipped.
+
+**Transactions.** A recipe save touches recipes, tags and photo links together. Instead of a unit-of-work port, repository methods are coarse-grained and atomic inside the adapter: `RecipeRepo::create` and `update` take the whole `RecipeInput` (tags and image links included), and `UserRepo::set_password_hash` ends the user's other sessions in the same step. A unit-of-work port would put transaction handles in the trait and tie every adapter to a transaction model. The cost is that a use case cannot combine two repository calls atomically; where one needs that, it gets a new coarse method. One consequence: changing a password is verify (slow, outside the lock), then set, so two concurrent changes are last-writer-wins instead of serialised by a row lock.
+
 The work is done in eight phases (#87 to #94), each keeping `main` green and `docs/openapi.json` unchanged. Phase 1 keeps the existing `recipe-box-api` package at `backend/` as a workspace member, so the binary name and image entrypoint do not change. Some structs are temporarily duplicated between domain types and HTTP DTOs until the services phase (#91).
 
 ## Consequences
