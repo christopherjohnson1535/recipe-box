@@ -22,10 +22,10 @@ pub struct Settings {
     (status = 200, description = "The settings.", body = Settings),
 ))]
 pub async fn get(State(state): State<AppState>, _user: CurrentUser) -> AppResult<Json<Settings>> {
-    let plate_treatment = sqlx::query_scalar("select plate_treatment from household_settings")
-        .fetch_one(&state.pool)
-        .await?;
-    Ok(Json(Settings { plate_treatment }))
+    let settings = state.settings.get().await?;
+    Ok(Json(Settings {
+        plate_treatment: settings.plate_treatment,
+    }))
 }
 
 /// Changes the household settings. Admin only.
@@ -39,12 +39,13 @@ pub async fn update(
     _admin: AdminUser,
     AppJson(body): AppJson<Settings>,
 ) -> AppResult<Json<Settings>> {
-    let plate_treatment = sqlx::query_scalar(
-        "update household_settings set plate_treatment = $1, updated_at = $2 returning plate_treatment",
-    )
-    .bind(body.plate_treatment)
-    .bind(state.clock.now())
-    .fetch_one(&state.pool)
-    .await?;
-    Ok(Json(Settings { plate_treatment }))
+    let settings = state
+        .settings
+        .set(domain::Settings {
+            plate_treatment: body.plate_treatment,
+        })
+        .await?;
+    Ok(Json(Settings {
+        plate_treatment: settings.plate_treatment,
+    }))
 }

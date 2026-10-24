@@ -5,10 +5,10 @@ use utoipa::ToSchema;
 
 use crate::{
     auth::{password, session},
-    error::{AppError, AppJson, AppResult, ErrorBody},
+    error::{AppJson, AppResult, ErrorBody},
     models::User,
     state::AppState,
-    user_columns, validate,
+    validate,
 };
 
 #[derive(serde::Serialize, ToSchema)]
@@ -22,11 +22,8 @@ pub struct SetupStatus {
     (status = 200, description = "Setup status.", body = SetupStatus),
 ))]
 pub async fn status(State(state): State<AppState>) -> AppResult<Json<SetupStatus>> {
-    let has_users: bool = sqlx::query_scalar("select exists (select 1 from users)")
-        .fetch_one(&state.pool)
-        .await?;
     Ok(Json(SetupStatus {
-        needs_setup: !has_users,
+        needs_setup: !state.users.any().await?,
     }))
 }
 
@@ -55,28 +52,16 @@ pub async fn create_admin(
     validate::password(&body.password)?;
     let hash = password::hash(body.password).await?;
 
-    let mut tx = state.pool.begin().await?;
-    // Serialises concurrent setup attempts so only one admin is created.
-    sqlx::query("lock table users in share row exclusive mode")
-        .execute(&mut *tx)
+    let user = state
+        .users
+        .create_first_admin(domain::NewUser {
+            username,
+            display_name,
+            password_hash: hash,
+            role: domain::ROLE_ADMIN.into(),
+        })
         .await?;
-    let has_users: bool = sqlx::query_scalar("select exists (select 1 from users)")
-        .fetch_one(&mut *tx)
-        .await?;
-    if has_users {
-        return Err(AppError::Forbidden("Setup is already done.".into()));
-    }
-    let user = sqlx::query_as::<_, User>(concat!(
-        "insert into users (username, display_name, password_hash, role) values ($1, $2, $3, 'admin') returning ",
-        user_columns!()
-    ))
-    .bind(&username)
-    .bind(&display_name)
-    .bind(&hash)
-    .fetch_one(&mut *tx)
-    .await?;
-    tx.commit().await?;
 
     let jar = session::start(&state, jar, user.id).await?;
-    Ok((StatusCode::CREATED, jar, Json(user)))
+    Ok((StatusCode::CREATED, jar, Json(user.into())))
 }

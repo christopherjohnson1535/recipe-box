@@ -18,7 +18,7 @@ pub struct Health {
 ))]
 pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<Health>) {
     let version = env!("CARGO_PKG_VERSION");
-    match sqlx::query("select 1").execute(&state.pool).await {
+    match state.health.ping().await {
         Ok(_) => (
             StatusCode::OK,
             Json(Health {

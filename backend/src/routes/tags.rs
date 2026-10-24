@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 
 use crate::{auth::CurrentUser, error::AppResult, state::AppState};
 
-#[derive(Serialize, sqlx::FromRow, ToSchema)]
+#[derive(Serialize, ToSchema)]
 pub struct TagCount {
     name: String,
     count: i64,
@@ -18,15 +18,13 @@ pub async fn list(
     State(state): State<AppState>,
     _user: CurrentUser,
 ) -> AppResult<Json<Vec<TagCount>>> {
-    let tags = sqlx::query_as::<_, TagCount>(
-        "select t.name::text as name, count(*) as count
-         from tags t
-         join recipe_tags rt on rt.tag_id = t.id
-         join recipes r on r.id = rt.recipe_id and r.deleted_at is null
-         group by t.id, t.name
-         order by t.name",
-    )
-    .fetch_all(&state.pool)
-    .await?;
-    Ok(Json(tags))
+    let tags = state.tags.list_in_use().await?;
+    Ok(Json(
+        tags.into_iter()
+            .map(|t| TagCount {
+                name: t.name,
+                count: t.count,
+            })
+            .collect(),
+    ))
 }

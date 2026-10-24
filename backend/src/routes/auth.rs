@@ -8,20 +8,13 @@ use crate::{
     error::{AppError, AppJson, AppResult, ErrorBody},
     models::User,
     state::AppState,
-    user_columns, validate,
+    validate,
 };
 
 #[derive(Deserialize, ToSchema)]
 pub struct LoginBody {
     username: String,
     password: String,
-}
-
-#[derive(sqlx::FromRow)]
-struct UserWithHash {
-    #[sqlx(flatten)]
-    user: User,
-    password_hash: String,
 }
 
 /// Signs in with a username and password.
@@ -40,16 +33,9 @@ pub async fn login(
     if body.password.chars().count() > validate::MAX_PASSWORD {
         return Err(AppError::Unauthenticated("Wrong username or password."));
     }
-    let found = sqlx::query_as::<_, UserWithHash>(concat!(
-        "select ",
-        user_columns!(),
-        ", password_hash from users where username = $1::citext"
-    ))
-    .bind(body.username.trim())
-    .fetch_optional(&state.pool)
-    .await?;
+    let found = state.users.find_with_hash(body.username.trim()).await?;
     let (user, hash) = match found {
-        Some(f) => (Some(f.user), Some(f.password_hash)),
+        Some((user, hash)) => (Some(user), Some(hash)),
         None => (None, None),
     };
     let ok = password::verify(body.password, hash).await?;
@@ -58,7 +44,7 @@ pub async fn login(
         return Err(AppError::Unauthenticated("Wrong username or password."));
     };
     let jar = session::start(&state, jar, user.id).await?;
-    Ok((jar, Json(user)))
+    Ok((jar, Json(user.into())))
 }
 
 /// Always succeeds, even without a session.
@@ -70,7 +56,7 @@ pub async fn logout(
     State(state): State<AppState>,
     jar: CookieJar,
 ) -> AppResult<(StatusCode, CookieJar)> {
-    let jar = session::end(&state.pool, jar).await?;
+    let jar = session::end(&state, jar).await?;
     Ok((StatusCode::NO_CONTENT, jar))
 }
 
