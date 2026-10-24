@@ -159,7 +159,9 @@ jobs:
         working-directory: backend
         run: |
           cargo llvm-cov --workspace --html --output-dir coverage
-          cargo llvm-cov report --json --summary-only --output-path coverage-summary.json
+          # --workspace: count every crate, as the HTML report does (the root package alone shrinks as code moves
+          # into crates/, which would read as a coverage drop).
+          cargo llvm-cov report --workspace --json --summary-only --output-path coverage-summary.json
       - name: Ratchet and summary
         # bash with pipefail: a ratchet failure must fail the job even though its output is piped into tee.
         shell: bash
