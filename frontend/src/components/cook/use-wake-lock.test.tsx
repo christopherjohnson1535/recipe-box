@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useWakeLock } from "./use-wake-lock";
 
@@ -68,5 +69,47 @@ describe("useWakeLock", () => {
     unmount();
     await act(async () => resolve(lock.sentinel));
     expect(lock.sentinel.release).toHaveBeenCalled();
+  });
+
+  it("reports checking until the first request answers", async () => {
+    const lock = fakeLock();
+    let resolve!: (s: typeof lock.sentinel) => void;
+    vi.stubGlobal("navigator", { wakeLock: { request: () => new Promise((r) => (resolve = r)) } });
+    const { result } = renderHook(() => useWakeLock());
+    expect(result.current).toBe("checking");
+    await act(async () => resolve(lock.sentinel));
+    expect(result.current).toBe("on");
+  });
+
+  it("holds exactly one lock under StrictMode's mount, unmount, mount", async () => {
+    const locks: ReturnType<typeof fakeLock>[] = [];
+    const request = vi.fn(() => {
+      const l = fakeLock();
+      locks.push(l);
+      return Promise.resolve(l.sentinel);
+    });
+    vi.stubGlobal("navigator", { wakeLock: { request } });
+    const { result, unmount } = renderHook(() => useWakeLock(), { wrapper: StrictMode });
+    await act(async () => {});
+    expect(result.current).toBe("on");
+    const held = locks.filter((l) => l.sentinel.release.mock.calls.length === 0);
+    expect(held).toHaveLength(1);
+    expect(locks.length).toBeGreaterThan(1);
+    unmount();
+    expect(locks.every((l) => l.sentinel.release.mock.calls.length > 0)).toBe(true);
+  });
+
+  it("does not ask again while a request is pending", async () => {
+    const lock = fakeLock();
+    let resolve!: (s: typeof lock.sentinel) => void;
+    const request = vi.fn(() => new Promise((r) => (resolve = r)));
+    vi.stubGlobal("navigator", { wakeLock: { request } });
+    renderHook(() => useWakeLock());
+    await act(async () => void setVisibility("visible"));
+    await act(async () => void setVisibility("visible"));
+    expect(request).toHaveBeenCalledTimes(1);
+    await act(async () => resolve(lock.sentinel));
+    await act(async () => void setVisibility("visible"));
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

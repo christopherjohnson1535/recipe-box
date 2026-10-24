@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 
-/** `off`: not held right now (refused, released by the system, or the page is hidden). `unsupported`: no Screen Wake Lock API. */
-export type WakeLockStatus = "on" | "off" | "unsupported";
+/** `checking`: the first request has not answered yet. `off`: not held right now (refused, released by the system, or the page is hidden). `unsupported`: no Screen Wake Lock API. */
+export type WakeLockStatus = "checking" | "on" | "off" | "unsupported";
 
 /**
  * Keeps the screen awake while mounted. Asks only while the page is visible; the system releases the lock when the page
  * hides (and iOS sometimes on its own), so it asks again the next time the page is visible.
  */
 export function useWakeLock(): WakeLockStatus {
-  const [status, setStatus] = useState<WakeLockStatus>("off");
+  const [status, setStatus] = useState<WakeLockStatus>("checking");
   useEffect(() => {
     if (!("wakeLock" in navigator)) {
       // The API is only known in the browser, so this cannot be the initial state without a hydration mismatch.
@@ -20,7 +20,11 @@ export function useWakeLock(): WakeLockStatus {
     let sentinel: WakeLockSentinel | null = null;
     let asking = false;
     const acquire = async () => {
-      if (document.visibilityState !== "visible" || sentinel || asking) return;
+      if (document.visibilityState !== "visible") {
+        if (alive && !sentinel) setStatus("off");
+        return;
+      }
+      if (sentinel || asking) return;
       asking = true;
       try {
         const lock = await navigator.wakeLock.request("screen");
