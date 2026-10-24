@@ -65,8 +65,7 @@ the root layout sets `<html data-theme>` before first paint; `EditionController`
 
 ## Print inks
 Three illustration colours exist as primitives (`--mustard-500` `#d9a21b`, `--fern-700` `#3f6b45`, `--tomato-600`
-`#d2492a`) for spot icons and stamps. No semantic token uses them yet; point a component token at a new semantic token
-that names the meaning before using one. Contrast against paper (recorded in `tokens.test.ts`):
+`#d2492a`) for spot icons and stamps. Mustard is named by the semantic tokens `--color-attention` (wash, rule or mark) and `--color-on-attention` (ink on it), plus `--color-stage` / `--color-on-stage` for the darkroom's dark ground; the others have no token yet, so name the meaning before using one. Contrast against paper (recorded in `tokens.test.ts`):
 
 | Ink | Day paper | Evening paper | Use |
 |---|---|---|---|
@@ -181,6 +180,7 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
 - `import/ImportScreen` (+ `ImportPanels`, `import-errors.ts`): `/import` with Link, Photo and Text modes (mode in
   `?mode=`, `?url=` starts a link import), loading and error notes, review in `RecipeForm` with the original photos
   beside it. `explainImportError` maps every API error code to a title, message and next steps (Try again, Type it in, Sign in, Paste the text instead). Below `lg` the original photos are a horizontal strip above the form.
+- Import as a darkroom (#42): `import/ImportScreen` has Photo / Link / Paste text tabs (`ui/Tabs`, arrow keys). While a request is in flight a `ScanHeading` ("Reading your page") sits over `ui/Darkroom` `ScanStage` (the photo tilted on the `stage` ground with an `attention` scan line and a pulsing dot, motion only) or `DomainCard`. When the draft arrives the photo stays on the left (sticky from 1024px, above the draft below that) with `regions` boxes if the draft has them (further photos in a strip under it), and the right column has `DraftKicker` ("Draft · not saved yet"), `DraftTitle` (typed in once, full title for screen readers) and `DraftRow`s: a check or a `?` badge at the left, the quantity (`splitIngredient`) in claret tabular figures, then the line. Every row is shown; rows with `confidence` under 0.6 get the `attention` wash and the `?` (ink on mustard); only the slide-in stagger stops after 12 rows. Warnings go in `DraftNote` (attention rule). AI off: no scan, the photo sits beside the empty form. Reduced motion removes the sweep, dot, typing and slide. Mustard is only a wash, rule or mark; contrast is tested in `tokens.test.ts`.
 - `settings/*`: `/settings`. `SettingsView` (My account always; Household for admins only; AI import), `PasswordForm` (own password asks for the current one; an admin reset doesn't; errors on the field, 401 lands on Current password), `AddMemberForm`, `HouseholdSection` (list, reset panel, remove confirmation naming the person; Remove is off for yourself and the last admin, with the reason shown; focus returns to the Reset button or the Household heading), `AiImportSection`.
 - `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `MagazineCard`.
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.

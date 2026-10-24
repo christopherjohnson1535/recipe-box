@@ -120,6 +120,8 @@ const TEXT: [string, string][] = [
   ["--bar-action-fg", "--bar-action-bg"], // its Start cooking link
   ["--qty-fg", "--target-bg"], // the ingredient row a step link jumped to
   ["--color-ink", "--target-bg"],
+  ["--color-on-attention", "--color-attention"], // the ? mark
+  ["--color-on-stage", "--color-stage"], // darkroom caption and domain card
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
 const UI: [string, string][] = [
@@ -147,6 +149,7 @@ const UI: [string, string][] = [
   ["--strike-fg", "--panel-bg"], // the drawn line through a ticked ingredient
   ["--mention-line", "--color-paper"], // dotted underline on an ingredient named in a step
   ["--bar-focus", "--bar-bg"],
+  ["--color-attention", "--color-stage"], // scan line and region boxes on the dark ground
 ];
 
 describe("design tokens", () => {
@@ -249,7 +252,7 @@ describe("design tokens", () => {
 
   it("print inks: where each is safe on day and evening paper", () => {
     // Recorded, not aspirational. text = 4.5:1 (may carry words); graphic = 3:1 (icons, strokes, large marks);
-    // decorative = below 3:1, flat colour with no meaning of its own. Nothing uses the inks yet (no semantic tokens).
+    // decorative = below 3:1, flat colour with no meaning of its own. Mustard is named by --color-attention (a wash, rule or mark only, ink on top).
     const use = (c: number) => (c >= 4.5 ? "text" : c >= 3 ? "graphic" : "decorative");
     const inks = { "--mustard-500": "#d9a21b", "--fern-700": "#3f6b45", "--tomato-600": "#d2492a" };
     for (const [name, value] of Object.entries(inks)) expect(primitives[name], name).toBe(value);
@@ -264,6 +267,13 @@ describe("design tokens", () => {
       "--fern-700": { day: "text", evening: "decorative" }, // 5.82:1 on day paper; 2.998:1 on evening paper, a hair under 3
       "--tomato-600": { day: "graphic", evening: "graphic" }, // 4.19:1 and 4.17:1: icons yes, body text no
     });
+  });
+
+  it.each(themeFiles.map((f) => f.replace(".css", "")))("%s: text on the attention wash (20% over paper) is at least 4.5:1", (t) => {
+    const mix = (a: string, b: string, k: number) =>
+      "#" + [1, 3, 5].map((i) => Math.round(k * parseInt(a.slice(i, i + 2), 16) + (1 - k) * parseInt(b.slice(i, i + 2), 16)).toString(16).padStart(2, "0")).join("");
+    const wash = mix(hex(t, "--color-attention"), hex(t, "--color-paper"), 0.2);
+    for (const fg of ["--color-ink", "--color-accent"]) expect(contrast(hex(t, fg), wash), `${t} ${fg}`).toBeGreaterThanOrEqual(4.5);
   });
 
   it("the contrast helper matches WCAG", () => {

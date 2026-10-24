@@ -17,6 +17,10 @@
   --color-on-accent: var(--cream-50);
   --color-danger: var(--claret-700);
   --color-focus: var(--claret-700);
+  --color-attention: var(--mustard-500); /* wash, rule or mark for "check this"; never text, ink sits on it */
+  --color-on-attention: var(--stone-950); /* ink on the attention mark */
+  --color-stage: var(--umber-900); /* the darkroom ground, dark in both editions */
+  --color-on-stage: var(--umber-50); /* text on the stage */
 }
 
 :root {

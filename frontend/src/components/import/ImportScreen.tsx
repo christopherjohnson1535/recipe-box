@@ -8,10 +8,13 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Heading } from "@/components/ui/Heading";
 import { Pending } from "@/components/ui/Pending";
 import { PhotoGallery } from "@/components/ui/PhotoPicker";
+import { DomainCard, ScanHeading, ScanStage } from "@/components/ui/Darkroom";
 import { Tabs } from "@/components/ui/Tabs";
 import { Text } from "@/components/ui/Text";
 import { showSaveStamp } from "@/components/ui/save-stamp-store";
 import { ApiError, api as browserApi, type Api, type Capabilities, type Image, type RecipeDraft } from "@/lib/api";
+import { DraftReveal } from "./DraftReveal";
+import { hostCard, readConfidence, readRegions, type Confidence, type Region } from "./darkroom";
 import { LinkPanel, MAX_PHOTOS, PhotoPanel, TextPanel, type PhotoKind } from "./ImportPanels";
 import { explainImportError, type ImportMode, type ImportProblem } from "./import-errors";
 
@@ -21,9 +24,9 @@ export type ImportApi = Pick<
 >;
 
 const TABS = [
-  { id: "link", label: "Link" },
   { id: "photo", label: "Photo" },
-  { id: "text", label: "Text" },
+  { id: "link", label: "Link" },
+  { id: "text", label: "Paste text" },
 ] as const;
 
 const WAITING: Record<ImportMode, string> = {
@@ -35,6 +38,17 @@ const WAITING: Record<ImportMode, string> = {
 /** A bare "example.com/pancakes" is a fair thing to paste; the API wants a scheme. */
 const withScheme = (s: string) => (/^[a-z][a-z\d+.-]*:\/\//i.test(s) || !/^[\w-]+(\.[\w-]+)+(\/|$)/.test(s) ? s : `https://${s}`);
 
+/** The photo being read, tilted on a dark ground with a scan line. Mounted only while the request is in flight. */
+function PhotoScan({ file }: { file: File }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setSrc(url); // eslint-disable-line react-hooks/set-state-in-effect -- an object URL is made and revoked with the effect
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return src ? <ScanStage src={src} alt="The photo being read" caption={`Scanning · ${file.name}`} scanning /> : null;
+}
+
 type Review = {
   id: number;
   initial: RecipeFormInitial;
@@ -45,6 +59,10 @@ type Review = {
   byHand: boolean;
   /** The mode the import came from, for the "Start over" label. */
   from: ImportMode;
+  /** Optional and not returned by the API yet: read defensively from the draft (darkroom.ts). */
+  confidence: Confidence;
+  regions: Region[];
+  warnings: string[];
 };
 
 export function ImportScreen({ initialMode = "link", initialUrl = "", api = browserApi }: { initialMode?: ImportMode; initialUrl?: string; api?: ImportApi }) {
@@ -120,11 +138,14 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
       setSeenDuplicate(false);
       setReview({
         id: ++reviewCount.current,
-        initial: { ...rest, warnings },
+        initial: rest, // warnings show once, in the reveal note
         duplicateOf,
         photoIds: draft.photoImageIds ?? [],
         byHand: false,
         from,
+        confidence: readConfidence(draft),
+        regions: readRegions(draft),
+        warnings,
       });
     } catch (e) {
       if (id !== request.current) return;
@@ -137,6 +158,9 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
           photoIds: value.photoIds,
           byHand: true,
           from,
+          confidence: {},
+          regions: [],
+          warnings: [],
         });
       } else {
         setProblem({ from, value });
@@ -194,6 +218,9 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
       photoIds: ids,
       byHand: true,
       from: "photo",
+      confidence: {},
+      regions: [],
+      warnings: [],
     });
   }
 
@@ -229,6 +256,30 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
   if (review) {
     const photos = review.photoIds.map((id) => ({ src: `/media/${id}.jpg`, alt: `Original photo ${review.photoIds.indexOf(id) + 1}` }));
     const duplicate = review.duplicateOf && !seenDuplicate;
+    const card = review.from === "link" ? hostCard(review.initial.sourceUrl ?? "", review.initial.sourceName) : null;
+    const boxes = review.regions.filter((r) => r.photo === 0);
+    const more = photos.slice(1);
+    // The first photo stays on the dark stage beside the draft (boxes drawn only when the provider returned regions);
+    // any further photos sit under it as a strip.
+    const side =
+      photos.length > 0 ? (
+        <>
+          <ScanStage src={photos[0].src} alt={photos[0].alt} caption={boxes.length > 0 ? "Found on your page" : "Your photo"} scanning={false} regions={boxes} />
+          {more.length > 0 && (
+            <>
+              <Heading level={3} size="label">
+                More photos ({more.length})
+              </Heading>
+              <PhotoGallery photos={more} strip />
+            </>
+          )}
+        </>
+      ) : card ? (
+        <DomainCard {...card} />
+      ) : null;
+    const reveal = review.byHand ? null : (
+      <DraftReveal title={review.initial.title} ingredients={review.initial.ingredients?.map((i) => i.text) ?? []} confidence={review.confidence} warnings={review.warnings} />
+    );
     const form = (
       <RecipeForm
         key={review.id}
@@ -270,18 +321,19 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
             ) : (
               <Text variant="deck">Nothing is saved until you press Save. Fix anything that looks wrong first.</Text>
             )}
-            {photos.length > 0 ? (
+            {side ? (
               <div className="grid items-start gap-10 lg:grid-cols-2">
-                <div className="flex flex-col gap-3 lg:sticky lg:top-6">
-                  <Heading level={3} size="label">
-                    Your {photos.length === 1 ? "photo" : `photos (${photos.length})`}
-                  </Heading>
-                  <PhotoGallery photos={photos} strip />
+                <div className="flex flex-col gap-3 lg:sticky lg:top-6">{side}</div>
+                <div className="flex flex-col gap-10">
+                  {reveal}
+                  {form}
                 </div>
-                {form}
               </div>
             ) : (
-              form
+              <>
+                {reveal}
+                {form}
+              </>
             )}
             <div>
               <Button variant="ghost" onClick={backToInput}>
@@ -294,70 +346,91 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
     );
   }
 
+  // A dark stage beside the form while a request is in flight: the photo and its scan (AI on), or the site's card.
+  const wait = hostCard(url);
+  const scene = busy === "photo" && mode === "photo" && !aiOff && files[0] ? <PhotoScan file={files[0]} /> : busy === "link" && mode === "link" && wait ? <DomainCard {...wait} /> : null;
+  const stage = scene && (
+    <div className="flex flex-col gap-6">
+      <ScanHeading />
+      {scene}
+    </div>
+  );
   const here = problem && problem.from === mode ? problem.value : null;
   const fieldError = here?.field && here.fieldId !== "import-source" ? here.message : undefined;
   const sourceError = here?.field && here.fieldId === "import-source" ? here.message : undefined;
+  const inner = (
+    <>
+      {mode === "link" && <LinkPanel url={url} onUrl={setUrl} error={fieldError} busy={busy !== null} onSubmit={() => importLink()} aiOff={aiOff} />}
+      {mode === "text" && (
+        <TextPanel
+          text={text}
+          onText={setText}
+          source={source}
+          onSource={setSource}
+          error={fieldError}
+          sourceError={sourceError}
+          busy={busy !== null}
+          onSubmit={importText}
+          aiOff={aiOff}
+          autoFocus={focusText}
+        />
+      )}
+      {mode === "photo" && (
+        <PhotoPanel
+          files={files}
+          onAdd={(added) => setFiles((f) => [...f, ...added].slice(0, MAX_PHOTOS))}
+          onRemove={(i) => setFiles((f) => f.filter((_, at) => at !== i))}
+          kind={kind}
+          onKind={setKind}
+          error={fieldError}
+          busy={busy !== null}
+          onSubmit={importPhotos}
+          aiOff={aiOff}
+        />
+      )}
+      {busy !== null && (
+        <Pending
+          action={
+            <Button variant="secondary" onClick={stopWaiting}>
+              Stop waiting and edit
+            </Button>
+          }
+        >
+          {busy === "photo" && aiOff ? "Keeping the photos…" : WAITING[busy]}
+        </Pending>
+      )}
+      {here && !here.field && (
+        <Alert tone={here.tone} title={here.title}>
+          <div className="flex flex-col gap-4">
+            <Text variant="small">{here.message}</Text>
+            {here.offers.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {here.offers.includes("retry") && <Button onClick={() => retry(mode)}>Try again</Button>}
+                {here.offers.includes("sign-in") && <ButtonLink href={`/login?next=${encodeURIComponent(`/import?mode=${mode}`)}`}>Sign in</ButtonLink>}
+                {here.offers.includes("paste-text") && <Button onClick={pasteInstead}>Paste the recipe text instead</Button>}
+                {here.offers.includes("type-in") && (
+                  <ButtonLink href="/recipes/new" variant="secondary">
+                    Type it in
+                  </ButtonLink>
+                )}
+              </div>
+            )}
+          </div>
+        </Alert>
+      )}
+    </>
+  );
   return (
     <div className="flex flex-col gap-8">
       <Tabs label="Import from" idPrefix="import" tabs={TABS} value={mode} onChange={pick} />
       <div role="tabpanel" id="import-panel" aria-labelledby={`import-tab-${mode}`} className="flex flex-col gap-6">
-        {mode === "link" && <LinkPanel url={url} onUrl={setUrl} error={fieldError} busy={busy !== null} onSubmit={() => importLink()} aiOff={aiOff} />}
-        {mode === "text" && (
-          <TextPanel
-            text={text}
-            onText={setText}
-            source={source}
-            onSource={setSource}
-            error={fieldError}
-            sourceError={sourceError}
-            busy={busy !== null}
-            onSubmit={importText}
-            aiOff={aiOff}
-            autoFocus={focusText}
-          />
-        )}
-        {mode === "photo" && (
-          <PhotoPanel
-            files={files}
-            onAdd={(added) => setFiles((f) => [...f, ...added].slice(0, MAX_PHOTOS))}
-            onRemove={(i) => setFiles((f) => f.filter((_, at) => at !== i))}
-            kind={kind}
-            onKind={setKind}
-            error={fieldError}
-            busy={busy !== null}
-            onSubmit={importPhotos}
-            aiOff={aiOff}
-          />
-        )}
-        {busy !== null && (
-          <Pending
-            action={
-              <Button variant="secondary" onClick={stopWaiting}>
-                Stop waiting and edit
-              </Button>
-            }
-          >
-            {busy === "photo" && aiOff ? "Keeping the photos…" : WAITING[busy]}
-          </Pending>
-        )}
-        {here && !here.field && (
-          <Alert tone={here.tone} title={here.title}>
-            <div className="flex flex-col gap-4">
-              <Text variant="small">{here.message}</Text>
-              {here.offers.length > 0 && (
-                <div className="flex flex-wrap gap-3">
-                  {here.offers.includes("retry") && <Button onClick={() => retry(mode)}>Try again</Button>}
-                  {here.offers.includes("sign-in") && <ButtonLink href={`/login?next=${encodeURIComponent(`/import?mode=${mode}`)}`}>Sign in</ButtonLink>}
-                  {here.offers.includes("paste-text") && <Button onClick={pasteInstead}>Paste the recipe text instead</Button>}
-                  {here.offers.includes("type-in") && (
-                    <ButtonLink href="/recipes/new" variant="secondary">
-                      Type it in
-                    </ButtonLink>
-                  )}
-                </div>
-              )}
-            </div>
-          </Alert>
+        {stage ? (
+          <div className="grid items-start gap-10 lg:grid-cols-2">
+            {stage}
+            <div className="flex flex-col gap-6">{inner}</div>
+          </div>
+        ) : (
+          inner
         )}
       </div>
     </div>

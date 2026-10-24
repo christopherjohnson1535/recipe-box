@@ -35,6 +35,25 @@ INT-10 — fixed: moot, compact chip labels removed (chips show the step's own w
 INT-11 — skipped: nice; grouping at ≥ 1,000 now done, the 0.4 → ⅜ rounding is the documented eighths behaviour
 INT-12 — fixed: a leading "(14 oz)" is skipped when naming an ingredient so "1 (14 oz) can tomatoes" links; "1 can (14 oz) tomatoes" already works
 INT-13 — fixed: the words are real text once, no duplicate label
+O42-01 fixed — after the draft the tilted photo stays on the dark stage (sticky at lg, above the draft below), region boxes drawn when present, other photos in a strip under it
+O42-02 fixed — claret kicker, display-size title, body-size rows with a check or ? at the left and the quantity from splitIngredient in a claret tabular column
+O42-03 fixed — the ? badge moved to the row's left, wash across the row, aria-label kept
+O42-04 fixed — added --color-attention, --color-on-attention, --color-stage, --color-on-stage (day and evening, both evening blocks) with contrast tests in tokens.test.ts; Darkroom uses them, no hex left (approved deviation)
+O42-05 fixed — ScanHeading "Reading your page / Hold tight…" over the stage while in flight (aria-hidden; the Pending box stays the live status)
+O42-06 fixed — pulsing attention dot beside the scanning label, motion-safe only
+R42-01 fixed — every row is shown and flagged; only the stagger delay is capped at 12 rows (test with 20 rows, flag on the 15th)
+R42-02 fixed — regions need w,h > 0, x+w and y+h <= 1, photo a non-negative integer; tests added
+R42-03 fixed — scan stage also requires mode === "photo"; test added
+R42-04 fixed — stage always shows photo 0, remaining photos in a strip under it; test added
+R42-05 fixed — hard-coded contrast test removed from Darkroom.test.tsx; checks now read the real tokens in tokens.test.ts
+R42-06 fixed — region boxes get a dark stage outline inside and out so they read over any photo
+R42-07 fixed — tests for object URL revoke, title typing and sr-only title, reduced motion, stop waiting, bad regions, long confidence/rows, 3 photos (f, the ai_disabled flow, was already covered at ImportScreen.test.tsx)
+R42-08 fixed — untyped remainder rendered invisible so the title keeps its space
+R42-09 fixed — warning key is the index
+R42-10 skipped — nice, mapping already correct
+R42-11 fixed — API.md no longer names UI colours; openapi.json left alone as the review says
+R42-12 skipped — ownership note belongs in the PR
+R42-13 fixed — root causes covered by O42-01, O42-03, O42-04, O42-05
 O41-01 fixed — the timer chip and the punctuation after it sit in one nowrap span; the leading punctuation moves out of the next text part
 O41-02 fixed — cook-logic `cookParts`: first word of a two-word name ("garlic") is lit and underlined in the step, with a test; mentions.ts untouched, same gap remains on the recipe page (follow-up)
 O41-03 fixed — portrait chips are one row of lit ingredients only, with "+N more" / "All ingredients (N)" to expand

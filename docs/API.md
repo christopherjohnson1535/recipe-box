@@ -100,6 +100,13 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   "Guessed from a photo of the dish" (PHO-4). When no draft comes back (422 `ai_disabled`, 422 `no_recipe_found`,
   502 `ai_error`) the photos stay stored and the body's `error` also carries `"photoImageIds": [...]` so the UI can
   show them beside an empty form (PHO-5). No other error has that field.
+- **Draft confidence and regions (optional, future).** Not yet returned by the API; the UI shows them when present and
+  never invents them. A draft may carry `confidence`: `{ "title": 0.9, "ingredients": [0.98, 0.4, ...] }`, scores from
+  0 to 1, `ingredients` indexed like the draft's `ingredients`; any key may be missing. The import screen flags a row
+  below 0.6 as doubtful (the screen flags every such row). A draft may also carry `regions`: `[{ "photo": 0, "x": 0.1, "y": 0.2, "w": 0.4,
+  "h": 0.1, "label": "title" }]`, boxes on the uploaded photos as fractions of width and height (`photo` is the index in
+  upload order, default 0); boxes are drawn over the first photo only when present. `warnings` (already returned) is
+  shown as a note.
 - **AI provider** (`AI_PROVIDER=anthropic`): images are shrunk to at most 1568 px on the long edge before sending; the
   reply is validated and capped like link import (500 items, field lengths as in `/api/recipes`), each cut adding a
   `warnings` entry. One retry on 429/5xx/connect errors (not after
