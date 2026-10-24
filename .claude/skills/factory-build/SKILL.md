@@ -10,7 +10,7 @@ For a small issue, one builder agent (or you, if the owner prefers) is enough â€
 
 ## Waves
 
-1. **Scaffold (done â€” see `docs/review/SCAFFOLD.md`).** Backend and frontend skeletons, containers, CI.
+1. **Scaffold (done; see the example run in `docs/FACTORY.md`).** Backend and frontend skeletons, containers, CI.
 2. **Design system (one agent, sequential).** Uses tastemaker (`.factory/vendor/tastemaker/skills/tastemaker/SKILL.md`,
    build mode) with the existing `.tastemaker/style-lock.md`; writes tokens, the app shell, `src/components/ui/*`,
    and `docs/UI.md`. Self-hosted fonts only. Runs every frontend check.

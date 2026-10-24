@@ -16,8 +16,8 @@ From the first release on, GitHub release notes are generated from merged PR tit
 - October 2026 redesign proposals with screenshots and mockup source (`docs/design/redesign-2026-10/`, #44).
 
 ### Changed
-- Agent run notes moved from `docs/review/` to `docs/archive/factory-runs/`.
-- Removed `docs/archive/factory-runs/` (agent run notes; still in git history).
+- Agent run notes are no longer kept in the repo (still in git history): `docs/review/` is gitignored and the
+  factory skills write reviews, the fix ledger and smoke tables to the session's scratch folder and the PR (#52).
 - README status updated: Phase 1 complete, Phase 2 in progress.
 
 ## Phase 1 — Recipe box (2026-10-21 to 2026-10-22)

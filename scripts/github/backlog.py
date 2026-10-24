@@ -167,10 +167,10 @@ ISSUES = [
         "Independent review of Phase 1 before building on it.",
         "All Phase 1 IDs",
         "Run `factory-verify` (reviewers: backend security — auth, sessions, uploads, SSRF; frontend UI audit; "
-        "integration build + smoke through compose), then fix waves with `docs/review/FIXES.md`, then `factory-test` "
+        "integration build + smoke through compose), then fix waves (ledger in the run folder and PR), then `factory-test` "
         "(adapt `scripts/factory/shoot.py` pages to Recipe Box) and `factory-design-qa`. Known small item from the "
-        "scaffold check (`docs/review/SCAFFOLD.md`): the API prints a backtrace when its port is in use — make it a one-line error.",
-        "`docs/review/**` plus whatever the fix waves own",
+        "scaffold check: the API prints a backtrace when its port is in use — make it a one-line error.",
+        "Whatever the fix waves own",
         ["Every Must fixed; Shoulds fixed or skipped with a reason", "Screenshot set reviewed (iPad + phone + desktop, light + dark)"],
     ),
     # ---------------- Phase 2 ----------------

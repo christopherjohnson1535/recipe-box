@@ -1,6 +1,6 @@
 # Recipe Box — requirements
 
-Draft 2026-10-21 for the owner to confirm. IDs are referenced by `docs/SPEC.md`, reviews and `docs/review/FIXES.md`.
+Draft 2026-10-21 for the owner to confirm. IDs are referenced by `docs/SPEC.md`, issues and pull requests.
 
 ## Overview
 A household recipe website. Recipes come in from a link, a photo (cookbook page, handwritten card, screenshot,

@@ -14,20 +14,24 @@ Filled-in builder rules: `docs/agents/agent-preamble.md`.
 
 ## Stages and gates
 
-| # | Stage | Skill | Output (in repo) | Gate to pass before the next stage |
+| # | Stage | Skill | Output | Gate to pass before the next stage |
 |---|---|---|---|---|
 | 1 | Requirements | `factory-requirements` | `docs/REQUIREMENTS.md` (IDs like LNK-1, MoSCoW) | Owner confirms; open questions answered or defaulted |
 | 2 | Plan | `factory-plan` | `docs/SPEC.md`, `docs/API.md` (+ `docs/UI.md` when UI architecture changes) | Environment check passed; file-ownership table has no overlaps |
 | 3 | Build | `factory-build` | Commits per agent; feature code + tests | Each agent: checks clean on its paths (see below), full test suites green |
-| 4 | Verify | `factory-verify` | `docs/review/<slug>.md` per reviewer, `docs/review/FIXES.md` ledger | Every Must fixed; every Should fixed or skipped with a reason |
-| 5 | Test | `factory-test` | `docs/review/FINAL*.md` smoke table; screenshots | All checks pass; smoke table green; orchestrator looked at screenshots |
-| 6 | Design QA (UI work only) | `factory-design-qa` | `docs/review/design-audit.md` + after-screenshots | P0/P1 done; before/after compared page by page |
+| 4 | Verify | `factory-verify` | `<SCRATCH_DIR>/<slug>.md` per reviewer, `<SCRATCH_DIR>/FIXES.md` ledger (not committed) | Every Must fixed; every Should fixed or skipped with a reason |
+| 5 | Test | `factory-test` | `<SCRATCH_DIR>/FINAL.md` smoke table; screenshots (not committed) | All checks pass; smoke table green; orchestrator looked at screenshots |
+| 6 | Design QA (UI work only) | `factory-design-qa` | `<SCRATCH_DIR>/design-audit.md` + after-screenshots (not committed) | P0/P1 done; before/after compared page by page |
 | 7 | Ship | `factory-ship` | PR merged / pushed to GitHub; owner's copy updated | Clean `git status`; CI green; owner told what's open |
 
 Checks: backend `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`;
 frontend `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build`.
 
 Loop back freely: a verify or test failure sends you to a fix wave (stage 4 rules), then re-test.
+
+`<SCRATCH_DIR>` is the run folder: the session's scratchpad, outside the repo. Run notes never go in `docs/`
+(`docs/review/` is gitignored). The PR description carries what matters: the plan, the Must/Should findings with
+how each was fixed or why it was skipped, and the smoke table.
 
 ## Orchestrator rules
 
