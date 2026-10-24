@@ -2386,6 +2386,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "recipe-box-adapter-fs-media"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "recipe-box-domain",
+ "recipe-box-ports",
+ "tokio",
+]
+
+[[package]]
 name = "recipe-box-adapter-memory"
 version = "0.1.0"
 dependencies = [
@@ -2422,6 +2432,7 @@ dependencies = [
  "http-body-util",
  "image",
  "rand 0.10.3",
+ "recipe-box-adapter-fs-media",
  "recipe-box-adapter-postgres",
  "recipe-box-domain",
  "recipe-box-ports",

@@ -30,18 +30,19 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates/domain/Cargo.toml crates/domain/Cargo.toml
 COPY crates/ports/Cargo.toml crates/ports/Cargo.toml
 COPY crates/adapters/memory/Cargo.toml crates/adapters/memory/Cargo.toml
+COPY crates/adapters/fs-media/Cargo.toml crates/adapters/fs-media/Cargo.toml
 COPY crates/adapters/postgres/Cargo.toml crates/adapters/postgres/Cargo.toml
 RUN . /env.sh \
-    && mkdir src benches crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/postgres/src && echo 'fn main() {}' > src/main.rs \
-    && touch src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/postgres/src/lib.rs \
+    && mkdir src benches crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/fs-media/src crates/adapters/postgres/src && echo 'fn main() {}' > src/main.rs \
+    && touch src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/fs-media/src/lib.rs crates/adapters/postgres/src/lib.rs \
     && echo 'fn main() {}' > benches/search.rs \
     && cargo build --release --locked \
-    && rm -rf src crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/postgres/src
+    && rm -rf src crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/fs-media/src crates/adapters/postgres/src
 COPY src src
 COPY crates crates
 # COPY keeps the context's mtimes, which can be older than the dummy build; touch so cargo rebuilds our crates.
 RUN . /env.sh \
-    && touch src/main.rs src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/postgres/src/lib.rs \
+    && touch src/main.rs src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/fs-media/src/lib.rs crates/adapters/postgres/src/lib.rs \
     && cargo build --release --locked \
     && cp "target/$CARGO_BUILD_TARGET/release/recipe-box-api" /recipe-box-api
 
