@@ -45,6 +45,8 @@ export function DraftReveal({
       <p role="status" className="sr-only">
         Draft ready: {ingredients.length}{" "}
         {ingredients.length === 1 ? "ingredient" : "ingredients"} found.
+        {warnings.length > 0 &&
+          ` ${warnings.length} ${warnings.length === 1 ? "note" : "notes"} to check.`}
       </p>
       <DraftKicker>Draft · not saved yet</DraftKicker>
       <DraftTitle title={title} typed={typed} />
