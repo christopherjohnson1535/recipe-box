@@ -13,6 +13,7 @@ pub mod state;
 
 use std::time::Duration;
 
+use app::Maintenance;
 use state::AppState;
 
 pub use domain::{PURGE_AFTER, validate};
@@ -25,13 +26,12 @@ pub fn startup_error_line(e: &anyhow::Error) -> String {
 
 /// Hard-deletes recipes soft-deleted more than a day ago and expired sessions.
 pub async fn purge(state: &AppState) -> domain::DomainResult<()> {
-    // shortcut: image files of purged recipes stay on disk, add an orphan-image sweep if storage matters.
-    let recipes = state
-        .recipes
-        .purge_deleted_before(state.clock.now() - PURGE_AFTER)
-        .await?;
-    let sessions = state.sessions.purge_expired().await?;
-    tracing::info!(recipes, sessions, "purge done");
+    let done = state.services().maintenance.purge().await?;
+    tracing::info!(
+        recipes = done.recipes,
+        sessions = done.sessions,
+        "purge done"
+    );
     Ok(())
 }
 
@@ -48,10 +48,27 @@ pub fn spawn_purge_task(state: AppState) {
     });
 }
 
+/// Gives every image without a rendition one and logs what happened; returns how many were made. An image that
+/// cannot be read is logged and skipped (it is tried again on the next start). Safe to run on every start.
+pub async fn backfill_displays(maintenance: &Maintenance) -> u64 {
+    let report = match maintenance.backfill_displays().await {
+        Ok(report) => report,
+        Err(e) => {
+            tracing::error!(error = %e, "display backfill: could not list images");
+            return 0;
+        }
+    };
+    for (id, e) in &report.skipped {
+        tracing::warn!(%id, error = ?e, "display backfill: skipped an image");
+    }
+    tracing::info!(made = report.made, "display backfill done");
+    report.made
+}
+
 /// Gives photos stored before renditions existed their rendition, in the background.
 pub fn spawn_display_backfill(state: AppState) {
     tokio::spawn(async move {
-        media::backfill_displays(state.images.as_ref(), state.media.as_ref()).await;
+        backfill_displays(&state.services().maintenance).await;
     });
 }
 

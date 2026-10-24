@@ -2,6 +2,8 @@
 
 use std::time::Instant;
 
+use adapter_http::extract::CurrentUser;
+use app::MediaService;
 use axum::{
     Json,
     extract::{Multipart, State},
@@ -11,9 +13,8 @@ use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::media::{delete_images, store_image, store_jpeg};
+use super::ImportState;
 use crate::{
-    auth::CurrentUser,
     error::{AppError, AppJson, AppResult, ErrorBody},
     import::{
         ai::{self, AiProvider as _},
@@ -22,7 +23,6 @@ use crate::{
         safe_fetch::{self, PAGE_MAX_BYTES},
     },
     models::{Image, RecipeDraft, SourceType},
-    state::AppState,
     validate,
 };
 
@@ -44,7 +44,11 @@ enum AiProvider {
 #[utoipa::path(get, path = "/api/import/capabilities", operation_id = "getImportCapabilities", tag = "import", security(("session" = [])), responses(
     (status = 200, description = "Whether an AI provider is configured.", body = Capabilities),
 ))]
-pub async fn capabilities(State(state): State<AppState>, _user: CurrentUser) -> Json<Capabilities> {
+pub async fn capabilities(
+    State(state): State<ImportState>,
+    _user: CurrentUser,
+) -> Json<Capabilities> {
+    let state = &state.app;
     let provider = match state.config.ai_provider.as_str() {
         "anthropic" => AiProvider::Anthropic,
         _ => AiProvider::None,
@@ -69,7 +73,7 @@ pub struct ImportUrlBody {
     (status = 502, description = "The site refused us (`site_blocked`), the fetch failed or timed out (`fetch_failed`), or the AI fallback failed (`ai_error`).", body = ErrorBody),
 ))]
 pub async fn from_url(
-    State(state): State<AppState>,
+    State(state): State<ImportState>,
     CurrentUser(user): CurrentUser,
     AppJson(body): AppJson<ImportUrlBody>,
 ) -> AppResult<Json<RecipeDraft>> {
@@ -82,15 +86,16 @@ pub async fn from_url(
             AppError::validation("url: enter a full web address starting with http:// or https://.")
         })?;
     let started = Instant::now();
-    let page = safe_fetch::fetch(&state.fetch_policy, &requested, PAGE_MAX_BYTES).await?;
+    let page = safe_fetch::fetch(&state.app.fetch_policy, &requested, PAGE_MAX_BYTES).await?;
     // Parsing is CPU-bound: off the async workers, and inside what is left of the page's time budget. On a
     // timeout the blocking thread is abandoned (the pre-checks in `extract` bound how long it can run).
     let left = state
+        .app
         .fetch_policy
         .total_timeout()
         .saturating_sub(started.elapsed());
     let final_url = page.final_url.clone();
-    let ai_on = state.config.ai_enabled();
+    let ai_on = state.app.config.ai_enabled();
     let parse = tokio::task::spawn_blocking(move || {
         // shortcut: pages are decoded as UTF-8 (lossy); honour <meta charset> if a non-UTF-8 site turns up.
         let html = String::from_utf8_lossy(&page.body);
@@ -127,7 +132,7 @@ pub async fn from_url(
                 return Err(no_recipe());
             }
             // Outside the page budget: the AI call has its own timeout.
-            let mut d = match state.ai.recipe_from_text(&page_text.text).await {
+            let mut d = match state.app.ai.recipe_from_text(&page_text.text).await {
                 Err(AppError::NoRecipeFound(_)) => return Err(no_recipe()),
                 r => r?,
             };
@@ -154,7 +159,7 @@ enum Parsed {
 }
 
 /// Id of a live recipe saved from the same page (LNK-5), comparing normalised URLs.
-async fn duplicate_of(state: &AppState, urls: &[&Url]) -> AppResult<Option<Uuid>> {
+async fn duplicate_of(state: &ImportState, urls: &[&Url]) -> AppResult<Option<Uuid>> {
     // Credentials and fragments never count: the saved `source_url` has none.
     let urls: Vec<Url> = urls.iter().map(|u| jsonld::cleaned(u)).collect();
     let wanted: Vec<String> = urls.iter().map(normalize_url).collect();
@@ -165,7 +170,7 @@ async fn duplicate_of(state: &AppState, urls: &[&Url]) -> AppResult<Option<Uuid>
         .collect();
     // shortcut: normalises in Rust over every live recipe from the same host (prefiltered by the repository);
     // store a normalised column with an index if one host ever has thousands of recipes.
-    let rows = state.recipes.live_source_urls(&hosts).await?;
+    let rows = state.http.services.recipes.live_source_urls(&hosts).await?;
     Ok(rows
         .into_iter()
         .find(|(_, saved)| Url::parse(saved).is_ok_and(|u| wanted.contains(&normalize_url(&u))))
@@ -174,15 +179,20 @@ async fn duplicate_of(state: &AppState, urls: &[&Url]) -> AppResult<Option<Uuid>
 
 /// Downloads the page's main photo through the SSRF guard and stores it (re-encoded). A failure only adds a
 /// warning: the recipe is still worth reviewing.
-async fn attach_image(state: &AppState, user_id: Uuid, draft: &mut RecipeDraft) {
+async fn attach_image(state: &ImportState, user_id: Uuid, draft: &mut RecipeDraft) {
     let Some(remote) = draft.image_url.take() else {
         return;
     };
     let stored = async {
         let url = Url::parse(&remote).map_err(|_| AppError::BlockedAddress)?;
-        let img =
-            safe_fetch::fetch(&state.fetch_policy, &url, state.config.max_upload_bytes()).await?;
-        store_image(state, user_id, img.body).await
+        let img = safe_fetch::fetch(
+            &state.app.fetch_policy,
+            &url,
+            state.app.config.max_upload_bytes(),
+        )
+        .await?;
+        let image = state.http.services.media.upload(user_id, img.body).await?;
+        AppResult::Ok(Image::from(image))
     }
     .await;
     match stored {
@@ -214,7 +224,7 @@ pub struct ImportTextBody {
     (status = 502, description = "The AI provider failed (`ai_error`).", body = ErrorBody),
 ))]
 pub async fn from_text(
-    State(state): State<AppState>,
+    State(state): State<ImportState>,
     _user: CurrentUser,
     AppJson(body): AppJson<ImportTextBody>,
 ) -> AppResult<Json<RecipeDraft>> {
@@ -225,7 +235,7 @@ pub async fn from_text(
     let source = validate::source_url(body.source_url.as_deref())?
         .and_then(|u| Url::parse(&u).ok())
         .map(|u| jsonld::cleaned(&u));
-    let mut draft = state.ai.recipe_from_text(&body.text).await?;
+    let mut draft = state.app.ai.recipe_from_text(&body.text).await?;
     if body.text.chars().count() > ai::MAX_TEXT_INPUT_CHARS {
         draft.warnings.push(format!(
             "The text was very long, so only the first {} characters were read.",
@@ -274,7 +284,7 @@ pub const MAX_PHOTOS: usize = 6;
     (status = 502, description = "The AI provider failed (`ai_error`). The photos stay stored and `error.photoImageIds` lists them.", body = ErrorBody),
 ))]
 pub async fn from_photo(
-    State(state): State<AppState>,
+    State(state): State<ImportState>,
     CurrentUser(user): CurrentUser,
     mut multipart: Multipart,
 ) -> AppResult<Json<RecipeDraft>> {
@@ -286,7 +296,7 @@ pub async fn from_photo(
                     return Err(AppError::validation("files: send at most 6 photos."));
                 }
                 // Stop reading as soon as the file is over the limit, not after buffering all of it.
-                let data = read_capped(field, state.config.max_upload_bytes()).await?;
+                let data = read_capped(field, state.app.config.max_upload_bytes()).await?;
                 files.push(data.ok_or(AppError::TooLarge)?);
             }
             Some("mode") => {
@@ -307,17 +317,18 @@ pub async fn from_photo(
     };
 
     let (mut images, mut jpegs) = (Vec::new(), Vec::new());
-    let mut stored = StoredGuard::new(&state);
+    let media = &state.http.services.media;
+    let mut stored = StoredGuard::new(media);
     for data in files {
-        match store_jpeg(&state, user.id, data).await {
+        match media.store_jpeg(user.id, data).await {
             Ok((image, jpeg)) => {
                 stored.ids.push(image.id);
-                images.push(image);
+                images.push(Image::from(image));
                 jpegs.push(jpeg);
             }
             Err(e) => {
                 stored.delete().await;
-                return Err(e);
+                return Err(e.into());
             }
         }
     }
@@ -327,7 +338,7 @@ pub async fn from_photo(
     } else {
         ai::PhotoMode::Recipe
     };
-    match state.ai.recipe_from_images(&jpegs, mode).await {
+    match state.app.ai.recipe_from_images(&jpegs, mode).await {
         Ok(mut draft) => {
             stored.keep();
             draft.photo_image_ids = ids;
@@ -370,15 +381,15 @@ async fn read_capped(
 /// Ids of the photos stored by this request. Unless [`keep`](Self::keep)t, they are deleted when the guard drops,
 /// so a client that disconnects mid-request (the handler future is dropped) leaves no orphan images.
 struct StoredGuard {
-    state: AppState,
+    media: MediaService,
     ids: Vec<Uuid>,
     armed: bool,
 }
 
 impl StoredGuard {
-    fn new(state: &AppState) -> Self {
+    fn new(media: &MediaService) -> Self {
         Self {
-            state: state.clone(),
+            media: media.clone(),
             ids: Vec::new(),
             armed: true,
         }
@@ -391,15 +402,15 @@ impl StoredGuard {
     /// Deletes the photos now (so the caller's response comes after they are gone).
     async fn delete(mut self) {
         self.armed = false;
-        delete_images(&self.state, &self.ids).await;
+        self.media.delete_images(&self.ids).await;
     }
 }
 
 impl Drop for StoredGuard {
     fn drop(&mut self) {
         if self.armed && !self.ids.is_empty() {
-            let (state, ids) = (self.state.clone(), std::mem::take(&mut self.ids));
-            tokio::spawn(async move { delete_images(&state, &ids).await });
+            let (media, ids) = (self.media.clone(), std::mem::take(&mut self.ids));
+            tokio::spawn(async move { media.delete_images(&ids).await });
         }
     }
 }

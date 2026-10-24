@@ -52,14 +52,18 @@ role needs `create` on that database (and the `citext` extension, created in `pu
 ## Layout
 
 - `src/main.rs` — config, tracing, pool, migrations, purge task, graceful shutdown (SIGTERM / Ctrl-C).
+- `src/lib.rs` — module tree, hourly `purge` and the display backfill (both run `app::Maintenance` and log).
+- `crates/app/` — the use-case services (`Services`): every rule that is not a data shape, a transport or storage.
+- `crates/adapters/http/` — the axum adapter: `routes/*` (one file per area), `extract.rs` (`CurrentUser` /
+  `AdminUser`, cookie `rb_session`), `error.rs` (`AppError` and the `AppJson` / `AppQuery` / `AppPath` extractors),
+  `dto.rs` (API types) and the OpenAPI spec. Handlers parse, call one service, map.
 - `crates/adapters/postgres/` — the Postgres adapter: repositories, row structs, `migrations/` and `migrate()`.
-- `src/lib.rs` — module tree, `migrate` (delegates to the adapter), hourly `purge` (recipes deleted > 1 day, expired sessions).
-- `src/routes/*` — one file per area; `router()` in `routes/mod.rs`.
-- `src/auth/*` — argon2id passwords, DB sessions (cookie `rb_session`, SHA-256 of the token stored),
-  `CurrentUser` / `AdminUser` extractors.
-- `src/import/*` — link/text/photo import: stubs with docs on what each feature issue must build.
-- `src/error.rs` — `AppError` (the API error table) and `AppJson` / `AppQuery` / `AppPath` extractors that answer
-  rejections in the same JSON shape.
+- `src/routes/*` — what the adapter does not have yet: link/text/photo import routes, wired with the adapter's
+  routes by `router()`.
+- `src/auth/*`, `src/media.rs`, `src/plate.rs` — outbound adapters: argon2id hashing, session tokens (SHA-256 stored),
+  the image codec and the print-style rendition.
+- `src/import/*` — link/text/photo import.
+- `src/error.rs`, `src/models.rs` — re-exports of the adapter's error and API types for the import code.
 
 ## Docker
 

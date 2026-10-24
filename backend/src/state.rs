@@ -5,14 +5,17 @@ use adapter_postgres::{
     PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo,
     PgUserRepo,
 };
+use app::{Deps, Services};
 use ports::{
     ImageRepo, MediaStore, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
 };
 
 use crate::{
+    auth::{password::Argon2Hasher, session::RandomTokens},
     clock::Clock,
     config::Config,
     import::{ai::Ai, safe_fetch::FetchPolicy},
+    media::ImageCrateCodec,
 };
 
 #[derive(Clone)]
@@ -38,6 +41,30 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// The ports the services run on: this state's repositories and clock, config and the server-side adapters.
+    /// Built from the state as it is now, so a test that changed `config` after `new` is respected.
+    pub fn deps(&self) -> Deps {
+        Deps {
+            recipes: self.recipes.clone(),
+            images: self.images.clone(),
+            users: self.users.clone(),
+            sessions: self.sessions.clone(),
+            settings: self.settings.clone(),
+            tags: self.tags.clone(),
+            health: self.health.clone(),
+            media: self.media.clone(),
+            hasher: Arc::new(Argon2Hasher),
+            tokens: Arc::new(RandomTokens),
+            codec: Arc::new(ImageCrateCodec),
+            clock: Arc::new(self.clock.clone()),
+            session_days: self.config.session_days,
+        }
+    }
+
+    pub fn services(&self) -> Services {
+        Services::new(self.deps())
+    }
+
     pub fn new(pool: PgPool, config: Config) -> anyhow::Result<Self> {
         Self::with_clock(pool, config, Clock::System)
     }

@@ -4,12 +4,7 @@ mod common;
 
 use axum::http::StatusCode;
 use common::{TestApp, a_recipe, a_user};
-use recipe_box_api::{
-    config::Config,
-    media::{backfill_displays, reencode, render_display},
-    routes::media::delete_images,
-    state::AppState,
-};
+use recipe_box_api::{backfill_displays, config::Config, media::reencode, state::AppState};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -157,7 +152,7 @@ async fn backfill_renders_missing_plates_and_skips_unreadable_originals() {
     std::fs::write(&path, &original.bytes).unwrap();
 
     assert_eq!(
-        backfill_displays(app.state.images.as_ref(), app.state.media.as_ref()).await,
+        backfill_displays(&app.state.services().maintenance).await,
         1
     );
     let name: Option<String> =
@@ -177,7 +172,7 @@ async fn backfill_renders_missing_plates_and_skips_unreadable_originals() {
     assert_eq!(still_null, 1);
     // Idempotent: nothing new to make, the unreadable one is skipped again.
     assert_eq!(
-        backfill_displays(app.state.images.as_ref(), app.state.media.as_ref()).await,
+        backfill_displays(&app.state.services().maintenance).await,
         0
     );
 }
@@ -193,7 +188,10 @@ async fn a_rendition_of_a_deleted_image_is_not_left_behind() {
     )
     .unwrap();
     assert!(
-        !render_display(app.state.images.as_ref(), app.state.media.as_ref(), id)
+        !app.state
+            .services()
+            .maintenance
+            .render_display(id)
             .await
             .unwrap()
     );
@@ -218,7 +216,7 @@ async fn deleting_images_removes_the_original_and_the_rendition() {
     };
     let state = AppState::new(app.pool.clone(), config).unwrap();
     let id: Uuid = image["id"].as_str().unwrap().parse().unwrap();
-    delete_images(&state, &[id]).await;
+    state.services().media.delete_images(&[id]).await;
     assert_eq!(std::fs::read_dir(&app.media_dir).unwrap().count(), 0);
     let rows: i64 = sqlx::query_scalar("select count(*) from images")
         .fetch_one(&app.pool)

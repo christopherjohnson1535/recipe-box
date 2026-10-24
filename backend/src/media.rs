@@ -1,19 +1,21 @@
-//! Image processing and storage orchestration. Path-free: it sees only the `ImageRepo` and `MediaStore` ports.
+//! Image processing: the `ImageCodec` port on the `image` crate. Decodes within hard bounds, re-encodes as JPEG and
+//! makes the print-style rendition. Storage and the rules around it are `app::MediaService`'s.
 
 use std::io::Cursor;
 
 use anyhow::anyhow;
+use async_trait::async_trait;
+use domain::{DomainError, DomainResult};
 use image::{
     DynamicImage, ImageDecoder, ImageReader, RgbImage, codecs::jpeg::JpegEncoder,
     imageops::FilterType,
 };
-use ports::{ImageRepo, MediaStore};
+use ports::{EncodedImage, ImageCodec};
 use uuid::Uuid;
 
 use crate::{
     error::{AppError, AppResult},
     import::photo,
-    models::{Image, media_url},
     plate,
 };
 
@@ -25,76 +27,52 @@ const MAX_SIDE_PX: u32 = 10_000;
 const MAX_PIXELS: u64 = 40_000_000;
 const MAX_DECODE_ALLOC: u64 = 256 << 20;
 
-/// Decodes, re-encodes and stores an uploaded image, returning its row and the stored JPEG bytes (photo import
-/// sends them to the AI provider).
-pub async fn store_jpeg(
-    images: &dyn ImageRepo,
-    media: &dyn MediaStore,
-    user_id: Uuid,
-    mut data: Vec<u8>,
-) -> AppResult<(Image, Vec<u8>)> {
-    if photo::is_heic(&data) {
-        data = photo::heic_to_png(&data).await?;
+/// The `image` crate (plus `heif-convert` for HEIC) behind the port.
+pub struct ImageCrateCodec;
+
+/// Port errors carry no HTTP type: an unreadable image stays `UnsupportedMedia`, anything else is infrastructure.
+fn domain_error(e: AppError) -> DomainError {
+    match e {
+        AppError::UnsupportedMedia(m) => DomainError::UnsupportedMedia(m),
+        AppError::Internal(e) => DomainError::Internal(format!("{e:#}")),
+        other => DomainError::Internal(other.to_string()),
     }
-    let id = Uuid::new_v4();
-    let (jpeg, display) = tokio::task::spawn_blocking(move || {
-        let jpeg = reencode(&data)?;
-        // A rendition that fails must not fail the upload: the original is what matters.
-        let display = display_jpeg(&jpeg.bytes, id)
-            .map_err(|e| tracing::warn!(%id, error = ?e, "could not make the display rendition"))
-            .ok();
-        AppResult::Ok((jpeg, display))
-    })
-    .await
-    .map_err(|e| anyhow!(e))??;
-    let file_name = format!("{id}.jpg");
-    media.put(&file_name, jpeg.bytes.clone()).await?;
-    let display_name = format!("{id}.display.jpg");
-    let display_name = match display {
-        Some(bytes) => media
-            .put(&display_name, bytes)
-            .await
-            .map_err(|e| tracing::warn!(%id, error = %e, "could not write the display rendition"))
-            .ok()
-            .map(|()| display_name),
-        None => None,
-    };
-    let inserted = images
-        .add(domain::Image {
-            id,
-            file_name: file_name.clone(),
-            display_file_name: display_name.clone(),
-            width: jpeg.width as i32,
-            height: jpeg.height as i32,
-            bytes: jpeg.bytes.len() as i32,
-            created_by: Some(user_id),
-        })
-        .await;
-    if let Err(e) = inserted {
-        let _ = media.delete(&file_name).await;
-        let _ = media.delete(&format!("{id}.display.jpg")).await;
-        return Err(e.into());
-    }
-    let image = Image {
-        id,
-        url: media_url(&file_name),
-        display_url: display_name.as_deref().map(media_url),
-        width: jpeg.width as i32,
-        height: jpeg.height as i32,
-    };
-    Ok((image, jpeg.bytes))
 }
 
-/// Deletes images stored by a request that then failed (row and blobs); best effort.
-pub async fn delete_images(images: &dyn ImageRepo, media: &dyn MediaStore, ids: &[Uuid]) {
-    if images.delete(ids).await.is_err() {
-        tracing::warn!("could not delete images of a failed request");
-        return;
-    }
-    for id in ids {
-        for name in [format!("{id}.jpg"), format!("{id}.display.jpg")] {
-            let _ = media.delete(&name).await;
+fn join_error(e: tokio::task::JoinError) -> DomainError {
+    DomainError::Internal(e.to_string())
+}
+
+#[async_trait]
+impl ImageCodec for ImageCrateCodec {
+    async fn encode(&self, id: Uuid, mut data: Vec<u8>) -> DomainResult<EncodedImage> {
+        if photo::is_heic(&data) {
+            data = photo::heic_to_png(&data).await.map_err(domain_error)?;
         }
+        tokio::task::spawn_blocking(move || {
+            let jpeg = reencode(&data).map_err(domain_error)?;
+            // A rendition that fails must not fail the upload: the original is what matters.
+            let display = display_jpeg(&jpeg.bytes, id)
+                .map_err(
+                    |e| tracing::warn!(%id, error = ?e, "could not make the display rendition"),
+                )
+                .ok();
+            Ok(EncodedImage {
+                jpeg: jpeg.bytes,
+                width: jpeg.width,
+                height: jpeg.height,
+                display,
+            })
+        })
+        .await
+        .map_err(join_error)?
+    }
+
+    async fn render_display(&self, id: Uuid, jpeg: Vec<u8>) -> DomainResult<Vec<u8>> {
+        tokio::task::spawn_blocking(move || display_jpeg(&jpeg, id))
+            .await
+            .map_err(join_error)?
+            .map_err(domain_error)
     }
 }
 
@@ -166,52 +144,6 @@ pub fn reencode(data: &[u8]) -> AppResult<Jpeg> {
 fn display_jpeg(original: &[u8], id: Uuid) -> AppResult<Vec<u8>> {
     let plate = plate::render_plate(&decode(original)?.to_rgb8(), plate::seed_for(id));
     encode_jpeg(&plate, DISPLAY_QUALITY)
-}
-
-/// Makes and stores the rendition of one image whose original is stored, if it has none yet. Returns false when
-/// the image row is gone (or was rendered meanwhile) and the file just written was removed again.
-pub async fn render_display(
-    images: &dyn ImageRepo,
-    media: &dyn MediaStore,
-    id: Uuid,
-) -> AppResult<bool> {
-    let original = media
-        .get(&format!("{id}.jpg"))
-        .await?
-        .ok_or_else(|| anyhow!("read original of {id}: not found"))?;
-    let bytes = tokio::task::spawn_blocking(move || display_jpeg(&original, id))
-        .await
-        .map_err(|e| anyhow!(e))??;
-    let name = format!("{id}.display.jpg");
-    media.put(&name, bytes).await?;
-    if images.set_display_file(id, &name).await? {
-        return Ok(true);
-    }
-    // The row was deleted meanwhile, or already has another rendition: the file just written is an orphan.
-    let _ = media.delete(&name).await;
-    Ok(false)
-}
-
-/// Gives every image without a rendition one, one at a time; returns how many were made. An image that cannot be
-/// read is logged and skipped (it is tried again on the next start). Safe to run on every start.
-pub async fn backfill_displays(images: &dyn ImageRepo, media: &dyn MediaStore) -> u64 {
-    let ids = match images.without_display_file().await {
-        Ok(ids) => ids,
-        Err(e) => {
-            tracing::error!(error = %e, "display backfill: could not list images");
-            return 0;
-        }
-    };
-    let mut made = 0;
-    for id in ids {
-        match render_display(images, media, id).await {
-            Ok(true) => made += 1,
-            Ok(false) => {}
-            Err(e) => tracing::warn!(%id, error = ?e, "display backfill: skipped an image"),
-        }
-    }
-    tracing::info!(made, "display backfill done");
-    made
 }
 
 #[cfg(test)]

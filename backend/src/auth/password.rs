@@ -3,13 +3,13 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use anyhow::anyhow;
 use argon2::{
     Argon2,
-    password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
+    password_hash::{PasswordHasher as _, PasswordVerifier, phc::PasswordHash},
 };
-
-use crate::error::AppResult;
+use async_trait::async_trait;
+use domain::{DomainError, DomainResult};
+use ports::PasswordHasher;
 
 /// How many argon2 operations (hash or verify) ran in this process. Lets a test prove that a request was refused
 /// before any hashing work, without timing it. Only meaningful when no other test shares the process.
@@ -19,8 +19,22 @@ pub fn work_count() -> u64 {
 
 static WORK: AtomicU64 = AtomicU64::new(0);
 
+/// argon2id with the crate's default parameters.
+pub struct Argon2Hasher;
+
+#[async_trait]
+impl PasswordHasher for Argon2Hasher {
+    async fn hash(&self, password: String) -> DomainResult<String> {
+        hash(password).await
+    }
+
+    async fn verify(&self, password: String, hash: Option<String>) -> DomainResult<bool> {
+        verify(password, hash).await
+    }
+}
+
 /// Hashes on a blocking thread (argon2 is deliberately slow).
-pub async fn hash(password: String) -> AppResult<String> {
+async fn hash(password: String) -> DomainResult<String> {
     WORK.fetch_add(1, Ordering::SeqCst);
     let phc = tokio::task::spawn_blocking(move || {
         Argon2::default()
@@ -28,13 +42,13 @@ pub async fn hash(password: String) -> AppResult<String> {
             .map(|h| h.to_string())
     })
     .await
-    .map_err(|e| anyhow!(e))?
-    .map_err(|e| anyhow!("hash password: {e}"))?;
+    .map_err(|e| DomainError::Internal(e.to_string()))?
+    .map_err(|e| DomainError::Internal(format!("hash password: {e}")))?;
     Ok(phc)
 }
 
 /// Verifies against `phc`, or against a dummy hash when the user does not exist so timing does not reveal it.
-pub async fn verify(password: String, phc: Option<String>) -> AppResult<bool> {
+async fn verify(password: String, phc: Option<String>) -> DomainResult<bool> {
     WORK.fetch_add(1, Ordering::SeqCst);
     static DUMMY: LazyLock<String> = LazyLock::new(|| {
         Argon2::default()
@@ -54,7 +68,7 @@ pub async fn verify(password: String, phc: Option<String>) -> AppResult<bool> {
         known && matches
     })
     .await
-    .map_err(|e| anyhow!(e))?;
+    .map_err(|e| DomainError::Internal(e.to_string()))?;
     Ok(ok)
 }
 
