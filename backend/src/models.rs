@@ -181,7 +181,7 @@ pub fn role_schema() -> utoipa::openapi::Object {
 
 impl User {
     pub fn is_admin(&self) -> bool {
-        self.role == "admin"
+        self.role == domain::ROLE_ADMIN
     }
 }
 
@@ -206,3 +206,89 @@ pub fn media_url(file_name: &str) -> String {
 #[schema(value_type = String, format = Binary)]
 #[allow(dead_code)] // schema only
 pub struct BinaryFile(Vec<u8>);
+
+// Conversions to and from the domain types; only what the routes need (validation of a recipe body).
+
+impl From<Ingredient> for domain::Ingredient {
+    fn from(i: Ingredient) -> Self {
+        Self {
+            text: i.text,
+            section: i.section,
+        }
+    }
+}
+
+impl From<domain::Ingredient> for Ingredient {
+    fn from(i: domain::Ingredient) -> Self {
+        Self {
+            text: i.text,
+            section: i.section,
+        }
+    }
+}
+
+impl From<SourceType> for domain::SourceType {
+    fn from(s: SourceType) -> Self {
+        match s {
+            SourceType::Manual => Self::Manual,
+            SourceType::Link => Self::Link,
+            SourceType::Photo => Self::Photo,
+            SourceType::Text => Self::Text,
+        }
+    }
+}
+
+impl From<domain::SourceType> for SourceType {
+    fn from(s: domain::SourceType) -> Self {
+        match s {
+            domain::SourceType::Manual => Self::Manual,
+            domain::SourceType::Link => Self::Link,
+            domain::SourceType::Photo => Self::Photo,
+            domain::SourceType::Text => Self::Text,
+        }
+    }
+}
+
+impl From<RecipeInput> for domain::RecipeInput {
+    fn from(r: RecipeInput) -> Self {
+        Self {
+            title: r.title,
+            description: r.description,
+            ingredients: r.ingredients.into_iter().map(Into::into).collect(),
+            steps: r.steps.into_iter().map(Into::into).collect(),
+            servings: r.servings,
+            prep_minutes: r.prep_minutes,
+            cook_minutes: r.cook_minutes,
+            total_minutes: r.total_minutes,
+            notes: r.notes,
+            source_url: r.source_url,
+            source_name: r.source_name,
+            source_type: r.source_type.into(),
+            image_id: r.image_id,
+            photo_image_ids: r.photo_image_ids,
+            tags: r.tags,
+        }
+    }
+}
+
+impl From<domain::RecipeInput> for RecipeInput {
+    fn from(r: domain::RecipeInput) -> Self {
+        Self {
+            title: r.title,
+            description: r.description,
+            ingredients: r.ingredients.into_iter().map(Into::into).collect(),
+            steps: r.steps.into_iter().map(Into::into).collect(),
+            servings: r.servings,
+            prep_minutes: r.prep_minutes,
+            cook_minutes: r.cook_minutes,
+            total_minutes: r.total_minutes,
+            notes: r.notes,
+            source_url: r.source_url,
+            source_name: r.source_name,
+            source_type: r.source_type.into(),
+            image_id: r.image_id,
+            photo_image_ids: r.photo_image_ids,
+            tags: r.tags,
+        }
+    }
+}

@@ -156,6 +156,14 @@ impl IntoResponse for AppError {
     }
 }
 
+impl From<domain::DomainError> for AppError {
+    fn from(e: domain::DomainError) -> Self {
+        match e {
+            domain::DomainError::Validation(m) => Self::Validation(m),
+        }
+    }
+}
+
 impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
         Self::Internal(e.into())

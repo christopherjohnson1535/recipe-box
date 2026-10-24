@@ -4,28 +4,40 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[workspace]
+members = [".", "crates/domain"]
+default-members = [".", "crates/domain"]
+
+[workspace.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
 [dependencies]
+recipe-box-domain = { path = "crates/domain" }
 anyhow = "1"
 argon2 = "0.6"
 axum = { version = "0.8", features = ["macros", "multipart"] }
 axum-extra = { version = "0.12", features = ["cookie"] }
 base64 = "0.23"
 cookie = "0.18" # already pulled in by axum-extra; needed for its re-exported `time::Duration` (Max-Age)
-chrono = { version = "0.4", features = ["serde"] }
+chrono.workspace = true
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 rand = "0.10"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json"] }
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true
 serde_json = "1"
 sha2 = "0.11"
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "uuid", "chrono", "json", "migrate", "macros", "runtime-tokio", "tls-rustls"] }
-thiserror = "2"
+thiserror.workspace = true
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "fs", "process"] }
 tower-http = { version = "0.7", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-url = "2"
-uuid = { version = "1", features = ["v4", "serde"] }
+url.workspace = true
+uuid.workspace = true
 scraper = "0.29.0"
 utoipa = { version = "6", features = ["chrono", "uuid"] }
 

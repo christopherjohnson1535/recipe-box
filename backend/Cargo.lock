@@ -2400,6 +2400,7 @@ dependencies = [
  "http-body-util",
  "image",
  "rand 0.10.3",
+ "recipe-box-domain",
  "reqwest",
  "scraper",
  "serde",
@@ -2415,6 +2416,17 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "utoipa",
+ "uuid",
+]
+
+[[package]]
+name = "recipe-box-domain"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "thiserror",
+ "url",
  "uuid",
 ]
 

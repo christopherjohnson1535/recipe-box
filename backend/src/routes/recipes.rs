@@ -1,5 +1,6 @@
 use axum::{Json, extract::State, http::StatusCode};
 use chrono::{DateTime, Duration, Utc};
+use domain::RESTORE_WINDOW_MINUTES;
 use serde::Deserialize;
 use sqlx::{AssertSqlSafe, PgPool, Postgres, Transaction, types::Json as SqlJson};
 use utoipa::{IntoParams, ToSchema};
@@ -14,8 +15,6 @@ use crate::{
     state::AppState,
     validate,
 };
-
-const RESTORE_WINDOW_MINUTES: i32 = 10;
 
 /// Sort orders for `GET /api/recipes`; the handler matches the raw string, so anything else is a 400.
 #[derive(ToSchema)]
@@ -189,7 +188,7 @@ pub async fn create(
     CurrentUser(user): CurrentUser,
     AppJson(input): AppJson<RecipeInput>,
 ) -> AppResult<(StatusCode, Json<Recipe>)> {
-    let input = validate::recipe(input)?;
+    let input = validate::recipe(input.into())?.into();
     check_images(&state.pool, &input).await?;
     let mut tx = state.pool.begin().await?;
     let id: Uuid = sqlx::query_scalar(
@@ -233,7 +232,7 @@ pub async fn update(
     AppPath(id): AppPath<Uuid>,
     AppJson(input): AppJson<RecipeInput>,
 ) -> AppResult<Json<Recipe>> {
-    let input = validate::recipe(input)?;
+    let input = validate::recipe(input.into())?.into();
     check_images(&state.pool, &input).await?;
     let mut tx = state.pool.begin().await?;
     let live: Option<Uuid> = sqlx::query_scalar(

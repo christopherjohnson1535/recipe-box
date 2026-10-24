@@ -1,8 +1,8 @@
 //! Input rules from docs/API.md, applied at the trust boundary.
 
 use crate::{
-    error::{AppError, AppResult},
-    models::{Ingredient, RecipeInput},
+    error::{DomainError, DomainResult},
+    model::{Ingredient, RecipeInput},
 };
 
 pub const MAX_TITLE: usize = 300;
@@ -22,36 +22,36 @@ fn clean(s: &str) -> String {
 }
 
 /// Trims and lower-cases; 3–40 chars of `[a-z0-9_.-]`.
-pub fn username(raw: &str) -> AppResult<String> {
+pub fn username(raw: &str) -> DomainResult<String> {
     let u = raw.trim().to_lowercase();
     let ok_chars = u
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '.' | '-'));
     if !(3..=40).contains(&u.len()) || !ok_chars {
-        return Err(AppError::validation(
+        return Err(DomainError::validation(
             "username: 3–40 characters, letters, digits, `_`, `.` or `-`.",
         ));
     }
     Ok(u)
 }
 
-pub fn password(p: &str) -> AppResult<()> {
+pub fn password(p: &str) -> DomainResult<()> {
     let n = p.chars().count();
     if n < MIN_PASSWORD {
-        return Err(AppError::validation(format!(
+        return Err(DomainError::validation(format!(
             "password: at least {MIN_PASSWORD} characters."
         )));
     }
     if n > MAX_PASSWORD {
-        return Err(AppError::validation("password: too long."));
+        return Err(DomainError::validation("password: too long."));
     }
     Ok(())
 }
 
-pub fn display_name(raw: &str) -> AppResult<String> {
+pub fn display_name(raw: &str) -> DomainResult<String> {
     let d = raw.trim();
     if d.is_empty() || d.chars().count() > 100 {
-        return Err(AppError::validation("displayName: 1–100 characters."));
+        return Err(DomainError::validation("displayName: 1–100 characters."));
     }
     Ok(d.to_string())
 }
@@ -69,7 +69,7 @@ pub fn tags(raw: &[String]) -> Vec<String> {
 }
 
 /// Accepts only absolute http(s) URLs; blank means none.
-pub fn source_url(raw: Option<&str>) -> AppResult<Option<String>> {
+pub fn source_url(raw: Option<&str>) -> DomainResult<Option<String>> {
     let Some(s) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
         return Ok(None);
     };
@@ -77,18 +77,20 @@ pub fn source_url(raw: Option<&str>) -> AppResult<Option<String>> {
         Ok(u) if matches!(u.scheme(), "http" | "https") && u.host().is_some() => {
             Ok(Some(u.to_string()))
         }
-        _ => Err(AppError::validation("sourceUrl: must be an http(s) URL.")),
+        _ => Err(DomainError::validation(
+            "sourceUrl: must be an http(s) URL.",
+        )),
     }
 }
 
-fn lines(field: &str, items: Vec<Ingredient>) -> AppResult<Vec<Ingredient>> {
+fn lines(field: &str, items: Vec<Ingredient>) -> DomainResult<Vec<Ingredient>> {
     if items.len() > MAX_LINES {
-        return Err(AppError::validation(format!(
+        return Err(DomainError::validation(format!(
             "{field}: at most {MAX_LINES} entries."
         )));
     }
     if items.iter().any(|i| i.text.chars().count() > MAX_LINE) {
-        return Err(AppError::validation(format!(
+        return Err(DomainError::validation(format!(
             "{field}: each entry at most {MAX_LINE} characters."
         )));
     }
@@ -104,9 +106,9 @@ fn lines(field: &str, items: Vec<Ingredient>) -> AppResult<Vec<Ingredient>> {
         .collect())
 }
 
-fn max_chars(field: &str, s: &str, max: usize) -> AppResult<()> {
+fn max_chars(field: &str, s: &str, max: usize) -> DomainResult<()> {
     if s.chars().count() > max {
-        return Err(AppError::validation(format!(
+        return Err(DomainError::validation(format!(
             "{field}: at most {max} characters."
         )));
     }
@@ -117,25 +119,29 @@ fn blank_to_none(s: Option<String>) -> Option<String> {
     s.map(|s| clean(&s)).filter(|s| !s.is_empty())
 }
 
-fn minutes(field: &str, v: Option<i32>) -> AppResult<Option<i32>> {
+fn minutes(field: &str, v: Option<i32>) -> DomainResult<Option<i32>> {
     match v {
-        Some(m) if m < 0 => Err(AppError::validation(format!("{field}: must be 0 or more."))),
+        Some(m) if m < 0 => Err(DomainError::validation(format!(
+            "{field}: must be 0 or more."
+        ))),
         _ => Ok(v),
     }
 }
 
 /// Validates and normalises a POST/PUT recipe body.
-pub fn recipe(input: RecipeInput) -> AppResult<RecipeInput> {
+pub fn recipe(input: RecipeInput) -> DomainResult<RecipeInput> {
     let title = clean(&input.title);
     if title.is_empty() || title.chars().count() > MAX_TITLE {
-        return Err(AppError::validation(format!(
+        return Err(DomainError::validation(format!(
             "title: 1–{MAX_TITLE} characters."
         )));
     }
     max_chars("description", &input.description, MAX_DESCRIPTION)?;
     max_chars("notes", &input.notes, MAX_NOTES)?;
     if input.tags.len() > MAX_TAGS {
-        return Err(AppError::validation(format!("tags: at most {MAX_TAGS}.")));
+        return Err(DomainError::validation(format!(
+            "tags: at most {MAX_TAGS}."
+        )));
     }
     Ok(RecipeInput {
         title,
@@ -186,7 +192,7 @@ mod tests {
             text: "x".repeat(n),
             section: None,
         };
-        let err = |r: AppResult<RecipeInput>| r.unwrap_err().to_string();
+        let err = |r: DomainResult<RecipeInput>| r.unwrap_err().to_string();
         let mut r = base();
         r.description = "x".repeat(MAX_DESCRIPTION + 1);
         assert!(err(recipe(r)).starts_with("description:"));
