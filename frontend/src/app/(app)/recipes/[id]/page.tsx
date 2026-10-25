@@ -25,6 +25,7 @@ import { serverApi } from "@/lib/server-api";
 import { bylines } from "@/components/recipe-page/byline";
 import { LocalDate } from "@/components/recipe-page/LocalDate";
 import { DeleteRecipeButton } from "@/components/recipe-page/DeleteRecipeButton";
+import { AddToGroceries } from "@/components/recipe-page/AddToGroceries";
 import { IngredientChecklist } from "@/components/recipe-page/IngredientChecklist";
 import { RecipeBar } from "@/components/recipe-page/RecipeBar";
 import { RecipeStateProvider, ScaledServings } from "@/components/recipe-page/RecipeState";
@@ -144,7 +145,14 @@ export default async function RecipePage({ params }: Params) {
 
         {lede && <Lede>{lede}</Lede>}
 
-        <SidebarLayout sidebar={<IngredientChecklist groups={ingredientGroups} />}>
+        <SidebarLayout
+          sidebar={
+            <div className="flex flex-col gap-4 self-start">
+              <IngredientChecklist groups={ingredientGroups} />
+              <AddToGroceries recipeId={id} />
+            </div>
+          }
+        >
           <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-8">
             <MethodHeader steps={recipe.steps.length} />
             {recipe.steps.length === 0 && <Text variant="note">No steps listed.</Text>}

@@ -5,14 +5,14 @@ import { Chip, ChipRow } from "@/components/ui/Chip";
 import { CoverStory } from "@/components/ui/CoverStory";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FeaturePanel, IssueIndex, IssueIndexItem } from "@/components/ui/IssueIndex";
-import { CardGrid, IssueLayout } from "@/components/ui/MagazineCard";
+import { IssueLayout } from "@/components/ui/MagazineCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SpotIcon } from "@/components/ui/SpotIcon";
 import { iconForTag } from "@/components/ui/spot-icons";
 import { issueLine, monthYear, planHome } from "@/components/home/issue";
 import { LocalIssueLine, LocalTicker } from "@/components/home/LocalIssue";
 import { formatMinutes, plateSrc } from "@/lib/recipe";
-import { RecipeCard } from "@/components/RecipeCard";
+import { SelectableGrid } from "@/components/groceries/SelectableGrid";
 import { NoMatches } from "@/components/search/ResultSummary";
 import { SearchControls } from "@/components/search/SearchControls";
 import { homeHref, parseSort, resultSummary } from "@/components/search/url";
@@ -178,11 +178,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         grid.length > 0 && (
           <IssueLayout aside={sidebar}>
             <section aria-label={filtered ? `${total} matching recipes` : "All recipes"}>
-              <CardGrid>
-                {grid.map((r, i) => (
-                  <RecipeCard key={r.id} recipe={r} index={i} />
-                ))}
-              </CardGrid>
+              <SelectableGrid recipes={grid} />
             </section>
           </IssueLayout>
         )
