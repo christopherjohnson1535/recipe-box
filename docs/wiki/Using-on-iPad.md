@@ -28,8 +28,18 @@ Open a recipe → **Start cooking**. Cooking mode is always dark (the evening ed
 While cooking mode is open the screen won't lock; the top of the screen says **Screen stays on**. This needs the Home Screen app on iPadOS 18.4 or later, and a secure (https) address — see [[Deploying]]. If it can't keep the screen awake you'll see **Screen may sleep**; tap it for what to do. The simplest fallback is **Settings → Display & Brightness → Auto-Lock → Never** while you cook.
 
 ## Offline
-Recipes you've opened before stay readable without internet. Saving and importing need a connection. iPadOS may
-clear offline data when storage is low — the server always has the real copy.
+Recipes you've opened on the iPad stay readable without internet, photos and cooking mode included. Open the ones
+you'll cook from while you're online (opening the recipe once is enough; cooking mode is kept when you open it too).
+- With no connection a banner says **You're offline**. Saving, importing, search and settings need the connection:
+  **Save** and the import buttons are turned off and say why. What you typed in a recipe stays on the page until
+  you're back online.
+- A page that wasn't kept shows **You're offline** with the list of recipes this iPad can still open.
+- Online, you always see the server's latest copy; the kept copy is only used when the server can't be reached.
+- The iPad keeps about the last 60 recipe pages and 200 photos, each for up to 30 days after you last opened it.
+- **Sign out** removes every kept recipe and photo from the iPad, and so does an expired sign-in. Nothing is shown
+  from the offline copy to someone who isn't signed in.
+- Offline needs the Home Screen app or Safari on the **HTTPS** address (see [[Deploying]]). iPadOS may clear offline
+  data when storage is low; the server always has the real copy.
 
 ## Evening edition
 After 7 pm Recipe Box switches to its darker evening edition, which is easier on the eyes at dinnertime, and back to

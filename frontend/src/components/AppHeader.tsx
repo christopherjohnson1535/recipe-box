@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { forgetOffline } from "./offline/forget";
 import { dismissUndo } from "./undo/undo-store";
 import { Masthead, NavButton, NavLink } from "./ui/Masthead";
 
@@ -24,6 +25,7 @@ export function AppHeader({ displayName }: { displayName?: string }) {
     // Even if the API is unreachable, leave: the proxy sends cookie-less visitors to /login.
     await api.logout().catch(() => undefined);
     dismissUndo(); // a pending Undo must not reach whoever signs in next
+    await forgetOffline(); // nor the recipes this device kept for offline reading
     router.replace("/login");
     router.refresh();
   }

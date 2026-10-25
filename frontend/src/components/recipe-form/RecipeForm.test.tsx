@@ -269,4 +269,15 @@ describe("RecipeForm", () => {
     type("Title", "Changed");
     expect(Object.keys(sessionStorage)).toEqual([]);
   });
+
+  it("keeps Save off while offline, with the reason, and never submits", () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { onSubmit } = setup();
+    type("Title", "Soup");
+    const button = screen.getByRole("button", { name: "Save recipe" });
+    expect(button).toHaveProperty("disabled", true);
+    expect(document.getElementById(button.getAttribute("aria-describedby")!)?.textContent).toMatch(/save once you’re back online/);
+    fireEvent.submit(button.closest("form")!);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

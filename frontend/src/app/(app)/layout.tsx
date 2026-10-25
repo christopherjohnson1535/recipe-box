@@ -5,6 +5,7 @@ import { RouteFocus } from "@/components/RouteFocus";
 import { SaveStamp } from "@/components/ui/SaveStamp";
 import { UndoToast } from "@/components/undo/UndoToast";
 import { ServerError } from "@/components/ServerError";
+import { OfflineBanner } from "@/components/offline/OfflineBanner";
 import { ApiError, type User } from "@/lib/api";
 import { serverApi } from "@/lib/server-api";
 
@@ -21,6 +22,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <AppHeader displayName={user?.displayName} />
+      <OfflineBanner />
       <main id="main" className="mx-auto w-full max-w-page px-gutter pt-10 pb-20 sm:pt-14">
         {failure ? <ServerError error={failure} /> : children}
       </main>

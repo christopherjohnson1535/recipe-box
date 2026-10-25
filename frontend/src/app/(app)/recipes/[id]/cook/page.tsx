@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { CookMode } from "@/components/cook/CookMode";
 import { ServerError } from "@/components/ServerError";
+import { KeepOffline } from "@/components/offline/KeepOffline";
 import { ApiError, type Recipe } from "@/lib/api";
 import { PIN_EVENING_SCRIPT } from "@/lib/edition";
 import { serverApi } from "@/lib/server-api";
@@ -30,6 +31,7 @@ export default async function CookPage({ params }: Params) {
   if ("error" in recipe) return <ServerError error={recipe.error} />;
   return (
     <>
+      <KeepOffline />
       {/* Pins the evening edition before first paint on a hard load; CookStage keeps it pinned after hydration. */}
       <script dangerouslySetInnerHTML={{ __html: PIN_EVENING_SCRIPT }} />
       <CookMode id={id} title={recipe.title} ingredients={recipe.ingredients.map((i) => i.text)} steps={recipe.steps.map((s) => s.text)} />

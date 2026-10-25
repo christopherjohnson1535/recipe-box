@@ -100,7 +100,7 @@ Shared versions (`sqlx`, `chrono`, `serde`, `thiserror`, `url`, `uuid`) are pinn
 because the port traits must be dyn-compatible: services hold `Arc<dyn Port>`.
 
 Frontend: next, react, react-dom, tailwindcss, @fontsource-variable/*, vitest, @testing-library/react, jsdom,
-eslint-config-next, serwist (PWA, when KIT-4/5 land).
+eslint-config-next, serwist + @serwist/turbopack + esbuild (service worker, KIT-5; build-time only).
 Anything else needs a one-line reason in the agent's report.
 
 ## Configuration (env)
@@ -227,8 +227,23 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   output schema). The server picks one in `backend/src/import/ai.rs`.
   Dish mode adds warning "Guessed from a photo of the dish".
 - **Search (FND-2):** `websearch_to_tsquery('simple', q)` on `search` + `ILIKE` fallback on title for short prefixes.
-- **Offline (KIT-5):** serwist service worker; cache app shell + `GET /api/recipes/:id` + images for recipes
-  opened; network-first with cache fallback; writes disabled offline with a banner.
+- **Offline (KIT-5):** Serwist service worker `src/app/sw.ts`, bundled by esbuild through the Turbopack route
+  `src/app/serwist/[path]/route.ts` and served at `/serwist/sw.js` (production builds only). Rules in
+  `src/components/offline/rules.ts`.
+  - Precache (app shell): `.next/static` (scripts, styles, fonts), `public/` icons and the static `/offline` page.
+  - Runtime, allowlist only: recipe pages `/recipes/:id` and `/recipes/:id/cook` (network-first, 5 s timeout, keyed
+    by path; kept only when 200, not redirected and marked by `KeepOffline`, so the server-error page never replaces a
+    good copy; after an in-app navigation the page asks the worker to fetch it with `CACHE_URLS`, and the worker
+    then keeps the photos the page names), `GET /api/recipes/:id` (network-first), `/media/*` (cache-first: names
+    are content ids). Everything else is network-only; a document with no copy falls back to `/offline`, which lists
+    the recipes kept on the device.
+  - Caps: 60 pages, 30 API responses, 200 photos, 30 days since last use, purge on quota error.
+  - Signed out never comes from cache: a 401, a page answered with a redirect, or a redirect to `/login` wipes the
+    `rb-*` caches; Sign out wipes them too; `/login`, `/setup`, lists, search and settings are never cached.
+  - A new worker re-fetches the kept pages on activate so they point at the new build's chunks.
+  - UI: `OfflineBanner` in the app layout; Save (recipe form) and the import buttons are disabled offline with the
+    reason beside them (`OfflineNote`). Edits are blocked, not queued. iOS may evict caches; the server stays the
+    source of truth.
 - **Cooking mode (KIT-2/3):** `navigator.wakeLock.request('screen')`, re-acquire on `visibilitychange`.
 
 ## Containers and deploy

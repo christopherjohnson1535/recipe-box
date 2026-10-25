@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { OfflineNote } from "@/components/offline/OfflineNote";
+import { useOnline } from "@/components/offline/use-online";
 import { Field } from "@/components/ui/Field";
 import { Fieldset } from "@/components/ui/Fieldset";
 import { Input } from "@/components/ui/Input";
@@ -127,6 +129,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
   const router = useRouter();
   const [state, setState] = useState(() => initialState(initial));
   const [saving, setSaving] = useState(false);
+  const online = useOnline();
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -207,7 +210,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (saving || uploading) return;
+    if (saving || uploading || !online) return;
     const input = buildInput(state, initial);
     const problems: Record<string, string> = {};
     if (!input.title) problems.title = "Give the recipe a title.";
@@ -433,12 +436,13 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
       </Fieldset>
 
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" pending={saving} disabled={uploading}>
+        <Button type="submit" pending={saving} disabled={uploading || !online} aria-describedby={online ? undefined : "rf-offline"}>
           {saving ? "Saving…" : submitLabel}
         </Button>
         <Button variant="secondary" onClick={cancel} disabled={saving}>
           Cancel
         </Button>
+        <OfflineNote id="rf-offline">You’re offline. Your changes stay here on this page; save once you’re back online.</OfflineNote>
       </div>
     </form>
   );

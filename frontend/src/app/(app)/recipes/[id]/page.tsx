@@ -17,6 +17,7 @@ import { SpotIcon } from "@/components/ui/SpotIcon";
 import { iconForTag } from "@/components/ui/spot-icons";
 import { Text } from "@/components/ui/Text";
 import { ServerError } from "@/components/ServerError";
+import { KeepOffline } from "@/components/offline/KeepOffline";
 import { ApiError, type Recipe } from "@/lib/api";
 import { formatMinutes, groupBySection, plateSrc, minuteNumeral } from "@/lib/recipe";
 import { splitIngredient } from "@/lib/scale";
@@ -88,6 +89,7 @@ export default async function RecipePage({ params }: Params) {
 
   return (
     <Arrive as="article" arriveKey={recipeArrivalKey(id)} className="flex flex-col gap-10 pb-28">
+      <KeepOffline />
       <RecipeStateProvider id={id}>
         <SpreadOpener
           morphId={id}

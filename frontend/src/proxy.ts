@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const SESSION_COOKIE = "rb_session";
-const PUBLIC_PATHS = ["/login", "/setup"];
+// /offline is precached by the service worker at install, often before anyone has signed in.
+const PUBLIC_PATHS = ["/login", "/setup", "/offline"];
 
 // Cheap gate only: a present cookie may still be expired. The (app) layout confirms it with
 // GET /api/auth/me and sends stale sessions to /login.
