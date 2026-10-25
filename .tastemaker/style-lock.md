@@ -1,47 +1,63 @@
 # Style lock — Recipe Box
 
-Established: 2026-10-21. Source: user-specified direction (classic editorial magazine, literary-weekly feel; original
-design, no trademarked names, logos or typefaces). No reference images; palette hand-set and matrix-checked.
+Established: 2026-10-21 (editorial magazine). Re-locked: 2026-10-25, **Riviera · Charcoal & Saffron** (ADR 0009,
+`docs/design/restyle-2026-10-riviera/README.md`). Source: owner-chosen direction after comparing four directions and
+four Riviera variants; original design, no trademarked names, logos or typefaces. Palette hand-set and matrix-checked.
 Full guide for builders: `docs/UI.md`. Colour tokens live in `frontend/src/styles/` (primitives, themes/day + evening,
 component tokens; see `docs/THEMING.md`), and this contract is enforced by `frontend/src/styles/tokens.test.ts`.
 
+## Lane
+- Riviera: refined and calm rather than magazine-like, for a long-lived household app. Cool paper, charcoal ink, one
+  saffron accent; a charcoal top band and band-coloured inverse panels (layout lands in #120 and #121).
+
 ## Palette (light: "day edition")
-- Paper `#fbf8f1` (page) · Paper-deep `#f3eee3` (ingredient sidebar, alerts)
-- Ink `#1a1714` (text, primary button fill) — 16.83:1 on paper
-- Ink-muted `#5c554c` (decks, bylines, metadata, hints) — 6.93:1 on paper, 6.35:1 on paper-deep
-- Accent `#9b1c1c` deep red, sparingly (kickers, step numerals, links, active underline, focus) — 7.68:1 on paper
-- Accent-hover `#7e1414` (9.91:1) · On-accent `#fbf8f1`
-- Rule `#cdc3b0` decorative hairlines only · Rule-strong `#8c8377` control borders (3.52:1 paper, 3.22:1 paper-deep)
-- Button label: paper on ink (16.83:1); paper on accent (7.68:1)
+- Paper `#f4f4f1` (page) · Paper-deep `#eaeae5` (ingredient sidebar, alerts, panels)
+- Ink `#22262b` (text, primary button fill) — 13.8:1 on paper, 12.6:1 on paper-deep
+- Ink-muted `#565c63` (decks, bylines, metadata, hints) — 6.1:1 on paper, 5.6:1 on paper-deep
+- Accent `#8a5c0c` deep saffron, sparingly (kickers, step numerals, links, active underline, focus) — 5.3:1 on paper,
+  4.8:1 on paper-deep
+- Accent-hover `#6f4a09` (7.2:1) · On-accent `#f4f4f1`
+- Danger `#a33a2b` brick red (6.0:1 paper, 5.4:1 paper-deep) · Danger-hover `#86301f` · On-danger `#f4f4f1`
+- Rule `#d8d9d3` decorative hairlines only · Rule-strong `#7d8288` control borders (3.5:1 paper, 3.2:1 paper-deep)
+- Attention `#6fb5bd` sea teal (wash, rule or mark only; ink on it 6.5:1) · Stage `#1b1e21` / on-stage `#eeede8` (14.3:1)
+- Band `#22262b` / on-band `#f4f4f1` (13.8:1) / band-accent `#e9b75a` (8.3:1)
+- Button label: paper on ink (13.8:1); paper on accent (5.3:1); paper on danger (6.0:1)
 
 ## Dark mode: the "evening edition", chosen by the clock
 - Evening shows 19:00 to 06:59 local time by default, day 07:00 to 18:59. Per device, Settings can pin day, pin
   evening or follow the device (`localStorage` `rb-edition`). `<html data-theme>` carries the result; with no
   attribute the device's `prefers-color-scheme` decides. See `docs/THEMING.md`.
-- Paper `#16130f` · Paper-deep `#241f19` (a step lighter so the sidebar reads) · Ink `#efe8da` (15.19:1 / 13.4:1) · Ink-muted `#b3a999` (7.98:1 / 7.04:1)
-- Accent `#d98c7f` desaturated red (7.06:1 on paper, 6.23:1 on paper-deep) · Accent-hover/focus `#e6a497` (8.92:1)
-- Rule `#463e33` decorative · Rule-strong `#7a7064` (3.82:1 on paper) · On-accent `#16130f`
+- Paper `#121416` · Paper-deep `#1b1e21` · Ink `#eeede8` (15.8:1 / 14.3:1) · Ink-muted `#a9aeb4` (8.3:1 / 7.5:1)
+- Accent `#e0b057` brighter saffron (9.3:1 on paper, 8.4:1 on paper-deep) · Accent-hover `#ecc57a` (11.3:1) · Focus = accent
+- Danger `#ef9a8a` (8.5:1 / 7.7:1) · Danger-hover `#f5b3a6` · On-danger and on-accent `#121416`
+- Rule `#2e3236` decorative · Rule-strong `#6d7379` (3.9:1 on paper, 3.5:1 on paper-deep)
+- Band `#22262b` / on-band `#eeede8` (13.0:1) / band-accent `#e0b057` (7.6:1); stage and attention as by day
 
 ## Color contract (check_contrast.py --matrix, both modes)
 - Text-safe: ink/paper, ink/paper-deep, ink-muted/paper, ink-muted/paper-deep, accent/paper, accent/paper-deep,
-  paper-on-ink fills, on-accent/accent.
-- UI-safe: rule-strong vs paper and paper-deep (control borders).
+  danger/paper, danger/paper-deep, paper-on-ink fills, on-accent/accent, on-danger/danger, on-band/band,
+  band-accent/band, on-stage/stage, on-attention/attention.
+- UI-safe: rule-strong vs paper and paper-deep (control borders); attention vs stage.
 - Decorative only: rule vs anything; ink vs accent; paper vs paper-deep. Never carry text or state with these.
+- Danger and attention stay at least 25 degrees of hue from the accent: saffron must never read as an error.
 
 ## Typography
-- Display: Libre Caslon Display 400 (`@fontsource/libre-caslon-display`), headlines, titles, wordmark, step numerals.
-  One weight only; `font-synthesis: none`, never bold.
-- Text: Newsreader Variable with opsz + italics (`@fontsource-variable/newsreader`): body, italic decks, labels.
-- No sans. Two families total.
-- Scale: label 14px uppercase +0.12em · small 16 · body 19 / 1.6 · deck 22 italic · title-sm 26 · title 36 ·
-  headline clamp(40px → 72px).
+- Display: Marcellus 400 (`@fontsource/marcellus`): wordmark, headlines, card titles, numerals. One weight, no
+  italic; `font-synthesis: none`, never bold.
+- Labels: Karla Variable 500–600 (`@fontsource-variable/karla`): kickers, nav, buttons, metadata, field labels.
+  Uppercase, letter-spacing 0.14em, 13px minimum.
+- Text: Crimson Pro Variable with italics (`@fontsource-variable/crimson-pro`): body, italic decks, inputs. Runs small:
+  body 20px / 1.6.
+- **This reverses the old "no sans" rule.** Karla is the one sans, for labels only. Three families total.
+- Scale: label 13px Karla · small 17 · body 20 / 1.6 · deck 22 italic · card title 29 · title 36 · numeral 34 ·
+  wordmark 44 · headline clamp(40px → 68px).
 
 ## Shape language
 - Square corners (controls 2px), no shadows. Separation by hairline rules; a thick-over-thin double rule under the
   masthead and atop the ingredient sidebar.
 
 ## Density & spacing
-- Generous editorial whitespace. Measure 38rem body, 64rem wide column, 72rem page. Gutter 16px phone / 40px ≥768.
+- Generous whitespace. Measure 38rem body, 64rem wide column, 72rem page (90rem from #120). Gutter 16px phone / 40px ≥768.
 - Listing entries: 24px vertical padding between hairlines. Touch targets 44px.
 - Section separation: hairline rules only.
 
@@ -58,16 +74,20 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
   Reduced motion removes movement and keeps colour changes. No GSAP: a reading app, restraint is the point. Tokens in
   `motion.css`; rules in `docs/UI.md` "Motion".
 
-## Print inks (illustration only, no semantic token yet)
-- Mustard `#d9a21b` (2.17:1 day, 8.05:1 evening) · Fern `#3f6b45` (5.82:1 day, 2.998:1 evening) · Tomato `#d2492a`
-  (4.19:1 day, 4.17:1 evening). Mustard is decorative-only on day paper, fern on evening paper; tomato is for graphics
-  (3:1), not text.
+## Print inks (illustration only, no semantic token)
+- Mustard `#d9a21b` (2.09:1 day, 8.03:1 evening) · Fern `#3f6b45` (5.60:1 day, 2.99:1 evening) · Tomato `#d2492a`
+  (4.03:1 day, 4.16:1 evening). Mustard is decorative-only on day paper and too close to saffron to carry a meaning,
+  fern is decorative-only on evening paper; tomato is for graphics (3:1), not text.
 
 ## Do not
-- Use The New Yorker's name, logo, mascot, masthead, or Irvin / Irvin look-alike fonts.
+- Use The New Yorker's name, logo, mascot, masthead, or Irvin / Irvin look-alike fonts; copy any publication's identity.
 - Use next/font/google; use @fontsource packages only.
-- Bold or italic display headlines; italics belong to decks, hints and notes.
+- Bold or italicise Marcellus; set running text in Karla; set a label under 13px or in lower case (the save stamp's small "Filed" and date lines are the one exception
+  left; #122 sweeps them); add a fourth family.
+- Use the saffron accent for an error, a destructive action or a "check this" mark (danger and attention own those).
 - Rounded cards, drop shadows, gradients, pills, or accent fills larger than a button.
+- Hard-code a hex value outside `primitives.css`.
 
 ## Taste memory
-- Profile priors used: none. Decision log: pending owner review of this editorial direction.
+- Profile priors used: none. Decision log: 2026-10-21 editorial magazine (ADR 0006); 2026-10-25 owner chose Riviera ·
+  Charcoal & Saffron over Maison, Linen, Edition II and four Riviera variants (ADR 0009).

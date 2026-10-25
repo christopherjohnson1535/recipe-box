@@ -14,6 +14,7 @@ old status to `Superseded by NNNN`.
 | [0003](0003-safe-fetch-for-outbound-requests.md) | All outbound fetches go through `safe_fetch` |
 | [0004](0004-ai-is-optional.md) | AI is optional (`AI_PROVIDER=none`) |
 | [0005](0005-imports-are-drafts.md) | Imports return drafts; nothing is saved until reviewed |
-| [0006](0006-editorial-design-system.md) | Editorial design system with three token layers |
+| [0006](0006-editorial-design-system.md) | Editorial design system with three token layers (palette and fonts superseded by 0009) |
 | [0007](0007-docs-in-repo-wiki-mirrored.md) | Documents live in the repo; the wiki is a mirror |
 | [0008](0008-hexagonal-backend.md) | Hexagonal backend: ports and adapters in a Cargo workspace |
+| [0009](0009-riviera-charcoal-saffron.md) | Riviera · Charcoal & Saffron palette and Marcellus / Karla / Crimson Pro fonts |

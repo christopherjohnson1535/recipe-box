@@ -3,7 +3,7 @@
 ## Add to Home Screen
 1. Open Recipe Box in **Safari** at its **HTTPS** address. Home Screen apps, the wake lock and offline all need a secure
    address: use Tailscale serve or the Caddy profile (see [[Deploying]]).
-2. Tap **Share** → **Add to Home Screen** → **Add**. The icon is a cream R on claret.
+2. Tap **Share** → **Add to Home Screen** → **Add**. The icon is a white R on charcoal with a saffron line under it.
 3. Open it from the Home Screen. It launches **standalone**: full screen with no Safari address bar or tabs, and it keeps
    its own place in the app switcher. Links to other sites open in Safari.
 
