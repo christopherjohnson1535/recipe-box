@@ -86,7 +86,7 @@ class ComposeStack implements BackupStack {
 
   async mediaListing() {
     const out = this.compose(
-      ["run", "--rm", "--no-deps", "-T", "--entrypoint", "sh", "api", "-c", 'find /data/media -mindepth 1 -maxdepth 1 -exec stat -c "%a %f" {} +'],
+      ["run", "--rm", "--no-deps", "-T", "--entrypoint", "sh", "api", "-c", 'find /data/media -mindepth 1 -maxdepth 1 -exec sh -c \'for f; do printf "%s %s\\n" "$(stat -c %a "$f")" "${f##*/}"; done\' sh {} +'],
       "pipe",
     );
     return out.split("\n").filter(Boolean).sort();
