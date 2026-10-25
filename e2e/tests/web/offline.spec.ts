@@ -29,6 +29,19 @@ async function openAndKeep(page: Page, id: string) {
     .toBe(true);
 }
 
+/** What the page shows, for assertion messages (CI only shows annotations). */
+const where = async (page: Page) =>
+  JSON.stringify(
+    await page.evaluate(async () => ({
+      url: location.href,
+      title: document.title,
+      h1: document.querySelector("h1")?.textContent,
+      controlled: !!navigator.serviceWorker.controller,
+      caches: await Promise.all((await caches.keys()).map(async (n) => `${n}:${(await (await caches.open(n)).keys()).length}`)),
+      offlineKept: !!(await caches.match("/offline", { ignoreSearch: true })),
+    })).catch((e) => String(e)),
+  );
+
 const keptCount = (page: Page) =>
   page.evaluate(async () => (await caches.keys()).filter((n) => n.startsWith("rb-")).length);
 
@@ -45,8 +58,8 @@ test("a recipe opened before loads offline, with its photo, and other pages fall
   await expect(page.getByText("You’re offline")).toBeVisible();
 
   // A page this device never kept: the offline page, listing what it did keep.
-  await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "You’re offline", level: 1 })).toBeVisible();
+  await page.goto("/settings").catch(() => undefined);
+  await expect(page.getByRole("heading", { name: "You’re offline", level: 1 }), await where(page)).toBeVisible();
   await page.getByRole("link", { name: new RegExp(recipe.title) }).click();
   await expect(page.getByRole("heading", { name: recipe.title, level: 1 })).toBeVisible();
   await context.setOffline(false);
