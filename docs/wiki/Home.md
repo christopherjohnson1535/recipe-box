@@ -7,6 +7,7 @@ A household recipe website: save recipes from links and photos, find them fast, 
 - [[Importing Recipes]] — links, photos, pasted text
 - [[Save from Safari]] — one tap from the iPad share sheet or a desktop bookmark
 - [[Finding Recipes]] — search, tags, sorting
+- [[Grocery List]] — one shared shopping list, grouped by store section
 - [[Using on iPad]] — Home Screen app, cooking mode, offline
 - [[AI Photo Import]] — optional setup for reading recipes from photos
 - [[Backup and Restore]]
