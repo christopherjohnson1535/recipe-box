@@ -73,10 +73,12 @@ openapi-lint:
 
 # Regenerate the Python reference client in sdks/python/ from docs/openapi.json (generator pinned; see docs/SDK.md)
 sdk-python:
-    uvx --from openapi-python-client==0.29.1 openapi-python-client generate --path docs/openapi.json --config sdks/python/config.yml --output-path sdks/python/recipe-box-client --meta uv --overwrite
+    uvx --from openapi-python-client==0.29.1 --with ruff==0.17.2 openapi-python-client generate --path docs/openapi.json --config sdks/python/config.yml --output-path sdks/python/recipe-box-client --meta uv --overwrite
     rm -rf sdks/python/recipe-box-client/.ruff_cache
+    cd sdks/python/tests && uv lock
 
-# Smoke-test the Python client against a running API (default: the e2e compose stack, `docker compose -f docker-compose.e2e.yml up -d --wait`)
+# Smoke-test the Python client against a running API (default: the e2e compose stack, `docker compose -f docker-compose.e2e.yml up -d --wait`).
+# On a stack that already has an admin, set RECIPE_BOX_USER and RECIPE_BOX_PASSWORD to that account.
 sdk-python-smoke:
     cd sdks/python/tests && RECIPE_BOX_URL="${RECIPE_BOX_URL:-http://127.0.0.1:3146}" uv run --locked pytest -q
 

@@ -30,8 +30,12 @@ just sdk-python-smoke                        # test against a running API; RECIP
 The config maps `application/zip` and `image/jpeg` responses to `application/octet-stream`; without that the
 generator silently drops `exportAll` and `getMedia`. Regeneration must print no warnings.
 
-The spec declares a cookie scheme, which the generator renders as an `AuthenticatedClient` that wants a bearer
-token. Pass an empty one; the underlying `httpx` client keeps the session cookie.
+The spec declares a cookie scheme (`rb_session`), and the generator has no cookie-auth client, so it renders an
+`AuthenticatedClient` that insists on a bearer `token`. Pass `token=""` and `prefix=""`: the client then sends an
+empty `Authorization:` header (with the default `prefix="Bearer"` it would send `Authorization: Bearer `), which the
+API ignores. What authenticates is the `rb_session` cookie in the `httpx` cookie jar, set by `login` or `createAdmin`
+and sent back on later calls. Public operations (`login`, `createAdmin`, `getSetupStatus`, health) take the same
+`AuthenticatedClient`, because the generator uses it for every operation in a spec that declares a scheme.
 
 ```python
 from recipe_box_client import AuthenticatedClient
@@ -47,14 +51,20 @@ with AuthenticatedClient(base_url="http://127.0.0.1:3000", token="", prefix="", 
 
 The smoke test (`sdks/python/tests/test_smoke.py`, its own pinned uv project) uses only the generated client:
 setup or login, current user, create a recipe, find it with `q=`, get it, delete, restore, delete, log out. CI runs
-it in the `sdk-python` job against `docker-compose.e2e.yml`.
+it in the `sdk-python` job against `docker-compose.e2e.yml`. It always logs out and logs back in, so `login` is
+exercised even on a fresh stack, and it deletes its recipe and logs out even when an assertion fails. On a stack that
+already has an admin (for example after `just e2e`), set `RECIPE_BOX_USER` and `RECIPE_BOX_PASSWORD` to that
+account; otherwise the test fails on a 401 from `login` and says so. Defaults: `sdk-smoke` / `sdk-smoke-password-123`.
 
 ## Adding a language
 
 1. Pick a generator and pin its exact version (for example `openapi-generator-cli` or a language-native tool).
    Check that generating prints no warnings and that all operations survive, including `exportAll` and `getMedia`.
 2. Put its config in `sdks/<lang>/` and generate into a subfolder there. Make the output deterministic (no
-   timestamps or caches checked in; run it twice and `git diff` must be empty).
+   timestamps or caches checked in; run it twice and `git diff` must be empty). Pin whatever formatter the
+   generator shells out to as well (the Python one runs `ruff`, pinned with `--with ruff==0.17.2`; check with
+   `uvx --from <generator> ruff --version`), or a formatter release will fail the drift check. Add a `.gitignore`
+   for tool caches.
 3. Add `just sdk-<lang>` (regenerate) and `just sdk-<lang>-smoke`.
 4. In `contract.yml`, install the toolchain, regenerate in the "Regenerate" step and add `sdks/<lang>` to the drift
    `git diff --exit-code`.
@@ -66,5 +76,6 @@ it in the `sdk-python` job against `docker-compose.e2e.yml`.
 ## Versioning
 
 An SDK's version is the API version, `info.version` in the spec. Bump it when the API changes; the generator copies
-it into the package. A PR that breaks the API (`oasdiff breaking`) needs the `breaking-api` label, and the SDKs
+it into the package. `just sdk-python` and CI then also run `uv lock` in `sdks/python/tests`, since the lockfile
+records the client's version. A PR that breaks the API (`oasdiff breaking`) needs the `breaking-api` label, and the SDKs
 then regenerate as a major change.

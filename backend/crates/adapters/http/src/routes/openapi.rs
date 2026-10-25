@@ -143,7 +143,7 @@ impl Modify for ExtensibleErrorCode {
 }
 
 /// `security(())` serializes as one empty requirement (`[{}]`), which means "no auth"; only a requirement naming a
-/// scheme needs a session.
+/// scheme needs a session. utoipa cannot emit `[]`; `[{}]` (auth optional) and `[]` both mean no session here.
 fn requires_session(op: &Operation) -> bool {
     let reqs = serde_json::to_value(&op.security).expect("security serializes");
     reqs.as_array().is_some_and(|a| {

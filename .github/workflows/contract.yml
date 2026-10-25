@@ -47,7 +47,9 @@ jobs:
           npm ci --prefix frontend
           npm run --prefix frontend api:types
           # Keep this command in step with `just sdk-python`.
-          uvx --from openapi-python-client==0.29.1 openapi-python-client generate --path docs/openapi.json --config sdks/python/config.yml --output-path sdks/python/recipe-box-client --meta uv --overwrite
+          uvx --from openapi-python-client==0.29.1 --with ruff==0.17.2 openapi-python-client generate --path docs/openapi.json --config sdks/python/config.yml --output-path sdks/python/recipe-box-client --meta uv --overwrite
+          rm -rf sdks/python/recipe-box-client/.ruff_cache
+          (cd sdks/python/tests && uv lock)
       - name: Fail on drift
         run: git diff --exit-code -- docs/openapi.json frontend/src/lib/api-types.ts sdks/python
       - name: Lint the spec

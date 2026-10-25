@@ -267,6 +267,7 @@ jobs:
   sdk-python:
     # The generated Python client (sdks/python) against the real stack: login, create, search, delete (docs/SDK.md).
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     needs: [backend, frontend]
