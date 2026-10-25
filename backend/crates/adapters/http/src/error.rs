@@ -29,6 +29,9 @@ pub enum ErrorCode {
     NoRecipeFound,
     AiDisabled,
     AiError,
+    GoogleDisabled,
+    GoogleNotConnected,
+    GoogleError,
     BlockedAddress,
     SiteBlocked,
     FetchFailed,
@@ -78,6 +81,12 @@ pub enum AppError {
     AiDisabled,
     #[error("{0}")]
     AiError(String),
+    #[error("Google Tasks is not set up on this server.")]
+    GoogleDisabled,
+    #[error("Your Google account is not connected. Connect it in Settings.")]
+    GoogleNotConnected,
+    #[error("{0}")]
+    GoogleError(String),
     #[error("That address is not allowed.")]
     BlockedAddress,
     #[error("{0}")]
@@ -120,6 +129,9 @@ impl AppError {
             Self::NoRecipeFound(_) => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::NoRecipeFound),
             Self::AiDisabled => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::AiDisabled),
             Self::AiError(_) => (StatusCode::BAD_GATEWAY, ErrorCode::AiError),
+            Self::GoogleDisabled => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::GoogleDisabled),
+            Self::GoogleNotConnected => (StatusCode::CONFLICT, ErrorCode::GoogleNotConnected),
+            Self::GoogleError(_) => (StatusCode::BAD_GATEWAY, ErrorCode::GoogleError),
             Self::BlockedAddress => (StatusCode::UNPROCESSABLE_ENTITY, ErrorCode::BlockedAddress),
             Self::SiteBlocked(_) => (StatusCode::BAD_GATEWAY, ErrorCode::SiteBlocked),
             Self::FetchFailed(_) => (StatusCode::BAD_GATEWAY, ErrorCode::FetchFailed),
@@ -181,6 +193,9 @@ impl From<domain::DomainError> for AppError {
             D::RateLimited { retry_after_secs } => Self::RateLimited { retry_after_secs },
             D::AiDisabled => Self::AiDisabled,
             D::Ai(m) => Self::AiError(m),
+            D::GoogleDisabled => Self::GoogleDisabled,
+            D::GoogleNotConnected => Self::GoogleNotConnected,
+            D::Google(m) => Self::GoogleError(m),
             D::NoRecipeFound(m) => Self::NoRecipeFound(m),
             D::BlockedAddress => Self::BlockedAddress,
             D::SiteBlocked(m) => Self::SiteBlocked(m),
@@ -292,6 +307,9 @@ mod tests {
             ),
             (D::AiDisabled, 422, "ai_disabled"),
             (D::Ai(m()), 502, "ai_error"),
+            (D::GoogleDisabled, 422, "google_disabled"),
+            (D::GoogleNotConnected, 409, "google_not_connected"),
+            (D::Google(m()), 502, "google_error"),
             (D::NoRecipeFound(m()), 422, "no_recipe_found"),
             (D::BlockedAddress, 422, "blocked_address"),
             (D::SiteBlocked(m()), 502, "site_blocked"),

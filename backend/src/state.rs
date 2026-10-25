@@ -1,22 +1,25 @@
 use std::sync::Arc;
 
 use adapter_fs_media::FsMediaStore;
+use adapter_google::GoogleTasksClient;
 use adapter_html::HtmlPageReader;
 use adapter_http_fetch::HttpPageFetcher;
 use adapter_postgres::{
-    PgGroceryRepo, PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo, PgSettingsRepo,
-    PgStorageHealth, PgTagRepo, PgUserRepo,
+    PgGoogleConnectionRepo, PgGroceryRepo, PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo,
+    PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo,
 };
-use app::{Deps, Services};
+use app::{Deps, DisabledGoogleTasks, Services};
 use ports::{
-    GroceryRepo, ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo, SessionRepo,
-    SettingsRepo, SpawnedTask, StorageHealth, TagRepo, TaskSpawner, UserRepo,
+    GoogleConnectionRepo, GoogleTasks, GroceryRepo, ImageRepo, MediaStore, PageFetcher,
+    RecipeExtractor, RecipeRepo, SessionRepo, SettingsRepo, SpawnedTask, StorageHealth, TagRepo,
+    TaskSpawner, TokenCipher, UserRepo,
 };
 
 use crate::{
     auth::{password::Argon2Hasher, session::RandomTokens},
     clock::Clock,
-    config::Config,
+    config::{Config, GoogleConfig},
+    crypto::{ChaChaCipher, NoCipher},
     import::{ai::Ai, safe_fetch::FetchPolicy},
     media::ImageCrateCodec,
 };
@@ -43,6 +46,7 @@ pub struct AppState {
     pub settings: Arc<dyn SettingsRepo>,
     pub tags: Arc<dyn TagRepo>,
     pub grocery: Arc<dyn GroceryRepo>,
+    pub google_connections: Arc<dyn GoogleConnectionRepo>,
     pub media: Arc<dyn MediaStore>,
     pub health: Arc<dyn StorageHealth>,
     pub config: Arc<Config>,
@@ -53,6 +57,10 @@ pub struct AppState {
     pub clock: Clock,
     /// Photo/text recipe extraction. `Ai::None` when `AI_PROVIDER=none`; tests swap in a mock-backed one.
     pub ai: Arc<dyn RecipeExtractor>,
+    /// Google sign-in and Tasks. Disabled unless the four Google settings are set; tests point it at a stub.
+    pub google: Arc<dyn GoogleTasks>,
+    /// Seals the stored Google refresh tokens.
+    pub cipher: Arc<dyn TokenCipher>,
     /// Proxies whose `X-Forwarded-For` the rate limiter believes (`TRUSTED_PROXIES`). None by default.
     pub trusted_proxies: adapter_http::TrustedProxies,
     /// Wrong-password counts, shared by every `deps()` call.
@@ -71,6 +79,7 @@ impl AppState {
             settings: self.settings.clone(),
             tags: self.tags.clone(),
             grocery: self.grocery.clone(),
+            google_connections: self.google_connections.clone(),
             health: self.health.clone(),
             media: self.media.clone(),
             backup: Arc::new(crate::backup::ZipBackup),
@@ -81,6 +90,8 @@ impl AppState {
             extractor: self.ai.clone(),
             fetcher: self.fetcher(),
             reader: Arc::new(HtmlPageReader),
+            google: self.google.clone(),
+            cipher: self.cipher.clone(),
             spawner: Arc::new(TokioSpawner),
             max_upload_bytes: self.config.max_upload_bytes(),
             session_days: self.config.session_days,
@@ -104,6 +115,7 @@ impl AppState {
     /// Like [`AppState::new`] with the given clock driving the repositories and every time rule.
     pub fn with_clock(pool: PgPool, config: Config, clock: Clock) -> anyhow::Result<Self> {
         let ai = Arc::new(Ai::from_config(&config)?);
+        let (google, cipher) = google_from_config(config.google.as_ref())?;
         let port_clock: Arc<dyn ports::Clock> = Arc::new(clock.clone());
         Ok(Self {
             recipes: Arc::new(PgRecipeRepo::new(pool.clone(), port_clock.clone())),
@@ -113,16 +125,36 @@ impl AppState {
             settings: Arc::new(PgSettingsRepo::new(pool.clone(), port_clock.clone())),
             tags: Arc::new(PgTagRepo::new(pool.clone())),
             grocery: Arc::new(PgGroceryRepo::new(pool.clone(), port_clock)),
+            google_connections: Arc::new(PgGoogleConnectionRepo::new(pool.clone())),
             media: Arc::new(FsMediaStore::new(config.media_dir.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
             config: Arc::new(config),
             fetch_policy: FetchPolicy::default(),
             clock,
             ai,
+            google,
+            cipher,
             trusted_proxies: Default::default(),
             throttle: app::Throttle::new(),
         })
     }
+}
+
+/// The Google adapter and token cipher for the config, or the disabled pair when Google is not set up.
+fn google_from_config(
+    google: Option<&GoogleConfig>,
+) -> anyhow::Result<(Arc<dyn GoogleTasks>, Arc<dyn TokenCipher>)> {
+    Ok(match google {
+        Some(g) => (
+            Arc::new(GoogleTasksClient::new(
+                g.client_id.clone(),
+                g.client_secret.clone(),
+                &g.public_url,
+            )?),
+            Arc::new(ChaChaCipher::new(&g.token_key)),
+        ),
+        None => (Arc::new(DisabledGoogleTasks), Arc::new(NoCipher)),
+    })
 }
 
 #[cfg(test)]

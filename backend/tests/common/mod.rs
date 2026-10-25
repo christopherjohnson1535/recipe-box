@@ -9,6 +9,7 @@
 #![allow(dead_code)]
 
 pub mod anthropic;
+pub mod google;
 
 use std::{
     path::PathBuf,
@@ -121,6 +122,8 @@ pub struct Res {
     pub content_type: Option<String>,
     /// The `Retry-After` header, whole.
     pub retry_after: Option<String>,
+    /// The `Location` header of a redirect.
+    pub location: Option<String>,
     pub bytes: Vec<u8>,
     /// The body as JSON, `Null` when it isn't.
     pub json: Value,
@@ -245,6 +248,7 @@ impl TestApp {
             ai_model: "test".into(),
             max_upload_mb: 2,
             max_backup_mb: 8,
+            google: None,
         };
         let clock = Clock::fixed(epoch());
         let mut state = AppState::with_clock(pool.clone(), config, clock.clone()).unwrap();
@@ -295,6 +299,7 @@ impl TestApp {
         let cookie = header_of(header::SET_COOKIE);
         let content_type = header_of(header::CONTENT_TYPE);
         let retry_after = header_of(header::RETRY_AFTER);
+        let location = header_of(header::LOCATION);
         let bytes = res.into_body().collect().await.unwrap().to_bytes().to_vec();
         let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
         Res {
@@ -302,6 +307,7 @@ impl TestApp {
             cookie,
             content_type,
             retry_after,
+            location,
             bytes,
             json,
         }

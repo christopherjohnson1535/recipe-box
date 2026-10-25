@@ -9,7 +9,7 @@ use std::{future::Future, pin::Pin, time::Duration};
 
 use async_trait::async_trait;
 use domain::{
-    AiProvider, DomainResult, PhotoMode, RecipeDraft,
+    AiProvider, DomainResult, PhotoMode, RecipeDraft, Secret,
     chrono::{DateTime, Utc},
     url::Url,
     uuid::Uuid,
@@ -21,8 +21,9 @@ mod repos;
 pub mod contract;
 
 pub use repos::{
-    Compute, GroceryItem, GroceryList, GroceryRepo, ImageRepo, ListedRecipe, NewGroceryItem,
-    RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+    Compute, GoogleConnection, GoogleConnectionRepo, GroceryItem, GroceryList, GroceryRepo,
+    ImageRepo, ListedRecipe, NewGroceryItem, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth,
+    TagRepo, UserRepo,
 };
 
 /// The one source of "now" for every time rule (restore window, session expiry, purge). Repositories are built
@@ -176,6 +177,57 @@ pub trait SessionTokens: Send + Sync {
 
     /// What is stored for `token`; the same token always gives the same digest.
     fn digest(&self, token: &str) -> Vec<u8>;
+}
+
+/// One parent task of a Google Tasks list: a store section and the items beneath it, as one-line titles.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskSection {
+    pub title: String,
+    pub items: Vec<String>,
+}
+
+/// Google sign-in and Google Tasks (GRO-5). Every method that talks to Google answers `Google` when the call
+/// fails (timeout, 5xx, a reply it could not read) and never puts a token in an error. A token is only ever sent to
+/// Google. Without configuration, `configured` is false and every other method fails with `GoogleDisabled`.
+#[async_trait]
+pub trait GoogleTasks: Send + Sync {
+    /// Whether the server has a Google OAuth client. The one method that works either way.
+    fn configured(&self) -> bool;
+
+    /// Where to send the browser to ask for the `tasks` scope with offline access. `state` comes back unchanged on
+    /// the redirect.
+    fn consent_url(&self, state: &str) -> DomainResult<Url>;
+
+    /// Trades the `code` of the redirect for a refresh token. `Google` when Google refuses the code or sends no
+    /// refresh token.
+    async fn exchange_code(&self, code: &str) -> DomainResult<Secret>;
+
+    /// A short-lived access token. `GoogleNotConnected` when Google says the refresh token is no longer valid
+    /// (revoked, expired, the account removed access).
+    async fn access_token(&self, refresh: &Secret) -> DomainResult<Secret>;
+
+    /// Revokes a token at Google.
+    async fn revoke(&self, token: &Secret) -> DomainResult<()>;
+
+    /// Makes the task list hold exactly `sections`: one parent task per section in order, each item a subtask of
+    /// its section in order. Reuses the list `tasklist_id` names, emptying it first; when there is none, or Google
+    /// no longer has it, makes a new list called `title`. Returns the id of the list used.
+    async fn replace_list(
+        &self,
+        access: &Secret,
+        tasklist_id: Option<&str>,
+        title: &str,
+        sections: &[TaskSection],
+    ) -> DomainResult<String>;
+}
+
+/// Seals secrets before they are stored. The key never leaves the implementation.
+pub trait TokenCipher: Send + Sync {
+    /// An opaque blob that only `open` can read back. Two seals of the same secret differ.
+    fn seal(&self, secret: &Secret) -> DomainResult<Vec<u8>>;
+
+    /// The secret in `sealed`. `Internal` when it was not made by this key or was changed.
+    fn open(&self, sealed: &[u8]) -> DomainResult<Secret>;
 }
 
 /// Reads and writes the backup archive format (ACC-5, docs/API.md "Backup archive"). The application hands over

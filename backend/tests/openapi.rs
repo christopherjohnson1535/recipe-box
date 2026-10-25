@@ -93,6 +93,7 @@ async fn spec_and_router_list_the_same_operations() {
         ai_model: "test".into(),
         max_upload_mb: 2,
         max_backup_mb: 8,
+        google: None,
     };
     let pool = PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_millis(200))
@@ -147,5 +148,8 @@ fn error_code_is_an_extensible_enum() {
     ] {
         assert!(codes.contains(&c), "missing {c}");
     }
-    assert_eq!(codes.len(), 17, "{codes:?}");
+    assert_eq!(codes.len(), 20, "{codes:?}");
+    for c in ["google_disabled", "google_not_connected", "google_error"] {
+        assert!(codes.contains(&c), "missing {c}");
+    }
 }

@@ -348,3 +348,34 @@ pub trait GroceryRepo: Send + Sync {
     /// and water.
     async fn staples(&self) -> DomainResult<HashSet<String>>;
 }
+
+/// A member's link to their Google account.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GoogleConnection {
+    /// The refresh token as sealed by a [`crate::TokenCipher`]; storage never sees it in the clear.
+    pub sealed_token: Vec<u8>,
+    /// The Google Tasks list the grocery list was last sent to.
+    pub tasklist_id: Option<String>,
+    pub connected_at: DateTime<Utc>,
+}
+
+/// At most one Google connection per user. A user's connection goes when the user does.
+#[async_trait]
+pub trait GoogleConnectionRepo: Send + Sync {
+    async fn get(&self, user_id: Uuid) -> DomainResult<Option<GoogleConnection>>;
+
+    /// Stores the token and `connected_at`, replacing an earlier connection's token; the remembered task list
+    /// stays (a list of another account is simply not found at Google). `NotFound` when there is no such user.
+    async fn upsert(
+        &self,
+        user_id: Uuid,
+        sealed_token: Vec<u8>,
+        connected_at: DateTime<Utc>,
+    ) -> DomainResult<()>;
+
+    /// Remembers the task list. Does nothing when the user has no connection.
+    async fn set_tasklist(&self, user_id: Uuid, tasklist_id: &str) -> DomainResult<()>;
+
+    /// Forgets the connection and its task list. Not an error when there is none.
+    async fn delete(&self, user_id: Uuid) -> DomainResult<()>;
+}

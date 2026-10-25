@@ -107,6 +107,7 @@ mod tests {
             ai_model: "test-model".into(),
             max_upload_mb: 1,
             max_backup_mb: 8,
+            google: None,
         }
     }
 

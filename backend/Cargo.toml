@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [workspace]
-members = [".", "crates/adapters/anthropic", "crates/adapters/http-fetch", "crates/adapters/html", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
-default-members = [".", "crates/adapters/anthropic", "crates/adapters/http-fetch", "crates/adapters/html", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
+members = [".", "crates/adapters/anthropic", "crates/adapters/google", "crates/adapters/http-fetch", "crates/adapters/html", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
+default-members = [".", "crates/adapters/anthropic", "crates/adapters/google", "crates/adapters/http-fetch", "crates/adapters/html", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
 
 [workspace.dependencies]
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "uuid", "chrono", "json", "migrate", "macros", "runtime-tokio", "tls-rustls"] }
@@ -22,6 +22,7 @@ recipe-box-domain = { path = "crates/domain" }
 recipe-box-adapter-http = { path = "crates/adapters/http" }
 recipe-box-adapter-postgres = { path = "crates/adapters/postgres" }
 recipe-box-adapter-anthropic = { path = "crates/adapters/anthropic" }
+recipe-box-adapter-google = { path = "crates/adapters/google" }
 recipe-box-adapter-http-fetch = { path = "crates/adapters/http-fetch" }
 recipe-box-adapter-html = { path = "crates/adapters/html" }
 recipe-box-adapter-fs-media = { path = "crates/adapters/fs-media" }
@@ -31,6 +32,7 @@ argon2 = "0.6"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["macros", "multipart"] }
 base64 = "0.23"
+chacha20poly1305 = "0.11"
 chrono = { workspace = true, features = ["serde"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 rand = "0.10"

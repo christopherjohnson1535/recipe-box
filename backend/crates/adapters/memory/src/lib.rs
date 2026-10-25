@@ -14,15 +14,16 @@ use std::{
 use async_trait::async_trait;
 use domain::{
     DomainError, DomainResult, Image, NewUser, Page, RESTORE_WINDOW_MINUTES, ROLE_ADMIN, Recipe,
-    RecipeInput, RecipeSummary, SearchQuery, Settings, Sort, TagCount, User, UserRef,
+    RecipeInput, RecipeSummary, SearchQuery, Secret, Settings, Sort, TagCount, User, UserRef,
     chrono::{DateTime, Duration, Utc},
     grocery::Section,
     uuid::Uuid,
 };
 use ports::{
-    Clock, Compute, EncodedImage, GroceryItem, GroceryList, GroceryRepo, ImageCodec, ImageRepo,
-    ListedRecipe, MediaStore, NewGroceryItem, PasswordHasher, RecipeRepo, SessionRepo,
-    SessionTokens, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+    Clock, Compute, EncodedImage, GoogleConnection, GoogleConnectionRepo, GroceryItem, GroceryList,
+    GroceryRepo, ImageCodec, ImageRepo, ListedRecipe, MediaStore, NewGroceryItem, PasswordHasher,
+    RecipeRepo, SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo, TokenCipher,
+    UserRepo,
 };
 
 struct StoredUser {
@@ -63,6 +64,7 @@ struct State {
     recipes: HashMap<Uuid, StoredRecipe>,
     settings: Settings,
     grocery: Grocery,
+    google: HashMap<Uuid, GoogleConnection>,
 }
 
 impl State {
@@ -187,6 +189,7 @@ impl MemoryStore {
                 settings: Settings {
                     plate_treatment: true,
                 },
+                google: HashMap::new(),
                 grocery: Grocery {
                     list: None,
                     recipes: Vec::new(),
@@ -563,6 +566,7 @@ impl UserRepo for MemoryStore {
             ));
         }
         s.users.remove(&id);
+        s.google.remove(&id);
         s.sessions.retain(|_, (user, _)| *user != id);
         let gone = Some(id);
         for r in s.recipes.values_mut() {
@@ -997,6 +1001,65 @@ impl PasswordHasher for FakePasswordHasher {
             .and_then(|h| h.strip_prefix("fake$"))
             .and_then(|h| h.split_once('$'))
             .is_some_and(|(_, stored)| stored == password))
+    }
+}
+
+#[async_trait]
+impl GoogleConnectionRepo for MemoryStore {
+    async fn get(&self, user_id: Uuid) -> DomainResult<Option<GoogleConnection>> {
+        Ok(self.lock().google.get(&user_id).cloned())
+    }
+
+    async fn upsert(
+        &self,
+        user_id: Uuid,
+        sealed_token: Vec<u8>,
+        connected_at: DateTime<Utc>,
+    ) -> DomainResult<()> {
+        let mut s = self.lock();
+        if !s.users.contains_key(&user_id) {
+            return Err(DomainError::NotFound("No such user.".into()));
+        }
+        let tasklist_id = s.google.get(&user_id).and_then(|c| c.tasklist_id.clone());
+        s.google.insert(
+            user_id,
+            GoogleConnection {
+                sealed_token,
+                tasklist_id,
+                connected_at,
+            },
+        );
+        Ok(())
+    }
+
+    async fn set_tasklist(&self, user_id: Uuid, tasklist_id: &str) -> DomainResult<()> {
+        if let Some(c) = self.lock().google.get_mut(&user_id) {
+            c.tasklist_id = Some(tasklist_id.to_string());
+        }
+        Ok(())
+    }
+
+    async fn delete(&self, user_id: Uuid) -> DomainResult<()> {
+        self.lock().google.remove(&user_id);
+        Ok(())
+    }
+}
+
+/// A "cipher" for tests: the secret behind a `sealed:` prefix. Not secure, but `open` refuses anything else.
+#[derive(Default)]
+pub struct FakeTokenCipher;
+
+impl TokenCipher for FakeTokenCipher {
+    fn seal(&self, secret: &Secret) -> DomainResult<Vec<u8>> {
+        Ok([b"sealed:", secret.expose().as_bytes()].concat())
+    }
+
+    fn open(&self, sealed: &[u8]) -> DomainResult<Secret> {
+        sealed
+            .strip_prefix(b"sealed:")
+            .and_then(|b| std::str::from_utf8(b).ok())
+            .map(Secret::new)
+            .ok_or_else(|| DomainError::Internal("not sealed by this cipher".into()))
     }
 }
 

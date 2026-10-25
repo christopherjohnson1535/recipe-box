@@ -12,6 +12,7 @@ pub mod export;
 pub mod grocery;
 pub mod health;
 pub mod imports;
+pub mod integrations;
 pub mod media;
 pub mod openapi;
 pub mod recipes;
@@ -71,6 +72,22 @@ where
             patch(grocery::update_item).delete(grocery::remove_item),
         )
         .route("/api/grocery/clear-checked", post(grocery::clear_checked))
+        .route(
+            "/api/grocery/export/google-tasks",
+            post(grocery::export_google_tasks),
+        )
+        .route(
+            "/api/integrations/google",
+            get(integrations::status).delete(integrations::disconnect),
+        )
+        .route(
+            "/api/integrations/google/connect",
+            get(integrations::connect),
+        )
+        .route(
+            "/api/integrations/google/callback",
+            get(integrations::callback),
+        )
         .route("/api/tags", get(tags::list))
         .route("/media/{file_name}", get(media::serve))
         .route("/api/export", get(export::export_zip))
