@@ -12,4 +12,5 @@
 - [[Deploying]]
 - [[Architecture]]
 - [[Development]]
+- [[Extending the Backend]]
 - [[Roadmap]]

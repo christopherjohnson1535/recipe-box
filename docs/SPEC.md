@@ -29,6 +29,34 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
   used because their destination is fixed at build time. Server components may call the API directly with the same URL,
   forwarding the session cookie.
 - The API is the only thing that touches the database, the media volume, external websites and the AI provider.
+  Inside it, each of those is behind a port trait (see *Backend: ports and adapters*).
+
+### Backend: ports and adapters (docs/adr/0008)
+The API is a Cargo workspace rooted at `backend/Cargo.toml`. Dependencies point inward only:
+
+```
+adapters/*  →  app  →  ports  →  domain          the server crate (backend/src) depends on all of them and wires them
+```
+
+| Crate (package) | Path | Holds | Must not depend on |
+|---|---|---|---|
+| `recipe-box-domain` (`domain`) | `backend/crates/domain` | Types (`Recipe`, `RecipeDraft`, `User`…), `DomainError`, `Secret`, `validate`, constants (`RESTORE_WINDOW_MINUTES`, `PURGE_AFTER`) | web, database, async runtime, OpenAPI |
+| `recipe-box-ports` (`ports`) | `backend/crates/ports` | Outbound traits: `RecipeRepo`, `ImageRepo`, `UserRepo`, `SessionRepo`, `SettingsRepo`, `TagRepo`, `StorageHealth`, `Clock`, `MediaStore`, `PasswordHasher`, `SessionTokens`, `ImageCodec`, `RecipeExtractor`, `PageFetcher`, `PageReader`, `TaskSpawner`; feature `contract` adds `ports::contract`, the storage contract suite | as `domain`, plus anything an adapter would pull in |
+| `recipe-box-app` (`app`) | `backend/crates/app` | Use-case services built from `Deps` into `Services` (recipes, users, auth, media, imports, maintenance), each holding `Arc<dyn Port>` | `axum`, `sqlx`, `reqwest`, `tokio`, `utoipa`, `hyper`, and `image`/`argon2`/`rand`/`sha2`/`base64` |
+| `recipe-box-adapter-http` (`adapter_http`) | `backend/crates/adapters/http` | Inbound axum adapter: `routes/*`, `extract.rs` (`CurrentUser`, `AdminUser`), `error.rs` (`AppError`), `dto.rs`, OpenAPI | `sqlx`, `reqwest`, `image`, `argon2`, the server crate |
+| `recipe-box-adapter-postgres` (`adapter_postgres`) | `backend/crates/adapters/postgres` | `Pg*` repositories, `migrations/`, `migrate()` | |
+| `recipe-box-adapter-memory` (`adapter_memory`) | `backend/crates/adapters/memory` | In-memory ports for service tests; the contract suite reference | |
+| `recipe-box-adapter-fs-media` (`adapter_fs_media`) | `backend/crates/adapters/fs-media` | `FsMediaStore`: `MediaStore` on a directory | |
+| `recipe-box-adapter-http-fetch` (`adapter_http_fetch`) | `backend/crates/adapters/http-fetch` | `HttpPageFetcher` and `safe_fetch` (SSRF guard) | `app`, the server, other adapters, `axum`, `sqlx` |
+| `recipe-box-adapter-html` (`adapter_html`) | `backend/crates/adapters/html` | `HtmlPageReader`: JSON-LD, microdata, readable text | same as `http-fetch` |
+| `recipe-box-adapter-anthropic` (`adapter_anthropic`) | `backend/crates/adapters/anthropic` | `AnthropicProvider`: `RecipeExtractor` on the Messages API | same as `http-fetch` |
+| `recipe-box-api` | `backend/src` | The server: config, wiring, process start. Still holds the adapters that have no crate of their own: `auth/` (argon2id `PasswordHasher`, `SessionTokens`), `media.rs` (`ImageCodec` on the `image` crate), `plate.rs`, `import/photo.rs` (HEIC via `heif-convert`), `clock.rs`, `import/ai.rs` (picks the extractor) | `reqwest` as a direct dependency |
+
+CI enforces the rule with `cargo tree` (`.github/workflows/ci.yml`, backend job): `domain`, `ports` and `app` may not
+pull in `axum`, `sqlx`, `reqwest`, `tokio`, `utoipa` or `hyper`; `app` also stays free of `image`, `argon2`, `rand`,
+`sha2` and `base64`; `adapter-http` may not reach `sqlx`, `reqwest`, `image`, `argon2` or the server crate; only
+`http-fetch`, `anthropic` and the server crate may have `reqwest` in their tree; the three import adapters may not
+depend on `app`, the server, another adapter, `axum` or `sqlx`.
 
 ## How we write code
 - Ponytail rules: smallest complete change, no speculative options, no new dependency for a few lines, one small
@@ -36,7 +64,7 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
   Never cut: input validation, auth checks, SSRF protection, data-loss safety, accessibility.
 - **Backend (Rust):** stable Rust, edition 2024, `axum` 0.8, `tokio`, `sqlx` 0.9 (Postgres, runtime queries with
   `query_as` + `FromRow`; no compile-time `query!` macros so builds don't need a live DB), migrations in
-  `backend/crates/adapters/postgres/migrations/` run on start. Errors via one `AppError` → JSON `{ "error": { "code", "message" } }`.
+  `backend/crates/adapters/postgres/migrations/` run on start. Services return `DomainError`; `AppError` (in `adapters/http/src/error.rs`) maps it to JSON `{ "error": { "code", "message" } }`.
   `cargo fmt`, `cargo clippy -- -D warnings`, `cargo test` must pass.
 - **Frontend:** Next.js 16 App Router, React 19, TypeScript strict, Tailwind 4, `output: "standalone"`.
   Read `frontend/node_modules/next/dist/docs/` before using an API you're unsure of — this Next version differs
@@ -52,12 +80,27 @@ server, a VPS or a managed container host (images published to GHCR for amd64 + 
 - Secrets only in env vars; AI keys never reach the browser.
 
 ## Dependencies (allowed list)
-- Backend: axum, axum-extra (cookies), tokio, tower-http (trace, limit, cors not needed), sqlx (postgres, uuid,
-  chrono, json, migrate, runtime-tokio, tls-rustls), serde, serde_json, uuid, chrono, argon2, rand, thiserror,
-  anyhow, tracing, tracing-subscriber, reqwest (rustls, stream), scraper, url, image, base64, sha2 (session token
-  hashing), async-trait (async methods in the dyn-compatible port traits, so services can hold `Arc<dyn Port>`). Dev: tokio test, tower (ServiceExt), http-body-util.
-- Frontend: next, react, react-dom, tailwindcss, @fontsource-variable/*, vitest, @testing-library/react, jsdom,
-  eslint-config-next, serwist (PWA, when KIT-4/5 land).
+Backend, per crate (the `Cargo.toml` files and the CI `cargo tree` guard are the source of truth):
+| Crate | Normal dependencies | Dev |
+|---|---|---|
+| `domain` | chrono, thiserror, url, uuid | |
+| `ports` | async-trait, `domain` | |
+| `app` | async-trait, `domain`, `ports` | `adapter-memory`, `ports` (feature `contract`), tokio |
+| `adapter-http` | axum (macros, multipart), axum-extra (cookie), cookie, tower-http (trace), utoipa, serde, serde_json, chrono, uuid, thiserror, anyhow, tracing, `app`, `domain` | `adapter-memory`, `ports` (feature `contract`), tokio, tracing-subscriber, async-trait |
+| `adapter-postgres` | sqlx (the workspace feature set, see `[workspace.dependencies]`), serde, async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
+| `adapter-memory` | async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
+| `adapter-fs-media` | tokio (fs), async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
+| `adapter-http-fetch` | reqwest (rustls, stream, json), tokio (net, time), url, async-trait, `domain`, `ports` | tokio |
+| `adapter-html` | scraper, serde_json, url, tokio, async-trait, `domain`, `ports` | tokio |
+| `adapter-anthropic` | reqwest (rustls, stream, json), image, base64, serde_json, tokio, tracing, anyhow, async-trait, `domain`, `ports` | tokio |
+| `recipe-box-api` (server) | all of the above crates except `adapter-memory`, axum, sqlx, tokio, argon2, rand, sha2, base64, image, chrono, uuid, anyhow, async-trait, tracing, tracing-subscriber | serde_json, url, futures-util, http-body-util, tower (util), testcontainers-modules (postgres) |
+
+Shared versions (`sqlx`, `chrono`, `serde`, `thiserror`, `url`, `uuid`) are pinned once in `[workspace.dependencies]`.
+`domain` re-exports `chrono`, `url` and `uuid`, so ports and adapters name them through it. `async-trait` is there
+because the port traits must be dyn-compatible: services hold `Arc<dyn Port>`.
+
+Frontend: next, react, react-dom, tailwindcss, @fontsource-variable/*, vitest, @testing-library/react, jsdom,
+eslint-config-next, serwist (PWA, when KIT-4/5 land).
 Anything else needs a one-line reason in the agent's report.
 
 ## Configuration (env)
@@ -137,22 +180,39 @@ reviewed draft to `/api/recipes`.
 ## Repository layout and file ownership
 - **Orchestrator**: `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/**`, `.claude/**`, `.github/**`,
   `docker-compose.yml`, `deploy/**`, `.env.example`, `.gitignore`, `scripts/**`.
-- **Backend scaffold (B0)**: `backend/**` (Cargo.toml, src, migrations, tests, Dockerfile, .dockerignore).
-- **Frontend scaffold (F0)**: `frontend/**` (Next app, Dockerfile, .dockerignore).
-- Feature issues later name their owned paths inside these trees (e.g. `backend/src/import/**`).
+- **Backend**: `backend/**` (workspace `Cargo.toml`, `crates/**`, `src/`, `tests/`, `benches/`, Dockerfile).
+- **Frontend**: `frontend/**` (Next app, Dockerfile, .dockerignore).
+- Feature issues name their owned paths inside these trees, by crate (e.g. `backend/crates/app/src/imports.rs`,
+  `backend/crates/adapters/http/src/routes/recipes.rs`).
 
-## Backend module map (B0 creates; features fill in)
+## Backend module map
 ```
-backend/src/main.rs          // config, tracing, pool, migrations, router, purge task, graceful shutdown
-backend/src/config.rs        // Config::from_env()
-backend/src/error.rs         // AppError + IntoResponse
-backend/src/state.rs         // AppState { pool, config, http: reqwest::Client }
-backend/src/auth/{mod,password,session,extract}.rs   // argon2, tokens, CurrentUser / AdminUser extractors
-backend/src/routes/{mod,health,setup,auth,recipes,tags,media,imports,users,export}.rs
-backend/src/import/{mod,safe_fetch,jsonld,ai}.rs      // stubs + trait AiProvider; feature issues fill in
-backend/src/models.rs        // Recipe, RecipeInput, RecipeDraft, Ingredient, Step, User… (serde camelCase)
-backend/tests/api.rs         // integration tests against TEST_DATABASE_URL (skipped when unset)
+backend/Cargo.toml                         // server package recipe-box-api + the workspace member list
+backend/src/main.rs                        // config, tracing, pool, migrations, router, purge task, graceful shutdown
+backend/src/lib.rs                         // module tree, hourly purge, display-rendition backfill
+backend/src/config.rs                      // Config::from_env()
+backend/src/state.rs                       // AppState (also TokioSpawner, the TaskSpawner impl): builds the Pg*/fs/AI adapters, deps() -> app::Deps, services()
+backend/src/routes/{mod,openapi}.rs        // router(): adapter_http routes + HttpState; OpenAPI json
+backend/src/auth/{password,session}.rs     // Argon2Hasher (PasswordHasher), RandomTokens (SessionTokens)
+backend/src/media.rs                       // ImageCrateCodec (ImageCodec)
+backend/src/plate.rs                       // print-style rendition of recipe photos
+backend/src/clock.rs                       // Clock (system or fixed) implementing ports::Clock
+backend/src/import/{ai,photo,safe_fetch}.rs // extractor selection, HEIC converter, FetchPolicy re-export
+backend/src/{models,error}.rs              // re-exports of adapter_http::dto / ::error
+backend/src/bin/openapi.rs                 // prints the OpenAPI spec (just openapi)
+backend/tests/*.rs, tests/common/          // HTTP integration tests against TEST_DATABASE_URL (skipped when unset)
+
+backend/crates/domain/src/{model,error,validate,source,secret}.rs
+backend/crates/ports/src/{lib,repos}.rs    // traits
+backend/crates/ports/src/contract/         // storage contract suite (feature "contract")
+backend/crates/app/src/{auth,imports,maintenance,media,recipes,users}.rs   // services; tests in app/tests/
+backend/crates/adapters/http/src/{routes/*,extract,error,dto}.rs
+backend/crates/adapters/postgres/{src,migrations,tests/contract.rs}
+backend/crates/adapters/memory/{src,tests/contract.rs}
+backend/crates/adapters/fs-media/{src,tests/contract.rs}
+backend/crates/adapters/{http-fetch,html,anthropic}/src
 ```
+Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
 
 ## Feature notes
 - **Link import (LNK):** find `<script type="application/ld+json">`, walk `@graph`/arrays for `@type` containing
@@ -160,9 +220,10 @@ backend/tests/api.rs         // integration tests against TEST_DATABASE_URL (ski
   section), recipeYield, prepTime/cookTime/totalTime (ISO 8601 → minutes), image (string | ImageObject |
   array → first), author, keywords/recipeCategory/recipeCuisine → tags`. Fall back to microdata. Duplicate check by
   normalised `source_url`. Fetch failures with 401/403/429/503 return code `site_blocked` so the UI offers paste-text.
-- **AI (PHO/LNK-3):** `trait AiProvider { async fn recipe_from_images(&self, imgs, mode) -> Result<RecipeDraft>;
-  async fn recipe_from_text(&self, text) -> Result<RecipeDraft>; }` with `NoneProvider` (returns `ai_disabled`)
-  and `AnthropicProvider` (Messages API via reqwest, images resized to ≤ 1568 px long edge, JSON output schema).
+- **AI (PHO/LNK-3):** port `ports::RecipeExtractor` (`extract_images(images, mode)`, `extract_text(text)`, both
+  returning a `RecipeDraft`) with `app::NoneExtractor` (returns `ai_disabled`) and
+  `adapter_anthropic::AnthropicProvider` (Messages API via reqwest, images resized to ≤ 1568 px long edge, JSON
+  output schema). The server picks one in `backend/src/import/ai.rs`.
   Dish mode adds warning "Guessed from a photo of the dish".
 - **Search (FND-2):** `websearch_to_tsquery('simple', q)` on `search` + `ILIKE` fallback on title for short prefixes.
 - **Offline (KIT-5):** serwist service worker; cache app shell + `GET /api/recipes/:id` + images for recipes

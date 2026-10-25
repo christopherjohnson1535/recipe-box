@@ -20,6 +20,9 @@ Built with the software factory process: requirements → plan → build (agent 
 Every issue goes through the whole loop, with the stages done by subagents on a cheaper model (Sonnet) and the main
 session orchestrating. Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
 
+## Extending the backend
+New storage, photo storage or client library? See [[Extending the Backend]].
+
 ## UI work
 Read `docs/UI.md` (the editorial look and the ui components) and `docs/THEMING.md` (the three token layers, how to
 change a colour or add a theme). Pages only arrange `src/components/ui/*` components with layout utilities;
