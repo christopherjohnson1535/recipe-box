@@ -14,6 +14,17 @@ describe("what the worker keeps", () => {
     expect(RECIPE_READ_PAGE.test(`/recipes/${ID}/cook`)).toBe(false);
   });
 
+  it("keeps the grocery list page and GET /api/grocery, and none of its writes or neighbours", () => {
+    expect(RECIPE_PAGE.test("/groceries")).toBe(true);
+    for (const p of ["/groceries/", "/groceries/x", "/groceries?x=1", "/grocery", "/api/grocery"]) expect(RECIPE_PAGE.test(p), p).toBe(false);
+    expect(RECIPE_API.test("/api/grocery")).toBe(true);
+    for (const p of ["/api/grocery/items", `/api/grocery/items/${ID}`, "/api/grocery/recipes", "/api/grocery/clear-checked", "/api/groceries", "/groceries"]) {
+      expect(RECIPE_API.test(p), p).toBe(false);
+    }
+    expect(RECIPE_READ_PAGE.test("/groceries")).toBe(false); // it is not listed among the kept recipes
+    expect(pageKey("https://box.example/groceries?x=1")).toBe("https://box.example/groceries");
+  });
+
   it("keeps one recipe from the API and the media files, not lists or auth", () => {
     expect(RECIPE_API.test(`/api/recipes/${ID}`)).toBe(true);
     for (const p of ["/api/recipes", "/api/auth/me", `/api/recipes/${ID}/restore`]) expect(RECIPE_API.test(p), p).toBe(false);
