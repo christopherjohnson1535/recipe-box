@@ -114,12 +114,7 @@ pub async fn callback(
     };
     let connected = match checked {
         Some(code) => match state.services.google.finish(user.id, code).await {
-            Ok(not_revoked) => {
-                if let Some(e) = not_revoked {
-                    tracing::warn!(error = %e, "the replaced Google token was not revoked");
-                }
-                true
-            }
+            Ok(()) => true,
             Err(e) => {
                 tracing::warn!(error = %e, "could not connect a Google account");
                 false

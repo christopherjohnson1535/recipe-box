@@ -212,8 +212,9 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
     token encrypted (AES-256-GCM or ChaCha20-Poly1305 with `TOKEN_ENCRYPTION_KEY`), clears the cookie and answers
     `302 /settings?google=connected`; any failure (state mismatch, `error=access_denied`, no refresh token, Google
     error) answers `302 /settings?google=error` and stores nothing; every outcome clears the state cookie. A token that
-    does not carry the Tasks scope is not stored. Connecting again replaces the old token, which is revoked at Google
-    (best effort; not when Google hands out the same token again) and keeps the remembered task list.
+    does not carry the Tasks scope is not stored. Connecting again replaces the old token, which is simply
+    discarded, not revoked at Google (Google's revoke ends the app's whole grant for that account, including the new
+    token), and keeps the remembered task list.
     `code` and `state` are not written to the request log (it records the path of a request, not its query string).
   - `DELETE /api/integrations/google` → revokes the token at Google (best effort: a failed revoke is logged and the
     local token is deleted anyway) and forgets the stored task list → `204`. Deleting a user deletes their connection.

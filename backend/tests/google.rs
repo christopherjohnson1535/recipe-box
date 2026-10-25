@@ -445,8 +445,15 @@ async fn connecting_again_replaces_the_token() {
             .unwrap();
     assert_ne!(first, second);
     assert_eq!(at, epoch() + chrono::Duration::days(1));
-    // The token it replaced is revoked at Google, not left alive there.
-    assert_eq!(stub.revoked(), [REFRESH]);
+    // The old token is only discarded: revoking it would end Google's grant, the new token's with it.
+    assert!(stub.revoked().is_empty());
+    // The new token works for a send.
+    on_the_list(&ctx, &["2 apples"]).await;
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert_eq!(stub.lists().len(), 1);
+    assert!(stub.revoked().is_empty());
 }
 
 #[tokio::test]
@@ -654,7 +661,7 @@ async fn a_token_revoked_at_google_is_a_409_and_reconnecting_reuses_the_list() {
         .await
         .assert_error(StatusCode::CONFLICT, "google_not_connected");
 
-    // Reconnect: the dead token has nothing to revoke, and the next send fills the same list.
+    // Reconnect: nothing is revoked, and the next send fills the same list.
     connect(&ctx, &stub, &c, "code-2", "1//stub-refresh-token-2").await;
     assert!(stub.revoked().is_empty());
     assert_eq!(

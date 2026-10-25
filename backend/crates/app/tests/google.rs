@@ -203,7 +203,7 @@ impl World {
     }
 
     async fn connect(&self) {
-        assert!(self.connect_with("good").await.is_none());
+        self.connect_with("good").await;
     }
 
     fn clock_now(&self) -> domain::chrono::DateTime<domain::chrono::Utc> {
@@ -220,8 +220,8 @@ impl World {
     }
 
     /// `finish` with `code`, as the callback does.
-    async fn connect_with(&self, code: &str) -> Option<DomainError> {
-        self.services.google.finish(self.user, code).await.unwrap()
+    async fn connect_with(&self, code: &str) {
+        self.services.google.finish(self.user, code).await.unwrap();
     }
 }
 
@@ -512,19 +512,16 @@ async fn only_one_send_per_member_runs_at_a_time() {
 }
 
 #[tokio::test]
-async fn connecting_again_revokes_the_token_it_replaces() {
+async fn connecting_again_replaces_the_token_without_revoking_it() {
     let w = World::new().await;
     w.connect().await;
-    assert!(
-        w.google.revoked.lock().unwrap().is_empty(),
-        "nothing to replace"
-    );
-    // Google hands out the same token again: it must not be revoked.
+    // Google hands out the same token again.
     w.connect().await;
-    assert!(w.google.revoked.lock().unwrap().is_empty());
 
-    assert!(w.connect_with("good-again").await.is_none());
-    assert_eq!(*w.google.revoked.lock().unwrap(), ["refresh-1"]);
+    // A different token replaces the old one, which is only discarded: Google's revoke would end the whole grant,
+    // the new token with it.
+    w.connect_with("good-again").await;
+    assert!(w.google.revoked.lock().unwrap().is_empty());
     let stored = w
         .store
         .get(w.user)
@@ -534,18 +531,12 @@ async fn connecting_again_revokes_the_token_it_replaces() {
         .sealed_token
         .unwrap();
     assert_eq!(FakeTokenCipher.open(&stored).unwrap().expose(), "refresh-2");
-
-    // A token that was already forgotten has nothing to revoke, and a failing revoke does not undo the connection.
-    w.store.forget_token(w.user).await.unwrap();
-    assert!(w.connect_with("good").await.is_none());
-    assert_eq!(w.google.revoked.lock().unwrap().len(), 1);
-    *w.google.revoke_fails.lock().unwrap() = true;
-    let problem = w.connect_with("good-again").await;
-    assert!(
-        matches!(problem, Some(DomainError::Google(_))),
-        "{problem:?}"
-    );
     assert!(w.services.google.status(w.user).await.unwrap().connected);
+
+    // The new token is the one a send uses.
+    w.services.google.export(w.user, false).await.unwrap();
+    assert_eq!(w.sent()[0].0, "access-for-refresh-2");
+    assert!(w.google.revoked.lock().unwrap().is_empty());
 }
 
 #[tokio::test]

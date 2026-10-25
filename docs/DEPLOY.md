@@ -266,7 +266,8 @@ filled; the message says so, and sending again repairs it.
 
 **Disconnecting.** A member disconnects in the same Settings section: the API revokes the token at Google
 and deletes it (and the remembered task list) from the database, even if Google could not be reached to revoke it.
-Connecting again without disconnecting first also revokes the token it replaces. The
+Connecting again without disconnecting first just replaces the stored token; the old one is not revoked,
+because Google's revoke would also end the new token's grant. The
 `Groceries` list in Google Tasks is left as it is; delete it in the Tasks app if you want it gone. A member can also
 remove Recipe Box under *Google Account > Security > Third-party access*. Deleting a member in Recipe Box deletes
 their connection too. To switch the feature off for everyone, empty the four variables and restart: stored tokens are

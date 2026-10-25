@@ -126,25 +126,15 @@ impl GoogleTasksService {
     }
 
     /// Stores the refresh token the `code` of Google's redirect is worth, sealed, for `user_id`. A token it
-    /// replaces is revoked at Google, best effort: a failure to do so is returned for the caller to log.
-    pub async fn finish(&self, user_id: Uuid, code: &str) -> DomainResult<Option<DomainError>> {
+    /// replaces is only discarded, never revoked: Google's revoke ends the app's whole grant for that Google
+    /// account, which would also end the token just issued.
+    pub async fn finish(&self, user_id: Uuid, code: &str) -> DomainResult<()> {
         self.enabled()?;
         let refresh = self.google.exchange_code(code).await?;
         let sealed = self.cipher.seal(&refresh)?;
-        let old = self
-            .connections
-            .get(user_id)
-            .await?
-            .and_then(|c| c.sealed_token)
-            .and_then(|sealed| self.cipher.open(&sealed).ok());
         self.connections
             .upsert(user_id, sealed, self.clock.now())
-            .await?;
-        // Not when Google handed the same token again: revoking it would end the connection just made.
-        match old.filter(|old| old.expose() != refresh.expose()) {
-            Some(old) => Ok(self.google.revoke(&old).await.err()),
-            None => Ok(None),
-        }
+            .await
     }
 
     /// Revokes the token at Google and forgets the connection. The connection goes even when revoking fails (or
