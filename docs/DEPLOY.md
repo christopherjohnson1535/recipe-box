@@ -69,7 +69,9 @@ tell the sign-in throttle who is calling when a proxy sits in front (see "Proxy 
 **Proxy headers (sign-in throttling, #33).** Wrong passwords are slowed per username and per client address. The API
 uses the TCP peer as the address, and reads `X-Forwarded-For` only when the peer is in `TRUSTED_PROXIES`
 (comma-separated IPs or CIDR networks; Compose defaults to the private Docker ranges, which only the `web` container
-can reach; empty trusts none). From a trusted peer it walks the header from the right and takes the first address that
+can reach; empty trusts none). The Compose default is `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` (also in
+`.env.example`). A visitor whose own address is in those ranges (for example on your home LAN) is treated as a trusted
+hop, so no address is counted for them and only the per-username throttle applies. From a trusted peer it walks the header from the right and takes the first address that
 is not itself trusted. If the peer is trusted but no client can be told (no header, a garbled one, only trusted
 hops), no address is counted and only the per-username throttle applies, so nobody can lock out the household by
 sharing one proxy address.

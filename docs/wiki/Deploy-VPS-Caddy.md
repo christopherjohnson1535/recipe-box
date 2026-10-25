@@ -31,6 +31,7 @@ Use `openssl rand -hex 24` for the password: it goes into `DATABASE_URL` as-is, 
 
 `PUBLIC_HOSTNAME` is required. Left empty, `docker compose --profile https up` stops with "PUBLIC_HOSTNAME is empty".
 `TRUST_PROXY_HEADERS=true` is right here because Caddy's `reverse_proxy` adds the visitor's address to `X-Forwarded-For` and is the only way in (`WEB_BIND=127.0.0.1`); the web container passes on just that last entry, so each visitor is throttled by their own address and a forged `X-Forwarded-For` from a browser is ignored. Leave `TRUSTED_PROXIES` at its default (the private Docker network).
+People behind one home or office NAT share a public IP, so they also share one address bucket.
 `WEB_BIND=127.0.0.1` matters: Docker publishes ports around the host firewall, so a `0.0.0.0` web port would be open
 to the internet without HTTPS.
 
