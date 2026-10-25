@@ -4,6 +4,87 @@
  */
 
 export interface paths {
+    "/api/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where Google sends the browser back. Always clears `rb_oauth` and ends on a page, never on JSON.
+         * @description Signing in: a member gets the session cookie (as the password login does) and lands on `next`; a Google account
+         *     that is no member lands on `/login?error=google_not_member` and nothing is created; any other failure (a wrong
+         *     or old `state`, a refusal from Google, an unverified email, a bad ID token) on `/login?error=google_failed`.
+         *     Linking from Settings (needs the session of the member who started it): `/settings?signin=linked`,
+         *     `/settings?signin=taken` (that Google account belongs to another member) or `/settings?signin=error`.
+         *
+         *     A malformed query (a repeated `code`) counts as an empty one. Callbacks are throttled per client address: after
+         *     repeated failures the address is sent to `/login?error=google_failed` without Google being called, for a while.
+         */
+        get: operations["googleSignInCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Starts signing in with Google. Open it as a page (a browser navigation), not with `fetch`. With `link=1` and a
+         *     session it links a Google account to that member instead; they need not share an email.
+         */
+        get: operations["startGoogleSignIn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Google accounts linked to the signed-in member, oldest first. */
+        get: operations["listIdentities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/identities/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlinks one of your Google accounts. The password keeps working. */
+        delete: operations["deleteIdentity"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -47,6 +128,23 @@ export interface paths {
         };
         /** The signed-in user. */
         get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which sign-in methods besides the password this server offers. The login page shows its Google button from this. */
+        get: operations["getAuthProviders"];
         put?: never;
         post?: never;
         delete?: never;
@@ -528,7 +626,12 @@ export interface paths {
         delete: operations["deleteUser"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Sets or clears a member's email, the address a Google account must have verified to sign in as them. Admin only.
+         *     Replacing or clearing an email that was set also deletes all of the member's linked Google accounts (they were
+         *     matched through the old address); setting a first email, or the same one again, keeps them.
+         */
+        patch: operations["updateUser"];
         trace?: never;
     };
     "/api/users/{id}/password": {
@@ -592,6 +695,11 @@ export interface components {
          * @enum {string}
          */
         AiProvider: "none" | "anthropic";
+        /** @description Which ways to sign in this server offers besides the password. */
+        AuthProviders: {
+            /** @description Sign in with Google is set up (the Google OAuth client is configured). */
+            google: boolean;
+        };
         /**
          * Format: binary
          * @description Raw bytes in a response (an image or a zip).
@@ -604,6 +712,7 @@ export interface components {
         /**
          * @example {
          *       "displayName": "Alex",
+         *       "email": "alex@example.com",
          *       "password": "correct horse battery",
          *       "role": "member",
          *       "username": "alex"
@@ -611,6 +720,8 @@ export interface components {
          */
         CreateUserBody: {
             displayName: string;
+            /** @description The Google address that may sign in as this member (optional; trimmed and lower-cased, blank means none). */
+            email?: string | null;
             password: string;
             /** @enum {string} */
             role: "admin" | "member";
@@ -706,6 +817,17 @@ export interface components {
             db: string;
             status: string;
             version: string;
+        };
+        /** @description A Google account linked to the signed-in member. */
+        Identity: {
+            /** Format: date-time */
+            createdAt: string;
+            /** @description The account's address when it was linked. */
+            email: string;
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            provider: "google";
         };
         Image: {
             /** @description The print-style rendition, whatever the household setting says; null if it could not be made. */
@@ -985,6 +1107,15 @@ export interface components {
             section?: components["schemas"]["GrocerySection"] | null;
             staple?: boolean | null;
         };
+        /**
+         * @example {
+         *       "email": "alex@example.com"
+         *     }
+         */
+        UpdateUserBody: {
+            /** @description The Google address that may sign in as this member; `null` or blank clears it. */
+            email: string | null;
+        };
         /** @description Multipart body of `POST /api/media`. */
         UploadForm: {
             /**
@@ -997,6 +1128,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             displayName: string;
+            /** @description The Google address that may sign in as this member; null when none is set. */
+            email: string | null;
             /** Format: uuid */
             id: string;
             /** @enum {string} */
@@ -1017,6 +1150,193 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    googleSignInCallback: {
+        parameters: {
+            query?: {
+                /** @description Google's authorisation code. */
+                code?: string;
+                /** @description Must equal the `state` sealed in the `rb_oauth` cookie. */
+                state?: string;
+                /** @description Set by Google when the person declined. */
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To `next` (a member signed in; sets `rb_session`), `/login?error=google_not_member`, `/login?error=google_failed`, or, when linking, `/settings?signin=linked`, `/settings?signin=taken` or `/settings?signin=error`. Clears `rb_oauth`. */
+            302: {
+                headers: {
+                    /** @description Where the browser lands. */
+                    Location?: string;
+                    /** @description Clears `rb_oauth`; on sign-in also sets `rb_session`. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Google sign-in is not set up on this server (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    startGoogleSignIn: {
+        parameters: {
+            query?: {
+                /** @description A path on this site to land on after signing in (anything else becomes `/`). */
+                next?: string;
+                /** @description `1` links a Google account to the signed-in member instead of signing in. */
+                link?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To Google (scopes `openid email profile`, PKCE S256, `state`, `nonce`, `prompt=select_account`), setting the `rb_oauth` cookie (httpOnly, SameSite=Lax, 10 minutes, path `/api/auth/google`). With `link=1` and no session: to `/login?next=/settings`, no cookie. */
+            302: {
+                headers: {
+                    /** @description Google's sign-in page, or `/login?next=/settings`. */
+                    Location?: string;
+                    /** @description `rb_oauth`, the sealed record of this sign-in. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Google sign-in is not set up on this server (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    listIdentities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your linked accounts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Identity"][];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    deleteIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Linked account id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlinked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed id (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No such linked account, or it is someone else's (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -1144,6 +1464,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getAuthProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The providers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthProviders"];
                 };
             };
             /** @description Something went wrong on the server (`internal`). */
@@ -3044,7 +3393,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Username taken (`conflict`). */
+            /** @description Username or email taken (`conflict`). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3121,6 +3470,96 @@ export interface operations {
             };
             /** @description No such user (`not_found`). */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserBody"];
+            };
+        };
+        responses: {
+            /** @description The member now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            /** @description Malformed email or id, or no `email` key (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not an admin (`forbidden`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No such user (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Another member has that email (`conflict`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Body over the size limit (`too_large`). */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };

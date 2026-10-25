@@ -19,6 +19,7 @@ const user = (id: string, displayName: string, role: User["role"] = "member"): U
   displayName,
   username: displayName.toLowerCase(),
   role,
+  email: null,
   createdAt: "2026-10-21T10:00:00Z",
 });
 const chris = user("u1", "Chris", "admin");

@@ -29,6 +29,12 @@ export type GoogleStatus = Schemas["GoogleStatus"];
 export type GoogleExport = Schemas["GoogleExport"];
 /** Connecting is a full-page navigation (a link, not a fetch): Google's consent page, then back to /settings?google=connected|error. */
 export const GOOGLE_CONNECT_URL = "/api/integrations/google/connect";
+export type AuthProviders = Schemas["AuthProviders"];
+export type Identity = Schemas["Identity"];
+/** Signing in with Google is a full-page navigation (a link, not a fetch or popup, so it works in the Home Screen app too). */
+export const googleSignInUrl = (next: string) => `/api/auth/google/start?next=${encodeURIComponent(next)}`;
+/** Linking a Google account to the signed-in member; the API sends them back to /settings?signin=linked|taken|error. */
+export const GOOGLE_LINK_URL = "/api/auth/google/start?link=1";
 export type RecipeQuery = { q?: string; tag?: string; sort?: RecipeSort; limit?: number; offset?: number };
 
 /** Dispatched on `window` after every grocery write, so the nav badge (and any other open view) refetches. */
@@ -107,6 +113,9 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, ini
     login: (body: Schemas["LoginBody"]) => request<User>("POST", "/api/auth/login", body),
     logout: () => request<void>("POST", "/api/auth/logout"),
     me: () => get<User>("/api/auth/me"),
+    authProviders: () => get<AuthProviders>("/api/auth/providers"),
+    listIdentities: () => get<Identity[]>("/api/auth/identities"),
+    deleteIdentity: (identityId: string) => request<void>("DELETE", `/api/auth/identities/${id(identityId)}`),
 
     listRecipes: (query: RecipeQuery = {}) => {
       const params = new URLSearchParams();
@@ -141,6 +150,9 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, ini
 
     listUsers: () => get<User[]>("/api/users"),
     createUser: (body: Schemas["CreateUserBody"]) => request<User>("POST", "/api/users", body),
+    /** Sets (or, with null, clears) the Google address that may sign in as this member. Admin only. */
+    updateUserEmail: (userId: string, email: string | null) =>
+      request<User>("PATCH", `/api/users/${id(userId)}`, { email } satisfies Schemas["UpdateUserBody"]),
     deleteUser: (userId: string) => request<void>("DELETE", `/api/users/${id(userId)}`),
     setPassword: (userId: string, password: string, currentPassword?: string) =>
       request<void>("PUT", `/api/users/${id(userId)}/password`, currentPassword === undefined ? { password } : { password, currentPassword }),

@@ -4,7 +4,7 @@ import type { Capabilities, GoogleExport, GoogleStatus, Health, Image, Recipe, R
 
 // Typed against the types api.ts re-exports from the generated OpenAPI types (src/lib/api-types.ts).
 // "*/api/..." matches both the browser's relative URLs and server-side absolute ones.
-export const user: User = { id: "u1", username: "chris", displayName: "Chris", role: "admin", createdAt: "2026-01-01T00:00:00Z" };
+export const user: User = { id: "u1", username: "chris", displayName: "Chris", role: "admin", email: null, createdAt: "2026-01-01T00:00:00Z" };
 export const summary: RecipeSummary = {
   id: "r1", title: "Soup", description: "", totalMinutes: 30, tags: [], imageUrl: null, imageDisplayUrl: null, sourceType: "manual", updatedAt: "2026-01-01T00:00:00Z",
 };
@@ -42,6 +42,11 @@ export const handlers = [
   http.post("*/api/import/url", () => HttpResponse.json(draft)),
   http.post("*/api/import/text", () => HttpResponse.json(draft)),
   http.post("*/api/import/photo", () => HttpResponse.json(draft)),
+  // Sign in with Google is off by default; a test that needs it on overrides these.
+  http.get("*/api/auth/providers", () => HttpResponse.json({ google: false })),
+  http.get("*/api/auth/identities", () => HttpResponse.json([])),
+  http.delete("*/api/auth/identities/:id", () => new HttpResponse(null, { status: 204 })),
+  http.patch("*/api/users/:id", () => HttpResponse.json(user)),
   http.get("*/api/users", () => HttpResponse.json<User[]>([user])),
   http.post("*/api/users", () => HttpResponse.json(user, { status: 201 })),
   http.delete("*/api/users/:id", () => new HttpResponse(null, { status: 204 })),
