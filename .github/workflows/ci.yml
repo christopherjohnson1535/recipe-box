@@ -264,6 +264,29 @@ jobs:
       - if: always()
         run: docker compose -f ../docker-compose.e2e.yml down -v
 
+  sdk-python:
+    # The generated Python client (sdks/python) against the real stack: login, create, search, delete (docs/SDK.md).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: docker compose -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 300
+      - name: Run the smoke test
+        working-directory: sdks/python/tests
+        env:
+          RECIPE_BOX_URL: http://127.0.0.1:3146
+        run: uv run --locked pytest -q
+      - if: failure()
+        run: docker compose -f docker-compose.e2e.yml logs --no-color
+      - if: always()
+        run: docker compose -f docker-compose.e2e.yml down -v
+
   images:
     # Multi-arch images (OPS-3): built on every run so a PR proves arm64 still builds; pushed to GHCR only on main
     # and version tags. The API cross-compiles for arm64 (see backend/Dockerfile), so no QEMU emulation of rustc.

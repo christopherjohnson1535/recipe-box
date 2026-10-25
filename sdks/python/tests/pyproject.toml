@@ -1,0 +1,12 @@
+[project]
+name = "recipe-box-sdk-smoke"
+version = "0.0.0"
+description = "Smoke test for the generated Python client, run against a live Recipe Box API"
+requires-python = ">=3.11"
+dependencies = ["recipe-box-client", "pytest==8.4.2"]
+
+[tool.uv.sources]
+recipe-box-client = { path = "../recipe-box-client" }
+
+[tool.uv]
+package = false

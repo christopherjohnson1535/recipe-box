@@ -20,6 +20,20 @@ use crate::extract::COOKIE_NAME;
     info(
         title = "Recipe Box API",
         description = "Conventions, error codes and limits: docs/API.md. Every non-2xx response is an `ErrorBody`.",
+        license(name = "MIT", identifier = "MIT"),
+    ),
+    servers((url = "/", description = "Same origin: the web container proxies /api and /media to the API.")),
+    tags(
+        (name = "auth", description = "Sign in, sign out and the current user."),
+        (name = "export", description = "Download or restore the whole recipe box as a ZIP."),
+        (name = "health", description = "Liveness and database check."),
+        (name = "import", description = "Turn links, text and photos into recipe drafts; nothing is saved."),
+        (name = "media", description = "Upload and serve recipe images."),
+        (name = "recipes", description = "Create, search, edit, delete and restore recipes."),
+        (name = "settings", description = "Household settings."),
+        (name = "setup", description = "First-run setup: create the first admin."),
+        (name = "tags", description = "Tags in use across recipes."),
+        (name = "users", description = "Household members. Admin only."),
     ),
     paths(
         health::health,
@@ -54,7 +68,8 @@ use crate::extract::COOKIE_NAME;
 )]
 struct ApiDoc;
 
-/// The `rb_session` cookie, referenced by every operation that needs a signed-in user.
+/// The `rb_session` cookie, referenced by every operation that needs a signed-in user. Public operations carry an
+/// explicit empty `security` list.
 struct Session;
 
 impl Modify for Session {
@@ -70,7 +85,7 @@ impl Modify for Session {
 }
 
 /// Errors any operation can produce, added unless the operation describes its own: 401 where a session is
-/// required, 413 where there is a body, 500 everywhere.
+/// required (a non-empty `security`), 413 where there is a body, 500 everywhere.
 struct CommonErrors;
 
 impl Modify for CommonErrors {
@@ -84,7 +99,7 @@ impl Modify for CommonErrors {
             ]
         });
         for op in ops.flatten() {
-            if op.security.is_some() {
+            if requires_session(op) {
                 add_error(op, "401", "No or expired session (`unauthenticated`).");
             }
             if op.request_body.is_some() {
@@ -125,6 +140,16 @@ impl Modify for ExtensibleErrorCode {
             None => note.to_string(),
         });
     }
+}
+
+/// `security(())` serializes as one empty requirement (`[{}]`), which means "no auth"; only a requirement naming a
+/// scheme needs a session. utoipa cannot emit `[]`; `[{}]` (auth optional) and `[]` both mean no session here.
+fn requires_session(op: &Operation) -> bool {
+    let reqs = serde_json::to_value(&op.security).expect("security serializes");
+    reqs.as_array().is_some_and(|a| {
+        a.iter()
+            .any(|r| r.as_object().is_some_and(|o| !o.is_empty()))
+    })
 }
 
 fn add_error(op: &mut Operation, status: &str, description: &str) {

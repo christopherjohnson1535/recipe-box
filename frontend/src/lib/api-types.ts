@@ -394,6 +394,14 @@ export interface components {
             ai: boolean;
             provider: components["schemas"]["AiProvider"];
         };
+        /**
+         * @example {
+         *       "displayName": "Alex",
+         *       "password": "correct horse battery",
+         *       "role": "member",
+         *       "username": "alex"
+         *     }
+         */
         CreateUserBody: {
             displayName: string;
             password: string;
@@ -447,10 +455,21 @@ export interface components {
             /** Format: int64 */
             skipped: number;
         };
+        /**
+         * @example {
+         *       "sourceUrl": "https://example.com/recipes/pancakes",
+         *       "text": "Pancakes\n2 cups flour\n2 eggs\nMix and fry."
+         *     }
+         */
         ImportTextBody: {
             sourceUrl?: string | null;
             text: string;
         };
+        /**
+         * @example {
+         *       "url": "https://example.com/recipes/pancakes"
+         *     }
+         */
         ImportUrlBody: {
             url: string;
         };
@@ -458,6 +477,12 @@ export interface components {
             section: string | null;
             text: string;
         };
+        /**
+         * @example {
+         *       "password": "correct horse battery",
+         *       "username": "sam"
+         *     }
+         */
         LoginBody: {
             password: string;
             username: string;
@@ -532,6 +557,45 @@ export interface components {
             totalMinutes: number | null;
             warnings: string[];
         };
+        /**
+         * @example {
+         *       "cookMinutes": 15,
+         *       "description": "Fluffy weekend pancakes.",
+         *       "imageId": null,
+         *       "ingredients": [
+         *         {
+         *           "section": null,
+         *           "text": "2 cups flour"
+         *         },
+         *         {
+         *           "section": null,
+         *           "text": "2 eggs"
+         *         }
+         *       ],
+         *       "notes": "",
+         *       "photoImageIds": [],
+         *       "prepMinutes": 10,
+         *       "servings": "4",
+         *       "sourceName": null,
+         *       "sourceType": "manual",
+         *       "sourceUrl": null,
+         *       "steps": [
+         *         {
+         *           "section": null,
+         *           "text": "Mix the batter."
+         *         },
+         *         {
+         *           "section": null,
+         *           "text": "Fry until golden."
+         *         }
+         *       ],
+         *       "tags": [
+         *         "breakfast"
+         *       ],
+         *       "title": "Pancakes",
+         *       "totalMinutes": 25
+         *     }
+         */
         RecipeInput: {
             /**
              * Format: int32
@@ -609,6 +673,13 @@ export interface components {
             /** @description Show recipe photos with the print treatment (`imageDisplayUrl`); the originals are always kept. */
             plateTreatment: boolean;
         };
+        /**
+         * @example {
+         *       "displayName": "Sam",
+         *       "password": "correct horse battery",
+         *       "username": "sam"
+         *     }
+         */
         SetupBody: {
             displayName: string;
             password: string;

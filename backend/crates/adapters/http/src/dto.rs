@@ -28,6 +28,23 @@ pub enum SourceType {
 
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", default)]
+#[schema(example = json!({
+    "title": "Pancakes",
+    "description": "Fluffy weekend pancakes.",
+    "ingredients": [{"text": "2 cups flour", "section": null}, {"text": "2 eggs", "section": null}],
+    "steps": [{"text": "Mix the batter.", "section": null}, {"text": "Fry until golden.", "section": null}],
+    "servings": "4",
+    "prepMinutes": 10,
+    "cookMinutes": 15,
+    "totalMinutes": 25,
+    "notes": "",
+    "sourceUrl": null,
+    "sourceName": null,
+    "sourceType": "manual",
+    "imageId": null,
+    "photoImageIds": [],
+    "tags": ["breakfast"]
+}))]
 pub struct RecipeInput {
     #[schema(required = true)]
     pub title: String,

@@ -51,6 +51,7 @@ pub async fn capabilities(
 }
 
 #[derive(Deserialize, ToSchema)]
+#[schema(example = json!({"url": "https://example.com/recipes/pancakes"}))]
 pub struct ImportUrlBody {
     url: String,
 }
@@ -100,6 +101,7 @@ fn log(notes: &ImportNotes) {
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(example = json!({"text": "Pancakes\n2 cups flour\n2 eggs\nMix and fry.", "sourceUrl": "https://example.com/recipes/pancakes"}))]
 pub struct ImportTextBody {
     text: String,
     source_url: Option<String>,

@@ -1,0 +1,10 @@
+extends:
+  - recommended
+rules:
+  # New routes must keep a stable operationId: SDK generators name methods after it.
+  operation-operationId: error
+  # health, getSetupStatus and logout have no client error to describe.
+  operation-4xx-response: off
+apis:
+  main:
+    root: docs/openapi.json

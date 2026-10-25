@@ -5,7 +5,7 @@ error responses and the `rb_session` cookie scheme. It is generated from the Rus
 (`cd backend && cargo run --bin openapi > ../docs/openapi.json`), and `frontend/src/lib/api-types.ts` is generated
 from it (`cd frontend && npm run api:types`). CI fails when either is stale, and when a PR breaks the API relative to
 `main` unless it carries the `breaking-api` label. This file keeps what the spec cannot say: conventions, the error
-table, limits and behaviour.
+table, limits and behaviour. To build a client in another language, see [SDK.md](SDK.md).
 
 Base path: `/api` (the browser reaches it through the frontend origin; Next.js rewrites to the API container).
 JSON uses **camelCase**. Times are RFC 3339 strings. IDs are UUIDs.
@@ -44,6 +44,15 @@ refused with the usual 401 "Wrong username or password."; elsewhere 400); recipe
 characters, `notes` 20,000, each ingredient/step line 2,000, at most 500 ingredients, 500 steps and 50 tags
 (400 `validation`, message starts with the field name). `POST /api/auth/logout` always returns 204 and clears the cookie,
 even with no or an expired session.
+
+## Clients outside the browser
+
+Scripts and SDKs use the same session cookie as the web app; there are no bearer tokens or API keys yet.
+
+1. `POST /api/auth/login` with `{"username", "password"}`.
+2. Keep the `rb_session` cookie from the `Set-Cookie` response header and send it back on every later request (any
+   cookie jar does this).
+3. With `COOKIE_SECURE=true` the cookie is `Secure`, so it is only sent over HTTPS.
 
 ## Behaviour the spec does not spell out
 

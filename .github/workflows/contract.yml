@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   contract:
-    # The API spec (docs/openapi.json) and the frontend types generated from it must match the code, and a PR
+    # The API spec (docs/openapi.json) and the frontend types and Python client generated from it must match the code, and a PR
     # may not break the API unless it carries the `breaking-api` label.
     runs-on: ubuntu-latest
     permissions:
@@ -40,13 +40,20 @@ jobs:
         with:
           go-version: 1.26.x # oasdiff v1.34.1 declares go 1.26.0
           cache: false
-      - name: Regenerate the spec and the frontend types
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Regenerate the spec, the frontend types and the Python client
         run: |
           cargo run --manifest-path backend/Cargo.toml --bin openapi > docs/openapi.json
           npm ci --prefix frontend
           npm run --prefix frontend api:types
+          # Keep this command in step with `just sdk-python`.
+          uvx --from openapi-python-client==0.29.1 --with ruff==0.17.2 openapi-python-client generate --path docs/openapi.json --config sdks/python/config.yml --output-path sdks/python/recipe-box-client --meta uv --overwrite
+          rm -rf sdks/python/recipe-box-client/.ruff_cache
+          (cd sdks/python/tests && uv lock)
       - name: Fail on drift
-        run: git diff --exit-code -- docs/openapi.json frontend/src/lib/api-types.ts
+        run: git diff --exit-code -- docs/openapi.json frontend/src/lib/api-types.ts sdks/python
+      - name: Lint the spec
+        run: npx --yes @redocly/cli@2.71.0 lint docs/openapi.json
       - name: Fail on breaking changes
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'breaking-api')
         run: |

@@ -1,0 +1,6 @@
+project_name_override: recipe-box-client
+package_name_override: recipe_box_client
+# exportAll (application/zip) and getMedia (image/jpeg) are dropped by the generator without this.
+content_type_overrides:
+  application/zip: application/octet-stream
+  image/jpeg: application/octet-stream

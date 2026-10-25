@@ -4,10 +4,17 @@
     "title": "Recipe Box API",
     "description": "Conventions, error codes and limits: docs/API.md. Every non-2xx response is an `ErrorBody`.",
     "license": {
-      "name": ""
+      "name": "MIT",
+      "identifier": "MIT"
     },
     "version": "0.1.0"
   },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Same origin: the web container proxies /api and /media to the API."
+    }
+  ],
   "paths": {
     "/api/auth/login": {
       "post": {
@@ -85,7 +92,10 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {}
+        ]
       }
     },
     "/api/auth/logout": {
@@ -117,7 +127,10 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {}
+        ]
       }
     },
     "/api/auth/me": {
@@ -270,7 +283,10 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {}
+        ]
       }
     },
     "/api/import/capabilities": {
@@ -1470,7 +1486,10 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {}
+        ]
       },
       "post": {
         "tags": [
@@ -1547,7 +1566,10 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {}
+        ]
       }
     },
     "/api/tags": {
@@ -2067,6 +2089,12 @@
           "username": {
             "type": "string"
           }
+        },
+        "example": {
+          "displayName": "Alex",
+          "password": "correct horse battery",
+          "role": "member",
+          "username": "alex"
         }
       },
       "ErrorBody": {
@@ -2229,6 +2257,10 @@
           "text": {
             "type": "string"
           }
+        },
+        "example": {
+          "sourceUrl": "https://example.com/recipes/pancakes",
+          "text": "Pancakes\n2 cups flour\n2 eggs\nMix and fry."
         }
       },
       "ImportUrlBody": {
@@ -2240,6 +2272,9 @@
           "url": {
             "type": "string"
           }
+        },
+        "example": {
+          "url": "https://example.com/recipes/pancakes"
         }
       },
       "Ingredient": {
@@ -2273,6 +2308,10 @@
           "username": {
             "type": "string"
           }
+        },
+        "example": {
+          "password": "correct horse battery",
+          "username": "sam"
         }
       },
       "PhotoForm": {
@@ -2700,6 +2739,43 @@
             "format": "int32",
             "default": null
           }
+        },
+        "example": {
+          "cookMinutes": 15,
+          "description": "Fluffy weekend pancakes.",
+          "imageId": null,
+          "ingredients": [
+            {
+              "section": null,
+              "text": "2 cups flour"
+            },
+            {
+              "section": null,
+              "text": "2 eggs"
+            }
+          ],
+          "notes": "",
+          "photoImageIds": [],
+          "prepMinutes": 10,
+          "servings": "4",
+          "sourceName": null,
+          "sourceType": "manual",
+          "sourceUrl": null,
+          "steps": [
+            {
+              "section": null,
+              "text": "Mix the batter."
+            },
+            {
+              "section": null,
+              "text": "Fry until golden."
+            }
+          ],
+          "tags": [
+            "breakfast"
+          ],
+          "title": "Pancakes",
+          "totalMinutes": 25
         }
       },
       "RecipePage": {
@@ -2836,6 +2912,11 @@
           "username": {
             "type": "string"
           }
+        },
+        "example": {
+          "displayName": "Sam",
+          "password": "correct horse battery",
+          "username": "sam"
         }
       },
       "SetupStatus": {
@@ -2946,5 +3027,47 @@
         "description": "httpOnly session cookie set by login and setup."
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Sign in, sign out and the current user."
+    },
+    {
+      "name": "export",
+      "description": "Download or restore the whole recipe box as a ZIP."
+    },
+    {
+      "name": "health",
+      "description": "Liveness and database check."
+    },
+    {
+      "name": "import",
+      "description": "Turn links, text and photos into recipe drafts; nothing is saved."
+    },
+    {
+      "name": "media",
+      "description": "Upload and serve recipe images."
+    },
+    {
+      "name": "recipes",
+      "description": "Create, search, edit, delete and restore recipes."
+    },
+    {
+      "name": "settings",
+      "description": "Household settings."
+    },
+    {
+      "name": "setup",
+      "description": "First-run setup: create the first admin."
+    },
+    {
+      "name": "tags",
+      "description": "Tags in use across recipes."
+    },
+    {
+      "name": "users",
+      "description": "Household members. Admin only."
+    }
+  ]
 }
