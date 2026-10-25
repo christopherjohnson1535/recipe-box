@@ -138,7 +138,7 @@ Anything else needs a one-line reason in the agent's report.
 - `tags(id serial pk, name citext unique)`, `recipe_tags(recipe_id fk cascade, tag_id fk cascade, pk both)`.
 - `recipe_photos(recipe_id fk cascade, image_id fk, position int)` — original import photos (PHO-7).
 - Groceries (`0003_grocery.sql`, GRO): `grocery_list(id uuid pk, created_at, updated_at)` (one row: the household's
-  active list), `grocery_list_recipe(list_id fk cascade, recipe_id fk recipes cascade, scale real, added_at, pk both)`,
+  active list), `grocery_list_recipe(list_id fk cascade, recipe_id fk recipes cascade, scale double precision, added_at, pk both)`,
   `grocery_item(id uuid pk, list_id fk cascade, key text, name text, amounts jsonb, section text, checked bool,
   cleared bool, manual bool, recipe_ids uuid[])` (`key` is the merge key of a generated item, unique per list among
   generated items), `grocery_section_override(key text pk, section text)`, `grocery_staple(key text pk)`.
