@@ -5,13 +5,16 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use domain::{
-    DomainError, DomainResult, Secret,
+    DomainError, DomainResult, Secret, SignInFlow,
     chrono::{DateTime, Duration, Utc},
     grocery::{Section, item_title},
     url::Url,
     uuid::Uuid,
 };
-use ports::{Clock, GoogleConnectionRepo, GoogleTasks, SessionTokens, TaskSection, TokenCipher};
+use ports::{
+    Clock, FlowSealer, GoogleAccount, GoogleConnectionRepo, GoogleSignIn, GoogleTasks,
+    SessionTokens, TaskSection, TokenCipher,
+};
 
 use crate::{Deps, GroceryService};
 
@@ -52,6 +55,34 @@ impl GoogleTasks for DisabledGoogleTasks {
     }
 
     async fn fill_list(&self, _: &Secret, _: &str, _: &[TaskSection]) -> DomainResult<()> {
+        Err(DomainError::GoogleDisabled)
+    }
+}
+
+/// `GoogleSignIn` and `FlowSealer` for a server without a Google OAuth client.
+pub struct DisabledGoogleSignIn;
+
+#[async_trait]
+impl GoogleSignIn for DisabledGoogleSignIn {
+    fn configured(&self) -> bool {
+        false
+    }
+
+    fn authorize_url(&self, _: &str, _: &str, _: &str) -> DomainResult<Url> {
+        Err(DomainError::GoogleDisabled)
+    }
+
+    async fn account(&self, _: &str, _: &str, _: &Secret) -> DomainResult<GoogleAccount> {
+        Err(DomainError::GoogleDisabled)
+    }
+}
+
+impl FlowSealer for DisabledGoogleSignIn {
+    fn seal(&self, _: &SignInFlow) -> DomainResult<String> {
+        Err(DomainError::GoogleDisabled)
+    }
+
+    fn open(&self, _: &str) -> DomainResult<SignInFlow> {
         Err(DomainError::GoogleDisabled)
     }
 }

@@ -10,6 +10,7 @@
 
 pub mod anthropic;
 pub mod google;
+pub mod idp;
 
 use std::{
     path::PathBuf,
@@ -119,6 +120,8 @@ pub struct Res {
     pub status: StatusCode,
     /// The first `Set-Cookie` header, whole.
     pub cookie: Option<String>,
+    /// Every `Set-Cookie` header, whole, in the order sent.
+    pub cookies: Vec<String>,
     pub content_type: Option<String>,
     /// The `Retry-After` header, whole.
     pub retry_after: Option<String>,
@@ -133,6 +136,14 @@ impl Res {
     /// The API error code (`{"error":{"code":..}}`), or "".
     pub fn code(&self) -> &str {
         self.json["error"]["code"].as_str().unwrap_or("")
+    }
+
+    /// The whole `Set-Cookie` header for the cookie `name` (`rb_session`), if the response set one.
+    pub fn cookie_named(&self, name: &str) -> Option<&str> {
+        self.cookies
+            .iter()
+            .map(String::as_str)
+            .find(|c| c.starts_with(&format!("{name}=")))
     }
 
     /// The `rb_session=...` pair from a login/setup response; asserts the cookie flags.
@@ -297,6 +308,12 @@ impl TestApp {
                 .map(|v| v.to_str().unwrap().to_string())
         };
         let cookie = header_of(header::SET_COOKIE);
+        let cookies = res
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .map(|v| v.to_str().unwrap().to_string())
+            .collect();
         let content_type = header_of(header::CONTENT_TYPE);
         let retry_after = header_of(header::RETRY_AFTER);
         let location = header_of(header::LOCATION);
@@ -305,6 +322,7 @@ impl TestApp {
         Res {
             status,
             cookie,
+            cookies,
             content_type,
             retry_after,
             location,
@@ -508,6 +526,7 @@ pub struct UserBuilder {
     display_name: String,
     password: String,
     role: &'static str,
+    email: Option<String>,
 }
 
 /// A member named `member` with `MEMBER_PASSWORD`; chain `.named("x")`, `.admin()`, `.password("..")`.
@@ -517,6 +536,7 @@ pub fn a_user() -> UserBuilder {
         display_name: "MEMBER".into(),
         password: MEMBER_PASSWORD.into(),
         role: "member",
+        email: None,
     }
 }
 
@@ -537,13 +557,23 @@ impl UserBuilder {
         self
     }
 
+    /// The Google address that may sign in as this member.
+    pub fn email(mut self, email: &str) -> Self {
+        self.email = Some(email.into());
+        self
+    }
+
     pub fn json(&self) -> Value {
-        json!({
+        let mut body = json!({
             "username": self.username,
             "displayName": self.display_name,
             "password": self.password,
             "role": self.role,
-        })
+        });
+        if let Some(email) = &self.email {
+            body["email"] = json!(email);
+        }
+        body
     }
 }
 

@@ -47,6 +47,8 @@ uuid = { workspace = true, features = ["serde"] }
 zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 
 [dev-dependencies]
+# Mints the fake identity provider's ID tokens (tests/common/idp.rs).
+jsonwebtoken = { version = "10.4", default-features = false, features = ["aws_lc_rs"] }
 url.workspace = true
 futures-util = "0.3"
 http-body-util = "0.1"
