@@ -63,8 +63,8 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   expect(sections.indexOf("Produce")).toBeLessThan(sections.indexOf("Meat"));
   expect(sections.indexOf("Meat")).toBeLessThan(sections.indexOf("Pantry"));
   const produce = page.getByRole("region", { name: "Produce" });
-  // 4 (2 onions at 2×) + 1 = 5; the API names it in the singular (docs/API.md, "How items are made").
-  const onions = produce.getByRole("button", { name: /^5 onion$/ });
+  // 4 (2 onions at 2×) + 1 = 5; a count with no unit is plural over 1 (docs/API.md, "How items are made").
+  const onions = produce.getByRole("button", { name: /^5 onions$/ });
   await expect(onions).toBeVisible();
   await expect(tick(page.getByRole("region", { name: "Meat" }), "ground beef")).toBeVisible();
 
@@ -100,7 +100,7 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   // Reload: the server has all of it.
   await page.reload();
   await expect(tick(page.getByRole("region", { name: "Freezer" }), "ground beef")).toBeVisible();
-  await expect(tick(page, "onion")).toHaveCount(0);
+  await expect(tick(page, "onions")).toHaveCount(0);
   await expect(tick(page, "dish soap")).toHaveCount(0);
   await expect(tick(page, "olive oil")).toBeVisible();
   await expect(page.getByRole("link", { name: `Stew ${word}` })).toBeVisible();

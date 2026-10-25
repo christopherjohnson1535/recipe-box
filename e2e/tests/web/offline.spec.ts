@@ -66,6 +66,16 @@ async function goOnline(context: BrowserContext) {
 const keptCount = (page: Page, prefix = "rb-") =>
   page.evaluate(async (prefix) => (await caches.keys()).filter((n) => n.startsWith(prefix)).length, prefix);
 
+/** The paths in the caches whose name starts with `prefix`. */
+const keptUrls = (page: Page, prefix: string) =>
+  page.evaluate(async (prefix) => {
+    const urls: string[] = [];
+    for (const name of (await caches.keys()).filter((n) => n.startsWith(prefix))) {
+      for (const req of await (await caches.open(name)).keys()) urls.push(new URL(req.url).pathname);
+    }
+    return urls;
+  }, prefix);
+
 /**
  * Nothing kept, and it stays that way: a first zero can be the moment between a wipe and a fetch that started before
  * it storing its page. Each further read comes after a round trip through the worker, so late writes have had their turn.
@@ -163,7 +173,9 @@ test("a second member signing in on the same browser sees none of the first one'
   await expect(page).not.toHaveURL(/\/login/);
   // Recipes are shared by the household, so the second member's own home page may keep photos; the first one's pages must be gone.
   await expectWiped(page, "rb-pages");
-  await expectWiped(page, "rb-api");
+  // The second member's own masthead reads the shared grocery list, which the worker keeps (docs/API.md); the first
+  // member's recipe must not be among what is kept.
+  await expect.poll(() => keptUrls(page, "rb-api"), { message: "the worker still keeps the first member's recipe" }).not.toContain(`/api/recipes/${recipe.id}`);
 
   await goOffline(context, page);
   await page.goto(`/recipes/${recipe.id}`);
