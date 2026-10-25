@@ -69,6 +69,7 @@ set -eu
 t=$(mktemp)
 trap 'rm -f "$t" "$t.body"' EXIT
 cat >"$t" <<'SQL'
+SET client_min_messages = warning;
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public AUTHORIZATION CURRENT_USER;
 COMMENT ON SCHEMA public IS 'standard public schema';
