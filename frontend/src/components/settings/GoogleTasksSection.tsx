@@ -101,7 +101,7 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
               Connect Google Tasks
             </HardLink>
           </div>
-          <Text variant="small">This takes you to Google’s consent page, then back here. You only do it once.</Text>
+          <Text variant="small">This takes you to Google’s consent page, then back here.</Text>
         </>
       )}
     </section>

@@ -106,7 +106,7 @@ export function SendList({
         </>
       }
     >
-      {google?.configured && !google.connected && <Text variant="small">Connect Google Tasks takes you to Google’s consent page, then back to Settings. You do it once.</Text>}
+      {google?.configured && !google.connected && <Text variant="small">Connect Google Tasks takes you to Google’s consent page, then back to Settings.</Text>}
       <div role="status">{message?.tone === "info" && <Text variant="small">{message.text}</Text>}</div>
       {message?.tone === "error" && <Alert tone="error">{message.text}</Alert>}
     </SendArea>
