@@ -8,8 +8,10 @@ Full guide: [`docs/DEPLOY.md`](https://github.com/christopherjohnson1535/recipe-
 | Small VPS | ~$5/mo | `docker compose --profile https up -d` with `PUBLIC_HOSTNAME` |
 | Managed container host | varies | provided by the host |
 
-Prebuilt images: `ghcr.io/christopherjohnson1535/recipe-box-api` and `recipe-box-web` (amd64 + arm64).
-Use them with `docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d`.
+Prebuilt images: `ghcr.io/christopherjohnson1535/recipe-box-api` and `recipe-box-web` (amd64 + arm64, public, no
+login). Use them with `docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d`. Pin a release with
+`IMAGE_TAG=v0.1.0` in `.env` (default `latest` = newest `main` build); a Raspberry Pi needs a 64-bit OS. Tags and the
+release steps: `docs/DEPLOY.md`.
 
 Why HTTPS matters: iPad Home Screen install, offline, the camera and keep-screen-awake only work on secure origins.
 

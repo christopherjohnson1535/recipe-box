@@ -290,8 +290,9 @@ jobs:
   images:
     # Multi-arch images (OPS-3): built on every run so a PR proves arm64 still builds; pushed to GHCR only on main
     # and version tags. The API cross-compiles for arm64 (see backend/Dockerfile), so no QEMU emulation of rustc.
+    # Waits for the compose and e2e jobs so a version tag only ever publishes images that passed the full suite.
     runs-on: ubuntu-latest
-    needs: [compose]
+    needs: [compose, e2e]
     permissions:
       contents: read
       packages: write
@@ -318,12 +319,17 @@ jobs:
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
           images: ghcr.io/${{ github.repository_owner }}/recipe-box-${{ matrix.name }}
+          # latest comes only from the explicit main rule below; a v* tag must not move it.
+          flavor: |
+            latest=false
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      - id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: ${{ matrix.context }}
           platforms: linux/amd64,linux/arm64
@@ -332,3 +338,57 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Both platforms published
+        if: github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/recipe-box-${{ matrix.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" | tee manifest.txt
+          grep -q 'linux/amd64' manifest.txt
+          grep -q 'linux/arm64' manifest.txt
+
+  release:
+    # Version tags only (docs/DEPLOY.md "Cutting a release"): checks that both images pull without credentials on
+    # both platforms, then creates the GitHub release with notes generated from merged PRs (.github/release.yml).
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [images]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Tagged commit is on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "::error::$GITHUB_SHA is not on main; release tags must point at a commit merged to main."
+            exit 1
+          fi
+      - name: Images pull anonymously (amd64 + arm64)
+        env:
+          OWNER: ${{ github.repository_owner }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # This job never logs in to GHCR, so a private package fails here: make both packages public first.
+          for name in api web; do
+            for arch in amd64 arm64; do
+              docker pull --quiet --platform "linux/$arch" "ghcr.io/$OWNER/recipe-box-$name:$TAG"
+            done
+          done
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Re-running the job for a tag that already has a release must not fail.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists; leaving it unchanged."
+            exit 0
+          fi
+          # A tag with a suffix (v0.2.0-rc.1) is a prerelease: marked as such and never shown as "Latest".
+          case "$TAG" in *-*) pre=--prerelease ;; *) pre= ;; esac
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$TAG" $pre
