@@ -97,7 +97,8 @@ def sync_detailed(
 ) -> Response[ErrorBody | GoogleExport]:
     """Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store
     section, the
-    items as subtasks. The list is emptied first, so sending again never duplicates.
+    items as subtasks. The list is emptied first, so sending again never duplicates. One send per member
+    at a time.
 
     Args:
         body (GoogleExportRequest):
@@ -128,7 +129,8 @@ def sync(
 ) -> ErrorBody | GoogleExport | None:
     """Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store
     section, the
-    items as subtasks. The list is emptied first, so sending again never duplicates.
+    items as subtasks. The list is emptied first, so sending again never duplicates. One send per member
+    at a time.
 
     Args:
         body (GoogleExportRequest):
@@ -154,7 +156,8 @@ async def asyncio_detailed(
 ) -> Response[ErrorBody | GoogleExport]:
     """Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store
     section, the
-    items as subtasks. The list is emptied first, so sending again never duplicates.
+    items as subtasks. The list is emptied first, so sending again never duplicates. One send per member
+    at a time.
 
     Args:
         body (GoogleExportRequest):
@@ -183,7 +186,8 @@ async def asyncio(
 ) -> ErrorBody | GoogleExport | None:
     """Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store
     section, the
-    items as subtasks. The list is emptied first, so sending again never duplicates.
+    items as subtasks. The list is emptied first, so sending again never duplicates. One send per member
+    at a time.
 
     Args:
         body (GoogleExportRequest):

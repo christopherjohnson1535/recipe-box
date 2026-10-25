@@ -5,8 +5,8 @@ rules:
   operation-operationId: error
   # health, getSetupStatus and logout have no client error to describe.
   operation-4xx-response: off
-  # The Google connect and callback routes only redirect (302), by design.
-  operation-2xx-response: off
+  # operation-2xx-response stays on; the two Google redirect routes (302 only, by design) are exempted one by one in
+  # .redocly.lint-ignore.yaml.
 apis:
   main:
     root: docs/openapi.json

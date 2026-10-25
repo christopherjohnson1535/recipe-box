@@ -1,0 +1,6 @@
+# This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
+# See https://redocly.com/docs/cli/ for more information.
+docs/openapi.json:
+  operation-2xx-response:
+    - '#/paths/~1api~1integrations~1google~1callback/get/responses'
+    - '#/paths/~1api~1integrations~1google~1connect/get/responses'

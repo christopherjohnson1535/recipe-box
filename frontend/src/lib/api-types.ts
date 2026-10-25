@@ -122,7 +122,7 @@ export interface paths {
         put?: never;
         /**
          * Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store section, the
-         *     items as subtasks. The list is emptied first, so sending again never duplicates.
+         *     items as subtasks. The list is emptied first, so sending again never duplicates. One send per member at a time.
          */
         post: operations["exportGroceryToGoogleTasks"];
         delete?: never;
@@ -1355,7 +1355,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description No Google account connected, or Google no longer accepts the connection, which is then forgotten (`google_not_connected`). */
+            /** @description No Google account connected, or Google no longer accepts the connection (`google_not_connected`; the token is then forgotten, the task list is remembered), or a send for this member is already running (`conflict`). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1391,7 +1391,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Google failed: timeout, 5xx or an unreadable reply (`google_error`). */
+            /** @description Google failed: timeout, 5xx, a refusal or an unreadable reply (`google_error`). The list in Google Tasks may be partly filled; sending again starts over. */
             502: {
                 headers: {
                     [name: string]: unknown;
