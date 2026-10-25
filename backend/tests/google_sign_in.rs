@@ -86,6 +86,21 @@ async fn trip(
     back(ctx, &format!("code={code}&state={}", s.state()), &[&s.flow]).await
 }
 
+/// `back` as a request that came over TCP from `peer` (`"203.0.113.9:4000"`), so the address can be throttled.
+async fn back_from(ctx: &TestApp, peer: &str, query: &str, cookies: &[&str]) -> Res {
+    let mut req = axum::http::Request::builder()
+        .method(Method::GET)
+        .uri(format!("/api/auth/google/callback?{query}"));
+    if !cookies.is_empty() {
+        req = req.header(axum::http::header::COOKIE, cookies.join("; "));
+    }
+    let mut req = req.body(axum::body::Body::empty()).unwrap();
+    let peer: std::net::SocketAddr = peer.parse().unwrap();
+    req.extensions_mut()
+        .insert(axum::extract::ConnectInfo(peer));
+    ctx.send(req).await
+}
+
 fn encode(s: &str) -> String {
     url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
 }
@@ -289,26 +304,16 @@ async fn a_member_with_the_matching_email_signs_in_and_stays_signed_in() {
 }
 
 #[tokio::test]
-async fn the_second_sign_in_uses_the_link_even_after_the_email_changed() {
+async fn the_second_sign_in_uses_the_link_even_after_the_google_address_changed() {
     let (ctx, idp) = app().await;
-    let sam = member(&ctx, "sam", Some("sam@example.com")).await;
+    member(&ctx, "sam", Some("sam@example.com")).await;
     let first = trip(&ctx, &idp, None, |n| {
         Id::new("sub-sam", "sam@example.com", n).mint()
     })
     .await;
     assert!(first.cookie_named("rb_session").is_some());
 
-    // The admin gives Sam another address, and Sam's Google account changed its address too.
-    let id = sam["id"].as_str().unwrap();
-    let patched = ctx
-        .call(
-            Method::PATCH,
-            &format!("/api/users/{id}"),
-            Some(&ctx.cookie),
-            Some(json!({ "email": "sam@new.example" })),
-        )
-        .await;
-    patched.assert_status(StatusCode::OK);
+    // Sam's Google account changed its address; the link is by account, not by address.
     let again = trip(&ctx, &idp, None, |n| {
         Id::new("sub-sam", "sam@renamed.example", n).mint()
     })
@@ -528,6 +533,11 @@ async fn an_id_token_with_anything_wrong_is_refused() {
             "payload changed after signing",
             Box::new(move |n| good(n).mint_tampered(&Id::new("sub-sam", "admin@example.com", n))),
         ),
+        (
+            "signed by another key under the right key id",
+            Box::new(move |n| good(n).mint_with_other_key()),
+        ),
+        ("alg none", Box::new(move |n| good(n).mint_alg_none())),
         (
             "HS256 keyed with the public key",
             Box::new(move |n| good(n).mint_hs256()),
@@ -828,8 +838,8 @@ async fn members_manage_only_their_own_linked_accounts() {
         .await
         .assert_error(StatusCode::NOT_FOUND, "not_found");
 
-    // Unlinked: the address still matches, so the next Google sign-in links again. (The admin clears the email to
-    // end that.)
+    // Unlinked: the address still matches, so the next Google sign-in links again. (The admin changing or clearing
+    // the email ends that.)
     for (method, path) in [
         (Method::GET, "/api/auth/identities".to_string()),
         (Method::DELETE, format!("/api/auth/identities/{alexs}")),
@@ -964,4 +974,185 @@ async fn an_admin_sets_and_clears_a_members_email() {
     ctx.call(Method::PATCH, &path, None, Some(json!({ "email": null })))
         .await
         .assert_error(StatusCode::UNAUTHORIZED, "unauthenticated");
+}
+
+#[tokio::test]
+async fn replaying_a_finished_callback_signs_nobody_in_again() {
+    let (ctx, idp) = app().await;
+    member(&ctx, "sam", Some("sam@example.com")).await;
+    let s = start(&ctx, "/api/auth/google/start", None).await;
+    let code = idp.code_for(
+        s.challenge(),
+        Id::new("sub-sam", "sam@example.com", s.nonce()).mint(),
+    );
+    let query = format!("code={code}&state={}", s.state());
+    let first = back(&ctx, &query, &[&s.flow]).await;
+    assert!(first.cookie_named("rb_session").is_some());
+    let sessions = count(&ctx, "sessions").await;
+
+    // The same cookie and the same code again: Google refuses a used code, and no second session starts.
+    let replay = back(&ctx, &query, &[&s.flow]).await;
+    assert_login_error(&replay, "google_failed");
+    assert_eq!(
+        idp.token_requests().len(),
+        2,
+        "Google was asked and said no"
+    );
+    assert_eq!(count(&ctx, "sessions").await, sessions);
+    assert_eq!(count(&ctx, "user_identities").await, 1);
+}
+
+#[tokio::test]
+async fn a_malformed_callback_query_still_clears_the_cookie_and_ends_on_the_login_page() {
+    let (ctx, idp) = app().await;
+    member(&ctx, "sam", Some("sam@example.com")).await;
+    let s = start(&ctx, "/api/auth/google/start", None).await;
+    let code = idp.code_for(
+        s.challenge(),
+        Id::new("sub-sam", "sam@example.com", s.nonce()).mint(),
+    );
+    for query in [
+        format!("code=a&code={code}&state={}", s.state()),
+        format!("code={code}&state={0}&state={0}", s.state()),
+        format!("code={code}&error=a&error=b&state={}", s.state()),
+    ] {
+        let res = back(&ctx, &query, &[&s.flow]).await;
+        assert_login_error(&res, "google_failed");
+    }
+    assert!(idp.token_requests().is_empty(), "Google was never asked");
+    // Nothing was spent: the good query still works.
+    let ok = back(
+        &ctx,
+        &format!("code={code}&state={}", s.state()),
+        &[&s.flow],
+    )
+    .await;
+    assert!(ok.cookie_named("rb_session").is_some());
+}
+
+#[tokio::test]
+async fn an_address_that_keeps_failing_the_callback_is_sent_back_without_asking_google() {
+    let (ctx, idp) = app().await;
+    member(&ctx, "sam", Some("sam@example.com")).await;
+    let s = start(&ctx, "/api/auth/google/start", None).await;
+    let spammer = "203.0.113.9:4000";
+    let state = s.state();
+
+    // A script re-uses one valid flow with made-up codes: each one reaches Google and is refused.
+    for i in 0..5 {
+        let res = back_from(
+            &ctx,
+            spammer,
+            &format!("code=forged{i}&state={state}"),
+            &[&s.flow],
+        )
+        .await;
+        assert_login_error(&res, "google_failed");
+    }
+    assert_eq!(idp.token_requests().len(), 5);
+
+    // Locked: still a page redirect with the cookie cleared (no JSON 429), and Google is not asked, even
+    // with a good code.
+    let code = idp.code_for(
+        s.challenge(),
+        Id::new("sub-sam", "sam@example.com", s.nonce()).mint(),
+    );
+    let query = format!("code={code}&state={state}");
+    let res = back_from(&ctx, spammer, &query, &[&s.flow]).await;
+    assert_login_error(&res, "google_failed");
+    assert_eq!(idp.token_requests().len(), 5, "Google was not asked");
+
+    // Another address is not affected, and neither is the same one by a different port.
+    let ok = back_from(&ctx, "203.0.113.10:4000", &query, &[&s.flow]).await;
+    assert!(ok.cookie_named("rb_session").is_some(), "{:?}", ok.location);
+    assert_eq!(idp.token_requests().len(), 6);
+    // Sign-in by password is a different count.
+    ctx.login_from(spammer, None, "sam", MEMBER_PASSWORD)
+        .await
+        .assert_status(StatusCode::OK);
+
+    // Later the address may try again.
+    ctx.clock.advance(chrono::Duration::seconds(31));
+    let s2 = start(&ctx, "/api/auth/google/start", None).await;
+    let code = idp.code_for(
+        s2.challenge(),
+        Id::new("sub-sam", "sam@example.com", s2.nonce()).mint(),
+    );
+    let res = back_from(
+        &ctx,
+        spammer,
+        &format!("code={code}&state={}", s2.state()),
+        &[&s2.flow],
+    )
+    .await;
+    assert!(
+        res.cookie_named("rb_session").is_some(),
+        "{:?}",
+        res.location
+    );
+}
+
+#[tokio::test]
+async fn changing_or_clearing_a_members_email_ends_their_google_links() {
+    let (ctx, idp) = app().await;
+    let c = ctx.cookie.as_str();
+    // The admin mistypes a stranger's address; the stranger signs in as Sam and is linked.
+    let sam = member(&ctx, "sam", Some("alicia@example.com")).await;
+    let path = format!("/api/users/{}", sam["id"].as_str().unwrap());
+    let res = trip(&ctx, &idp, None, |n| {
+        Id::new("sub-stranger", "alicia@example.com", n).mint()
+    })
+    .await;
+    assert!(res.cookie_named("rb_session").is_some());
+    assert_eq!(count(&ctx, "user_identities").await, 1);
+
+    // Setting the same address again changes nothing.
+    ctx.call(
+        Method::PATCH,
+        &path,
+        Some(c),
+        Some(json!({ "email": "Alicia@example.com" })),
+    )
+    .await
+    .assert_status(StatusCode::OK);
+    assert_eq!(count(&ctx, "user_identities").await, 1);
+
+    // The admin corrects it: the stranger's link goes with the old address and the stranger is out.
+    ctx.call(
+        Method::PATCH,
+        &path,
+        Some(c),
+        Some(json!({ "email": "sam@example.com" })),
+    )
+    .await
+    .assert_status(StatusCode::OK);
+    assert_eq!(count(&ctx, "user_identities").await, 0);
+    let res = trip(&ctx, &idp, None, |n| {
+        Id::new("sub-stranger", "alicia@example.com", n).mint()
+    })
+    .await;
+    assert_login_error(&res, "google_not_member");
+    // Sam's own account matches the new address and links afresh.
+    let res = trip(&ctx, &idp, None, |n| {
+        Id::new("sub-sam", "sam@example.com", n).mint()
+    })
+    .await;
+    assert!(res.cookie_named("rb_session").is_some());
+    assert_eq!(count(&ctx, "user_identities").await, 1);
+
+    // Clearing the address ends that link too, and the account cannot come back by email.
+    ctx.call(
+        Method::PATCH,
+        &path,
+        Some(c),
+        Some(json!({ "email": null })),
+    )
+    .await
+    .assert_status(StatusCode::OK);
+    assert_eq!(count(&ctx, "user_identities").await, 0);
+    let res = trip(&ctx, &idp, None, |n| {
+        Id::new("sub-sam", "sam@example.com", n).mint()
+    })
+    .await;
+    assert_login_error(&res, "google_not_member");
 }

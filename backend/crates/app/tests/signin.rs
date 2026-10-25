@@ -98,7 +98,22 @@ impl World {
     fn build(port: Arc<dyn GoogleSignIn>, google: Arc<FakeSignIn>) -> Self {
         let clock = Arc::new(ManualClock::new());
         let store = Arc::new(MemoryStore::new(clock.clone()));
-        let services = Services::new(Deps {
+        let services = Services::new(Self::deps(&port, &store, &clock, store.clone()));
+        Self {
+            clock,
+            store,
+            google,
+            services,
+        }
+    }
+
+    fn deps(
+        port: &Arc<dyn GoogleSignIn>,
+        store: &Arc<MemoryStore>,
+        clock: &Arc<ManualClock>,
+        identities: Arc<dyn IdentityRepo>,
+    ) -> Deps {
+        Deps {
             recipes: store.clone(),
             images: store.clone(),
             users: store.clone(),
@@ -107,8 +122,8 @@ impl World {
             tags: store.clone(),
             grocery: store.clone(),
             google_connections: store.clone(),
-            identities: store.clone(),
-            google_signin: port,
+            identities,
+            google_signin: port.clone(),
             flows: Arc::new(FakeFlowSealer::default()),
             health: store.clone(),
             media: Arc::new(MemoryMedia::default()),
@@ -126,13 +141,13 @@ impl World {
             max_upload_bytes: 1 << 20,
             session_days: 30,
             throttle: Throttle::new(),
-        });
-        Self {
-            clock,
-            store,
-            google,
-            services,
         }
+    }
+
+    /// The same world with its own link store (to script a race).
+    fn services_with_identities(&self, identities: Arc<dyn IdentityRepo>) -> Services {
+        let port: Arc<dyn GoogleSignIn> = self.google.clone();
+        Services::new(Self::deps(&port, &self.store, &self.clock, identities))
     }
 
     async fn member(&self, name: &str, email: Option<&str>) -> User {
@@ -167,7 +182,7 @@ impl World {
         };
         self.services
             .signin
-            .finish(Some(cookie), reply, signed_in)
+            .finish(Some(cookie), reply, signed_in, None)
             .await
             .unwrap()
     }
@@ -216,7 +231,10 @@ async fn without_google_nothing_starts_and_nothing_finishes() {
         error: None,
     };
     assert!(matches!(
-        w.services.signin.finish(Some("flow-0"), reply, None).await,
+        w.services
+            .signin
+            .finish(Some("flow-0"), reply, None, None)
+            .await,
         Err(DomainError::NotFound(_))
     ));
 }
@@ -288,12 +306,7 @@ async fn the_second_sign_in_uses_the_link_even_after_the_email_changed() {
         SignInOutcome::SignedIn { .. }
     ));
 
-    // The admin changes the member's email and Google's account changes address too.
-    w.services
-        .users
-        .set_email(sam.id, Some("sam@new.example"))
-        .await
-        .unwrap();
+    // Google's account changes address: the link still signs the member in.
     w.google.says("sub-sam", "sam@renamed.example", true);
     let (cookie, state) = w.start(None);
     let out = w.back(&cookie, &state, None).await;
@@ -304,13 +317,205 @@ async fn the_second_sign_in_uses_the_link_even_after_the_email_changed() {
     assert_eq!(who.map(|u| u.id), Some(sam.id));
     assert_eq!(w.services.signin.identities(sam.id).await.unwrap().len(), 1);
 
-    // An account that is not linked and whose address no longer matches is a stranger.
-    w.google.says("sub-other", "sam@example.com", true);
+    // An account that is not linked, whose address matches nobody, is a stranger.
+    w.google.says("sub-other", "nobody@example.com", true);
     let (cookie, state) = w.start(None);
     assert!(matches!(
         w.back(&cookie, &state, None).await,
         SignInOutcome::NotMember
     ));
+}
+
+#[tokio::test]
+async fn changing_or_clearing_the_email_ends_the_links_made_by_the_old_one() {
+    let w = World::new();
+    let sam = w.member("sam", Some("alicia@example.com")).await;
+    // A stranger holding the mistyped address links to Sam on first sign-in.
+    w.google.says("sub-stranger", "alicia@example.com", true);
+    let (cookie, state) = w.start(None);
+    assert!(matches!(
+        w.back(&cookie, &state, None).await,
+        SignInOutcome::SignedIn { .. }
+    ));
+
+    // The admin fixes the address: the stranger's link goes, and the stranger cannot get in again.
+    w.services
+        .users
+        .set_email(sam.id, Some("sam@example.com"))
+        .await
+        .unwrap();
+    assert!(w.link_of("sub-stranger").await.is_none());
+    let (cookie, state) = w.start(None);
+    assert!(matches!(
+        w.back(&cookie, &state, None).await,
+        SignInOutcome::NotMember
+    ));
+    // Sam's own Google account matches the new address.
+    w.google.says("sub-sam", "sam@example.com", true);
+    let (cookie, state) = w.start(None);
+    assert!(matches!(
+        w.back(&cookie, &state, None).await,
+        SignInOutcome::SignedIn { .. }
+    ));
+
+    // Clearing the email ends that link too.
+    w.services.users.set_email(sam.id, None).await.unwrap();
+    assert!(w.link_of("sub-sam").await.is_none());
+    let (cookie, state) = w.start(None);
+    assert!(matches!(
+        w.back(&cookie, &state, None).await,
+        SignInOutcome::NotMember
+    ));
+}
+
+#[tokio::test]
+async fn a_callback_that_loses_the_race_to_link_the_same_member_still_signs_in() {
+    // The first sign-in is on its way (no link yet) when a second callback for the same account links it.
+    struct Racing {
+        store: Arc<MemoryStore>,
+        raced: std::sync::atomic::AtomicBool,
+        /// Who the other callback links the account to.
+        winner: Mutex<Option<Uuid>>,
+    }
+    #[async_trait]
+    impl IdentityRepo for Racing {
+        async fn find(&self, p: &str, s: &str) -> DomainResult<Option<domain::Identity>> {
+            self.store.find(p, s).await
+        }
+        async fn list(&self, u: Uuid) -> DomainResult<Vec<domain::Identity>> {
+            self.store.list(u).await
+        }
+        async fn create(&self, new: domain::NewIdentity) -> DomainResult<domain::Identity> {
+            use std::sync::atomic::Ordering::SeqCst;
+            if !self.raced.swap(true, SeqCst) {
+                let user_id = self.winner.lock().unwrap().unwrap_or(new.user_id);
+                IdentityRepo::create(
+                    &*self.store,
+                    domain::NewIdentity {
+                        user_id,
+                        provider: new.provider.clone(),
+                        subject: new.subject.clone(),
+                        email: new.email.clone(),
+                    },
+                )
+                .await?;
+            }
+            self.store.create(new).await
+        }
+        async fn delete(&self, u: Uuid, id: Uuid) -> DomainResult<()> {
+            self.store.delete(u, id).await
+        }
+    }
+
+    for to_same_member in [true, false] {
+        let w = World::new();
+        let racing = Arc::new(Racing {
+            store: w.store.clone(),
+            raced: Default::default(),
+            winner: Mutex::default(),
+        });
+        let services = w.services_with_identities(racing.clone());
+        let sam = w.member("sam", Some("sam@example.com")).await;
+        let kim = w.member("kim", Some("kim@example.com")).await;
+        *racing.winner.lock().unwrap() = Some(if to_same_member { sam.id } else { kim.id });
+        w.google.says("sub-sam", "sam@example.com", true);
+        let started = services.signin.start(None, None).unwrap();
+        let state = query_of(&started.url, "state");
+        let reply = Callback {
+            code: Some("the-code"),
+            state: Some(&state),
+            error: None,
+        };
+        let out = services
+            .signin
+            .finish(Some(&started.flow), reply, None, None)
+            .await
+            .unwrap();
+        if to_same_member {
+            let SignInOutcome::SignedIn { session, .. } = out else {
+                panic!("{out:?}");
+            };
+            let who = w.services.auth.current_user(&session.token).await.unwrap();
+            assert_eq!(who.map(|u| u.id), Some(sam.id));
+        } else {
+            // Linked to someone else in the meantime: never sign in as the member the email names.
+            assert_failed(&out, false);
+            assert_eq!(w.link_of("sub-sam").await.unwrap().user_id, kim.id);
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_client_address_whose_callbacks_keep_failing_is_locked_out_without_asking_google() {
+    let w = World::new();
+    w.member("sam", Some("sam@example.com")).await;
+    w.google.says("sub-sam", "sam@example.com", true);
+    let ip: std::net::IpAddr = "203.0.113.9".parse().unwrap();
+    let other: std::net::IpAddr = "203.0.113.10".parse().unwrap();
+    let (cookie, state) = w.start(None);
+    let reply = Callback {
+        code: Some("the-code"),
+        state: Some(&state),
+        error: None,
+    };
+    let from = |client| w.services.signin.finish(Some(&cookie), reply, None, client);
+
+    // A Google that says no: failures count against the address.
+    *w.google.reply.lock().unwrap() = Err("invalid_grant".into());
+    for _ in 0..5 {
+        assert_failed(&from(Some(ip)).await.unwrap(), false);
+    }
+    assert_eq!(w.google_was_asked(), 5);
+    // Locked now: refused at once, even though Google would say yes, and Google is not asked.
+    w.google.says("sub-sam", "sam@example.com", true);
+    let out = from(Some(ip)).await.unwrap();
+    assert!(
+        matches!(
+            out,
+            SignInOutcome::Failed {
+                error: Some(DomainError::RateLimited { .. }),
+                ..
+            }
+        ),
+        "{out:?}"
+    );
+    assert_eq!(w.google_was_asked(), 5);
+    // Another address and a request with no known address are not affected.
+    assert!(matches!(
+        from(Some(other)).await.unwrap(),
+        SignInOutcome::SignedIn { .. }
+    ));
+    assert_eq!(w.google_was_asked(), 6);
+
+    // After the lock runs out the address is let in again.
+    w.clock.advance(Duration::seconds(31));
+    assert!(matches!(
+        from(Some(ip)).await.unwrap(),
+        SignInOutcome::SignedIn { .. }
+    ));
+}
+
+#[tokio::test]
+async fn good_callbacks_do_not_use_up_the_allowance_of_an_address() {
+    let w = World::new();
+    w.member("sam", Some("sam@example.com")).await;
+    w.google.says("sub-sam", "sam@example.com", true);
+    let ip: std::net::IpAddr = "203.0.113.9".parse().unwrap();
+    for _ in 0..12 {
+        let (cookie, state) = w.start(None);
+        let reply = Callback {
+            code: Some("the-code"),
+            state: Some(&state),
+            error: None,
+        };
+        let out = w
+            .services
+            .signin
+            .finish(Some(&cookie), reply, None, Some(ip))
+            .await
+            .unwrap();
+        assert!(matches!(out, SignInOutcome::SignedIn { .. }), "{out:?}");
+    }
 }
 
 #[tokio::test]
@@ -342,7 +547,7 @@ async fn a_wrong_or_missing_state_or_cookie_never_reaches_google() {
     let out = w
         .services
         .signin
-        .finish(Some(&cookie), no_state, None)
+        .finish(Some(&cookie), no_state, None, None)
         .await
         .unwrap();
     assert_failed(&out, false);
@@ -352,7 +557,12 @@ async fn a_wrong_or_missing_state_or_cookie_never_reaches_google() {
         error: None,
     };
     for bad in [None, Some("flow-999"), Some("garbage"), Some("")] {
-        let out = w.services.signin.finish(bad, reply, None).await.unwrap();
+        let out = w
+            .services
+            .signin
+            .finish(bad, reply, None, None)
+            .await
+            .unwrap();
         assert_failed(&out, false);
     }
     assert_eq!(w.google_was_asked(), 0);
@@ -395,7 +605,7 @@ async fn a_no_from_google_a_missing_code_or_a_google_error_fails() {
     let out = w
         .services
         .signin
-        .finish(Some(&cookie), denied, None)
+        .finish(Some(&cookie), denied, None, None)
         .await
         .unwrap();
     assert_failed(&out, false);
@@ -407,7 +617,7 @@ async fn a_no_from_google_a_missing_code_or_a_google_error_fails() {
     let out = w
         .services
         .signin
-        .finish(Some(&cookie), no_code, None)
+        .finish(Some(&cookie), no_code, None, None)
         .await
         .unwrap();
     assert_failed(&out, false);

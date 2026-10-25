@@ -2,7 +2,7 @@
 //! is, and never makes one. The flow runs entirely here (confidential client, PKCE); what must survive the trip to
 //! Google rides in a sealed cookie, so no server-side state is needed.
 
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 
 use domain::{
     DomainError, DomainResult, Identity, NewIdentity, PROVIDER_GOOGLE, Secret, SignInFlow,
@@ -10,7 +10,7 @@ use domain::{
 };
 use ports::{Clock, FlowSealer, GoogleSignIn, IdentityRepo, SessionTokens, UserRepo};
 
-use crate::{Deps, auth::AuthService, auth::NewSession};
+use crate::{Deps, Scope, Throttle, auth::AuthService, auth::NewSession};
 
 /// How long a started sign-in may take; an older one is refused even if the browser still holds its cookie.
 pub const FLOW_MAX_AGE: Duration = Duration::minutes(10);
@@ -62,6 +62,7 @@ pub struct SignInService {
     flows: Arc<dyn FlowSealer>,
     tokens: Arc<dyn SessionTokens>,
     clock: Arc<dyn Clock>,
+    throttle: Arc<Throttle>,
     auth: AuthService,
 }
 
@@ -74,6 +75,7 @@ impl SignInService {
             flows: d.flows.clone(),
             tokens: d.tokens.clone(),
             clock: d.clock.clone(),
+            throttle: d.throttle.clone(),
             auth,
         }
     }
@@ -125,30 +127,72 @@ impl SignInService {
     /// Finishes what [`SignInService::start`] began. `cookie` is the `rb_oauth` value, `signed_in` the member whose
     /// session the request carries, if any (needed for a link: it must be the member who started it). Every
     /// failure is an outcome; only a server without Google is an error (`NotFound`).
+    ///
+    /// The callback is public and a started flow can be replayed, so every call is counted against `client` (the
+    /// caller's address) like a wrong password and given back when it ends well (a member, a link, a Google
+    /// account that is no member). Once the address is locked the call fails at once, without asking Google. With
+    /// no `client` address (a proxy that hides it) nothing is counted.
     pub async fn finish(
         &self,
         cookie: Option<&str>,
         reply: Callback<'_>,
         signed_in: Option<Uuid>,
+        client: Option<IpAddr>,
     ) -> DomainResult<SignInOutcome> {
         self.ensure_enabled()?;
+        // The throttle wants a name as well as an address; the address is the name too, so five wrong callbacks
+        // lock it (the address's own limit of twenty is the looser backstop for a whole IPv6 /64).
+        let attempt = match client {
+            Some(ip) => {
+                match self.throttle.begin(
+                    self.clock.now(),
+                    Scope::GoogleCallback,
+                    &ip.to_string(),
+                    client,
+                ) {
+                    Ok(attempt) => Some(attempt),
+                    Err(retry_after_secs) => {
+                        return Ok(SignInOutcome::Failed {
+                            link: false,
+                            error: Some(DomainError::RateLimited { retry_after_secs }),
+                        });
+                    }
+                }
+            }
+            None => None,
+        };
+        let outcome = self.finish_counted(cookie, reply, signed_in).await;
+        if let Some(attempt) = attempt
+            && !matches!(outcome, SignInOutcome::Failed { .. })
+        {
+            attempt.succeed();
+        }
+        Ok(outcome)
+    }
+
+    async fn finish_counted(
+        &self,
+        cookie: Option<&str>,
+        reply: Callback<'_>,
+        signed_in: Option<Uuid>,
+    ) -> SignInOutcome {
         let flow = match self.open_flow(cookie, reply.state) {
             Ok(flow) => flow,
             Err(error) => {
-                return Ok(SignInOutcome::Failed {
+                return SignInOutcome::Failed {
                     link: false,
                     error: Some(error),
-                });
+                };
             }
         };
         let link = flow.link_user.is_some();
-        Ok(match self.complete(flow, reply, signed_in).await {
+        match self.complete(flow, reply, signed_in).await {
             Ok(outcome) => outcome,
             Err(error) => SignInOutcome::Failed {
                 link,
                 error: Some(error),
             },
-        })
+        }
     }
 
     /// The flow behind the cookie, if the cookie is ours, young enough, and `state` is the one sent to Google.
@@ -219,15 +263,27 @@ impl SignInService {
             Some(link) => self.users.find(link.user_id).await?,
             None => match self.users.find_by_email(&email).await? {
                 Some(user) => {
-                    self.identities
+                    let made = self
+                        .identities
                         .create(NewIdentity {
                             user_id: user.id,
                             provider: PROVIDER_GOOGLE.into(),
-                            subject,
+                            subject: subject.clone(),
                             email,
                         })
-                        .await?;
-                    Some(user)
+                        .await;
+                    match made {
+                        Ok(_) => Some(user),
+                        // A second callback for the same account linked it first (a double tap): fine if it
+                        // linked it to this member.
+                        Err(DomainError::Conflict(c)) => {
+                            match self.identities.find(PROVIDER_GOOGLE, &subject).await? {
+                                Some(link) if link.user_id == user.id => Some(user),
+                                _ => return Err(DomainError::Conflict(c)),
+                            }
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
                 None => return Ok(SignInOutcome::NotMember),
             },

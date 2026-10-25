@@ -22,7 +22,7 @@
           "auth"
         ],
         "summary": "Where Google sends the browser back. Always clears `rb_oauth` and ends on a page, never on JSON.",
-        "description": "Signing in: a member gets the session cookie (as the password login does) and lands on `next`; a Google account\nthat is no member lands on `/login?error=google_not_member` and nothing is created; any other failure (a wrong\nor old `state`, a refusal from Google, an unverified email, a bad ID token) on `/login?error=google_failed`.\nLinking from Settings (needs the session of the member who started it): `/settings?signin=linked`,\n`/settings?signin=taken` (that Google account belongs to another member) or `/settings?signin=error`.",
+        "description": "Signing in: a member gets the session cookie (as the password login does) and lands on `next`; a Google account\nthat is no member lands on `/login?error=google_not_member` and nothing is created; any other failure (a wrong\nor old `state`, a refusal from Google, an unverified email, a bad ID token) on `/login?error=google_failed`.\nLinking from Settings (needs the session of the member who started it): `/settings?signin=linked`,\n`/settings?signin=taken` (that Google account belongs to another member) or `/settings?signin=error`.\n\nA malformed query (a repeated `code`) counts as an empty one. Callbacks are throttled per client address: after\nrepeated failures the address is sent to `/login?error=google_failed` without Google being called, for a while.",
         "operationId": "googleSignInCallback",
         "parameters": [
           {
@@ -3027,7 +3027,7 @@
         "tags": [
           "users"
         ],
-        "summary": "Sets or clears a member's email, the address a Google account must have verified to sign in as them. Admin only.",
+        "summary": "Sets or clears a member's email, the address a Google account must have verified to sign in as them. Admin only.\nReplacing or clearing an email that was set also deletes all of the member's linked Google accounts (they were\nmatched through the old address); setting a first email, or the same one again, keeps them.",
         "operationId": "updateUser",
         "parameters": [
           {

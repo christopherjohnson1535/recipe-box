@@ -39,6 +39,8 @@ pub const KID: &str = "test-key-1";
 // A 2048-bit RSA key generated only for these tests (PKCS#1, DER, base64), and its public modulus (base64url). The
 // exponent is 65537 (`AQAB`).
 const PRIVATE_KEY_DER_B64: &str = include_str!("idp_test_key.der.b64");
+// A second throwaway key the fake never serves: what a forger who signs with his own key has.
+const OTHER_KEY_DER_B64: &str = include_str!("idp_other_key.der.b64");
 const PUBLIC_N: &str = "tCn3-EMVzywDo8HCKTdaA4vbkh9tkQ2IBrWgwFaO6T0bBn0dV0kr2rbd0kYxy_x_mYV0adczFWPYdQEwXzTp3d5wrVyCoq1FWWVchVFIEcKUpxKH2qb8yaZ_g5QNID0Nt-cAPDm9L4eY0KA31A_PrvLFJ77mZeC1Q21b9sVYzkycBLIXxTqcEz6M0rblclS9g3sQORvvBDiTLVjX_Xrp0LdesM6lEhr5wT5yIj_EV6VAhDAYL_6kmlhnP894Ijy31ozYp_TfGZhIUWbSlVOdY7A-Tmojcx7gnXg1Prfq-gNRZxVbdW3aU5Xh4ECNzLXlyhyIfn_bN7-I4uiUErZV2Q";
 
 fn now_secs() -> i64 {
@@ -101,6 +103,23 @@ impl Id {
             .decode(PRIVATE_KEY_DER_B64.trim())
             .unwrap();
         jsonwebtoken::encode(&header, &self.claims(), &EncodingKey::from_rsa_der(&der)).unwrap()
+    }
+
+    /// Signed with another RSA key, under the `kid` of the key the fake serves: the signature cannot fit.
+    pub fn mint_with_other_key(&self) -> String {
+        let mut header = Header::new(Algorithm::RS256);
+        header.kid = Some(self.kid.clone());
+        let der = base64::engine::general_purpose::STANDARD
+            .decode(OTHER_KEY_DER_B64.trim())
+            .unwrap();
+        jsonwebtoken::encode(&header, &self.claims(), &EncodingKey::from_rsa_der(&der)).unwrap()
+    }
+
+    /// `alg: none` and no signature: what a forger who drops the signature would send.
+    pub fn mint_alg_none(&self) -> String {
+        let header = json!({ "alg": "none", "typ": "JWT", "kid": self.kid });
+        let part = |v: &Value| URL_SAFE_NO_PAD.encode(v.to_string());
+        format!("{}.{}.", part(&header), part(&self.claims()))
     }
 
     /// Signed with the key, then the payload swapped for another one: the signature no longer fits.

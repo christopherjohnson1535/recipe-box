@@ -5,7 +5,7 @@
 use app::{Callback, SignInOutcome};
 use axum::{
     Json,
-    extract::State,
+    extract::{Query, State, rejection::QueryRejection},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -16,6 +16,7 @@ use uuid::Uuid;
 use super::integrations::{clear_flow_cookie, flow_cookie, found, member};
 use crate::{
     HttpState,
+    client_ip::ClientIp,
     dto::{AuthProviders, Identity},
     error::{AppError, AppPath, AppQuery, AppResult, ErrorBody},
     extract::{CurrentUser, session_cookie},
@@ -81,7 +82,7 @@ pub async fn start(
     Ok((jar.add(cookie), found(started.url.as_str())))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct CallbackQuery {
     code: Option<String>,
     state: Option<String>,
@@ -96,6 +97,9 @@ pub struct CallbackQuery {
 /// or old `state`, a refusal from Google, an unverified email, a bad ID token) on `/login?error=google_failed`.
 /// Linking from Settings (needs the session of the member who started it): `/settings?signin=linked`,
 /// `/settings?signin=taken` (that Google account belongs to another member) or `/settings?signin=error`.
+///
+/// A malformed query (a repeated `code`) counts as an empty one. Callbacks are throttled per client address: after
+/// repeated failures the address is sent to `/login?error=google_failed` without Google being called, for a while.
 #[utoipa::path(get, path = "/api/auth/google/callback", operation_id = "googleSignInCallback", tag = "auth", security(()),
     params(
         ("code" = Option<String>, Query, description = "Google's authorisation code."),
@@ -109,9 +113,12 @@ pub struct CallbackQuery {
 pub async fn callback(
     State(state): State<HttpState>,
     user: Result<CurrentUser, AppError>,
+    ClientIp(client): ClientIp,
     jar: CookieJar,
-    AppQuery(q): AppQuery<CallbackQuery>,
+    // A malformed query (say a repeated `code`) is no reason to answer in JSON: it fails like an empty one.
+    q: Result<Query<CallbackQuery>, QueryRejection>,
 ) -> AppResult<(CookieJar, Response)> {
+    let q = q.map(|Query(q)| q).unwrap_or_default();
     let signed_in = member(user)?.map(|CurrentUser(user)| user.id);
     let cookie = jar.get(FLOW_COOKIE).map(|c| c.value().to_string());
     let jar = jar.add(clear_flow_cookie(FLOW_COOKIE, FLOW_PATH));
@@ -123,7 +130,7 @@ pub async fn callback(
     let outcome = match state
         .services
         .signin
-        .finish(cookie.as_deref(), reply, signed_in)
+        .finish(cookie.as_deref(), reply, signed_in, client)
         .await
     {
         Ok(outcome) => outcome,

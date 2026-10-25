@@ -261,7 +261,10 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   Google account must have verified to sign in as them (ACC-6). `POST /api/users` takes an optional `email`;
   `PATCH /api/users/{id}` `{"email": string | null}` (the key must be present) sets or clears it and answers `200 User`.
   Emails are trimmed and lower-cased, blank means none; a malformed one is `400 validation` (`email: ...`), one another
-  member has is `409 conflict`, an unknown id `404`, a member calling it `403`.
+  member has is `409 conflict`, an unknown id `404`, a member calling it `403`. **Replacing or clearing an email that was
+  set deletes all of that member's linked Google accounts**, in the same transaction as the change: they were matched
+  through the old address and must not outlive it. The member signs in with Google again once an account matches the new
+  email (or links one from Settings). Setting a first email, or the same one again, leaves the links alone.
 - **Sign in with Google (ACC-6).** Optional: on exactly when the Google settings above are set (`GOOGLE_CLIENT_ID`,
   `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY`); one OAuth client serves this and the Tasks export, so
   add `${PUBLIC_URL}/api/auth/google/callback` as a second authorised redirect URI. Google only proves who someone is:
@@ -290,7 +293,13 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
     `rb_session` exactly like password login (`SESSION_DAYS`) and answers `302` to `next`. A Google account that is no
     member: `302 /login?error=google_not_member`. Any other failure (no, wrong or old cookie or `state`, a refusal or
     `error=access_denied`, a bad or unverified ID token, Google unreachable): `302 /login?error=google_failed`, no
-    session. **Link mode** (the request must carry the session of the member who started it): `302
+    session. A malformed query (a repeated `code`, say) is treated as an empty one: the same `google_failed` redirect,
+    cookie cleared, never JSON. **Rate limit:** every callback is counted per client address (the same address
+    detection and lock-out as password sign-in: five unsuccessful callbacks lock the address for 30 s, doubling to 15
+    minutes; a callback that ends in a sign-in, a link or `google_not_member` is not counted against it). While locked
+    the callback answers `302 /login?error=google_failed` (also for a link started in Settings) without calling
+    Google, still clearing `rb_oauth`; there is no `429` because this is a page navigation. A request whose address
+    cannot be told (a proxy that hides it) is not counted. **Link mode** (the request must carry the session of the member who started it): `302
     /settings?signin=linked` (also when it was already linked to them), `/settings?signin=taken` (that Google account is
     linked to another member), or `/settings?signin=error` (anything else, including a different or missing session);
     no session is started.
@@ -299,7 +308,8 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
     Works whether or not Google is set up.
   - `DELETE /api/auth/identities/{id}` → `204`; an unknown id or one that belongs to someone else is `404`. The member
     can sign in with Google again later if their email still matches.
-  - Removing a member removes their links. Codes, tokens and the client secret are never logged or put in an address.
+  - Links also end when an admin replaces or clears the member's email (`PATCH /api/users/{id}`, above). Removing a
+    member removes their links. Codes, tokens and the client secret are never logged or put in an address.
 - **Export and import (admin, ACC-5).** `GET /api/export` streams every live recipe and its photos as a zip
   (`application/zip`, `Content-Disposition: attachment; filename="recipe-box-export-YYYY-MM-DD.zip"`, `Cache-Control:
   no-store`). It is built chunk by chunk, so memory use does not grow with the number of photos; a failure part-way cuts
