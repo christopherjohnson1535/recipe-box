@@ -307,6 +307,7 @@ mod tests {
             tags: store.clone(),
             health: store.clone(),
             media: Arc::new(MemoryMedia::default()),
+            backup: Arc::new(adapter_memory::MemoryBackup::default()),
             hasher: Arc::new(FakePasswordHasher::default()),
             tokens: Arc::new(FakeSessionTokens::default()),
             codec: Arc::new(FakeImageCodec::default()),
@@ -325,6 +326,7 @@ mod tests {
             config: HttpConfig {
                 cookie_secure: false,
                 max_upload_bytes: 1 << 20,
+                max_backup_bytes: 1 << 20,
                 version: "test",
             },
         }

@@ -38,6 +38,7 @@ impl World {
             tags: store.clone(),
             health: store.clone(),
             media,
+            backup: Arc::new(adapter_memory::MemoryBackup::default()),
             hasher: hasher.clone(),
             tokens: Arc::new(FakeSessionTokens::default()),
             codec: Arc::new(FakeImageCodec::default()),
@@ -584,17 +585,6 @@ async fn purge_cutoffs_are_strict() {
     assert_eq!(purge().await.unwrap().sessions, 0);
     w.clock.advance(Duration::seconds(1));
     assert_eq!(purge().await.unwrap().sessions, 1);
-}
-
-#[tokio::test]
-async fn export_is_not_built() {
-    let s = World::new().services();
-    assert!(
-        matches!(s.export.export(), Err(DomainError::NotImplemented(m)) if m == "Export is not built yet.")
-    );
-    assert!(
-        matches!(s.export.import_backup(), Err(DomainError::NotImplemented(m)) if m == "Importing an export is not built yet.")
-    );
 }
 
 /// The image repository with switches for the calls that must fail.

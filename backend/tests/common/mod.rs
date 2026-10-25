@@ -244,6 +244,7 @@ impl TestApp {
             anthropic_api_key: None,
             ai_model: "test".into(),
             max_upload_mb: 2,
+            max_backup_mb: 8,
         };
         let clock = Clock::fixed(epoch());
         let mut state = AppState::with_clock(pool.clone(), config, clock.clone()).unwrap();

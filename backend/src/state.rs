@@ -71,6 +71,7 @@ impl AppState {
             tags: self.tags.clone(),
             health: self.health.clone(),
             media: self.media.clone(),
+            backup: Arc::new(crate::backup::ZipBackup),
             hasher: Arc::new(Argon2Hasher),
             tokens: Arc::new(RandomTokens),
             codec: Arc::new(ImageCrateCodec),

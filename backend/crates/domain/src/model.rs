@@ -97,6 +97,39 @@ pub struct Recipe {
     pub updated_at: DateTime<Utc>,
 }
 
+/// A recipe as it sits in a backup archive: its id there and its content. `image_id` and `photo_image_ids` are the
+/// archive's own image ids (the names of its photo files), not ids in any database.
+#[derive(Debug)]
+pub struct BackupRecipe {
+    pub id: Uuid,
+    pub input: RecipeInput,
+}
+
+/// What a backup archive may hold; the reader refuses an archive that goes over any of these.
+#[derive(Debug, Clone, Copy)]
+pub struct BackupLimits {
+    pub max_recipes: usize,
+    pub max_entries: usize,
+    /// Everything the archive expands to.
+    pub max_total_bytes: u64,
+    pub max_manifest_bytes: u64,
+    /// One photo.
+    pub max_photo_bytes: u64,
+}
+
+impl BackupLimits {
+    /// The archive limits of this crate with `max_photo_bytes` (the upload limit) for one photo.
+    pub fn new(max_photo_bytes: u64) -> Self {
+        Self {
+            max_recipes: crate::BACKUP_MAX_RECIPES,
+            max_entries: crate::BACKUP_MAX_ENTRIES,
+            max_total_bytes: crate::BACKUP_MAX_TOTAL_BYTES,
+            max_manifest_bytes: crate::BACKUP_MAX_MANIFEST_BYTES,
+            max_photo_bytes,
+        }
+    }
+}
+
 /// One row of a recipe list.
 pub struct RecipeSummary {
     pub id: Uuid,

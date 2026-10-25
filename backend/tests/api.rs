@@ -446,7 +446,7 @@ async fn media_upload_and_serve() {
 }
 
 #[tokio::test]
-async fn capabilities_and_stubs() {
+async fn capabilities() {
     let ctx = TestApp::spawn().await;
     let cookie = ctx.setup_admin().await;
     let c = Some(cookie.as_str());
@@ -455,21 +455,6 @@ async fn capabilities_and_stubs() {
         .call(Method::GET, "/api/import/capabilities", c, None)
         .await;
     assert_eq!(caps.json, json!({ "ai": false, "provider": "none" }));
-
-    let stubs = [
-        (Method::GET, "/api/export".to_string()),
-        (Method::POST, "/api/import/export".to_string()),
-    ];
-    for (method, path) in stubs {
-        let anon = ctx.call(method.clone(), &path, None, None).await;
-        assert_eq!(anon.status, StatusCode::UNAUTHORIZED, "{method} {path}");
-        let res = ctx.call(method.clone(), &path, c, None).await;
-        assert_eq!(
-            (res.status, res.code()),
-            (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
-            "{method} {path}"
-        );
-    }
 }
 
 #[tokio::test]

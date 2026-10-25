@@ -27,6 +27,8 @@ pub struct Config {
     pub anthropic_api_key: Option<Secret>,
     pub ai_model: String,
     pub max_upload_mb: usize,
+    /// Largest backup archive `POST /api/import/export` takes.
+    pub max_backup_mb: usize,
 }
 
 impl Config {
@@ -60,11 +62,20 @@ impl Config {
                 .ok()
                 .filter(|m| *m > 0)
                 .context("MAX_UPLOAD_MB must be a positive number")?,
+            max_backup_mb: var("MAX_BACKUP_MB", "512")
+                .parse()
+                .ok()
+                .filter(|m| (1..=65_536).contains(m))
+                .context("MAX_BACKUP_MB must be a whole number from 1 to 65536")?,
         })
     }
 
     pub fn max_upload_bytes(&self) -> usize {
         self.max_upload_mb * 1024 * 1024
+    }
+
+    pub fn max_backup_bytes(&self) -> usize {
+        self.max_backup_mb * 1024 * 1024
     }
 }
 

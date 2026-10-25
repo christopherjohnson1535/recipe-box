@@ -92,6 +92,7 @@ async fn spec_and_router_list_the_same_operations() {
         anthropic_api_key: None,
         ai_model: "test".into(),
         max_upload_mb: 2,
+        max_backup_mb: 8,
     };
     let pool = PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_millis(200))

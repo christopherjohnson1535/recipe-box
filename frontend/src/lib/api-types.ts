@@ -62,7 +62,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Backup zip with `recipes.json` and `media/*`. Admin only. */
+        /**
+         * Backup zip of every recipe and photo. Admin only.
+         * @description `recipes.json` and `media/*`; the format is in docs/API.md. Streamed: the answer starts before the zip is complete,
+         *     and a failure part-way ends the connection early.
+         */
         get: operations["exportAll"];
         put?: never;
         post?: never;
@@ -115,7 +119,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Restores a backup zip, skipping recipes whose id exists. Admin only. */
+        /**
+         * Restores a backup zip. Admin only.
+         * @description A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the caller, and
+         *     its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is wrong, nothing
+         *     is added.
+         */
         post: operations["importExport"];
         delete?: never;
         options?: never;
@@ -450,9 +459,9 @@ export interface components {
         };
         /** @description Result of importing a backup zip. */
         ImportSummary: {
-            /** Format: int64 */
+            /** @description Recipes added. */
             imported: number;
-            /** Format: int64 */
+            /** @description Recipes left out because a recipe with their id already exists. */
             skipped: number;
         };
         /**
@@ -876,7 +885,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The backup zip. */
+            /** @description The backup zip, as an attachment. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -905,15 +914,6 @@ export interface operations {
             };
             /** @description Something went wrong on the server (`internal`). */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Not built yet (`not_implemented`); every call returns this today. */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1021,7 +1021,7 @@ export interface operations {
                     "application/json": components["schemas"]["ImportSummary"];
                 };
             };
-            /** @description Missing or unreadable `file` (`validation`). */
+            /** @description Missing `file`, or not a valid export: not a zip, unknown or oversized entries, bad JSON, a newer format version, a recipe that fails the usual recipe rules (`validation`). Nothing is imported. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1048,8 +1048,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Upload over `MAX_UPLOAD_MB` (`too_large`). */
+            /** @description Upload over `MAX_BACKUP_MB` (`too_large`). */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A photo in the archive is not an image we can read (`unsupported_media`). Nothing is imported. */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1059,15 +1068,6 @@ export interface operations {
             };
             /** @description Something went wrong on the server (`internal`). */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Not built yet (`not_implemented`); every call returns this today. */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };

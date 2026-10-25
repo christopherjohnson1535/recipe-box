@@ -1,5 +1,9 @@
 # Backup and restore
 
+There are two complementary ways to keep your recipes safe: the **operator backup** on this page (scripts that copy
+the whole server) and the **in-app zip export** (recipes and photos only, from Settings; see [In-app export](#in-app-export-and-import)
+below). Use the backup for disaster recovery and the zip to move recipes between Recipe Boxes.
+
 Your recipes live in two places: the database (recipes, accounts, tags) and the photo folder. One command backs up
 both, one command puts them back. The test suite does this for real on every pull request: it backs up a household,
 deletes the whole stack including its disks, restores, and checks every recipe and photo is identical.
@@ -133,6 +137,23 @@ is refused. Restored photos get fixed permissions (folders `755`, files `644`) s
 account ran the restore; run the restore as the same account that runs the API (or as root) so that it can also
 write new photos there.
 
-## In-app export
-Admins will also be able to export every recipe and photo as a zip from the app and import it again (ACC-5). That is
-for moving recipes between Recipe Boxes; it has no accounts or settings. This page is the whole-server backup.
+## In-app export and import
+Admins can also download every recipe and photo as one `.zip` from **Settings > Export and import**, and import such a
+zip into any Recipe Box (ACC-5). It is for moving recipes between boxes or keeping a portable copy. It holds recipes and
+photos only: no accounts, sign-in sessions or settings, so it is **not** a replacement for the backup above. For a whole
+server (accounts included), use `scripts/backup.sh` and `scripts/restore.sh`.
+
+- **Download export** saves one `.zip` with every recipe and every photo. Recipes you deleted are not in it. It is built as it downloads, so a big box starts downloading at once.
+- **Import export** picks such a zip and adds its recipes. Nothing is overwritten.
+
+What import does:
+- Every recipe and photo gets a new identity and is recorded as added by you, today.
+- A recipe that is already in the box (same id, which is the case when you import a file back into the box it came from) is **skipped**. Importing the same file into a different box twice adds the recipes twice.
+- Everything is checked first: the recipe fields follow the same rules as typing a recipe in, and photos are checked and re-saved like any upload. If anything is wrong, **nothing is imported** and the message says what. The recipes are added in a single database transaction.
+- Only one import runs at a time; a second one started meanwhile is refused (HTTP 409). Try again when the first finishes.
+- Files that are not exports, are damaged, are too big (limit `MAX_BACKUP_MB`, 512 MB by default), contain unexpected files, or come from a newer Recipe Box are refused.
+
+To move to a new install without the backup scripts: set up the new box, sign in as its admin, and import the zip.
+Household accounts and settings are not in the zip; add members again (a script restore brings them back).
+
+The zip format is documented in `docs/API.md` ("Backup archive format").

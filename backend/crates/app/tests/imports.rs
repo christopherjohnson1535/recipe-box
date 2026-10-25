@@ -63,6 +63,7 @@ impl World {
             tags: store.clone(),
             health: store.clone(),
             media: media.clone(),
+            backup: Arc::new(adapter_memory::MemoryBackup::default()),
             hasher: Arc::new(FakePasswordHasher::default()),
             tokens: Arc::new(FakeSessionTokens::default()),
             codec: Arc::new(FakeImageCodec::default()),

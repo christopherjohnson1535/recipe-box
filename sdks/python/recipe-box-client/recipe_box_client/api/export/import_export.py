@@ -58,15 +58,15 @@ def _parse_response(
 
         return response_413
 
+    if response.status_code == 415:
+        response_415 = ErrorBody.from_dict(response.json())
+
+        return response_415
+
     if response.status_code == 500:
         response_500 = ErrorBody.from_dict(response.json())
 
         return response_500
-
-    if response.status_code == 501:
-        response_501 = ErrorBody.from_dict(response.json())
-
-        return response_501
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -90,7 +90,13 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> Response[ErrorBody | ImportSummary]:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
+    caller, and
+    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
+    wrong, nothing
+    is added.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -119,7 +125,13 @@ def sync(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> ErrorBody | ImportSummary | None:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
+    caller, and
+    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
+    wrong, nothing
+    is added.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -143,7 +155,13 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> Response[ErrorBody | ImportSummary]:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
+    caller, and
+    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
+    wrong, nothing
+    is added.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -170,7 +188,13 @@ async def asyncio(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> ErrorBody | ImportSummary | None:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
+    caller, and
+    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
+    wrong, nothing
+    is added.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.

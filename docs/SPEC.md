@@ -115,6 +115,7 @@ Anything else needs a one-line reason in the agent's report.
 | `ANTHROPIC_API_KEY` | api | — | only when provider = anthropic |
 | `AI_MODEL` | api | `claude-sonnet-5-5` | |
 | `MAX_UPLOAD_MB` | api | `15` | per file; photo import allows 6 files per request |
+| `MAX_BACKUP_MB` | api | `512` | largest backup zip `POST /api/import/export` accepts; spooled to a temp file |
 | `HEIF_CONVERT` | api | `heif-convert` | libheif CLI used to read HEIC photos (installed in the API image) |
 | `API_INTERNAL_URL` | web | `http://api:8080` | runtime proxy target |
 | `PUBLIC_HOSTNAME` | caddy | — | deployed HTTPS |
@@ -156,7 +157,7 @@ Anything else needs a one-line reason in the agent's report.
 | POST `/api/import/photo` (multipart `files[]`, `mode=recipe\|dish`) → `RecipeDraft` | s | PHO-1–5, PHO-7 | done (#11) |
 | GET `/api/import/capabilities` → `{ ai: bool, provider }` | s | PHO-5/6 | done |
 | GET/POST `/api/users`, DELETE `/api/users/:id`, PUT `/api/users/:id/password` | admin | ACC-2 | **501 stub** → issue |
-| GET `/api/export`, POST `/api/import/export` | admin | ACC-5 | **501 stub** → issue |
+| GET `/api/export`, POST `/api/import/export` | admin | ACC-5 | done (#20); archive format in API.md |
 
 `RecipeDraft` = recipe fields without id/timestamps + `warnings: string[]` + `duplicateOf: uuid|null` +
 `imageId` (already stored) + `photoImageIds`. Drafts are never saved by the import endpoints — the client POSTs the

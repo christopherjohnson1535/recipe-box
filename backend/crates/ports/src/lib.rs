@@ -176,3 +176,48 @@ pub trait SessionTokens: Send + Sync {
     /// What is stored for `token`; the same token always gives the same digest.
     fn digest(&self, token: &str) -> Vec<u8>;
 }
+
+/// Reads and writes the backup archive format (ACC-5, docs/API.md "Backup archive"). The application hands over
+/// recipes and photos and gets bytes back, so it never sees zip.
+#[async_trait]
+pub trait BackupFormat: Send + Sync {
+    /// A writer for a new archive.
+    fn writer(&self) -> Box<dyn BackupWriter>;
+
+    /// Opens the archive file at `path` and checks its structure against `limits` before returning: it is a
+    /// readable archive of this format, has no entry that is not part of the format (so no path that leaves the
+    /// archive: absolute, `..`, or any other name), no duplicate or encrypted entry, no overlapping entries, and
+    /// stays within `limits` (entry count, declared sizes). `Validation` for anything wrong with the file.
+    async fn open(
+        &self,
+        path: std::path::PathBuf,
+        limits: domain::BackupLimits,
+    ) -> DomainResult<Box<dyn BackupReader>>;
+}
+
+/// Builds one archive. Each call returns the bytes ready to send so far, which the caller streams on, so the whole
+/// archive is never held in memory. Call `photo` for each photo, then `finish` once.
+pub trait BackupWriter: Send {
+    /// Adds the JPEG of image `image_id`.
+    fn photo(&mut self, image_id: Uuid, jpeg: &[u8]) -> DomainResult<Vec<u8>>;
+
+    /// Adds the recipes (their image ids must be ones passed to `photo`) and ends the archive.
+    fn finish(
+        &mut self,
+        exported_at: DateTime<Utc>,
+        recipes: &[domain::BackupRecipe],
+    ) -> DomainResult<Vec<u8>>;
+}
+
+/// An opened archive.
+#[async_trait]
+pub trait BackupReader: Send + Sync {
+    /// The recipes. `Validation` when the manifest is not valid JSON of the format, was made by a newer version,
+    /// holds more than `limits.max_recipes`, or refers to a photo that is not in the archive. The recipe fields
+    /// themselves are not checked here.
+    async fn recipes(&self) -> DomainResult<Vec<domain::BackupRecipe>>;
+
+    /// The bytes of the photo with archive image id `image_id`, or `None` when the archive has none. Never more
+    /// than `limits.max_photo_bytes`: a photo that expands to more is `Validation`.
+    async fn photo(&self, image_id: Uuid) -> DomainResult<Option<Vec<u8>>>;
+}

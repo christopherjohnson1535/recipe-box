@@ -26,6 +26,8 @@ pub struct HttpConfig {
     pub cookie_secure: bool,
     /// Largest accepted upload (`MAX_UPLOAD_MB`).
     pub max_upload_bytes: usize,
+    /// Largest accepted backup archive (`MAX_BACKUP_MB`).
+    pub max_backup_bytes: usize,
     /// Reported by `/api/health` and in the OpenAPI spec.
     pub version: &'static str,
 }

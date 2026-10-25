@@ -1,6 +1,7 @@
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AppearanceSection } from "@/components/settings/AppearanceSection";
 import { AiImportSection } from "@/components/settings/AiImportSection";
+import { ExportSection } from "@/components/settings/ExportSection";
 import { HouseholdSection } from "@/components/settings/HouseholdSection";
 import { PhotosSection } from "@/components/settings/PhotosSection";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -14,6 +15,7 @@ export function SettingsView({ me, users, capabilities, settings = null }: { me:
       <AccountSection user={me} />
       {me.role === "admin" && <HouseholdSection currentUserId={me.id} initialUsers={users} />}
       {me.role === "admin" && settings && <PhotosSection initial={settings.plateTreatment} />}
+      {me.role === "admin" && <ExportSection />}
       <AppearanceSection />
       <AiImportSection capabilities={capabilities} />
     </div>
