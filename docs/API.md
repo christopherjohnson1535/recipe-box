@@ -22,7 +22,7 @@ Every non-2xx response:
 | 401 | `unauthenticated` | no/expired session |
 | 403 | `forbidden` | not admin; setup already done |
 | 404 | `not_found` | |
-| 409 | `conflict` | username taken; restore window passed |
+| 409 | `conflict` | username taken; restore window passed; a backup import is already running |
 | 405 | `method_not_allowed` | known path, wrong method |
 | 429 | `rate_limited` | too many wrong passwords on `POST /api/auth/login` or on `PUT /api/users/:id/password` with a `currentPassword`; see "Password throttling". Has a `Retry-After` header (seconds) and a message that says how long to wait |
 | 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`), a backup over `MAX_BACKUP_MB` (`/api/import/export`), or any other request body over 1 MB |
@@ -169,17 +169,27 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   memory. Rules:
   - **Ids are never trusted.** Every imported recipe and photo gets a new id, belongs to the importing admin
     (`createdBy`/`updatedBy`), and gets fresh timestamps. Owners, timestamps and addresses in the file are ignored.
-  - **Skipped.** A recipe whose archive id is the id of a live recipe here is skipped (so importing an export back into
-    the box it came from changes nothing), and so is a repeat of an id inside the archive. Importing the same export into
-    a *different* box twice therefore adds the recipes twice.
+  - **Skipped.** A recipe is skipped only when its archive id equals the id of a live recipe in this box. That is the
+    case when you import an export back into the box it came from (it then changes nothing). It is also skipped when
+    the archive holds the same id twice. An export from another box has ids this box has never seen, so every recipe
+    is added with a new id, and importing the same zip a second time into that box adds them all again (duplicates).
+    Deleting a recipe first makes its id free again.
   - **Validated.** Every recipe goes through the same rules as `POST /api/recipes` (lengths, counts, `sourceUrl` must
     be http(s), non-negative minutes, tag limits; lengths are checked as a recipe, not truncated). Every photo goes
     through the same decode and re-encode as `POST /api/media` (so HEIC/PNG/WebP are accepted, scripts and non-images
     are not, and the pixel limits apply), then gets its rendition.
-  - **All or nothing.** The archive is checked first, then the recipes, then the photos are stored, then the recipes
-    saved. If anything fails, the photos stored so far are deleted and any recipe already saved is deleted again (a soft
-    delete the nightly purge finishes), and the error is returned: `400 validation` (message says what, and which
-    recipe), `415 unsupported_media` (a photo is not an image), `413 too_large`. A success is never partial.
+  - **All or nothing.** The archive is checked first, then every recipe, then the photos are stored, then all the
+    recipes are saved in one database transaction. If anything fails, no recipe row exists afterwards (not even a
+    deleted one) and the photos stored for this import are deleted (photos that were there before are untouched), and
+    the error is returned: `400 validation` (message says what, and which recipe), `415 unsupported_media` (a photo is
+    not an image), `413 too_large`, `500 internal` (the database failed). A success is never partial. The import
+    keeps running to its end, or undoes itself, even if the browser disconnects.
+  - **One at a time.** While an import runs, a second one is refused with `409 conflict` ("Another import is already
+    running…") and nothing is read from it. Try again when the first has finished.
+  - **How long.** The import is synchronous: the answer comes when it is done, after every photo is decoded and
+    re-encoded, so a large archive takes a while. Through the web container the wait is limited to about five
+    minutes (Node's default); an archive that takes longer still finishes on the server, but the browser then sees
+    `api_unreachable`. Check the recipe list before trying again.
   - **Hostile archives.** Refused as `400 validation` before anything is read: more than 50,000 entries; a name other than
     `recipes.json`, `media/` or `media/<uuid>.jpg` (so any absolute, `..`, backslash, nested or oddly-cased path); duplicate
     names; encrypted entries; compression other than stored/deflate; overlapping entries (shared bytes); an entry

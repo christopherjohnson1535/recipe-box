@@ -352,7 +352,7 @@
           "export"
         ],
         "summary": "Restores a backup zip. Admin only.",
-        "description": "A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the caller, and\nits photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is wrong, nothing\nis added.",
+        "description": "Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked and re-encoded\nlike uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is skipped, which\nonly happens when the archive is imported back into the box it was exported from (ids in another box are\ndifferent, so importing the same zip twice into another box adds every recipe twice). All or nothing: if\nanything is wrong, or saving fails, no recipe is kept and the photos stored for the import are removed. One import\nruns at a time (`409 conflict` for a second). It can take a minute or more for a large archive.",
         "operationId": "importExport",
         "requestBody": {
           "content": {
@@ -397,6 +397,16 @@
           },
           "403": {
             "description": "Not an admin (`forbidden`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another import is still running (`conflict`). Wait for it to finish.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2267,13 +2277,13 @@
         "properties": {
           "imported": {
             "type": "integer",
-            "description": "Recipes added.",
-            "minimum": 0
+            "format": "int64",
+            "description": "Recipes added."
           },
           "skipped": {
             "type": "integer",
-            "description": "Recipes left out because a recipe with their id already exists.",
-            "minimum": 0
+            "format": "int64",
+            "description": "Recipes left out because a recipe with their id already exists."
           }
         }
       },

@@ -67,6 +67,14 @@ async fn recipe_count(app: &TestApp) -> i64 {
         .unwrap()
 }
 
+/// Every recipe row, soft-deleted ones included: a failed import must leave none.
+async fn recipe_rows(app: &TestApp) -> i64 {
+    sqlx::query_scalar("select count(*) from recipes")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap()
+}
+
 fn media_files(app: &TestApp) -> usize {
     std::fs::read_dir(&app.media_dir).unwrap().count()
 }
@@ -397,7 +405,7 @@ async fn a_photo_that_is_not_an_image_fails_the_whole_import() {
     import(&app, &zip)
         .await
         .assert_error(StatusCode::UNSUPPORTED_MEDIA_TYPE, "unsupported_media");
-    assert_eq!(recipe_count(&app).await, 0);
+    assert_eq!(recipe_rows(&app).await, 0);
     assert_eq!(
         media_files(&app),
         0,
@@ -416,7 +424,52 @@ async fn one_invalid_recipe_keeps_the_valid_ones_out_too() {
     let m = manifest(json!([recipe_json("Good"), recipe_json("")]));
     let res = import(&app, &zip_of(&[("recipes.json", &m)])).await;
     res.assert_error(StatusCode::BAD_REQUEST, "validation");
-    assert_eq!(recipe_count(&app).await, 0);
+    assert_eq!(recipe_rows(&app).await, 0);
+}
+
+#[tokio::test]
+async fn a_database_failure_part_way_keeps_nothing_and_removes_only_this_imports_photos() {
+    let app = TestApp::spawn_as_admin().await;
+    let earlier = upload_photo(&app, &jpeg(16, 16, 5)).await;
+    let earlier_files = media_files(&app);
+    // The archive passes every check; the database then refuses the second recipe, after the first was written.
+    sqlx::raw_sql(
+        "create function reject_boom() returns trigger language plpgsql as
+         $$ begin if new.title = 'Boom' then raise exception 'boom'; end if; return new; end $$;
+         create trigger reject_boom before insert on recipes for each row execute function reject_boom();",
+    )
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    let p = Uuid::new_v4();
+    let m = manifest(json!([
+        {"id": Uuid::new_v4(), "title": "First", "photoImageIds": [p]},
+        recipe_json("Boom"),
+    ]));
+    let zip = zip_of(&[
+        ("recipes.json", &m),
+        (&format!("media/{p}.jpg"), &jpeg(20, 20, 9)),
+    ]);
+    import(&app, &zip)
+        .await
+        .assert_error(StatusCode::INTERNAL_SERVER_ERROR, "internal");
+    assert_eq!(recipe_rows(&app).await, 0, "no row, not even a deleted one");
+    assert_eq!(
+        media_files(&app),
+        earlier_files,
+        "the import's photo files are gone; the earlier upload is untouched"
+    );
+    let images: i64 = sqlx::query_scalar("select count(*) from images where id = $1::uuid")
+        .bind(&earlier)
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(images, 1);
+    let all: i64 = sqlx::query_scalar("select count(*) from images")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(all, 1, "the import's image rows were deleted too");
 }
 
 #[tokio::test]

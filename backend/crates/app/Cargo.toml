@@ -17,4 +17,4 @@ recipe-box-ports = { path = "../ports" }
 recipe-box-adapter-memory = { path = "../adapters/memory" }
 # `contract` is only for its `ManualClock`.
 recipe-box-ports = { path = "../ports", features = ["contract"] }
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio = { version = "1", features = ["macros", "rt", "sync"] }

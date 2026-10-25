@@ -25,9 +25,9 @@ use crate::{
 #[derive(Serialize, ToSchema)]
 pub struct ImportSummary {
     /// Recipes added.
-    imported: usize,
+    imported: i64,
     /// Recipes left out because a recipe with their id already exists.
-    skipped: usize,
+    skipped: i64,
 }
 
 /// Multipart body of `POST /api/import/export`.
@@ -85,14 +85,18 @@ pub async fn export_zip(State(state): State<HttpState>, _admin: AdminUser) -> Ap
 
 /// Restores a backup zip. Admin only.
 ///
-/// A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the caller, and
-/// its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is wrong, nothing
-/// is added.
+/// Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked and re-encoded
+/// like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is skipped, which
+/// only happens when the archive is imported back into the box it was exported from (ids in another box are
+/// different, so importing the same zip twice into another box adds every recipe twice). All or nothing: if
+/// anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are removed. One import
+/// runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 #[utoipa::path(post, path = "/api/import/export", operation_id = "importExport", tag = "export", security(("session" = [])),
     request_body(content = ImportExportForm, content_type = "multipart/form-data"), responses(
     (status = 200, description = "Counts of imported and skipped recipes.", body = ImportSummary),
     (status = 400, description = "Missing `file`, or not a valid export: not a zip, unknown or oversized entries, bad JSON, a newer format version, a recipe that fails the usual recipe rules (`validation`). Nothing is imported.", body = ErrorBody),
     (status = 403, description = "Not an admin (`forbidden`).", body = ErrorBody),
+    (status = 409, description = "Another import is still running (`conflict`). Wait for it to finish.", body = ErrorBody),
     (status = 413, description = "Upload over `MAX_BACKUP_MB` (`too_large`).", body = ErrorBody),
     (status = 415, description = "A photo in the archive is not an image we can read (`unsupported_media`). Nothing is imported.", body = ErrorBody),
 ))]
@@ -144,7 +148,7 @@ pub async fn import_zip(
         log_rendition(*id, e);
     }
     Ok(Json(ImportSummary {
-        imported: report.imported,
-        skipped: report.skipped,
+        imported: report.imported as i64,
+        skipped: report.skipped as i64,
     }))
 }

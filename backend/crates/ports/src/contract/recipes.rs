@@ -15,6 +15,7 @@ pub async fn recipe_repo<F: Fn(Arc<dyn Clock>) -> Stack>(make: F, caps: Capabili
     create_and_get(&make).await;
     update_replaces_everything(&make).await;
     unknown_images_are_refused(&make).await;
+    create_many_is_all_or_nothing(&make).await;
     delete_hides_the_recipe(&make).await;
     deleting_stamps_the_clock(&make).await;
     live_source_urls_prefilter(&make).await;
@@ -347,6 +348,46 @@ async fn unknown_images_are_refused<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
         );
         c.s.recipes.soft_delete(id).await.unwrap();
     }
+}
+
+async fn create_many_is_all_or_nothing<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let good = |t: &str| RecipeInput {
+        title: t.into(),
+        tags: vec!["batch".into()],
+        ..Default::default()
+    };
+    let ids =
+        c.s.recipes
+            .create_many(c.user, vec![good("One"), good("Two")])
+            .await
+            .unwrap();
+    assert_eq!(ids.len(), 2);
+    let one = c.s.recipes.get(ids[0]).await.unwrap().unwrap();
+    assert_eq!(
+        (one.title.as_str(), one.tags),
+        ("One", vec!["batch".into()])
+    );
+    assert_eq!(c.query(SearchQuery::default()).await.1, 2);
+
+    // The second recipe names an unknown image: the first must not be kept, live or deleted.
+    let bad = RecipeInput {
+        image_id: Some(Uuid::new_v4()),
+        ..good("Bad")
+    };
+    let r =
+        c.s.recipes
+            .create_many(c.user, vec![good("Three"), bad])
+            .await;
+    assert!(matches!(r, Err(DomainError::Validation(_))), "{r:?}");
+    assert_eq!(c.query(SearchQuery::default()).await.1, 2, "nothing added");
+    assert!(
+        c.s.recipes
+            .create_many(c.user, vec![])
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 async fn delete_hides_the_recipe<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {

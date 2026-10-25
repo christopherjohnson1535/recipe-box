@@ -47,8 +47,8 @@ export function ExportSection({ api = browserApi }: Props) {
         Export and import
       </Heading>
       <Text>
-        Save every recipe and photo as one zip file, or add the recipes from one. Importing never overwrites: recipes already in the box are skipped, and if
-        anything in the file is wrong, nothing is added.
+        Save every recipe and photo as one zip file, or add the recipes from one. Importing never overwrites. Into the box the file came from, recipes already there are skipped; into another box, every recipe
+        is added. If anything in the file is wrong, nothing is added.
       </Text>
       {error && <Alert tone="error">{error}</Alert>}
       {done && <Alert>{done}</Alert>}

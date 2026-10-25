@@ -3,7 +3,10 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use domain::{
@@ -38,6 +41,17 @@ pub struct ExportService {
     backup: Arc<dyn BackupFormat>,
     clock: Arc<dyn Clock>,
     max_photo_bytes: u64,
+    /// Set while an import runs: one at a time, so two imports never compete for memory, disk and the database.
+    importing: Arc<AtomicBool>,
+}
+
+/// Holds the import slot; frees it when dropped, whatever way the import ends.
+struct ImportSlot(Arc<AtomicBool>);
+
+impl Drop for ImportSlot {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
 }
 
 impl ExportService {
@@ -49,6 +63,7 @@ impl ExportService {
             backup: d.backup.clone(),
             clock: d.clock.clone(),
             max_photo_bytes: d.max_upload_bytes as u64,
+            importing: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -111,12 +126,18 @@ impl ExportService {
     ///
     /// Everything is checked before anything is written: the archive's structure and limits, then every recipe
     /// (the same rules as saving one) and, as each photo is stored, that it is a readable image (the same rules as
-    /// an upload). If any of that fails, or saving fails, nothing is kept: the photos stored so far are deleted and
-    /// the recipes already saved are deleted again (a soft delete, which the nightly purge finishes), and the error
-    /// is returned. Ids in the archive are never trusted: every recipe and photo gets a new id and belongs to
+    /// an upload). All recipes are then saved in one transaction ([`RecipeRepo::create_many`]). If any of that fails,
+    /// nothing is kept: no recipe row exists (not even a deleted one), the photos stored for this import are
+    /// deleted, and the error is returned. Ids in the archive are never trusted: every recipe and photo gets a new id and belongs to
     /// `user_id`. A recipe whose archive id is already a live recipe is skipped (so importing an export back into
-    /// the box it came from changes nothing). `Validation` for a bad archive, `UnsupportedMedia` for a bad photo.
+    /// the box it came from changes nothing). `Validation` for a bad archive, `UnsupportedMedia` for a bad photo, `Conflict` while another import runs.
     pub async fn import_backup(&self, user_id: Uuid, path: PathBuf) -> DomainResult<ImportReport> {
+        if self.importing.swap(true, Ordering::SeqCst) {
+            return Err(DomainError::Conflict(
+                "Another import is already running. Wait for it to finish, then try again.".into(),
+            ));
+        }
+        let _slot = ImportSlot(self.importing.clone());
         let reader = self
             .backup
             .open(path, BackupLimits::new(self.max_photo_bytes))
@@ -136,12 +157,13 @@ impl ExportService {
                 }
                 other => other,
             })?;
-            let mut refs: Vec<Uuid> = input
+            let mut once = HashSet::new();
+            let refs: Vec<Uuid> = input
                 .image_id
                 .into_iter()
                 .chain(input.photo_image_ids.iter().copied())
+                .filter(|id| once.insert(*id))
                 .collect();
-            refs.dedup();
             todo.push((input, refs));
         }
 
@@ -163,23 +185,23 @@ impl ExportService {
             return Err(e);
         }
 
-        let mut created: Vec<Uuid> = Vec::new();
-        for (mut input, _) in todo {
-            let map = |old: Uuid| new_ids[&old];
-            input.image_id = input.image_id.map(map);
-            input.photo_image_ids = input.photo_image_ids.into_iter().map(map).collect();
-            match self.recipes.create(user_id, input).await {
-                Ok(r) => created.push(r.id),
-                Err(e) => {
-                    for id in created {
-                        let _ = self.recipes.soft_delete(id).await;
-                    }
-                    self.media.delete_images(&stored).await;
-                    return Err(e);
-                }
+        let inputs: Vec<RecipeInput> = todo
+            .into_iter()
+            .map(|(mut input, _)| {
+                let map = |old: Uuid| new_ids[&old];
+                input.image_id = input.image_id.map(map);
+                input.photo_image_ids = input.photo_image_ids.into_iter().map(map).collect();
+                input
+            })
+            .collect();
+        // One transaction: either every recipe is saved or none is (not even a deleted row).
+        match self.recipes.create_many(user_id, inputs).await {
+            Ok(ids) => report.imported = ids.len(),
+            Err(e) => {
+                self.media.delete_images(&stored).await;
+                return Err(e);
             }
         }
-        report.imported = created.len();
         Ok(report)
     }
 

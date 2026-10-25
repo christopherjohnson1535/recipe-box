@@ -121,9 +121,12 @@ export interface paths {
         put?: never;
         /**
          * Restores a backup zip. Admin only.
-         * @description A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the caller, and
-         *     its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is wrong, nothing
-         *     is added.
+         * @description Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked and re-encoded
+         *     like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is skipped, which
+         *     only happens when the archive is imported back into the box it was exported from (ids in another box are
+         *     different, so importing the same zip twice into another box adds every recipe twice). All or nothing: if
+         *     anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are removed. One import
+         *     runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
          */
         post: operations["importExport"];
         delete?: never;
@@ -459,9 +462,15 @@ export interface components {
         };
         /** @description Result of importing a backup zip. */
         ImportSummary: {
-            /** @description Recipes added. */
+            /**
+             * Format: int64
+             * @description Recipes added.
+             */
             imported: number;
-            /** @description Recipes left out because a recipe with their id already exists. */
+            /**
+             * Format: int64
+             * @description Recipes left out because a recipe with their id already exists.
+             */
             skipped: number;
         };
         /**
@@ -1041,6 +1050,15 @@ export interface operations {
             };
             /** @description Not an admin (`forbidden`). */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Another import is still running (`conflict`). Wait for it to finish. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

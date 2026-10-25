@@ -13,7 +13,7 @@ use domain::{
     chrono::{DateTime, Utc},
     uuid::Uuid,
 };
-use ports::{ImageRepo, RecipeRepo, contract::ManualClock};
+use ports::{BackupFormat, ImageRepo, RecipeRepo, contract::ManualClock};
 
 #[allow(dead_code)] // shared with the other test files
 mod common;
@@ -26,21 +26,19 @@ struct World {
     user: Uuid,
 }
 
-/// A recipe repository that fails its `fail_on`th `create` (1-based) and passes everything else on.
+/// A recipe repository whose `create_many` always fails with a database-style error, after the (inner) store has
+/// been asked to do nothing. Everything else passes through.
 struct FailingCreate {
     inner: Arc<MemoryStore>,
-    fail_on: usize,
-    calls: std::sync::atomic::AtomicUsize,
 }
 
 #[async_trait]
 impl RecipeRepo for FailingCreate {
     async fn create(&self, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe> {
-        let n = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-        if n == self.fail_on {
-            return Err(DomainError::Internal("disk on fire".into()));
-        }
         self.inner.create(user_id, input).await
+    }
+    async fn create_many(&self, _: Uuid, _: Vec<RecipeInput>) -> DomainResult<Vec<Uuid>> {
+        Err(DomainError::Internal("disk on fire".into()))
     }
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>> {
         self.inner.get(id).await
@@ -71,6 +69,13 @@ impl World {
     }
 
     fn with(recipes: impl FnOnce(Arc<MemoryStore>) -> Arc<dyn RecipeRepo>) -> Self {
+        Self::build(recipes, |b| b)
+    }
+
+    fn build(
+        recipes: impl FnOnce(Arc<MemoryStore>) -> Arc<dyn RecipeRepo>,
+        format: impl FnOnce(Arc<MemoryBackup>) -> Arc<dyn BackupFormat>,
+    ) -> Self {
         let clock = Arc::new(ManualClock::new());
         let store = Arc::new(MemoryStore::new(clock.clone()));
         let media = Arc::new(MemoryMedia::default());
@@ -84,7 +89,7 @@ impl World {
             tags: store.clone(),
             health: store.clone(),
             media: media.clone(),
-            backup: backup.clone(),
+            backup: format(backup.clone()),
             hasher: Arc::new(FakePasswordHasher::default()),
             tokens: Arc::new(FakeSessionTokens::default()),
             codec: Arc::new(FakeImageCodec::default()),
@@ -204,6 +209,70 @@ async fn export_sends_photos_then_the_manifest_of_live_recipes_only() {
     assert_eq!(written.recipes[0].input.photo_image_ids, vec![a, b]);
 }
 
+/// An archive writer that fails on the second photo.
+struct BreaksOnSecondPhoto(Arc<MemoryBackup>);
+
+struct BreakingWriter {
+    inner: Box<dyn ports::BackupWriter>,
+    photos: usize,
+}
+
+impl ports::BackupWriter for BreakingWriter {
+    fn photo(&mut self, image_id: Uuid, jpeg: &[u8]) -> DomainResult<Vec<u8>> {
+        self.photos += 1;
+        if self.photos == 2 {
+            return Err(DomainError::Internal("zip broke".into()));
+        }
+        self.inner.photo(image_id, jpeg)
+    }
+    fn finish(&mut self, at: DateTime<Utc>, recipes: &[BackupRecipe]) -> DomainResult<Vec<u8>> {
+        self.inner.finish(at, recipes)
+    }
+}
+
+#[async_trait]
+impl BackupFormat for BreaksOnSecondPhoto {
+    fn writer(&self) -> Box<dyn ports::BackupWriter> {
+        Box::new(BreakingWriter {
+            inner: self.0.writer(),
+            photos: 0,
+        })
+    }
+    async fn open(
+        &self,
+        path: PathBuf,
+        limits: domain::BackupLimits,
+    ) -> DomainResult<Box<dyn ports::BackupReader>> {
+        self.0.open(path, limits).await
+    }
+}
+
+#[tokio::test]
+async fn an_export_that_fails_part_way_never_writes_the_end_of_the_archive() {
+    let w = World::build(|s| s, |b| Arc::new(BreaksOnSecondPhoto(b)));
+    let (a, b) = (
+        add_image(&w, b"jpeg-a").await,
+        add_image(&w, b"jpeg-b").await,
+    );
+    let mut i = input("Soup");
+    i.photo_image_ids = vec![a, b];
+    w.store.create(w.user, i).await.unwrap();
+
+    let mut job = w.services.export.export().await.unwrap();
+    assert!(
+        job.next_chunk().await.unwrap().is_some(),
+        "first photo goes out"
+    );
+    assert!(matches!(
+        job.next_chunk().await,
+        Err(DomainError::Internal(_))
+    ));
+    // The job is over and the manifest (the zip's closing part) was never produced, so the client's copy is
+    // not a valid archive and cannot be mistaken for a complete one.
+    assert!(job.next_chunk().await.unwrap().is_none());
+    assert!(w.backup.written().recipes.is_empty());
+}
+
 #[tokio::test]
 async fn export_leaves_out_photos_whose_file_is_gone() {
     let w = World::new();
@@ -308,7 +377,7 @@ async fn import_rejects_a_photo_that_is_not_an_image_and_removes_the_others() {
         w.import().await,
         Err(DomainError::UnsupportedMedia(_))
     ));
-    assert!(w.live().await.is_empty());
+    assert_eq!(w.store.recipe_rows(), 0);
     assert!(
         w.media.names().is_empty(),
         "the stored photo was deleted again"
@@ -327,14 +396,8 @@ async fn import_with_a_photo_missing_from_the_archive_fails() {
 }
 
 #[tokio::test]
-async fn a_failure_while_saving_undoes_the_recipes_and_photos_already_stored() {
-    let w = World::with(|store| {
-        Arc::new(FailingCreate {
-            inner: store,
-            fail_on: 2,
-            calls: Default::default(),
-        })
-    });
+async fn a_failure_while_saving_leaves_no_recipe_row_and_no_photo() {
+    let w = World::with(|store| Arc::new(FailingCreate { inner: store }));
     let old = Uuid::new_v4();
     w.backup.serve(
         vec![
@@ -344,8 +407,115 @@ async fn a_failure_while_saving_undoes_the_recipes_and_photos_already_stored() {
         HashMap::from([(old, b"jpeg".to_vec())]),
     );
     assert!(matches!(w.import().await, Err(DomainError::Internal(_))));
-    assert!(w.live().await.is_empty());
-    assert!(w.media.names().is_empty());
+    assert_eq!(w.store.recipe_rows(), 0, "no row at all, deleted or not");
+    assert!(w.media.names().is_empty(), "the import's photo was deleted");
+}
+
+#[tokio::test]
+async fn a_failed_import_deletes_only_its_own_photos() {
+    let w = World::with(|store| Arc::new(FailingCreate { inner: store }));
+    add_image(&w, b"someone-elses").await;
+    let before = w.media.names();
+    assert!(!before.is_empty());
+    let old = Uuid::new_v4();
+    w.backup.serve(
+        vec![archived(Uuid::new_v4(), input("One"), &[old])],
+        HashMap::from([(old, b"jpeg".to_vec())]),
+    );
+    assert!(w.import().await.is_err());
+    assert_eq!(w.media.names(), before, "the earlier photo is untouched");
+}
+
+#[tokio::test]
+async fn a_failed_batch_in_the_store_adds_nothing() {
+    // The real all-or-nothing rule at the store: the second recipe names an image that does not exist.
+    let w = World::new();
+    let mut bad = input("Bad");
+    bad.image_id = Some(Uuid::new_v4());
+    let r = w.store.create_many(w.user, vec![input("Good"), bad]).await;
+    assert!(matches!(r, Err(DomainError::Validation(_))));
+    assert_eq!(w.store.recipe_rows(), 0);
+}
+
+/// An archive format whose `open` waits until the test lets it go.
+struct Gated {
+    inner: Arc<MemoryBackup>,
+    entered: Arc<tokio::sync::Notify>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+#[async_trait]
+impl BackupFormat for Gated {
+    fn writer(&self) -> Box<dyn ports::BackupWriter> {
+        self.inner.writer()
+    }
+    async fn open(
+        &self,
+        path: PathBuf,
+        limits: domain::BackupLimits,
+    ) -> DomainResult<Box<dyn ports::BackupReader>> {
+        self.entered.notify_one();
+        self.release.notified().await;
+        self.inner.open(path, limits).await
+    }
+}
+
+#[tokio::test]
+async fn a_second_import_is_refused_while_one_runs_and_allowed_after() {
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let (e, r) = (entered.clone(), release.clone());
+    let w = Arc::new(World::build(
+        |s| s,
+        move |inner| {
+            Arc::new(Gated {
+                inner,
+                entered: e,
+                release: r,
+            })
+        },
+    ));
+    w.backup.serve(
+        vec![archived(Uuid::new_v4(), input("Soup"), &[])],
+        HashMap::new(),
+    );
+    let first = tokio::spawn({
+        let w = w.clone();
+        async move { w.import().await }
+    });
+    entered.notified().await; // the first import holds the slot and is waiting inside `open`
+    let second = w.import().await;
+    assert!(
+        matches!(second, Err(DomainError::Conflict(_))),
+        "{second:?}"
+    );
+    release.notify_one();
+    assert_eq!(first.await.unwrap().unwrap().imported, 1);
+
+    // The slot is free again (and the refused call did not consume the archive).
+    w.backup.serve(
+        vec![archived(Uuid::new_v4(), input("Stew"), &[])],
+        HashMap::new(),
+    );
+    let third = tokio::spawn({
+        let w = w.clone();
+        async move { w.import().await }
+    });
+    entered.notified().await;
+    release.notify_one();
+    assert_eq!(third.await.unwrap().unwrap().imported, 1);
+}
+
+#[tokio::test]
+async fn the_import_slot_is_freed_when_an_import_fails() {
+    let w = World::new();
+    w.backup.refuse(DomainError::validation("not a zip"));
+    assert!(matches!(w.import().await, Err(DomainError::Validation(_))));
+    w.backup.serve(
+        vec![archived(Uuid::new_v4(), input("Soup"), &[])],
+        HashMap::new(),
+    );
+    assert_eq!(w.import().await.unwrap().imported, 1);
 }
 
 #[tokio::test]

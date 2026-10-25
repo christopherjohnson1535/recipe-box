@@ -53,6 +53,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 409:
+        response_409 = ErrorBody.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 413:
         response_413 = ErrorBody.from_dict(response.json())
 
@@ -92,11 +97,17 @@ def sync_detailed(
 ) -> Response[ErrorBody | ImportSummary]:
     """Restores a backup zip. Admin only.
 
-     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
-    caller, and
-    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
-    wrong, nothing
-    is added.
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -127,11 +138,17 @@ def sync(
 ) -> ErrorBody | ImportSummary | None:
     """Restores a backup zip. Admin only.
 
-     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
-    caller, and
-    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
-    wrong, nothing
-    is added.
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -157,11 +174,17 @@ async def asyncio_detailed(
 ) -> Response[ErrorBody | ImportSummary]:
     """Restores a backup zip. Admin only.
 
-     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
-    caller, and
-    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
-    wrong, nothing
-    is added.
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -190,11 +213,17 @@ async def asyncio(
 ) -> ErrorBody | ImportSummary | None:
     """Restores a backup zip. Admin only.
 
-     A recipe whose id already exists is skipped; every other recipe is added with a new id, owned by the
-    caller, and
-    its photos are checked and re-encoded like uploads. All or nothing: if anything in the archive is
-    wrong, nothing
-    is added.
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.

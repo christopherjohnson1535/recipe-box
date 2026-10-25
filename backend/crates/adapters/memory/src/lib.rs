@@ -153,6 +153,11 @@ impl MemoryStore {
         }
     }
 
+    /// How many recipe rows the store holds, soft-deleted ones included (for tests of all-or-nothing writes).
+    pub fn recipe_rows(&self) -> usize {
+        self.lock().recipes.len()
+    }
+
     fn lock(&self) -> MutexGuard<'_, State> {
         self.state.lock().expect("memory store lock")
     }
@@ -181,6 +186,36 @@ impl RecipeRepo for MemoryStore {
         let recipe = s.recipe(&stored);
         s.recipes.insert(id, stored);
         Ok(recipe)
+    }
+
+    async fn create_many(
+        &self,
+        user_id: Uuid,
+        inputs: Vec<RecipeInput>,
+    ) -> DomainResult<Vec<Uuid>> {
+        let mut s = self.lock();
+        for input in &inputs {
+            s.check_images(input)?;
+        }
+        let now = self.clock.now();
+        let mut ids = Vec::with_capacity(inputs.len());
+        for input in inputs {
+            let id = Uuid::new_v4();
+            s.recipes.insert(
+                id,
+                StoredRecipe {
+                    id,
+                    input,
+                    created_by: Some(user_id),
+                    updated_by: Some(user_id),
+                    created_at: now,
+                    updated_at: now,
+                    deleted_at: None,
+                },
+            );
+            ids.push(id);
+        }
+        Ok(ids)
     }
 
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>> {
