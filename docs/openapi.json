@@ -385,6 +385,112 @@
         ]
       }
     },
+    "/api/grocery/export/google-tasks": {
+      "post": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store section, the\nitems as subtasks. The list is emptied first, so sending again never duplicates.",
+        "operationId": "exportGroceryToGoogleTasks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What was sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleExport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No Google account connected, or Google no longer accepts the connection, which is then forgotten (`google_not_connected`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over the size limit (`too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Google Tasks is not set up on this server (`google_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Google failed: timeout, 5xx or an unreadable reply (`google_error`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/grocery/items": {
       "post": {
         "tags": [
@@ -1241,6 +1347,234 @@
           },
           "502": {
             "description": "The site refused us (`site_blocked`), the fetch failed or timed out (`fetch_failed`), or the AI fallback failed (`ai_error`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/integrations/google": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Whether this member can send the list to Google Tasks.",
+        "operationId": "getGoogleStatus",
+        "responses": {
+          "200": {
+            "description": "The status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Revokes the token at Google (best effort) and forgets the connection and its task list.",
+        "operationId": "disconnectGoogle",
+        "responses": {
+          "204": {
+            "description": "Disconnected. Also when nothing was connected, or Google could not be reached to revoke."
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/integrations/google/callback": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Where Google sends the browser back. Always ends on the settings page with `?google=connected` or\n`?google=error`; no token is ever put in the address.",
+        "operationId": "googleCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "description": "Google's authorisation code.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "Must equal the `rb_google_state` cookie.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "description": "Set by Google when the member declined.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "To `/settings?google=connected`, or `/settings?google=error` when anything went wrong (nothing is stored then). Clears the `rb_google_state` cookie.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`/settings?google=connected` or `/settings?google=error`."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Clears `rb_google_state`."
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/integrations/google/connect": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Starts connecting a Google account. Open it as a page (a browser navigation), not with `fetch`.",
+        "operationId": "connectGoogle",
+        "responses": {
+          "302": {
+            "description": "To Google's consent page. Sets the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes).",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Google's consent page."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`rb_google_state`, the random `state` sent to Google."
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Google Tasks is not set up on this server (`google_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2721,6 +3055,9 @@
           "no_recipe_found",
           "ai_disabled",
           "ai_error",
+          "google_disabled",
+          "google_not_connected",
+          "google_error",
           "blocked_address",
           "site_blocked",
           "fetch_failed",
@@ -2751,6 +3088,70 @@
               "format": "uuid"
             },
             "description": "Photo import only: the photos were stored but no draft could be made."
+          }
+        }
+      },
+      "GoogleExport": {
+        "type": "object",
+        "description": "What was sent to Google Tasks.",
+        "required": [
+          "taskListTitle",
+          "sections",
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "integer",
+            "description": "Subtasks: the items beneath them.",
+            "minimum": 0
+          },
+          "sections": {
+            "type": "integer",
+            "description": "Parent tasks: the store sections that had something to buy.",
+            "minimum": 0
+          },
+          "taskListTitle": {
+            "type": "string",
+            "description": "The Google Tasks list used (`Groceries`)."
+          }
+        }
+      },
+      "GoogleExportRequest": {
+        "type": "object",
+        "properties": {
+          "includeStaples": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Also send items marked as staples (default false)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "GoogleStatus": {
+        "type": "object",
+        "description": "Whether this member can send the grocery list to Google Tasks.",
+        "required": [
+          "configured",
+          "connected",
+          "connectedAt"
+        ],
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "The server has a Google OAuth client. When false, nothing else here works and `connected` is false."
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "This member connected their Google account."
+          },
+          "connectedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -3831,6 +4232,10 @@
     {
       "name": "import",
       "description": "Turn links, text and photos into recipe drafts; nothing is saved."
+    },
+    {
+      "name": "integrations",
+      "description": "Connect a Google account to send the grocery list to Google Tasks."
     },
     {
       "name": "media",

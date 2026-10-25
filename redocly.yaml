@@ -5,6 +5,8 @@ rules:
   operation-operationId: error
   # health, getSetupStatus and logout have no client error to describe.
   operation-4xx-response: off
+  # The Google connect and callback routes only redirect (302), by design.
+  operation-2xx-response: off
 apis:
   main:
     root: docs/openapi.json
