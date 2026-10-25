@@ -167,8 +167,9 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   - **How items are made (recompute).** Each ingredient line of each recipe is parsed (deterministic, no AI): a
     leading quantity (whole, decimal, `1/2`, `1 1/2`, `1-1/2`, unicode `½`, ranges `2-3`/`2 to 3`), a unit from the
     same list as the recipe page's scaler (canonical short form: `cup`, `tbsp`, `tsp`, `lb`, `oz`, `g`, `kg`, `ml`,
-    `l`, `clove`, `can`, …) and the item name (prep notes after a comma and parentheticals dropped, lower-cased,
-    simple plurals made singular). The quantity is multiplied by the recipe's `scale`. Lines that do not parse
+    `l`, `clove`, `can`, …) and the item name (prep notes after a comma, parentheticals and size words dropped,
+    lower-cased). Items merge on a key that also makes simple plurals singular; the returned `name` is for display:
+    a count with no unit is plural when the total is over 1 ("3 onions"), singular otherwise. The quantity is multiplied by the recipe's `scale`. Lines that do not parse
     ("salt to taste", "2 cups plus 2 tbsp flour") are kept whole as the name, with no amount, never dropped.
     Items merge by name across recipes: amounts with the same unit (or both unit-less) add up; different units stay
     side by side in `amounts` under the one name (no unit conversion). The section is the household override for
