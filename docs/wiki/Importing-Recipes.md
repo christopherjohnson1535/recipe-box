@@ -1,6 +1,6 @@
 # Importing recipes
 
-Every import gives you a **draft** to check and fix before it is saved. Open **Import** and pick Link, Photo or Text; the page address remembers the choice, and `/import?url=…` starts a link import straight away.
+Every import gives you a **draft** to check and fix before it is saved. Open **Import** and pick Link, Photo or Text; the page address remembers the choice, and `/import?url=…` (what the Shortcut and bookmarklet open) asks you to confirm that page first, then imports it.
 
 | From | How | Notes |
 |---|---|---|
@@ -8,7 +8,7 @@ Every import gives you a **draft** to check and fix before it is saved. Open **I
 | A blocked site, or any text | Import → Text → paste the recipe | Some sites block servers; copy the recipe text from the page instead. Headings such as "For the sauce" become sections. Needs AI. You can add the page address so the recipe keeps its source. |
 | A photo | Import → Photo → pick or take up to 6 photos | Cookbook pages, handwritten cards, screenshots. Needs AI; without it the photo is saved next to an empty form. |
 | A photo of a dish | Import → Photo → "Guess from a dish" | Clearly marked as a guess. Needs AI. |
-| Safari share sheet | Apple Shortcut / bookmarklet | Planned (Phase 4). |
+| Safari share sheet or a bookmark | Apple Shortcut / bookmarklet | See [[Save from Safari]]. You confirm the page, then check the draft. |
 
 **While it works**
 - A link takes a few seconds; reading photos can take about 20 seconds. **Stop waiting and edit** brings the form back (the server may still finish, its answer is ignored). If an import fails you always get a next step: Try again, Type it in, or Sign in.

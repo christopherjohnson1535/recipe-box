@@ -162,11 +162,31 @@ describe("ImportScreen", () => {
     expect(screen.getByRole("button", { name: "Start over with a different link" })).toBeTruthy();
   });
 
-  it("starts the link import by itself from ?url=", async () => {
+  it("asks before importing a shared ?url= and fetches nothing until confirmed", async () => {
     const api = mockApi();
     render(<ImportScreen api={api} initialUrl="https://example.com/pancakes" />);
+    expect(screen.getByRole("heading", { name: "Import this page?" })).toBeTruthy();
+    expect(screen.getByText("https://example.com/pancakes")).toBeTruthy();
+    expect(api.importUrl).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Import this recipe" }));
     await screen.findByRole("heading", { name: "Check the recipe" });
     expect(api.importUrl).toHaveBeenCalledTimes(1);
+    expect(api.importUrl).toHaveBeenCalledWith("https://example.com/pancakes");
+  });
+
+  it("drops a shared address on Not this one without importing", () => {
+    const api = mockApi();
+    render(<ImportScreen api={api} initialUrl="https://example.com/pancakes" />);
+    fireEvent.click(screen.getByRole("button", { name: "Not this one" }));
+    expect((screen.getByLabelText("Recipe link") as HTMLInputElement).value).toBe("");
+    expect(api.importUrl).not.toHaveBeenCalled();
+  });
+
+  it("shows a note, and no import, when the shared address was refused", () => {
+    const api = mockApi();
+    render(<ImportScreen api={api} sharedRejected />);
+    expect(screen.getByText("That link can’t be imported")).toBeTruthy();
+    expect(api.importUrl).not.toHaveBeenCalled();
   });
 
   // No import mode answers 501 any more (only export does), so this uses photo as a synthetic stub to keep the generic mapping covered.
