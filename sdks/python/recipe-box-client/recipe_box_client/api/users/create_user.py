@@ -89,8 +89,8 @@ def sync_detailed(
     """Adds a household member. Admin only.
 
     Args:
-        body (CreateUserBody):  Example: {'displayName': 'Alex', 'password': 'correct horse
-            battery', 'role': 'member', 'username': 'alex'}.
+        body (CreateUserBody):  Example: {'displayName': 'Alex', 'email': 'alex@example.com',
+            'password': 'correct horse battery', 'role': 'member', 'username': 'alex'}.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -119,8 +119,8 @@ def sync(
     """Adds a household member. Admin only.
 
     Args:
-        body (CreateUserBody):  Example: {'displayName': 'Alex', 'password': 'correct horse
-            battery', 'role': 'member', 'username': 'alex'}.
+        body (CreateUserBody):  Example: {'displayName': 'Alex', 'email': 'alex@example.com',
+            'password': 'correct horse battery', 'role': 'member', 'username': 'alex'}.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -144,8 +144,8 @@ async def asyncio_detailed(
     """Adds a household member. Admin only.
 
     Args:
-        body (CreateUserBody):  Example: {'displayName': 'Alex', 'password': 'correct horse
-            battery', 'role': 'member', 'username': 'alex'}.
+        body (CreateUserBody):  Example: {'displayName': 'Alex', 'email': 'alex@example.com',
+            'password': 'correct horse battery', 'role': 'member', 'username': 'alex'}.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -172,8 +172,8 @@ async def asyncio(
     """Adds a household member. Admin only.
 
     Args:
-        body (CreateUserBody):  Example: {'displayName': 'Alex', 'password': 'correct horse
-            battery', 'role': 'member', 'username': 'alex'}.
+        body (CreateUserBody):  Example: {'displayName': 'Alex', 'email': 'alex@example.com',
+            'password': 'correct horse battery', 'role': 'member', 'username': 'alex'}.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
