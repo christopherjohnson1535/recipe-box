@@ -20,13 +20,13 @@ export const LIMITS = {
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 /**
  * The pages kept: a recipe page, its cooking mode, and the grocery list (GRO, the shopping list opens in the store with
- * no signal). The name is from before the list; sw.ts and OfflineSupport read it as "a page worth keeping".
+ * no signal).
  */
-export const RECIPE_PAGE = new RegExp(`^(?:/recipes/${ID}(?:/cook)?|/groceries)$`);
+export const KEPT_PAGE = new RegExp(`^(?:/recipes/${ID}(?:/cook)?|/groceries)$`);
 /** A recipe page (not cooking mode), for the list of kept recipes. */
 export const RECIPE_READ_PAGE = new RegExp(`^/recipes/${ID}$`);
 /** The API responses kept, network first: one recipe, and the grocery list (`GET /api/grocery`; writes are never cached). */
-export const RECIPE_API = new RegExp(`^/api/(?:recipes/${ID}|grocery)$`);
+export const KEPT_API = new RegExp(`^/api/(?:recipes/${ID}|grocery)$`);
 /** Same rule as the API's `GET /media/{file_name}` (docs/API.md). The names are content ids, so they never change. */
 export const MEDIA = /^\/media\/[0-9a-f-]{36}(?:\.display)?\.jpg$/;
 

@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { RECIPE_PAGE } from "./rules";
+import { KEPT_PAGE } from "./rules";
 
 export const SW_URL = "/serwist/sw.js";
 
@@ -27,7 +27,7 @@ export function OfflineSupport() {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
     const first = landed.current === null;
     if (first) landed.current = pathname;
-    if (!RECIPE_PAGE.test(pathname) || (first && navigator.serviceWorker.controller)) return;
+    if (!KEPT_PAGE.test(pathname) || (first && navigator.serviceWorker.controller)) return;
     navigator.serviceWorker.ready
       .then((reg) => {
         if (navigator.onLine) reg.active?.postMessage({ type: "CACHE_URLS", payload: { urlsToCache: [pathname] } });

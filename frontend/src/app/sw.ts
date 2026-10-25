@@ -5,7 +5,7 @@
 // and /media/* only, network first so online always shows the server's copy. Everything else goes to the network.
 import type { PrecacheEntry, RouteHandler, SerwistGlobalConfig } from "serwist";
 import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
-import { CACHES, LIMITS, MEDIA, mediaIn, OFFLINE_URL, pageKey, RECIPE_API, RECIPE_PAGE, RECIPE_READ_PAGE } from "../components/offline/rules";
+import { CACHES, LIMITS, MEDIA, mediaIn, OFFLINE_URL, pageKey, KEPT_API, KEPT_PAGE, RECIPE_READ_PAGE } from "../components/offline/rules";
 import { createSession } from "../components/offline/worker-plugins";
 
 declare global {
@@ -57,11 +57,11 @@ const serwist = new Serwist({
   runtimeCaching: [
     {
       // Documents and the page's CACHE_URLS fetches; React Server Component requests (RSC: 1) stay network-only.
-      matcher: ({ request, sameOrigin, url }) => sameOrigin && request.headers.get("RSC") !== "1" && RECIPE_PAGE.test(url.pathname),
+      matcher: ({ request, sameOrigin, url }) => sameOrigin && request.headers.get("RSC") !== "1" && KEPT_PAGE.test(url.pathname),
       handler: pages,
     },
     {
-      matcher: ({ sameOrigin, url }) => sameOrigin && RECIPE_API.test(url.pathname),
+      matcher: ({ sameOrigin, url }) => sameOrigin && KEPT_API.test(url.pathname),
       handler: new NetworkFirst({
         cacheName: CACHES.api,
         networkTimeoutSeconds: LIMITS.networkTimeoutSeconds,
