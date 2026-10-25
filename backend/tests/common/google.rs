@@ -1,7 +1,11 @@
 //! A local stand-in for Google's OAuth token and revoke endpoints and the Tasks API, on 127.0.0.1 (no real
 //! network). It records every request, keeps task lists in memory with Google's sibling ordering (a task made
-//! without `previous` goes first among its siblings; with `parent` it goes under that task), deletes a task's
-//! subtasks with it, pages task listings, and rejects an access token it did not issue.
+//! without `previous` goes first among its siblings; with `parent` it goes under that task), pages task and list
+//! listings (20 by default, 100 at most), hides completed and hidden tasks unless asked (`showCompleted`,
+//! `showHidden`), answers 404 for a list or task it does not have, and rejects an access token it did not issue.
+//! Whether deleting a task deletes its subtasks is not documented by Google; by default the stub does, and
+//! `strict_deletes` makes it refuse (400) to delete a task that still has subtasks, so a test can prove the
+//! adapter does not rely on either. Failures can be scripted: `fail_tasks_after`, `hiccup`.
 //!
 //! ```ignore
 //! let google = StubGoogle::start().await;
@@ -12,6 +16,7 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use axum::{
@@ -48,6 +53,21 @@ struct Task {
     id: String,
     title: String,
     parent: Option<String>,
+    /// Ticked off.
+    completed: bool,
+    /// Completed in a Google app: listed only with `showHidden=true`.
+    hidden: bool,
+}
+
+/// How a scripted Tasks call goes wrong.
+#[derive(Clone, Copy, Debug)]
+pub enum Hiccup {
+    /// `429` with this `Retry-After` (seconds).
+    TooMany { retry_after: Option<u32> },
+    /// `403` with the reason `rateLimitExceeded`.
+    RateLimited,
+    /// Any other status.
+    Status(u16),
 }
 
 #[derive(Default)]
@@ -97,6 +117,18 @@ struct Inner {
     revoke_status: Option<u16>,
     /// Every Tasks call answers this status.
     tasks_status: Option<u16>,
+    /// Tasks calls seen so far (throttled and failed ones too).
+    tasks_calls: usize,
+    /// Every Tasks call after this many answers this status.
+    fail_after: Option<(usize, u16)>,
+    /// `(calls to let through first, calls to spoil, how)`.
+    hiccups: Option<(usize, usize, Hiccup)>,
+    /// Deleting a task with subtasks answers 400.
+    strict_deletes: bool,
+    /// The `scope` the code exchange reports (default: the Tasks scope).
+    granted_scope: Option<String>,
+    /// A refresh answers this status and error instead of an access token.
+    refresh_refused: Option<(u16, String)>,
     /// The code exchange leaves out the refresh token.
     omit_refresh_token: bool,
     page_size: Option<usize>,
@@ -120,7 +152,7 @@ impl StubGoogle {
         let app = Router::new()
             .route("/token", post(token))
             .route("/revoke", post(revoke))
-            .route("/tasks/v1/users/@me/lists", post(make_list))
+            .route("/tasks/v1/users/@me/lists", get(list_lists).post(make_list))
             .route("/tasks/v1/users/@me/lists/{id}", get(get_list))
             .route(
                 "/tasks/v1/lists/{id}/tasks",
@@ -136,6 +168,11 @@ impl StubGoogle {
 
     /// Points `state` at this stub: the Google adapter on the stub's hosts, and the real cipher.
     pub fn enable(&self, state: &mut AppState) {
+        self.enable_with_deadline(state, Duration::from_secs(30));
+    }
+
+    /// Like `enable`, with a limit on how long filling a list may take.
+    pub fn enable_with_deadline(&self, state: &mut AppState, fill_deadline: Duration) {
         let urls = adapter_google::GoogleUrls {
             auth: "https://accounts.test/o/oauth2/v2/auth".into(),
             token: format!("{}/token", self.base_url),
@@ -148,7 +185,8 @@ impl StubGoogle {
             PUBLIC_URL,
             urls,
         )
-        .unwrap();
+        .unwrap()
+        .with_timing(Duration::from_millis(5), fill_deadline);
         state.google = Arc::new(client);
         state.cipher = Arc::new(ChaChaCipher::new(&KEY));
     }
@@ -173,8 +211,41 @@ impl StubGoogle {
         self.lock().revoke_status = Some(status);
     }
 
+    /// Every Tasks call answers this status (`None`: back to normal, scripted `fail_tasks_after` and `hiccup` included).
     pub fn fail_tasks_with(&self, status: Option<u16>) {
-        self.lock().tasks_status = status;
+        let mut g = self.lock();
+        g.tasks_status = status;
+        if status.is_none() {
+            g.fail_after = None;
+            g.hiccups = None;
+        }
+    }
+
+    /// The first `calls` Tasks calls from now on work, every later one answers `status` (a failure mid-run).
+    pub fn fail_tasks_after(&self, calls: usize, status: u16) {
+        let mut g = self.lock();
+        g.fail_after = Some((g.tasks_calls + calls, status));
+    }
+
+    /// After `after` more Tasks calls, the next `calls` go wrong in this way; the ones after that work again.
+    pub fn hiccup(&self, after: usize, calls: usize, how: Hiccup) {
+        let mut g = self.lock();
+        g.hiccups = Some((g.tasks_calls + after, calls, how));
+    }
+
+    /// Deleting a task that still has subtasks answers 400 instead of taking them along.
+    pub fn strict_deletes(&self) {
+        self.lock().strict_deletes = true;
+    }
+
+    /// The code exchange reports this granted `scope`.
+    pub fn grant_scope(&self, scope: &str) {
+        self.lock().granted_scope = Some(scope.into());
+    }
+
+    /// Refreshing a token answers this status and OAuth error (not `invalid_grant`, which `kill_refresh_token` gives).
+    pub fn refuse_refresh_with(&self, status: u16, error: &str) {
+        self.lock().refresh_refused = Some((status, error.into()));
     }
 
     pub fn omit_refresh_token(&self) {
@@ -186,6 +257,21 @@ impl StubGoogle {
         self.lock().page_size = Some(n);
     }
 
+    /// The member already has a list with this title; returns its id.
+    pub fn add_list(&self, title: &str) -> String {
+        let mut g = self.lock();
+        g.counter += 1;
+        let id = format!("manual-list-{}", g.counter);
+        g.lists.push((
+            id.clone(),
+            List {
+                title: title.into(),
+                ..Default::default()
+            },
+        ));
+        id
+    }
+
     /// The member deleted the list in Google Tasks.
     pub fn delete_list(&self, id: &str) {
         self.lock().lists.retain(|(l, _)| l != id);
@@ -193,6 +279,16 @@ impl StubGoogle {
 
     /// Someone (the member, in the Google app) added a task by hand.
     pub fn add_task(&self, list: &str, title: &str) {
+        self.add_manual_task(list, title, false, false);
+    }
+
+    /// A task the member ticked off in the Google app: completed and hidden, so it is listed only with
+    /// `showHidden=true`.
+    pub fn add_completed_task(&self, list: &str, title: &str) {
+        self.add_manual_task(list, title, true, true);
+    }
+
+    fn add_manual_task(&self, list: &str, title: &str, completed: bool, hidden: bool) {
         let mut g = self.lock();
         g.counter += 1;
         let id = format!("manual-{}", g.counter);
@@ -203,6 +299,8 @@ impl StubGoogle {
                 id: id.clone(),
                 title: title.into(),
                 parent: None,
+                completed,
+                hidden,
             },
         );
         l.order.entry(None).or_default().push(id);
@@ -219,6 +317,15 @@ impl StubGoogle {
         self.requests()
             .into_iter()
             .filter(|r| r.path.starts_with(prefix))
+            .collect()
+    }
+
+    /// The ids of the tasks deleted, in the order they were asked for.
+    pub fn deleted_tasks(&self) -> Vec<String> {
+        self.requests()
+            .into_iter()
+            .filter(|r| r.method == "DELETE")
+            .filter_map(|r| r.path.rsplit('/').next().map(String::from))
             .collect()
     }
 
@@ -319,14 +426,20 @@ async fn token(
             };
             let access = format!("access-{n}");
             g.access.insert(access.clone(), refresh.clone());
-            let mut body =
-                json!({ "access_token": access, "expires_in": 3599, "token_type": "Bearer" });
+            let scope = g
+                .granted_scope
+                .clone()
+                .unwrap_or_else(|| "https://www.googleapis.com/auth/tasks".into());
+            let mut body = json!({ "access_token": access, "expires_in": 3599, "token_type": "Bearer", "scope": scope });
             if !g.omit_refresh_token {
                 body["refresh_token"] = json!(refresh);
             }
             Json(body).into_response()
         }
         Some("refresh_token") => {
+            if let Some((status, error)) = g.refresh_refused.clone() {
+                return oauth_error(status, &error);
+            }
             let refresh = field("refresh_token").unwrap_or_default().to_string();
             let known = g.access.values().any(|r| *r == refresh);
             if !known || g.dead.contains(&refresh) {
@@ -364,9 +477,38 @@ async fn revoke(
     StatusCode::OK.into_response()
 }
 
-/// Checks the bearer token and the forced failure; `Some` is the answer to give instead.
-fn tasks_gate(g: &Inner, headers: &HeaderMap) -> Option<Response> {
+/// Checks the bearer token and the scripted failures; `Some` is the answer to give instead.
+fn tasks_gate(g: &mut Inner, headers: &HeaderMap) -> Option<Response> {
+    g.tasks_calls += 1;
+    let calls = g.tasks_calls;
+    if let Some((_, left, how)) = g
+        .hiccups
+        .as_mut()
+        .filter(|(after, left, _)| calls > *after && *left > 0)
+    {
+        *left -= 1;
+        return Some(match *how {
+            Hiccup::TooMany { retry_after } => {
+                let mut res = oauth_error(429, "rate_limited");
+                if let Some(secs) = retry_after {
+                    res.headers_mut().insert("retry-after", secs.into());
+                }
+                res
+            }
+            Hiccup::RateLimited => (
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": { "code": 403, "message": "Rate Limit Exceeded", "errors": [
+                    { "domain": "usageLimits", "reason": "rateLimitExceeded", "message": "Rate Limit Exceeded" }
+                ] } })),
+            )
+                .into_response(),
+            Hiccup::Status(status) => oauth_error(status, "stub_failure"),
+        });
+    }
     if let Some(status) = g.tasks_status {
+        return Some(oauth_error(status, "stub_failure"));
+    }
+    if let Some((_, status)) = g.fail_after.filter(|(after, _)| g.tasks_calls > *after) {
         return Some(oauth_error(status, "stub_failure"));
     }
     let bearer = headers
@@ -397,7 +539,7 @@ async fn make_list(State(inner): Shared, headers: HeaderMap, Json(body): Json<Va
         body.clone(),
         &headers,
     );
-    if let Some(r) = tasks_gate(&g, &headers) {
+    if let Some(r) = tasks_gate(&mut g, &headers) {
         return r;
     }
     g.counter += 1;
@@ -423,13 +565,65 @@ async fn get_list(State(inner): Shared, Path(id): Path<String>, headers: HeaderM
         Value::Null,
         &headers,
     );
-    if let Some(r) = tasks_gate(&g, &headers) {
+    if let Some(r) = tasks_gate(&mut g, &headers) {
         return r;
     }
     match g.lists.iter().find(|(l, _)| *l == id) {
         Some((id, l)) => Json(json!({ "id": id, "title": l.title })).into_response(),
         None => not_found(),
     }
+}
+
+/// The page of `ids` a listing asks for: `maxResults` (20 if absent, 100 at most, and at most `page_size`) from the
+/// `pageToken` (an offset in the stub), and the token of the next page.
+fn page_of<T: Clone>(
+    g: &Inner,
+    q: &HashMap<String, String>,
+    all: &[T],
+    default: usize,
+) -> (Vec<T>, Option<String>) {
+    let size = g.page_size.unwrap_or(100).min(
+        q.get("maxResults")
+            .and_then(|m| m.parse::<usize>().ok())
+            .unwrap_or(default)
+            .min(100),
+    );
+    let start: usize = q.get("pageToken").and_then(|t| t.parse().ok()).unwrap_or(0);
+    let items = all.iter().skip(start).take(size).cloned().collect();
+    (
+        items,
+        (start + size < all.len()).then(|| (start + size).to_string()),
+    )
+}
+
+async fn list_lists(
+    State(inner): Shared,
+    Query(q): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Response {
+    let mut g = inner.lock().unwrap();
+    record(
+        &mut g,
+        "GET",
+        "/tasks/v1/users/@me/lists",
+        q.clone(),
+        Value::Null,
+        &headers,
+    );
+    if let Some(r) = tasks_gate(&mut g, &headers) {
+        return r;
+    }
+    let all: Vec<Value> = g
+        .lists
+        .iter()
+        .map(|(id, l)| json!({ "id": id, "title": l.title }))
+        .collect();
+    let (items, next) = page_of(&g, &q, &all, 1000);
+    let mut body = json!({ "kind": "tasks#taskLists", "items": items });
+    if let Some(next) = next {
+        body["nextPageToken"] = json!(next);
+    }
+    Json(body).into_response()
 }
 
 async fn list_tasks(
@@ -447,28 +641,25 @@ async fn list_tasks(
         Value::Null,
         &headers,
     );
-    if let Some(r) = tasks_gate(&g, &headers) {
+    if let Some(r) = tasks_gate(&mut g, &headers) {
         return r;
     }
-    let size = g.page_size.unwrap_or(100).min(
-        q.get("maxResults")
-            .and_then(|m| m.parse().ok())
-            .unwrap_or(20),
-    );
     let Some((_, l)) = g.lists.iter().find(|(l, _)| *l == id) else {
         return not_found();
     };
-    let ids = l.in_order();
-    let start: usize = q.get("pageToken").and_then(|t| t.parse().ok()).unwrap_or(0);
-    let items: Vec<Value> = ids
+    let flag = |name: &str, default: bool| q.get(name).map_or(default, |v| v == "true");
+    let (show_hidden, show_completed) = (flag("showHidden", false), flag("showCompleted", true));
+    let visible: Vec<Value> = l
+        .in_order()
         .iter()
-        .skip(start)
-        .take(size)
-        .map(|t| json!({ "id": t, "title": l.tasks[t].title }))
+        .map(|t| &l.tasks[t])
+        .filter(|t| (!t.hidden || show_hidden) && (!t.completed || show_completed))
+        .map(|t| json!({ "id": t.id, "title": t.title, "parent": t.parent }))
         .collect();
+    let (items, next) = page_of(&g, &q, &visible, 20);
     let mut body = json!({ "kind": "tasks#tasks", "items": items });
-    if start + size < ids.len() {
-        body["nextPageToken"] = json!((start + size).to_string());
+    if let Some(next) = next {
+        body["nextPageToken"] = json!(next);
     }
     Json(body).into_response()
 }
@@ -489,7 +680,7 @@ async fn make_task(
         body.clone(),
         &headers,
     );
-    if let Some(r) = tasks_gate(&g, &headers) {
+    if let Some(r) = tasks_gate(&mut g, &headers) {
         return r;
     }
     g.counter += 1;
@@ -528,6 +719,8 @@ async fn make_task(
             id: task_id.clone(),
             title: title.clone(),
             parent,
+            completed: false,
+            hidden: false,
         },
     );
     Json(json!({ "id": task_id, "title": title })).into_response()
@@ -547,14 +740,26 @@ async fn delete_task(
         Value::Null,
         &headers,
     );
-    if let Some(r) = tasks_gate(&g, &headers) {
+    if let Some(r) = tasks_gate(&mut g, &headers) {
         return r;
     }
+    let strict = g.strict_deletes;
     let Some((_, l)) = g.lists.iter_mut().find(|(l, _)| *l == id) else {
         return not_found();
     };
     if !l.tasks.contains_key(&task) {
         return not_found();
+    }
+    if strict
+        && l.order
+            .get(&Some(task.clone()))
+            .is_some_and(|c| !c.is_empty())
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "code": 400, "message": "Task has subtasks" } })),
+        )
+            .into_response();
     }
     l.remove(&task);
     StatusCode::NO_CONTENT.into_response()

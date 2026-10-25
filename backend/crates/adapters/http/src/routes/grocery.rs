@@ -144,13 +144,13 @@ pub async fn clear_checked(
 }
 
 /// Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store section, the
-/// items as subtasks. The list is emptied first, so sending again never duplicates.
+/// items as subtasks. The list is emptied first, so sending again never duplicates. One send per member at a time.
 #[utoipa::path(post, path = "/api/grocery/export/google-tasks", operation_id = "exportGroceryToGoogleTasks", tag = "grocery", security(("session" = [])), request_body = GoogleExportRequest, responses(
     (status = 200, description = "What was sent.", body = GoogleExport),
     (status = 400, description = "Malformed body (`validation`).", body = ErrorBody),
-    (status = 409, description = "No Google account connected, or Google no longer accepts the connection, which is then forgotten (`google_not_connected`).", body = ErrorBody),
+    (status = 409, description = "No Google account connected, or Google no longer accepts the connection (`google_not_connected`; the token is then forgotten, the task list is remembered), or a send for this member is already running (`conflict`).", body = ErrorBody),
     (status = 422, description = "Google Tasks is not set up on this server (`google_disabled`).", body = ErrorBody),
-    (status = 502, description = "Google failed: timeout, 5xx or an unreadable reply (`google_error`).", body = ErrorBody),
+    (status = 502, description = "Google failed: timeout, 5xx, a refusal or an unreadable reply (`google_error`). The list in Google Tasks may be partly filled; sending again starts over.", body = ErrorBody),
 ))]
 pub async fn export_google_tasks(
     State(state): State<HttpState>,

@@ -17,8 +17,8 @@ use domain::{
 };
 use ports::{GoogleConnectionRepo, GoogleTasks, TaskSection, TokenCipher, contract::ManualClock};
 
-/// `(access token, tasklist id asked for, title, sections)` of one `replace_list`.
-type Replaced = (String, Option<String>, String, Vec<TaskSection>);
+/// `(access token, list id, sections)` of one `fill_list`.
+type Filled = (String, String, Vec<TaskSection>);
 
 /// A Google that records what it was asked and answers from a script.
 #[derive(Default)]
@@ -26,10 +26,14 @@ struct FakeGoogle {
     /// `access_token` answers `GoogleNotConnected` when set.
     refresh_is_dead: Mutex<bool>,
     revoke_fails: Mutex<bool>,
-    /// The list id `replace_list` answers with.
+    /// The list id `ensure_list` answers with.
     list_id: Mutex<String>,
+    /// `fill_list` answers `Google`.
+    fill_fails: Mutex<bool>,
     revoked: Mutex<Vec<String>>,
-    replaced: Mutex<Vec<Replaced>>,
+    /// The list id each `ensure_list` was given.
+    ensured: Mutex<Vec<Option<String>>>,
+    filled: Mutex<Vec<Filled>>,
 }
 
 #[async_trait]
@@ -45,6 +49,7 @@ impl GoogleTasks for FakeGoogle {
     async fn exchange_code(&self, code: &str) -> DomainResult<Secret> {
         match code {
             "good" => Ok(Secret::new("refresh-1")),
+            "good-again" => Ok(Secret::new("refresh-2")),
             _ => Err(DomainError::Google("refused".into())),
         }
     }
@@ -64,20 +69,35 @@ impl GoogleTasks for FakeGoogle {
         Ok(())
     }
 
-    async fn replace_list(
+    async fn ensure_list(
         &self,
-        access: &Secret,
+        _: &Secret,
         tasklist_id: Option<&str>,
         title: &str,
-        sections: &[TaskSection],
     ) -> DomainResult<String> {
-        self.replaced.lock().unwrap().push((
+        assert_eq!(title, "Groceries");
+        self.ensured
+            .lock()
+            .unwrap()
+            .push(tasklist_id.map(Into::into));
+        Ok(self.list_id.lock().unwrap().clone())
+    }
+
+    async fn fill_list(
+        &self,
+        access: &Secret,
+        tasklist_id: &str,
+        sections: &[TaskSection],
+    ) -> DomainResult<()> {
+        if *self.fill_fails.lock().unwrap() {
+            return Err(DomainError::Google("down".into()));
+        }
+        self.filled.lock().unwrap().push((
             access.expose().into(),
-            tasklist_id.map(Into::into),
-            title.into(),
+            tasklist_id.into(),
             sections.to_vec(),
         ));
-        Ok(self.list_id.lock().unwrap().clone())
+        Ok(())
     }
 }
 
@@ -183,15 +203,25 @@ impl World {
     }
 
     async fn connect(&self) {
-        self.services
-            .google
-            .finish(self.user, "good")
-            .await
-            .unwrap();
+        assert!(self.connect_with("good").await.is_none());
     }
 
-    fn sent(&self) -> Vec<Replaced> {
-        self.google.replaced.lock().unwrap().clone()
+    fn clock_now(&self) -> domain::chrono::DateTime<domain::chrono::Utc> {
+        ports::Clock::now(&*self.clock)
+    }
+
+    fn sent(&self) -> Vec<Filled> {
+        self.google.filled.lock().unwrap().clone()
+    }
+
+    /// The list id each `ensure_list` was given.
+    fn asked(&self) -> Vec<Option<String>> {
+        self.google.ensured.lock().unwrap().clone()
+    }
+
+    /// `finish` with `code`, as the callback does.
+    async fn connect_with(&self, code: &str) -> Option<DomainError> {
+        self.services.google.finish(self.user, code).await.unwrap()
     }
 }
 
@@ -246,11 +276,9 @@ async fn finishing_stores_the_token_sealed_and_status_follows() {
         Some(ports::contract::epoch() + Duration::minutes(5))
     );
     let stored = w.store.get(w.user).await.unwrap().unwrap();
-    assert_eq!(
-        FakeTokenCipher.open(&stored.sealed_token).unwrap().expose(),
-        "refresh-1"
-    );
-    assert_ne!(stored.sealed_token, b"refresh-1");
+    let sealed = stored.sealed_token.expect("a token");
+    assert_eq!(FakeTokenCipher.open(&sealed).unwrap().expose(), "refresh-1");
+    assert_ne!(sealed, b"refresh-1");
 }
 
 #[tokio::test]
@@ -311,10 +339,10 @@ async fn export_sends_unticked_items_by_section_in_store_order() {
     );
     let calls = w.sent();
     assert_eq!(calls.len(), 1);
-    let (access, list_id, title, sections) = &calls[0];
+    let (access, list_id, sections) = &calls[0];
     assert_eq!(access, "access-for-refresh-1");
-    assert_eq!(list_id, &None);
-    assert_eq!(title, "Groceries");
+    assert_eq!(list_id, "list-1");
+    assert_eq!(w.asked(), [None]);
     assert_eq!(
         sections,
         &[
@@ -338,9 +366,9 @@ async fn staples_go_only_when_asked() {
     let with = w.services.google.export(w.user, true).await.unwrap();
     assert_eq!((with.sections, with.items), (2, 2));
     let calls = w.sent();
-    assert_eq!(calls[0].3, [section("Produce", &["2 apples"])]);
+    assert_eq!(calls[0].2, [section("Produce", &["2 apples"])]);
     assert_eq!(
-        calls[1].3,
+        calls[1].2,
         [
             section("Produce", &["2 apples"]),
             section("Pantry", &["salt"])
@@ -354,7 +382,7 @@ async fn an_empty_list_still_empties_the_google_list() {
     w.connect().await;
     let sent = w.services.google.export(w.user, false).await.unwrap();
     assert_eq!((sent.sections, sent.items), (0, 0));
-    assert_eq!(w.sent()[0].3, []);
+    assert_eq!(w.sent()[0].2, []);
 }
 
 #[tokio::test]
@@ -368,9 +396,8 @@ async fn the_list_id_is_remembered_and_follows_google() {
     *w.google.list_id.lock().unwrap() = "list-2".into();
     w.services.google.export(w.user, false).await.unwrap();
     w.services.google.export(w.user, false).await.unwrap();
-    let asked: Vec<Option<String>> = w.sent().into_iter().map(|c| c.1).collect();
     assert_eq!(
-        asked,
+        w.asked(),
         [
             None,
             Some("list-1".into()),
@@ -381,30 +408,144 @@ async fn the_list_id_is_remembered_and_follows_google() {
 }
 
 #[tokio::test]
-async fn a_token_google_no_longer_accepts_is_forgotten() {
+async fn a_token_google_no_longer_accepts_is_forgotten_but_the_list_is_kept() {
     let w = World::new().await;
     w.on_the_list(&["2 apples"]).await;
     w.connect().await;
+    w.services.google.export(w.user, false).await.unwrap();
     *w.google.refresh_is_dead.lock().unwrap() = true;
     let r = w.services.google.export(w.user, false).await;
     assert!(matches!(r, Err(DomainError::GoogleNotConnected)), "{r:?}");
     assert!(!w.services.google.status(w.user).await.unwrap().connected);
-    assert!(w.sent().is_empty());
-    // Asking again is the plain "not connected".
+    assert_eq!(w.sent().len(), 1, "nothing more was sent");
+    // The token is gone, the remembered list is not.
+    let kept = w.store.get(w.user).await.unwrap().expect("the row stays");
+    assert_eq!(kept.sealed_token, None);
+    assert_eq!(kept.tasklist_id.as_deref(), Some("list-1"));
+    // Asking again is the plain "not connected", without asking Google.
     let again = w.services.google.export(w.user, false).await;
     assert!(matches!(again, Err(DomainError::GoogleNotConnected)));
+
+    // Reconnecting goes back to the same list.
+    *w.google.refresh_is_dead.lock().unwrap() = false;
+    w.connect().await;
+    assert!(w.services.google.status(w.user).await.unwrap().connected);
+    w.services.google.export(w.user, false).await.unwrap();
+    assert_eq!(w.asked(), [None, Some("list-1".into())]);
 }
 
 #[tokio::test]
-async fn a_token_sealed_with_another_key_is_forgotten_too() {
+async fn a_token_sealed_with_another_key_is_kept_and_answers_not_connected() {
     let w = World::new().await;
+    w.on_the_list(&["2 apples"]).await;
+    w.connect().await;
+    let good = w.store.get(w.user).await.unwrap().unwrap().sealed_token;
     w.store
         .upsert(w.user, b"garbage".to_vec(), ports::contract::epoch())
         .await
         .unwrap();
     let r = w.services.google.export(w.user, false).await;
     assert!(matches!(r, Err(DomainError::GoogleNotConnected)), "{r:?}");
-    assert!(w.store.get(w.user).await.unwrap().is_none());
+    assert!(w.sent().is_empty());
+    let kept = w.store.get(w.user).await.unwrap().expect("not deleted");
+    assert_eq!(kept.sealed_token.as_deref(), Some(b"garbage".as_slice()));
+
+    // The right key comes back: the same stored token works again, nobody reconnects.
+    w.store
+        .upsert(w.user, good.unwrap(), ports::contract::epoch())
+        .await
+        .unwrap();
+    w.services.google.export(w.user, false).await.unwrap();
+}
+
+#[tokio::test]
+async fn the_list_is_remembered_before_it_is_filled() {
+    let w = World::new().await;
+    w.on_the_list(&["2 apples"]).await;
+    w.connect().await;
+    *w.google.fill_fails.lock().unwrap() = true;
+    let r = w.services.google.export(w.user, false).await;
+    assert!(matches!(r, Err(DomainError::Google(_))), "{r:?}");
+    let kept = w.store.get(w.user).await.unwrap().unwrap();
+    assert_eq!(kept.tasklist_id.as_deref(), Some("list-1"));
+    assert!(w.services.google.status(w.user).await.unwrap().connected);
+
+    *w.google.fill_fails.lock().unwrap() = false;
+    w.services.google.export(w.user, false).await.unwrap();
+    assert_eq!(w.asked(), [None, Some("list-1".into())]);
+}
+
+#[tokio::test]
+async fn only_one_send_per_member_runs_at_a_time() {
+    let w = World::new().await;
+    w.on_the_list(&["2 apples"]).await;
+    w.connect().await;
+    let now = w.clock_now();
+    // Another send for this member is under way.
+    assert!(
+        w.store
+            .claim_export(w.user, now, now - Duration::minutes(2))
+            .await
+            .unwrap()
+    );
+    let r = w.services.google.export(w.user, false).await;
+    assert!(
+        matches!(&r, Err(DomainError::Conflict(m)) if m == "A send to Google Tasks is already running."),
+        "{r:?}"
+    );
+    assert!(w.sent().is_empty());
+    assert!(w.asked().is_empty());
+
+    // It died without letting go: after two minutes the lease is taken over.
+    w.clock.advance(Duration::minutes(3));
+    w.services.google.export(w.user, false).await.unwrap();
+    // The send let go of the lease, and so does one that fails.
+    w.services.google.export(w.user, false).await.unwrap();
+    *w.google.fill_fails.lock().unwrap() = true;
+    assert!(w.services.google.export(w.user, false).await.is_err());
+    *w.google.fill_fails.lock().unwrap() = false;
+    *w.google.refresh_is_dead.lock().unwrap() = true;
+    assert!(w.services.google.export(w.user, false).await.is_err());
+    *w.google.refresh_is_dead.lock().unwrap() = false;
+    w.connect().await;
+    w.services.google.export(w.user, false).await.unwrap();
+}
+
+#[tokio::test]
+async fn connecting_again_revokes_the_token_it_replaces() {
+    let w = World::new().await;
+    w.connect().await;
+    assert!(
+        w.google.revoked.lock().unwrap().is_empty(),
+        "nothing to replace"
+    );
+    // Google hands out the same token again: it must not be revoked.
+    w.connect().await;
+    assert!(w.google.revoked.lock().unwrap().is_empty());
+
+    assert!(w.connect_with("good-again").await.is_none());
+    assert_eq!(*w.google.revoked.lock().unwrap(), ["refresh-1"]);
+    let stored = w
+        .store
+        .get(w.user)
+        .await
+        .unwrap()
+        .unwrap()
+        .sealed_token
+        .unwrap();
+    assert_eq!(FakeTokenCipher.open(&stored).unwrap().expose(), "refresh-2");
+
+    // A token that was already forgotten has nothing to revoke, and a failing revoke does not undo the connection.
+    w.store.forget_token(w.user).await.unwrap();
+    assert!(w.connect_with("good").await.is_none());
+    assert_eq!(w.google.revoked.lock().unwrap().len(), 1);
+    *w.google.revoke_fails.lock().unwrap() = true;
+    let problem = w.connect_with("good-again").await;
+    assert!(
+        matches!(problem, Some(DomainError::Google(_))),
+        "{problem:?}"
+    );
+    assert!(w.services.google.status(w.user).await.unwrap().connected);
 }
 
 #[tokio::test]
@@ -437,5 +578,18 @@ async fn a_failed_revoke_still_forgets_the_connection() {
         matches!(problem, Some(DomainError::Google(_))),
         "{problem:?}"
     );
+    assert!(w.store.get(w.user).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn disconnecting_after_google_dropped_the_token_forgets_the_list_without_revoking() {
+    let w = World::new().await;
+    w.on_the_list(&["2 apples"]).await;
+    w.connect().await;
+    w.services.google.export(w.user, false).await.unwrap();
+    w.store.forget_token(w.user).await.unwrap();
+    let problem = w.services.google.disconnect(w.user).await.unwrap();
+    assert!(problem.is_none());
+    assert!(w.google.revoked.lock().unwrap().is_empty());
     assert!(w.store.get(w.user).await.unwrap().is_none());
 }

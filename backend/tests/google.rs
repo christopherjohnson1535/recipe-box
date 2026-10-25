@@ -7,7 +7,7 @@ mod common;
 use axum::http::{Method, StatusCode};
 use common::{
     MEMBER_PASSWORD, Res, TestApp, a_recipe, a_user, epoch,
-    google::{CLIENT_ID, REDIRECT_URI, StubGoogle},
+    google::{CLIENT_ID, Hiccup, REDIRECT_URI, StubGoogle},
     session_pair,
 };
 use serde_json::{Value, json};
@@ -71,6 +71,40 @@ async fn on_the_list(ctx: &TestApp, lines: &[&str]) {
 async fn export(ctx: &TestApp, session: &str, body: Value) -> Res {
     ctx.post("/api/grocery/export/google-tasks", session, body)
         .await
+}
+
+/// The response clears the state cookie.
+#[track_caller]
+fn assert_state_cookie_cleared(res: &Res, what: &str) {
+    let c = res.cookie.as_deref().unwrap_or("");
+    assert!(
+        c.starts_with("rb_google_state=;")
+            && c.contains("Path=/api/integrations/google")
+            && c.contains("Max-Age=0"),
+        "{what}: {c}"
+    );
+}
+
+/// Whether the stored token is there (a member whose token Google dropped keeps a row without one).
+async fn token_stored(ctx: &TestApp) -> bool {
+    sqlx::query_scalar("select refresh_token is not null from google_connection")
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap()
+}
+
+async fn remembered_list(ctx: &TestApp) -> Option<String> {
+    sqlx::query_scalar("select tasklist_id from google_connection")
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap()
+}
+
+async fn lease(ctx: &TestApp) -> Option<chrono::DateTime<chrono::Utc>> {
+    sqlx::query_scalar("select export_started_at from google_connection")
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap()
 }
 
 async fn connections_stored(ctx: &TestApp) -> i64 {
@@ -285,6 +319,7 @@ async fn a_wrong_or_missing_state_stores_nothing_and_asks_google_nothing() {
             Some("/settings?google=error"),
             "{path}"
         );
+        assert_state_cookie_cleared(&res, &path);
     }
     assert_eq!(connections_stored(&ctx).await, 0);
     assert!(
@@ -361,6 +396,7 @@ async fn google_sending_no_refresh_token_or_refusing_the_code_stores_nothing() {
         )
         .await;
     assert_eq!(res.location.as_deref(), Some("/settings?google=error"));
+    assert_state_cookie_cleared(&res, "code refused");
 
     // A good code, but no refresh token in the answer (the member connected before without `prompt=consent`).
     stub.accept_code("code-2", REFRESH);
@@ -373,6 +409,20 @@ async fn google_sending_no_refresh_token_or_refusing_the_code_stores_nothing() {
         )
         .await;
     assert_eq!(res.location.as_deref(), Some("/settings?google=error"));
+    assert_state_cookie_cleared(&res, "no refresh token");
+
+    // Google grants something else than the Tasks scope: a token that cannot send is not stored.
+    stub.accept_code("code-3", REFRESH);
+    stub.grant_scope("openid email");
+    let state = start(&ctx, &c).await;
+    let res = ctx
+        .get(
+            &format!("/api/integrations/google/callback?code=code-3&state={state}"),
+            &with_state(&c, &state),
+        )
+        .await;
+    assert_eq!(res.location.as_deref(), Some("/settings?google=error"));
+    assert_state_cookie_cleared(&res, "wrong scope");
     assert_eq!(connections_stored(&ctx).await, 0);
 }
 
@@ -395,6 +445,8 @@ async fn connecting_again_replaces_the_token() {
             .unwrap();
     assert_ne!(first, second);
     assert_eq!(at, epoch() + chrono::Duration::days(1));
+    // The token it replaced is revoked at Google, not left alive there.
+    assert_eq!(stub.revoked(), [REFRESH]);
 }
 
 #[tokio::test]
@@ -576,20 +628,91 @@ async fn a_list_deleted_in_google_is_made_again() {
 }
 
 #[tokio::test]
-async fn a_token_revoked_at_google_is_a_409_and_the_connection_is_gone() {
+async fn a_token_revoked_at_google_is_a_409_and_reconnecting_reuses_the_list() {
     let (ctx, stub) = app().await;
     let c = ctx.cookie.clone();
     connect(&ctx, &stub, &c, "code-1", REFRESH).await;
     on_the_list(&ctx, &["2 apples"]).await;
-    stub.kill_refresh_token(REFRESH);
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    let list = stub.lists()[0].0.clone();
 
+    stub.kill_refresh_token(REFRESH);
     export(&ctx, &c, json!({}))
         .await
         .assert_error(StatusCode::CONFLICT, "google_not_connected");
-    assert_eq!(connections_stored(&ctx).await, 0);
+    // Not connected any more, but the row remembers the list.
+    assert!(!token_stored(&ctx).await);
+    assert_eq!(remembered_list(&ctx).await.as_deref(), Some(list.as_str()));
     let status = ctx.get("/api/integrations/google", &c).await;
     assert_eq!(status.json["connected"], false);
-    assert!(stub.lists().is_empty(), "nothing was sent");
+    assert_eq!(status.json["connectedAt"], Value::Null);
+    assert_eq!(stub.lists().len(), 1);
+    // Asking again is the same answer.
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_error(StatusCode::CONFLICT, "google_not_connected");
+
+    // Reconnect: the dead token has nothing to revoke, and the next send fills the same list.
+    connect(&ctx, &stub, &c, "code-2", "1//stub-refresh-token-2").await;
+    assert!(stub.revoked().is_empty());
+    assert_eq!(
+        ctx.get("/api/integrations/google", &c).await.json["connected"],
+        true
+    );
+    ctx.post("/api/grocery/items", &c, json!({ "text": "2 lemons" }))
+        .await
+        .assert_status(StatusCode::CREATED);
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert_eq!(stub.lists().len(), 1, "no second Groceries list");
+    assert_eq!(
+        titles(&stub.tree(&list)),
+        [("Produce", vec!["2 apples", "2 lemons"])]
+    );
+}
+
+#[tokio::test]
+async fn a_token_that_will_not_open_is_not_deleted() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+    let good: Vec<u8> = sqlx::query_scalar("select refresh_token from google_connection")
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap();
+
+    // As if the server now ran with another TOKEN_ENCRYPTION_KEY.
+    let mut wrong = good.clone();
+    *wrong.last_mut().unwrap() ^= 1;
+    sqlx::query("update google_connection set refresh_token = $1")
+        .bind(&wrong)
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_error(StatusCode::CONFLICT, "google_not_connected");
+    assert_eq!(connections_stored(&ctx).await, 1);
+    let kept: Vec<u8> = sqlx::query_scalar("select refresh_token from google_connection")
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap();
+    assert_eq!(kept, wrong, "left as it was");
+    assert!(stub.requests_to("/tasks").is_empty(), "nothing was sent");
+
+    // The right key is back: the same row works again.
+    sqlx::query("update google_connection set refresh_token = $1")
+        .bind(&good)
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
 }
 
 #[tokio::test]
@@ -744,5 +867,390 @@ async fn no_response_the_browser_sees_holds_a_token() {
     assert!(
         !seen.contains(common::google::CLIENT_SECRET),
         "client secret reached the browser"
+    );
+}
+
+#[tokio::test]
+async fn a_failed_first_send_and_a_second_one_leave_one_list_with_the_current_items() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples", "1 lb chicken thighs", "1 cup rice"]).await;
+
+    // Calls: find a list called Groceries, make it, list its tasks, Produce, apples; then Google fails on Meat.
+    stub.fail_tasks_after(5, 503);
+    let res = export(&ctx, &c, json!({})).await;
+    res.assert_error(StatusCode::BAD_GATEWAY, "google_error");
+    let message = res.json["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("may be incomplete; send it again"),
+        "{message}"
+    );
+    let lists = stub.lists();
+    assert_eq!(lists.len(), 1, "the list exists");
+    let list = lists[0].0.clone();
+    assert_eq!(titles(&stub.tree(&list)), [("Produce", vec!["2 apples"])]);
+    assert_eq!(remembered_list(&ctx).await.as_deref(), Some(list.as_str()));
+    assert!(
+        lease(&ctx).await.is_none(),
+        "a failed send lets go of its lease"
+    );
+
+    stub.fail_tasks_with(None);
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert_eq!(
+        stub.lists().len(),
+        1,
+        "the second send did not make another list"
+    );
+    assert_eq!(
+        titles(&stub.tree(&list)),
+        [
+            ("Produce", vec!["2 apples"]),
+            ("Meat", vec!["1 lb chicken thighs"]),
+            ("Pantry", vec!["1 cup rice"]),
+        ]
+    );
+    assert_eq!(stub.task_count(&list), 6, "nothing left from the first try");
+}
+
+#[tokio::test]
+async fn a_throttled_call_is_tried_again_after_the_pause_google_asks_for() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples", "1 cup rice"]).await;
+
+    // Find, make, list tasks, Produce, apples ... the sixth call (Pantry) is told to wait a second.
+    stub.hiccup(
+        5,
+        1,
+        Hiccup::TooMany {
+            retry_after: Some(1),
+        },
+    );
+    let started = std::time::Instant::now();
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert!(
+        started.elapsed() >= std::time::Duration::from_millis(900),
+        "{:?}",
+        started.elapsed()
+    );
+    let list = stub.lists()[0].0.clone();
+    assert_eq!(
+        titles(&stub.tree(&list)),
+        [
+            ("Produce", vec!["2 apples"]),
+            ("Pantry", vec!["1 cup rice"])
+        ],
+        "the throttled task was made once"
+    );
+    let makes = stub
+        .requests_to(&format!("/tasks/v1/lists/{list}/tasks"))
+        .iter()
+        .filter(|r| r.method == "POST")
+        .count();
+    assert_eq!(makes, 5, "4 tasks and 1 repeat");
+}
+
+#[tokio::test]
+async fn rate_limit_403s_and_server_errors_on_reads_are_tried_again() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    let list = stub.lists()[0].0.clone();
+    let tasks_path = format!("/tasks/v1/lists/{list}/tasks");
+
+    // 403 rateLimitExceeded on the list lookup, then a 503 on the listing of tasks.
+    stub.hiccup(0, 2, Hiccup::RateLimited);
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    stub.hiccup(1, 2, Hiccup::Status(503));
+    let before = stub.requests_to(&tasks_path).len();
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert!(stub.requests_to(&tasks_path).len() > before + 3);
+    assert_eq!(stub.lists().len(), 1);
+    assert_eq!(titles(&stub.tree(&list)), [("Produce", vec!["2 apples"])]);
+}
+
+#[tokio::test]
+async fn a_call_that_keeps_failing_gives_up_after_three_tries_and_a_plain_403_is_not_retried() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+
+    stub.hiccup(
+        0,
+        100,
+        Hiccup::TooMany {
+            retry_after: Some(0),
+        },
+    );
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_error(StatusCode::BAD_GATEWAY, "google_error");
+    assert_eq!(stub.requests_to("/tasks").len(), 3);
+    assert_eq!(connections_stored(&ctx).await, 1);
+    assert!(token_stored(&ctx).await);
+    assert!(lease(&ctx).await.is_none());
+
+    // 403 for another reason (say the Tasks API is not enabled for the project) is final.
+    stub.fail_tasks_with(None);
+    stub.fail_tasks_with(Some(403));
+    let before = stub.requests_to("/tasks").len();
+    let res = export(&ctx, &c, json!({})).await;
+    res.assert_error(StatusCode::BAD_GATEWAY, "google_error");
+    assert_eq!(stub.requests_to("/tasks").len(), before + 1);
+    assert!(
+        res.json["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("(403)")
+    );
+}
+
+#[tokio::test]
+async fn emptying_the_list_does_not_rely_on_a_parent_taking_its_subtasks_along() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    stub.strict_deletes(); // deleting a task that still has subtasks answers 400
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples", "3 onions", "1 cup rice"]).await;
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    let list = stub.lists()[0].0.clone();
+    stub.add_task(&list, "typed in the Google app");
+    stub.add_completed_task(&list, "ticked in the Google app");
+    assert_eq!(stub.task_count(&list), 5 + 2);
+
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert_eq!(
+        stub.task_count(&list),
+        5,
+        "completed and hidden tasks are cleared too"
+    );
+    assert_eq!(
+        titles(&stub.tree(&list)),
+        [
+            ("Produce", vec!["2 apples", "3 onions"]),
+            ("Pantry", vec!["1 cup rice"])
+        ]
+    );
+    // It asked for hidden and completed tasks, a full page at a time.
+    let listing = stub
+        .requests_to(&format!("/tasks/v1/lists/{list}/tasks"))
+        .into_iter()
+        .find(|r| r.method == "GET")
+        .unwrap();
+    for (k, v) in [
+        ("showHidden", "true"),
+        ("showCompleted", "true"),
+        ("maxResults", "100"),
+    ] {
+        assert_eq!(listing.query.get(k).map(String::as_str), Some(v), "{k}");
+    }
+    // A parent deleted before its subtasks would have been refused (400) and failed the send.
+    assert_eq!(stub.deleted_tasks().len(), 7);
+}
+
+#[tokio::test]
+async fn a_groceries_list_google_already_has_is_used_and_not_duplicated() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    stub.add_list("Errands");
+    stub.add_list("groceries"); // not the same title
+    stub.add_list("Groceries ");
+    let mine = stub.add_list("Groceries");
+    stub.add_list("Groceries");
+    stub.add_task(&mine, "left over from before");
+    stub.page_size(2); // the list is on the third page of lists
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert_eq!(stub.lists().len(), 5, "no new list");
+    assert_eq!(titles(&stub.tree(&mine)), [("Produce", vec!["2 apples"])]);
+    assert_eq!(remembered_list(&ctx).await.as_deref(), Some(mine.as_str()));
+    let looked = stub.requests_to("/tasks/v1/users/@me/lists").len();
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert_eq!(
+        stub.requests_to("/tasks/v1/users/@me/lists").len(),
+        looked + 1,
+        "known by id from now on: one lookup, no search"
+    );
+
+    // Nothing by that name: a new one is made.
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    stub.add_list("Errands");
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert_eq!(stub.lists().len(), 2);
+}
+
+#[tokio::test]
+async fn only_one_send_per_member_at_a_time_across_processes() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+
+    // Another process started a send a minute ago and is still at it.
+    sqlx::query("update google_connection set export_started_at = $1")
+        .bind(epoch() - chrono::Duration::minutes(1))
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+    let res = export(&ctx, &c, json!({})).await;
+    res.assert_error(StatusCode::CONFLICT, "conflict");
+    assert_eq!(
+        res.json["error"]["message"],
+        "A send to Google Tasks is already running."
+    );
+    assert!(
+        stub.requests()
+            .iter()
+            .all(|r| !r.path.starts_with("/tasks"))
+    );
+    assert_eq!(
+        lease(&ctx).await,
+        Some(epoch() - chrono::Duration::minutes(1)),
+        "the refused send did not touch the lease"
+    );
+
+    // One that started over two minutes ago died; the lease is taken over, and let go of at the end.
+    sqlx::query("update google_connection set export_started_at = $1")
+        .bind(epoch() - chrono::Duration::minutes(3))
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+    export(&ctx, &c, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+    assert!(lease(&ctx).await.is_none());
+
+    // Another member is not held up by this one.
+    sqlx::query("update google_connection set export_started_at = $1")
+        .bind(epoch())
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+    ctx.create_user(&c, a_user().named("mem")).await;
+    let mem = session_pair(&ctx.login("mem", MEMBER_PASSWORD).await);
+    connect(&ctx, &stub, &mem, "code-2", "1//stub-refresh-token-2").await;
+    export(&ctx, &mem, json!({}))
+        .await
+        .assert_status(StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_send_that_takes_too_long_gives_up_and_says_the_list_may_be_incomplete() {
+    let stub = StubGoogle::start().await;
+    let ctx =
+        TestApp::spawn_as_admin_with(|s| stub.enable_with_deadline(s, std::time::Duration::ZERO))
+            .await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+    let res = export(&ctx, &c, json!({})).await;
+    res.assert_error(StatusCode::BAD_GATEWAY, "google_error");
+    let message = res.json["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("took too long") && message.contains("send it again"),
+        "{message}"
+    );
+    assert!(lease(&ctx).await.is_none());
+    assert_eq!(remembered_list(&ctx).await, Some(stub.lists()[0].0.clone()));
+}
+
+#[tokio::test]
+async fn google_refusing_the_client_is_a_502_and_does_not_forget_the_token() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    connect(&ctx, &stub, &c, "code-1", REFRESH).await;
+    on_the_list(&ctx, &["2 apples"]).await;
+    // Only `invalid_grant` means the member has to reconnect; these are the operator's to fix.
+    for (status, error) in [(400, "unauthorized_client"), (401, "invalid_client")] {
+        stub.refuse_refresh_with(status, error);
+        export(&ctx, &c, json!({}))
+            .await
+            .assert_error(StatusCode::BAD_GATEWAY, "google_error");
+        assert!(token_stored(&ctx).await, "{error}");
+        assert_eq!(
+            ctx.get("/api/integrations/google", &c).await.json["connected"],
+            true
+        );
+    }
+}
+
+/// What the `tracing` subscriber of a test wrote.
+#[derive(Clone, Default)]
+struct Captured(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn the_request_log_never_holds_the_callbacks_code_or_state() {
+    let (ctx, stub) = app().await;
+    let c = ctx.cookie.clone();
+    stub.accept_code("4/0A-secret-code", REFRESH);
+    let state = start(&ctx, &c).await;
+
+    // The runtime of `#[tokio::test]` is single-threaded, so the request is traced on this thread.
+    let log = Captured::default();
+    let writer = log.clone();
+    let _guard = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(move || writer.clone())
+            .with_ansi(false)
+            .finish(),
+    );
+    let back = ctx
+        .get(
+            &format!("/api/integrations/google/callback?code=4/0A-secret-code&state={state}"),
+            &with_state(&c, &state),
+        )
+        .await;
+    assert_eq!(back.location.as_deref(), Some("/settings?google=connected"));
+    let out = String::from_utf8(log.0.lock().unwrap().clone()).unwrap();
+    assert!(
+        out.contains("path=/api/integrations/google/callback"),
+        "the request is logged at all: {out}"
+    );
+    assert!(
+        !out.contains("secret-code") && !out.contains(&state) && !out.contains("code="),
+        "{out}"
     );
 }

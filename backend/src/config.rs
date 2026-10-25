@@ -93,9 +93,14 @@ pub fn google_config(
             && u.host_str().is_some()
             && u.query().is_none()
             && u.fragment().is_none()
+            // Google refuses a redirect address with userinfo, and it would end up in every redirect_uri.
+            && u.username().is_empty()
+            && u.password().is_none()
     });
     if parsed.is_none() {
-        bail!("PUBLIC_URL must be an http(s) address such as https://recipes.example.com");
+        bail!(
+            "PUBLIC_URL must be an http(s) address such as https://recipes.example.com (no user name, password, query or fragment)"
+        );
     }
     Ok(Some(GoogleConfig {
         client_id,
@@ -103,6 +108,21 @@ pub fn google_config(
         public_url: url.trim_end_matches('/').to_string(),
         token_key: crate::crypto::parse_key(&key).map_err(anyhow::Error::msg)?,
     }))
+}
+
+/// A sentence for the log when `PUBLIC_URL` and `COOKIE_SECURE` disagree about HTTPS: the session cookie is then not
+/// Secure on an https site, or Secure on a site browsers reach over http (and so never sent back).
+pub fn scheme_mismatch(public_url: &str, cookie_secure: bool) -> Option<&'static str> {
+    let https = public_url.starts_with("https://");
+    match (https, cookie_secure) {
+        (false, true) => Some(
+            "COOKIE_SECURE=true but PUBLIC_URL is http: browsers will not send the Secure cookies back over http",
+        ),
+        (true, false) => Some(
+            "PUBLIC_URL is https but COOKIE_SECURE is not true: set COOKIE_SECURE=true so the session cookie is Secure",
+        ),
+        _ => None,
+    }
 }
 
 impl Config {
@@ -120,13 +140,26 @@ impl Config {
         if ai_provider == "anthropic" && anthropic_api_key.is_none() {
             bail!("AI_PROVIDER=anthropic needs ANTHROPIC_API_KEY");
         }
+        let cookie_secure = var("COOKIE_SECURE", "false")
+            .parse()
+            .context("COOKIE_SECURE must be true or false")?;
+        let google = google_config(
+            env::var("GOOGLE_CLIENT_ID").ok(),
+            env::var("GOOGLE_CLIENT_SECRET").ok(),
+            env::var("PUBLIC_URL").ok(),
+            env::var("TOKEN_ENCRYPTION_KEY").ok(),
+        )?;
+        if let Some(warning) = google
+            .as_ref()
+            .and_then(|g| scheme_mismatch(&g.public_url, cookie_secure))
+        {
+            tracing::warn!("{warning}");
+        }
         Ok(Self {
             database_url: var("DATABASE_URL", "postgres://recipes:recipes@db:5432/recipes"),
             media_dir: var("MEDIA_DIR", "/data/media").into(),
             bind_addr: var("BIND_ADDR", "0.0.0.0:8080"),
-            cookie_secure: var("COOKIE_SECURE", "false")
-                .parse()
-                .context("COOKIE_SECURE must be true or false")?,
+            cookie_secure,
             session_days: parse_session_days(&var("SESSION_DAYS", "30"))?,
             ai_provider,
             anthropic_api_key,
@@ -141,12 +174,7 @@ impl Config {
                 .ok()
                 .filter(|m| (1..=65_536).contains(m))
                 .context("MAX_BACKUP_MB must be a whole number from 1 to 65536")?,
-            google: google_config(
-                env::var("GOOGLE_CLIENT_ID").ok(),
-                env::var("GOOGLE_CLIENT_SECRET").ok(),
-                env::var("PUBLIC_URL").ok(),
-                env::var("TOKEN_ENCRYPTION_KEY").ok(),
-            )?,
+            google,
         })
     }
 
@@ -284,6 +312,8 @@ mod google_tests {
             "ftp://r.example.com",
             "https://",
             "https://r.example.com/?x=1",
+            "https://me:pw@r.example.com",
+            "https://me@r.example.com",
         ] {
             let e = google_config(some("id"), some("s"), some(bad), key()).unwrap_err();
             assert!(
@@ -304,6 +334,15 @@ mod google_tests {
                 "{e}"
             );
         }
+    }
+
+    #[test]
+    fn a_public_url_that_disagrees_with_cookie_secure_is_worth_a_warning() {
+        use super::scheme_mismatch;
+        assert!(scheme_mismatch("https://r.example.com", true).is_none());
+        assert!(scheme_mismatch("http://localhost:3000", false).is_none());
+        assert!(scheme_mismatch("http://r.example.com", true).is_some());
+        assert!(scheme_mismatch("https://r.example.com", false).is_some());
     }
 
     #[test]

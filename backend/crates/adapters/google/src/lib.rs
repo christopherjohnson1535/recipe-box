@@ -2,8 +2,11 @@
 //!
 //! [`GoogleTasksClient`] runs the OAuth web-server flow (consent URL, code exchange, refresh, revoke) and replaces
 //! the contents of a task list. Tokens are [`Secret`]s: they travel in request bodies and `Authorization` headers
-//! only, never in a URL, a log line or an error. Every call has a 10 s timeout and nothing is retried (a repeated
-//! POST would add tasks twice). Google's own error text is logged, trimmed, without any request data.
+//! only, never in a URL, a log line or an error. Every call has a 10 s timeout. A throttled call (429, or 403 with a
+//! rate-limit reason) is repeated up to three times in all, after `Retry-After` (at most 10 s) or a growing pause;
+//! reading and deleting tasks is also repeated after a 5xx or a lost connection, but making a task is not (a repeated
+//! POST that Google did process would add the task twice). A send that still fails leaves the list partly filled and
+//! the next send starts by emptying it. Google's own error text is logged, trimmed, without any request data.
 
 use std::time::Duration;
 
@@ -22,6 +25,16 @@ const SCOPE: &str = "https://www.googleapis.com/auth/tasks";
 /// Where Google sends the browser back, below `PUBLIC_URL`.
 pub const CALLBACK_PATH: &str = "/api/integrations/google/callback";
 const CALL_TIMEOUT: Duration = Duration::from_secs(10);
+/// Tries per call, the first included.
+const ATTEMPTS: u32 = 3;
+/// Longest `Retry-After` that is waited out.
+const MAX_WAIT: Duration = Duration::from_secs(10);
+/// The pause before the second try; the third waits twice as long. `Retry-After` takes its place when sent.
+const BACKOFF: Duration = Duration::from_millis(500);
+/// How long filling a list may take in all. The service's export lease runs out only after this.
+const FILL_DEADLINE: Duration = Duration::from_secs(100);
+/// Said when a send fails after the list was touched.
+const INCOMPLETE: &str = "The list in Google Tasks may be incomplete; send it again.";
 /// Tasks per page asked for (Google's maximum).
 const PAGE_SIZE: &str = "100";
 /// A task list holds at most 20,000 tasks, so more pages than this means Google keeps repeating itself.
@@ -56,6 +69,8 @@ pub struct GoogleTasksClient {
     client_secret: Secret,
     redirect_uri: String,
     urls: GoogleUrls,
+    backoff: Duration,
+    fill_deadline: Duration,
 }
 
 impl GoogleTasksClient {
@@ -86,7 +101,16 @@ impl GoogleTasksClient {
                 tasks: urls.tasks.trim_end_matches('/').to_string(),
                 ..urls
             },
+            backoff: BACKOFF,
+            fill_deadline: FILL_DEADLINE,
         })
+    }
+
+    /// Other pauses between tries and another limit for filling a list; tests make them short.
+    pub fn with_timing(mut self, backoff: Duration, fill_deadline: Duration) -> Self {
+        self.backoff = backoff;
+        self.fill_deadline = fill_deadline;
+        self
     }
 
     /// `POST` of a form to the token or revoke endpoint.
@@ -111,6 +135,55 @@ impl GoogleTasksClient {
         self.http.request(method, url).bearer_auth(access.expose())
     }
 
+    /// Sends the request, repeating it when `replay` allows and Google throttled it (or, for `Idempotent`, failed
+    /// on its side or could not be reached). Returns the last answer; a 403 that is not about rate limits is
+    /// already an error.
+    async fn call(&self, req: RequestBuilder, replay: Replay) -> DomainResult<Response> {
+        let mut pause = self.backoff;
+        for attempt in 1..=ATTEMPTS {
+            let last = attempt == ATTEMPTS;
+            let again = req.try_clone().ok_or_else(unreadable)?;
+            let res = match again.send().await {
+                Ok(res) => res,
+                Err(e)
+                    if replay == Replay::Idempotent
+                        && !last
+                        && (e.is_connect() || e.is_timeout()) =>
+                {
+                    tokio::time::sleep(pause).await;
+                    pause *= 2;
+                    continue;
+                }
+                Err(e) => return Err(unreachable_google(&e)),
+            };
+            let status = res.status();
+            let wait = if status == StatusCode::TOO_MANY_REQUESTS {
+                Some(retry_after(&res).unwrap_or(pause))
+            } else if status == StatusCode::FORBIDDEN {
+                let asked = retry_after(&res);
+                let body = res.text().await.unwrap_or_default();
+                if last || !rate_limited(&body) {
+                    return Err(refused(status, &body));
+                }
+                tokio::time::sleep(asked.unwrap_or(pause)).await;
+                pause *= 2;
+                continue;
+            } else if status.is_server_error() && replay == Replay::Idempotent {
+                Some(pause)
+            } else {
+                None
+            };
+            match wait {
+                Some(w) if !last => {
+                    tokio::time::sleep(w).await;
+                    pause *= 2;
+                }
+                _ => return Ok(res),
+            }
+        }
+        Err(unreadable())
+    }
+
     /// Makes a task and returns its id. `parent` and `previous` place it among its siblings.
     async fn insert(
         &self,
@@ -129,12 +202,14 @@ impl GoogleTasksClient {
         let req = self
             .api(reqwest::Method::POST, url, access)
             .json(&json!({ "title": title }));
-        Ok(read::<Created>(send(req).await?).await?.id)
+        Ok(read::<Created>(self.call(req, Replay::Throttled).await?)
+            .await?
+            .id)
     }
 
-    /// The ids of every task of the list, completed and hidden ones too.
-    async fn task_ids(&self, access: &Secret, list: &str) -> DomainResult<Vec<String>> {
-        let mut ids = Vec::new();
+    /// Every task of the list, completed and hidden ones too.
+    async fn tasks(&self, access: &Secret, list: &str) -> DomainResult<Vec<Task>> {
+        let mut tasks = Vec::new();
         let mut token: Option<String> = None;
         for _ in 0..MAX_PAGES {
             let mut query = vec![
@@ -146,39 +221,100 @@ impl GoogleTasksClient {
                 query.push(("pageToken", t));
             }
             let url = self.tasks_url(&["lists", list, "tasks"], &query)?;
-            let page: TaskPage =
-                read(send(self.api(reqwest::Method::GET, url, access)).await?).await?;
-            ids.extend(page.items.into_iter().map(|t| t.id));
+            let req = self.api(reqwest::Method::GET, url, access);
+            let page: Page<Task> = read(self.call(req, Replay::Idempotent).await?).await?;
+            tasks.extend(page.items);
             match page.next_page_token.filter(|t| !t.is_empty()) {
                 Some(next) => token = Some(next),
-                None => return Ok(ids),
+                None => return Ok(tasks),
             }
         }
         Err(unreadable())
     }
 
-    /// The list to fill: the one `known` names if Google still has it, else a new one.
-    async fn list_to_fill(
-        &self,
-        access: &Secret,
-        known: Option<&str>,
-        title: &str,
-    ) -> DomainResult<String> {
-        if let Some(id) = known {
-            let url = self.tasks_url(&["users", "@me", "lists", id], &[])?;
-            let res = send(self.api(reqwest::Method::GET, url, access)).await?;
-            match res.status() {
-                s if s.is_success() => return Ok(read::<Created>(res).await?.id),
-                StatusCode::NOT_FOUND => {}
-                _ => return Err(failed(res).await),
+    /// The id of the first of the member's task lists called exactly `title`.
+    async fn list_titled(&self, access: &Secret, title: &str) -> DomainResult<Option<String>> {
+        let mut token: Option<String> = None;
+        for _ in 0..MAX_PAGES {
+            let mut query = vec![("maxResults", PAGE_SIZE)];
+            if let Some(t) = &token {
+                query.push(("pageToken", t));
+            }
+            let url = self.tasks_url(&["users", "@me", "lists"], &query)?;
+            let req = self.api(reqwest::Method::GET, url, access);
+            let page: Page<TaskList> = read(self.call(req, Replay::Idempotent).await?).await?;
+            if let Some(found) = page.items.into_iter().find(|l| l.title == title) {
+                return Ok(Some(found.id));
+            }
+            match page.next_page_token.filter(|t| !t.is_empty()) {
+                Some(next) => token = Some(next),
+                None => return Ok(None),
             }
         }
-        let url = self.tasks_url(&["users", "@me", "lists"], &[])?;
-        let req = self
-            .api(reqwest::Method::POST, url, access)
-            .json(&json!({ "title": title }));
-        Ok(read::<Created>(send(req).await?).await?.id)
+        Err(unreadable())
     }
+
+    /// Empties the list, then makes the sections and their items.
+    async fn rewrite(
+        &self,
+        access: &Secret,
+        list: &str,
+        sections: &[TaskSection],
+    ) -> DomainResult<()> {
+        // Whether deleting a task takes its subtasks along is not documented, so subtasks go first, and a task that
+        // is already gone is fine.
+        let (subtasks, top): (Vec<Task>, Vec<Task>) = self
+            .tasks(access, list)
+            .await?
+            .into_iter()
+            .partition(|t| t.parent.is_some());
+        for task in subtasks.iter().chain(&top) {
+            let url = self.tasks_url(&["lists", list, "tasks", &task.id], &[])?;
+            let res = self
+                .call(
+                    self.api(reqwest::Method::DELETE, url, access),
+                    Replay::Idempotent,
+                )
+                .await?;
+            if !res.status().is_success()
+                && !matches!(res.status(), StatusCode::NOT_FOUND | StatusCode::GONE)
+            {
+                return Err(failed(res).await);
+            }
+        }
+
+        // A task made without `previous` goes first among its siblings, so each one names the one before it.
+        let mut previous_section: Option<String> = None;
+        for section in sections {
+            let parent = self
+                .insert(
+                    access,
+                    list,
+                    &section.title,
+                    None,
+                    previous_section.as_deref(),
+                )
+                .await?;
+            let mut previous_item: Option<String> = None;
+            for item in &section.items {
+                previous_item = Some(
+                    self.insert(access, list, item, Some(&parent), previous_item.as_deref())
+                        .await?,
+                );
+            }
+            previous_section = Some(parent);
+        }
+        Ok(())
+    }
+}
+
+/// What a call may repeat after a failure.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Replay {
+    /// Reading and deleting: repeating changes nothing, so server errors and lost connections are retried too.
+    Idempotent,
+    /// Making things: only a throttled request is repeated, because Google did not act on it.
+    Throttled,
 }
 
 #[derive(Deserialize)]
@@ -186,10 +322,25 @@ struct Created {
     id: String,
 }
 
+/// A task as listed: a subtask names its parent.
 #[derive(Deserialize)]
-struct TaskPage {
+struct Task {
+    id: String,
+    parent: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct TaskList {
+    id: String,
     #[serde(default)]
-    items: Vec<Created>,
+    title: String,
+}
+
+/// One page of a listing.
+#[derive(Deserialize)]
+struct Page<T> {
+    #[serde(default = "Vec::new")]
+    items: Vec<T>,
     #[serde(rename = "nextPageToken")]
     next_page_token: Option<String>,
 }
@@ -198,28 +349,35 @@ struct TaskPage {
 struct TokenReply {
     access_token: Option<String>,
     refresh_token: Option<String>,
+    /// The scopes granted, separated by spaces.
+    scope: Option<String>,
 }
 
 fn unreadable() -> DomainError {
     DomainError::Google("Google sent a reply we could not read.".into())
 }
 
-/// Sends the request. A failure to get any answer is a fixed sentence: the error text could carry the URL.
-async fn send(req: RequestBuilder) -> DomainResult<Response> {
-    req.send().await.map_err(|e| {
-        DomainError::Google(if e.is_timeout() {
-            "Google took too long to answer.".into()
-        } else {
-            "Could not reach Google.".into()
-        })
+/// A failure to get any answer, as a fixed sentence: the error text could carry the URL.
+fn unreachable_google(e: &reqwest::Error) -> DomainError {
+    DomainError::Google(if e.is_timeout() {
+        "Google took too long to answer.".into()
+    } else {
+        "Could not reach Google.".into()
     })
+}
+
+async fn send(req: RequestBuilder) -> DomainResult<Response> {
+    req.send().await.map_err(|e| unreachable_google(&e))
 }
 
 /// Google's error answer as a `Google` error; what Google said (status and message) is logged, trimmed.
 async fn failed(res: Response) -> DomainError {
     let status = res.status();
-    let body = res.text().await.unwrap_or_default();
-    let said = match serde_json::from_str::<Value>(&body) {
+    refused(status, &res.text().await.unwrap_or_default())
+}
+
+fn refused(status: StatusCode, body: &str) -> DomainError {
+    let said = match serde_json::from_str::<Value>(body) {
         Ok(v) => v["error"]["message"]
             .as_str()
             .or_else(|| v["error_description"].as_str())
@@ -232,6 +390,32 @@ async fn failed(res: Response) -> DomainError {
     };
     tracing::warn!(%status, said = %said, "Google answered with an error");
     DomainError::Google(format!("Google refused the request ({}).", status.as_u16()))
+}
+
+/// Whether a 403 body says "slow down" (`rateLimitExceeded`, `userRateLimitExceeded`) and not "no".
+fn rate_limited(body: &str) -> bool {
+    let v: Value = serde_json::from_str(body).unwrap_or(Value::Null);
+    v["error"]["errors"].as_array().is_some_and(|errors| {
+        errors.iter().any(|e| {
+            matches!(
+                e["reason"].as_str(),
+                Some("rateLimitExceeded" | "userRateLimitExceeded")
+            )
+        })
+    })
+}
+
+/// The `Retry-After` of an answer in seconds (the date form is not used by Google's APIs), at most [`MAX_WAIT`].
+fn retry_after(res: &Response) -> Option<Duration> {
+    let secs: u64 = res
+        .headers()
+        .get("retry-after")?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse()
+        .ok()?;
+    Some(Duration::from_secs(secs).min(MAX_WAIT))
 }
 
 /// The JSON body of a successful answer; anything else is an error.
@@ -287,6 +471,15 @@ impl GoogleTasks for GoogleTasksClient {
             )
             .await?;
         let reply: TokenReply = read(res).await?;
+        if reply
+            .scope
+            .as_deref()
+            .is_some_and(|granted| !granted.split_whitespace().any(|s| s == SCOPE))
+        {
+            return Err(DomainError::Google(
+                "Google did not grant access to Google Tasks.".into(),
+            ));
+        }
         match reply.refresh_token.filter(|t| !t.is_empty()) {
             Some(t) => Ok(Secret::new(t)),
             None => Err(DomainError::Google(
@@ -336,48 +529,61 @@ impl GoogleTasks for GoogleTasksClient {
         }
     }
 
-    async fn replace_list(
+    async fn ensure_list(
         &self,
         access: &Secret,
         tasklist_id: Option<&str>,
         title: &str,
-        sections: &[TaskSection],
     ) -> DomainResult<String> {
-        let list = self.list_to_fill(access, tasklist_id, title).await?;
-
-        // Deleting a parent may take its subtasks with it, so a task that is already gone is fine.
-        for id in self.task_ids(access, &list).await? {
-            let url = self.tasks_url(&["lists", &list, "tasks", &id], &[])?;
-            let res = send(self.api(reqwest::Method::DELETE, url, access)).await?;
-            if !res.status().is_success()
-                && !matches!(res.status(), StatusCode::NOT_FOUND | StatusCode::GONE)
-            {
-                return Err(failed(res).await);
-            }
-        }
-
-        // A task made without `previous` goes first among its siblings, so each one names the one before it.
-        let mut previous_section: Option<String> = None;
-        for section in sections {
-            let parent = self
-                .insert(
-                    access,
-                    &list,
-                    &section.title,
-                    None,
-                    previous_section.as_deref(),
+        if let Some(id) = tasklist_id {
+            let url = self.tasks_url(&["users", "@me", "lists", id], &[])?;
+            let res = self
+                .call(
+                    self.api(reqwest::Method::GET, url, access),
+                    Replay::Idempotent,
                 )
                 .await?;
-            let mut previous_item: Option<String> = None;
-            for item in &section.items {
-                previous_item = Some(
-                    self.insert(access, &list, item, Some(&parent), previous_item.as_deref())
-                        .await?,
-                );
+            match res.status() {
+                s if s.is_success() => return Ok(read::<Created>(res).await?.id),
+                StatusCode::NOT_FOUND => {}
+                _ => return Err(failed(res).await),
             }
-            previous_section = Some(parent);
         }
-        Ok(list)
+        // No list remembered, or Google no longer has it: a list the member already has under this name is the
+        // one (a reconnect or a restored backup must not make a second `Groceries`).
+        if let Some(id) = self.list_titled(access, title).await? {
+            return Ok(id);
+        }
+        let url = self.tasks_url(&["users", "@me", "lists"], &[])?;
+        let req = self
+            .api(reqwest::Method::POST, url, access)
+            .json(&json!({ "title": title }));
+        Ok(read::<Created>(self.call(req, Replay::Throttled).await?)
+            .await?
+            .id)
+    }
+
+    async fn fill_list(
+        &self,
+        access: &Secret,
+        tasklist_id: &str,
+        sections: &[TaskSection],
+    ) -> DomainResult<()> {
+        let done = tokio::time::timeout(
+            self.fill_deadline,
+            self.rewrite(access, tasklist_id, sections),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            Err(DomainError::Google(
+                "Google took too long to answer.".into(),
+            ))
+        });
+        // Whatever stopped it, the list may be half done.
+        done.map_err(|e| match e {
+            DomainError::Google(m) => DomainError::Google(format!("{m} {INCOMPLETE}")),
+            other => other,
+        })
     }
 }
 

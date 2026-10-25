@@ -65,6 +65,8 @@ struct State {
     settings: Settings,
     grocery: Grocery,
     google: HashMap<Uuid, GoogleConnection>,
+    /// When each user's running export started.
+    google_exports: HashMap<Uuid, DateTime<Utc>>,
 }
 
 impl State {
@@ -190,6 +192,7 @@ impl MemoryStore {
                     plate_treatment: true,
                 },
                 google: HashMap::new(),
+                google_exports: HashMap::new(),
                 grocery: Grocery {
                     list: None,
                     recipes: Vec::new(),
@@ -567,6 +570,7 @@ impl UserRepo for MemoryStore {
         }
         s.users.remove(&id);
         s.google.remove(&id);
+        s.google_exports.remove(&id);
         s.sessions.retain(|_, (user, _)| *user != id);
         let gone = Some(id);
         for r in s.recipes.values_mut() {
@@ -1024,7 +1028,7 @@ impl GoogleConnectionRepo for MemoryStore {
         s.google.insert(
             user_id,
             GoogleConnection {
-                sealed_token,
+                sealed_token: Some(sealed_token),
                 tasklist_id,
                 connected_at,
             },
@@ -1039,8 +1043,40 @@ impl GoogleConnectionRepo for MemoryStore {
         Ok(())
     }
 
+    async fn forget_token(&self, user_id: Uuid) -> DomainResult<()> {
+        if let Some(c) = self.lock().google.get_mut(&user_id) {
+            c.sealed_token = None;
+        }
+        Ok(())
+    }
+
     async fn delete(&self, user_id: Uuid) -> DomainResult<()> {
-        self.lock().google.remove(&user_id);
+        let mut s = self.lock();
+        s.google.remove(&user_id);
+        s.google_exports.remove(&user_id);
+        Ok(())
+    }
+
+    async fn claim_export(
+        &self,
+        user_id: Uuid,
+        now: DateTime<Utc>,
+        stale_before: DateTime<Utc>,
+    ) -> DomainResult<bool> {
+        let mut s = self.lock();
+        let free = s
+            .google_exports
+            .get(&user_id)
+            .is_none_or(|started| *started < stale_before);
+        if !s.google.contains_key(&user_id) || !free {
+            return Ok(false);
+        }
+        s.google_exports.insert(user_id, now);
+        Ok(true)
+    }
+
+    async fn release_export(&self, user_id: Uuid) -> DomainResult<()> {
+        self.lock().google_exports.remove(&user_id);
         Ok(())
     }
 }

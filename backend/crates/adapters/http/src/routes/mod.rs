@@ -111,6 +111,11 @@ where
     router
         .method_not_allowed_fallback(|| async { AppError::MethodNotAllowed })
         .fallback(|| async { AppError::NotFound("No such endpoint.".into()) })
-        .layer(TraceLayer::new_for_http())
+        // The span carries the path, not the address: a query string can hold a secret (the Google callback's `code`).
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<_>| {
+                tracing::debug_span!("request", method = %req.method(), path = %req.uri().path())
+            }),
+        )
         .with_state(state)
 }

@@ -36,6 +36,10 @@ impl ChaChaCipher {
 }
 
 fn failed() -> DomainError {
+    // Never the bytes. Most likely `TOKEN_ENCRYPTION_KEY` is not the key the token was sealed with.
+    tracing::warn!(
+        "a stored token could not be opened; is TOKEN_ENCRYPTION_KEY the key it was sealed with?"
+    );
     DomainError::Internal("could not open a sealed token".into())
 }
 

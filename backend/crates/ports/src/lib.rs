@@ -209,16 +209,25 @@ pub trait GoogleTasks: Send + Sync {
     /// Revokes a token at Google.
     async fn revoke(&self, token: &Secret) -> DomainResult<()>;
 
-    /// Makes the task list hold exactly `sections`: one parent task per section in order, each item a subtask of
-    /// its section in order. Reuses the list `tasklist_id` names, emptying it first; when there is none, or Google
-    /// no longer has it, makes a new list called `title`. Returns the id of the list used.
-    async fn replace_list(
+    /// The task list to send to: the one `tasklist_id` names if Google still has it; else the first list titled
+    /// exactly `title`; else a new list called `title`. Returns its id.
+    async fn ensure_list(
         &self,
         access: &Secret,
         tasklist_id: Option<&str>,
         title: &str,
-        sections: &[TaskSection],
     ) -> DomainResult<String>;
+
+    /// Makes the list `tasklist_id` hold exactly `sections`: every task in it is deleted first, then one parent
+    /// task per section is made in order, each item a subtask of its section in order. Safe to run again after a
+    /// failure half way: it starts by emptying the list. `Google` when Google refuses a call; the list may then be
+    /// partly filled.
+    async fn fill_list(
+        &self,
+        access: &Secret,
+        tasklist_id: &str,
+        sections: &[TaskSection],
+    ) -> DomainResult<()>;
 }
 
 /// Seals secrets before they are stored. The key never leaves the implementation.
