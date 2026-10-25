@@ -116,7 +116,6 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
         )}
       </ToastRegion>
 
-      {selecting && <div className="h-16" aria-hidden="true" />}
       {selecting && (
         <SelectionBar
           status={picked.length === 0 ? "None chosen" : `${picked.length} chosen`}

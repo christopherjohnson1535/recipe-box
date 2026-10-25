@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { IngredientGroup, IngredientPanel, IngredientRow, ScaleControl } from "@/components/ui/IngredientPanel";
 import { Text } from "@/components/ui/Text";
 import { scaleQuantity, splitIngredient } from "@/lib/scale";
@@ -14,10 +15,10 @@ const OPTIONS = [
 type Group = { section: string | null; items: { index: number; text: string }[] };
 
 /** The ingredient panel: tap a row to tick it off, scale the amounts with ½× / 1× / 2×. State lives in `RecipeStateProvider`. */
-export function IngredientChecklist({ groups }: { groups: Group[] }) {
+export function IngredientChecklist({ groups, footer }: { groups: Group[]; footer?: ReactNode }) {
   const { ticked, toggle, scale, setScale, rescaled } = useRecipeState();
   return (
-    <IngredientPanel id="ingredients" scale={<ScaleControl value={scale} options={OPTIONS} onChange={setScale} />}>
+    <IngredientPanel id="ingredients" scale={<ScaleControl value={scale} options={OPTIONS} onChange={setScale} />} footer={footer}>
       {/* Heard when the scale changes (nothing is announced on first load). */}
       <p role="status" className="sr-only">
         {rescaled ? `Scaled to ${OPTIONS.find((o) => o.value === scale)?.label}` : ""}

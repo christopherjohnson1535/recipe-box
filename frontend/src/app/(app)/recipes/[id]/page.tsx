@@ -146,12 +146,7 @@ export default async function RecipePage({ params }: Params) {
         {lede && <Lede>{lede}</Lede>}
 
         <SidebarLayout
-          sidebar={
-            <div className="flex flex-col gap-4 self-start">
-              <IngredientChecklist groups={ingredientGroups} />
-              <AddToGroceries recipeId={id} />
-            </div>
-          }
+          sidebar={<IngredientChecklist groups={ingredientGroups} footer={<AddToGroceries recipeId={id} />} />}
         >
           <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-8">
             <MethodHeader steps={recipe.steps.length} />

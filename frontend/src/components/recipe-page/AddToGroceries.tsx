@@ -33,8 +33,8 @@ export function AddToGroceries({ recipeId }: { recipeId: string }) {
   }
 
   return (
-    <div className="flex flex-col items-start gap-3 print:hidden">
-      <Button variant="secondary" pending={pending} disabled={!online} aria-describedby={online ? undefined : "groceries-add-offline"} onClick={add}>
+    <div className="flex flex-col gap-3 print:hidden">
+      <Button variant="secondary" className="max-sm:w-full" pending={pending} disabled={!online} aria-describedby={online ? undefined : "groceries-add-offline"} onClick={add}>
         {pending ? "Adding…" : "Add to groceries"}
       </Button>
       <OfflineNote id="groceries-add-offline">You’re offline. Adding to the list needs the server; try again once you’re back online.</OfflineNote>

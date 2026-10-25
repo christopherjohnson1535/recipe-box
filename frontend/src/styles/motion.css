@@ -178,6 +178,10 @@ li:target > button {
 html:has(.floating-bar, .selection-bar) {
   scroll-padding-bottom: 7rem;
 }
+/* While the grocery selection bar is up, leave room under the page for it: the last panel ends well above the pill, never behind it. */
+html:has(.selection-bar) main {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 7rem);
+}
 
 /* Reduced motion removes all movement. Opacity changes (the stamp, the arrival fades) become instant or stay still. */
 @media (prefers-reduced-motion: reduce) {
