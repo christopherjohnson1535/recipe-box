@@ -6,7 +6,7 @@ use domain::{
     DomainError, Image, ROLE_ADMIN, RecipeInput, Settings, TagCount, chrono::Duration, uuid::Uuid,
 };
 
-use super::{Ctx, ManualClock, Stack, epoch, ms, new_user};
+use super::{Ctx, ManualClock, Stack, epoch, ms, new_user, new_user_with_email};
 use crate::Clock;
 
 fn ready<T>(p: Poll<T>) -> Option<T> {
@@ -51,6 +51,9 @@ pub async fn user_repo<F: Fn(Arc<dyn Clock>) -> Stack>(make: F) {
     concurrent_password_changes(&make).await;
     removing_users(&make).await;
     concurrent_removals_keep_an_admin(&make).await;
+    emails_are_unique_and_found(&make).await;
+    setting_an_email(&make).await;
+    finding_a_user_by_id(&make).await;
 }
 
 async fn first_admin_only_once<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
@@ -262,6 +265,177 @@ async fn concurrent_first_admins<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
     let loser = a.err().or(b.err()).expect("one failed");
     assert!(matches!(loser, DomainError::Forbidden(_)), "{loser:?}");
     assert_eq!(s.users.list().await.unwrap().len(), 1);
+}
+
+async fn emails_are_unique_and_found<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    assert_eq!(
+        c.s.users
+            .find_by_email("sam@example.com")
+            .await
+            .unwrap()
+            .map(|u| u.id),
+        None
+    );
+    let sam =
+        c.s.users
+            .create(new_user_with_email(
+                "sam",
+                "Sam",
+                "member",
+                "sam@example.com",
+            ))
+            .await
+            .unwrap();
+    assert_eq!(sam.email.as_deref(), Some("sam@example.com"));
+    // Members without an email do not clash with each other.
+    for name in ["no-mail-1", "no-mail-2"] {
+        let user =
+            c.s.users
+                .create(new_user(name, name, "member"))
+                .await
+                .unwrap();
+        assert_eq!(user.email, None);
+    }
+
+    let found = c.s.users.find_by_email("Sam@Example.COM").await.unwrap();
+    assert_eq!(
+        found.map(|u| u.id),
+        Some(sam.id),
+        "emails compare case-insensitively"
+    );
+    assert!(
+        c.s.users
+            .find_by_email("other@example.com")
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    let taken =
+        c.s.users
+            .create(new_user_with_email(
+                "sam2",
+                "Sam 2",
+                "member",
+                "SAM@example.com",
+            ))
+            .await;
+    assert!(matches!(taken, Err(DomainError::Conflict(_))), "{taken:?}");
+    assert!(
+        c.s.users
+            .list()
+            .await
+            .unwrap()
+            .iter()
+            .all(|u| u.username != "sam2"),
+        "nothing was created"
+    );
+    let listed = c.s.users.list().await.unwrap();
+    assert_eq!(
+        listed
+            .iter()
+            .find(|u| u.id == sam.id)
+            .and_then(|u| u.email.as_deref()),
+        Some("sam@example.com")
+    );
+    // A session finds the member with their email, too.
+    c.s.sessions
+        .create(sam.id, token(9), c.clock.now() + SESSION_LIFETIME)
+        .await
+        .unwrap();
+    let by_session =
+        c.s.sessions
+            .user_for_token(&token(9))
+            .await
+            .unwrap()
+            .unwrap();
+    assert_eq!(by_session.email.as_deref(), Some("sam@example.com"));
+}
+
+async fn setting_an_email<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let a =
+        c.s.users
+            .create(new_user("alice", "Alice", "member"))
+            .await
+            .unwrap();
+    let b =
+        c.s.users
+            .create(new_user_with_email(
+                "bob",
+                "Bob",
+                "member",
+                "bob@example.com",
+            ))
+            .await
+            .unwrap();
+
+    let set =
+        c.s.users
+            .set_email(a.id, Some("alice@example.com"))
+            .await
+            .unwrap();
+    assert_eq!(
+        (set.id, set.email.as_deref()),
+        (a.id, Some("alice@example.com"))
+    );
+    assert_eq!(set.username, "alice");
+    // Setting your own again is not a clash.
+    c.s.users
+        .set_email(a.id, Some("alice@example.com"))
+        .await
+        .unwrap();
+
+    let clash = c.s.users.set_email(a.id, Some("Bob@example.com")).await;
+    assert!(matches!(clash, Err(DomainError::Conflict(_))), "{clash:?}");
+    let kept = c.s.users.find(a.id).await.unwrap().unwrap();
+    assert_eq!(
+        kept.email.as_deref(),
+        Some("alice@example.com"),
+        "a refused change changes nothing"
+    );
+
+    let cleared = c.s.users.set_email(b.id, None).await.unwrap();
+    assert_eq!(cleared.email, None);
+    assert!(
+        c.s.users
+            .find_by_email("bob@example.com")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    // The address is free again.
+    c.s.users
+        .set_email(a.id, Some("bob@example.com"))
+        .await
+        .unwrap();
+
+    let missing =
+        c.s.users
+            .set_email(Uuid::new_v4(), Some("x@example.com"))
+            .await;
+    assert!(
+        matches!(missing, Err(DomainError::NotFound(_))),
+        "{missing:?}"
+    );
+    let missing = c.s.users.set_email(Uuid::new_v4(), None).await;
+    assert!(
+        matches!(missing, Err(DomainError::NotFound(_))),
+        "{missing:?}"
+    );
+}
+
+async fn finding_a_user_by_id<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let found =
+        c.s.users
+            .find(c.user)
+            .await
+            .unwrap()
+            .expect("the case's user");
+    assert_eq!((found.id, found.username.as_str()), (c.user, "tester"));
+    assert!(c.s.users.find(Uuid::new_v4()).await.unwrap().is_none());
 }
 
 async fn concurrent_removals_keep_an_admin<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {

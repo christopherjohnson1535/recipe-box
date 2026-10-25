@@ -62,6 +62,45 @@ pub fn password(p: &str) -> DomainResult<()> {
     Ok(())
 }
 
+/// A member's email for Google sign-in (ACC-6): trimmed and lower-cased; blank means none. Basic shape only (one
+/// `@`, something on both sides, a dotted domain, no spaces or control characters, at most 254 characters); Google
+/// is what proves the address.
+pub fn email(raw: Option<&str>) -> DomainResult<Option<String>> {
+    let Some(e) = raw
+        .map(|e| e.trim().to_lowercase())
+        .filter(|e| !e.is_empty())
+    else {
+        return Ok(None);
+    };
+    let bad = || DomainError::validation("email: must look like name@example.com.");
+    let (local, host) = e.split_once('@').ok_or_else(bad)?;
+    let labels_ok = host.split('.').all(|l| !l.is_empty());
+    if e.len() > 254
+        || local.is_empty()
+        || host.contains('@')
+        || !host.contains('.')
+        || !labels_ok
+        || e.chars().any(|c| c.is_whitespace() || c.is_control())
+    {
+        return Err(bad());
+    }
+    Ok(Some(e))
+}
+
+/// Where to go after Google sign-in: only a path on this site. Anything else (another address, `//host`,
+/// `/\host`, a scheme, spaces, control or non-ASCII characters that a browser would strip or turn into another
+/// address) becomes `/`. A path with such characters arrives percent-encoded.
+pub fn next_path(raw: Option<&str>) -> String {
+    let ok = |p: &&str| {
+        p.len() <= 2000
+            && p.starts_with('/')
+            && !p.starts_with("//")
+            && !p.contains('\\')
+            && p.chars().all(|c| c.is_ascii_graphic())
+    };
+    raw.filter(ok).unwrap_or("/").to_string()
+}
+
 pub fn display_name(raw: &str) -> DomainResult<String> {
     let d = raw.trim();
     if d.is_empty() || d.chars().count() > 100 {
@@ -200,6 +239,57 @@ mod tests {
         assert!(username(&"a".repeat(41)).is_err());
         assert!(username("bad name").is_err());
         assert!(username("émile").is_err());
+    }
+
+    #[test]
+    fn email_rules() {
+        assert_eq!(email(None).unwrap(), None);
+        assert_eq!(email(Some("  \t ")).unwrap(), None);
+        assert_eq!(
+            email(Some("  Sam.Smith+rb@Example.COM "))
+                .unwrap()
+                .as_deref(),
+            Some("sam.smith+rb@example.com")
+        );
+        for bad in [
+            "sam",
+            "@example.com",
+            "sam@",
+            "sam@example",
+            "sam@@example.com",
+            "sam@exa@mple.com",
+            "sam@.com",
+            "sam@example..com",
+            "sam smith@example.com",
+            "sam@exam\nple.com",
+        ] {
+            assert!(email(Some(bad)).is_err(), "{bad:?}");
+        }
+        assert!(email(Some(&format!("{}@example.com", "a".repeat(250)))).is_err());
+    }
+
+    #[test]
+    fn next_is_a_path_on_this_site_or_the_front_page() {
+        for (raw, want) in [
+            (Some("/recipes/1?x=1#y"), "/recipes/1?x=1#y"),
+            (Some("/"), "/"),
+            (None, "/"),
+            (Some(""), "/"),
+            (Some("recipes"), "/"),
+            (Some("https://evil.example"), "/"),
+            (Some("//evil.example"), "/"),
+            (Some("/\\evil.example"), "/"),
+            (Some("/a\\b"), "/"),
+            (Some("javascript:alert(1)"), "/"),
+            (Some("/\t/evil.example"), "/"),
+            (Some("/ foo"), "/"),
+            (Some("/a\nb"), "/"),
+            (Some("/caf\u{e9}"), "/"),
+            (Some("/caf%C3%A9"), "/caf%C3%A9"),
+        ] {
+            assert_eq!(next_path(raw), want, "{raw:?}");
+        }
+        assert_eq!(next_path(Some(&format!("/{}", "a".repeat(2000)))), "/");
     }
 
     #[test]

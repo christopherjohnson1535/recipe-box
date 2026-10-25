@@ -13,17 +13,18 @@ use std::{
 
 use async_trait::async_trait;
 use domain::{
-    DomainError, DomainResult, Image, NewUser, Page, RESTORE_WINDOW_MINUTES, ROLE_ADMIN, Recipe,
-    RecipeInput, RecipeSummary, SearchQuery, Secret, Settings, Sort, TagCount, User, UserRef,
+    DomainError, DomainResult, Identity, Image, NewIdentity, NewUser, Page, RESTORE_WINDOW_MINUTES,
+    ROLE_ADMIN, Recipe, RecipeInput, RecipeSummary, SearchQuery, Secret, Settings, SignInFlow,
+    Sort, TagCount, User, UserRef,
     chrono::{DateTime, Duration, Utc},
     grocery::Section,
     uuid::Uuid,
 };
 use ports::{
-    Clock, Compute, EncodedImage, GoogleConnection, GoogleConnectionRepo, GroceryItem, GroceryList,
-    GroceryRepo, ImageCodec, ImageRepo, ListedRecipe, MediaStore, NewGroceryItem, PasswordHasher,
-    RecipeRepo, SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo, TokenCipher,
-    UserRepo,
+    Clock, Compute, EncodedImage, FlowSealer, GoogleConnection, GoogleConnectionRepo, GroceryItem,
+    GroceryList, GroceryRepo, IdentityRepo, ImageCodec, ImageRepo, ListedRecipe, MediaStore,
+    NewGroceryItem, PasswordHasher, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo,
+    StorageHealth, TagRepo, TokenCipher, UserRepo,
 };
 
 struct StoredUser {
@@ -65,6 +66,8 @@ struct State {
     settings: Settings,
     grocery: Grocery,
     google: HashMap<Uuid, GoogleConnection>,
+    /// Linked identity-provider accounts, in the order they were made.
+    identities: Vec<Identity>,
     /// When each user's running export started.
     google_exports: HashMap<Uuid, DateTime<Utc>>,
 }
@@ -192,6 +195,7 @@ impl MemoryStore {
                     plate_treatment: true,
                 },
                 google: HashMap::new(),
+                identities: Vec::new(),
                 google_exports: HashMap::new(),
                 grocery: Grocery {
                     list: None,
@@ -467,11 +471,23 @@ fn username_taken(s: &State, username: &str) -> bool {
         .any(|u| u.user.username.eq_ignore_ascii_case(username))
 }
 
+/// Whether a user other than `except` has this email (case-insensitively).
+fn email_taken(s: &State, email: &str, except: Option<Uuid>) -> bool {
+    s.users.values().any(|u| {
+        Some(u.user.id) != except
+            && u.user
+                .email
+                .as_deref()
+                .is_some_and(|e| e.eq_ignore_ascii_case(email))
+    })
+}
+
 fn insert_user(s: &mut State, now: DateTime<Utc>, new: NewUser) -> User {
     let user = User {
         id: Uuid::new_v4(),
         username: new.username,
         display_name: new.display_name,
+        email: new.email,
         role: new.role,
         created_at: now,
     };
@@ -498,6 +514,13 @@ impl UserRepo for MemoryStore {
                 "That username is already taken.".into(),
             ));
         }
+        if new
+            .email
+            .as_deref()
+            .is_some_and(|e| email_taken(&s, e, None))
+        {
+            return Err(email_conflict());
+        }
         Ok(insert_user(&mut s, self.clock.now(), new))
     }
 
@@ -513,6 +536,36 @@ impl UserRepo for MemoryStore {
         let mut users: Vec<User> = self.lock().users.values().map(|u| u.user.clone()).collect();
         users.sort_by_key(|u| (u.display_name.to_lowercase(), u.username.clone()));
         Ok(users)
+    }
+
+    async fn find(&self, id: Uuid) -> DomainResult<Option<User>> {
+        Ok(self.lock().users.get(&id).map(|u| u.user.clone()))
+    }
+
+    async fn find_by_email(&self, email: &str) -> DomainResult<Option<User>> {
+        let s = self.lock();
+        Ok(s.users
+            .values()
+            .find(|u| {
+                u.user
+                    .email
+                    .as_deref()
+                    .is_some_and(|e| e.eq_ignore_ascii_case(email))
+            })
+            .map(|u| u.user.clone()))
+    }
+
+    async fn set_email(&self, id: Uuid, email: Option<&str>) -> DomainResult<User> {
+        let mut s = self.lock();
+        if !s.users.contains_key(&id) {
+            return Err(DomainError::NotFound("No such user.".into()));
+        }
+        if email.is_some_and(|e| email_taken(&s, e, Some(id))) {
+            return Err(email_conflict());
+        }
+        let stored = s.users.get_mut(&id).expect("checked above");
+        stored.user.email = email.map(str::to_string);
+        Ok(stored.user.clone())
     }
 
     async fn find_with_hash(&self, username: &str) -> DomainResult<Option<(User, String)>> {
@@ -569,6 +622,7 @@ impl UserRepo for MemoryStore {
             ));
         }
         s.users.remove(&id);
+        s.identities.retain(|i| i.user_id != id);
         s.google.remove(&id);
         s.google_exports.remove(&id);
         s.sessions.retain(|_, (user, _)| *user != id);
@@ -583,6 +637,68 @@ impl UserRepo for MemoryStore {
         }
         for i in s.images.values_mut().filter(|i| i.created_by == gone) {
             i.created_by = None;
+        }
+        Ok(())
+    }
+}
+
+fn email_conflict() -> DomainError {
+    DomainError::Conflict("That email is already used by another member.".into())
+}
+
+#[async_trait]
+impl IdentityRepo for MemoryStore {
+    async fn find(&self, provider: &str, subject: &str) -> DomainResult<Option<Identity>> {
+        Ok(self
+            .lock()
+            .identities
+            .iter()
+            .find(|i| i.provider == provider && i.subject == subject)
+            .cloned())
+    }
+
+    async fn list(&self, user_id: Uuid) -> DomainResult<Vec<Identity>> {
+        Ok(self
+            .lock()
+            .identities
+            .iter()
+            .filter(|i| i.user_id == user_id)
+            .cloned()
+            .collect())
+    }
+
+    async fn create(&self, new: NewIdentity) -> DomainResult<Identity> {
+        let mut s = self.lock();
+        if !s.users.contains_key(&new.user_id) {
+            return Err(DomainError::NotFound("No such user.".into()));
+        }
+        if s.identities
+            .iter()
+            .any(|i| i.provider == new.provider && i.subject == new.subject)
+        {
+            return Err(DomainError::Conflict(
+                "That account is already linked.".into(),
+            ));
+        }
+        let identity = Identity {
+            id: Uuid::new_v4(),
+            user_id: new.user_id,
+            provider: new.provider,
+            subject: new.subject,
+            email: new.email,
+            created_at: self.clock.now(),
+        };
+        s.identities.push(identity.clone());
+        Ok(identity)
+    }
+
+    async fn delete(&self, user_id: Uuid, id: Uuid) -> DomainResult<()> {
+        let mut s = self.lock();
+        let before = s.identities.len();
+        s.identities
+            .retain(|i| !(i.id == id && i.user_id == user_id));
+        if s.identities.len() == before {
+            return Err(DomainError::NotFound("No such linked account.".into()));
         }
         Ok(())
     }
@@ -1096,6 +1212,29 @@ impl TokenCipher for FakeTokenCipher {
             .and_then(|b| std::str::from_utf8(b).ok())
             .map(Secret::new)
             .ok_or_else(|| DomainError::Internal("not sealed by this cipher".into()))
+    }
+}
+
+/// A sealer for tests: the flow is kept here and the cookie text is its number, `flow-0`, `flow-1`, ... Only text
+/// this sealer made opens, so a changed or made-up cookie is refused, as with the real one.
+#[derive(Default)]
+pub struct FakeFlowSealer {
+    flows: Mutex<Vec<SignInFlow>>,
+}
+
+impl FlowSealer for FakeFlowSealer {
+    fn seal(&self, flow: &SignInFlow) -> DomainResult<String> {
+        let mut flows = self.flows.lock().expect("sealer lock");
+        flows.push(flow.clone());
+        Ok(format!("flow-{}", flows.len() - 1))
+    }
+
+    fn open(&self, sealed: &str) -> DomainResult<SignInFlow> {
+        sealed
+            .strip_prefix("flow-")
+            .and_then(|n| n.parse::<usize>().ok())
+            .and_then(|n| self.flows.lock().expect("sealer lock").get(n).cloned())
+            .ok_or_else(|| DomainError::validation("not sealed by this sealer"))
     }
 }
 

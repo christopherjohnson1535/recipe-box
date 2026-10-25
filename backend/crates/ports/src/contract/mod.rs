@@ -14,6 +14,7 @@
 mod accounts;
 mod google;
 mod grocery;
+mod identities;
 mod infra;
 mod recipes;
 
@@ -26,13 +27,14 @@ use domain::{
 };
 
 use crate::{
-    Clock, GoogleConnectionRepo, GroceryRepo, ImageRepo, RecipeRepo, SessionRepo, SettingsRepo,
-    StorageHealth, TagRepo, UserRepo,
+    Clock, GoogleConnectionRepo, GroceryRepo, IdentityRepo, ImageRepo, RecipeRepo, SessionRepo,
+    SettingsRepo, StorageHealth, TagRepo, UserRepo,
 };
 
 pub use accounts::{image_repo, session_repo, settings_repo, tag_repo, user_repo};
 pub use google::google_connection_repo;
 pub use grocery::grocery_repo;
+pub use identities::identity_repo;
 pub use infra::{media_store, password_hasher, storage_health};
 pub use recipes::recipe_repo;
 
@@ -47,6 +49,7 @@ pub struct Stack {
     pub tags: Arc<dyn TagRepo>,
     pub grocery: Arc<dyn GroceryRepo>,
     pub google: Arc<dyn GoogleConnectionRepo>,
+    pub identities: Arc<dyn IdentityRepo>,
     pub health: Arc<dyn StorageHealth>,
 }
 
@@ -112,6 +115,19 @@ pub(crate) fn new_user(username: &str, display_name: &str, role: &str) -> NewUse
         display_name: display_name.into(),
         password_hash: "hash".into(),
         role: role.into(),
+        email: None,
+    }
+}
+
+pub(crate) fn new_user_with_email(
+    username: &str,
+    display_name: &str,
+    role: &str,
+    email: &str,
+) -> NewUser {
+    NewUser {
+        email: Some(email.into()),
+        ..new_user(username, display_name, role)
     }
 }
 
