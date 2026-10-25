@@ -7,6 +7,7 @@
 
 mod auth;
 mod export;
+mod grocery;
 mod imports;
 mod maintenance;
 mod media;
@@ -17,13 +18,14 @@ mod users;
 use std::sync::Arc;
 
 use ports::{
-    BackupFormat, Clock, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader,
+    BackupFormat, Clock, GroceryRepo, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader,
     PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo,
     StorageHealth, TagRepo, TaskSpawner, UserRepo,
 };
 
 pub use auth::{AuthService, NewSession};
 pub use export::{ExportJob, ExportService, ImportReport};
+pub use grocery::{GroceryItemView, GroceryListView, GroceryRecipeView, GroceryService, ItemPatch};
 pub use imports::{
     Capabilities, ImportNotes, ImportService, Imported, NoneExtractor, PhotoFailure,
 };
@@ -42,6 +44,7 @@ pub struct Deps {
     pub sessions: Arc<dyn SessionRepo>,
     pub settings: Arc<dyn SettingsRepo>,
     pub tags: Arc<dyn TagRepo>,
+    pub grocery: Arc<dyn GroceryRepo>,
     pub health: Arc<dyn StorageHealth>,
     pub media: Arc<dyn MediaStore>,
     pub backup: Arc<dyn BackupFormat>,
@@ -70,6 +73,7 @@ pub struct Services {
     pub auth: AuthService,
     pub settings: SettingsService,
     pub tags: TagService,
+    pub grocery: GroceryService,
     pub media: MediaService,
     pub imports: ImportService,
     pub export: ExportService,
@@ -85,6 +89,7 @@ impl Services {
             auth,
             settings: SettingsService::new(&d),
             tags: TagService::new(&d),
+            grocery: GroceryService::new(&d),
             media: MediaService::new(&d),
             imports: ImportService::new(&d),
             export: ExportService::new(&d),

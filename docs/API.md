@@ -154,6 +154,48 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   `warnings` entry. One retry on 429/5xx/connect errors (not after
   a timeout, nor when `retry-after` asks for more than 10 s); otherwise 502 `ai_error`. A reply cut off at the token
   limit is kept when usable, with a warning. The API key is never logged or returned.
+- **Grocery list (GRO-1–4).** One active list for the household, shared by every signed-in member (no admin rights
+  needed); `GET /api/grocery` creates it on first use. Every write answers with the new state, so two people shopping
+  converge by refetching (`updatedAt` changes on every write). `GET` first rebuilds the items from the list's recipes
+  as they are now, so a recipe edited, deleted or restored since the last write shows up without a list write; it
+  writes (and moves `updatedAt`) only when the rebuilt items differ from what is stored, so polling is quiet.
+  `GroceryList` = `{id, updatedAt, recipes: [{recipeId, title, scale, servings, imageUrl}], items: [GroceryItem]}`;
+  `servings` is the recipe's servings text scaled like the recipe page does (`"4-6"` × 0.5 → `"2–3"`), or null.
+  - **Recipes on the list.** `POST /api/grocery/recipes` `{recipeId, scale?}` adds a live recipe, or sets the scale
+    of one already on it (upsert); `scale` is the factor the recipe page uses (½× = 0.5), 0.25-10, default 1 (else
+    400 `validation`); unknown or deleted recipe 404 `not_found`. `DELETE /api/grocery/recipes/{recipeId}` takes it off
+    (404 when it is not on the list; a deleted recipe still on the list can be taken off, `200`). Both answer
+    `200 GroceryList`. Adding a recipe already on the list sets its scale (a missing `scale` resets it to 1). A
+    recipe deleted later drops off at the next `GET`; if it is restored within the window it comes back on the list
+    at its scale, with fresh unticked items (its earlier ticks are not kept). Edits to a listed recipe's
+    ingredients show up at the next `GET`; an item whose amounts change is un-ticked.
+  - **How items are made (recompute).** Each ingredient line of each recipe is parsed (deterministic, no AI): a
+    leading quantity (whole, decimal, `1/2`, `1 1/2`, `1-1/2`, unicode `½`, ranges `2-3`/`2 to 3`), a unit from the
+    same list as the recipe page's scaler (canonical short form: `cup`, `tbsp`, `tsp`, `lb`, `oz`, `g`, `kg`, `ml`,
+    `l`, `clove`, `can`, …) and the item name (prep notes after a comma, parentheticals and size words dropped,
+    lower-cased). Items merge on a key that also makes simple plurals singular; the returned `name` is for display:
+    a count with no unit is plural when the total is over 1 ("3 onions"), singular otherwise. The quantity is multiplied by the recipe's `scale`. Lines that do not parse
+    ("salt to taste", "2 cups plus 2 tbsp flour") are kept whole as the name, with no amount, never dropped.
+    Items merge by name across recipes: amounts with the same unit (or both unit-less) add up; different units stay
+    side by side in `amounts` under the one name (no unit conversion). The section is the household override for
+    that name if there is one, else the built-in dictionary, else `other`. Recompute runs on every `GET` and
+    write that touches recipes (added, removed, rescaled, edited, deleted, restored); amounts that are not a finite
+    number (`1/0 cup`, a 400-digit number) leave the line whole; manual items are untouched; a generated item keeps its tick and its cleared state unless its
+    amounts changed (then it is un-ticked and shown again: you need more).
+  - **Items.** `GroceryItem` = `{id, name, amounts: [{quantity: string|null, unit: string|null}], section, checked,
+    manual, staple, recipeIds}`. `quantity` is set as a cook writes it (`1½`, `⅓`, `2–3`, `12`); an empty `amounts`
+    means "no amount". `section` is one of `produce`, `meat`, `fridge`, `freezer`, `pantry`, `other`. `GET` returns
+    items ordered by section in that order, then by name; cleared items are not returned. `recipeIds` lists the recipes in the order they were put on the list.
+  - `POST /api/grocery/items` `{text, section?}` adds a manual item (`201 GroceryItem`); `text` is parsed like an
+    ingredient line ("2 lb potatoes"), 1-200 characters after NUL characters are dropped and it is trimmed (else 400); without `section` it is classified
+    like generated items. `PATCH /api/grocery/items/{id}` `{checked?, section?, staple?}` (at least one field, else
+    400) answers `200 GroceryItem`. Setting `section` also stores a household override for that name, so the next list
+    puts it there (GRO-4). Setting `staple` marks or unmarks the name as a household staple ("always have it": salt,
+    pepper, water are staples to begin with); staples are still returned, with `staple: true`, and the client hides
+    them unless asked. `DELETE /api/grocery/items/{id}` (`204`) deletes a manual item and clears a generated one (it
+    stays off the list until its amounts change). Unknown item ids are 404.
+  - `POST /api/grocery/clear-checked` clears every ticked item the same way and answers `200 GroceryList`.
+    `DELETE /api/grocery` empties the list (recipes and items; overrides and staples are kept) and answers `204`.
 - **Users (admin)**: changing **your own** password requires `currentPassword` (401 `unauthenticated` if wrong, same
   message as a bad login); an admin resetting **someone else's** doesn't. Password at least 10 characters. Ends that
   user's other sessions (the caller's current session stays when it is their own password). `DELETE` ends the deleted

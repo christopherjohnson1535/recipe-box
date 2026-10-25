@@ -197,6 +197,96 @@ pub fn media_url(file_name: &str) -> String {
     format!("/media/{file_name}")
 }
 
+/// A store section, in shopping order.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum GrocerySection {
+    Produce,
+    Meat,
+    Fridge,
+    Freezer,
+    Pantry,
+    Other,
+}
+
+/// One amount of a grocery item: `quantity` as a cook writes it (`1½`, `2–3`), `unit` in its short form.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct GroceryAmount {
+    #[schema(required = true)]
+    pub quantity: Option<String>,
+    #[schema(required = true)]
+    pub unit: Option<String>,
+}
+
+/// Several amounts mean different units side by side; none means "no amount".
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GroceryItem {
+    pub id: Uuid,
+    pub name: String,
+    pub amounts: Vec<GroceryAmount>,
+    pub section: GrocerySection,
+    pub checked: bool,
+    /// Added by hand rather than made from a recipe.
+    pub manual: bool,
+    /// Always has it at home: shown, but the client hides it unless asked.
+    pub staple: bool,
+    pub recipe_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GroceryRecipe {
+    pub recipe_id: Uuid,
+    pub title: String,
+    /// The factor the recipe page uses (½× is 0.5).
+    pub scale: f64,
+    /// The recipe's servings text scaled by `scale` (`"4-6"` at 0.5 is `"2–3"`).
+    #[schema(required = true)]
+    pub servings: Option<String>,
+    #[schema(required = true)]
+    pub image_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GroceryList {
+    pub id: Uuid,
+    /// Changes on every write: refetch when it differs from what you hold.
+    pub updated_at: DateTime<Utc>,
+    pub recipes: Vec<GroceryRecipe>,
+    /// By section in shopping order, then by name. Cleared items are not returned.
+    pub items: Vec<GroceryItem>,
+}
+
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AddGroceryRecipe {
+    pub recipe_id: Uuid,
+    /// 0.25 to 10; default 1. Setting it for a recipe already on the list rescales it.
+    #[schema(minimum = 0.25, maximum = 10.0, default = 1.0)]
+    pub scale: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AddGroceryItem {
+    /// Read like an ingredient line ("2 lb potatoes"); 1 to 200 characters once trimmed.
+    pub text: String,
+    /// Without it the section is the household's choice for the name, else a built-in guess.
+    pub section: Option<GrocerySection>,
+}
+
+/// At least one field.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpdateGroceryItem {
+    pub checked: Option<bool>,
+    /// Also remembered for the item's name, so the next list files it there.
+    pub section: Option<GrocerySection>,
+    pub staple: Option<bool>,
+}
+
 /// Raw bytes in a response (an image or a zip).
 #[derive(ToSchema)]
 #[schema(value_type = String, format = Binary)]
@@ -276,6 +366,77 @@ impl From<domain::RecipeSummary> for RecipeSummary {
             image_display_url: r.image_display_file.as_deref().map(media_url),
             source_type: r.source_type.into(),
             updated_at: r.updated_at,
+        }
+    }
+}
+
+impl From<GrocerySection> for domain::grocery::Section {
+    fn from(s: GrocerySection) -> Self {
+        match s {
+            GrocerySection::Produce => Self::Produce,
+            GrocerySection::Meat => Self::Meat,
+            GrocerySection::Fridge => Self::Fridge,
+            GrocerySection::Freezer => Self::Freezer,
+            GrocerySection::Pantry => Self::Pantry,
+            GrocerySection::Other => Self::Other,
+        }
+    }
+}
+
+impl From<domain::grocery::Section> for GrocerySection {
+    fn from(s: domain::grocery::Section) -> Self {
+        use domain::grocery::Section as S;
+        match s {
+            S::Produce => Self::Produce,
+            S::Meat => Self::Meat,
+            S::Fridge => Self::Fridge,
+            S::Freezer => Self::Freezer,
+            S::Pantry => Self::Pantry,
+            S::Other => Self::Other,
+        }
+    }
+}
+
+impl From<app::GroceryItemView> for GroceryItem {
+    fn from(v: app::GroceryItemView) -> Self {
+        let i = v.item;
+        Self {
+            id: i.id,
+            name: i.name,
+            amounts: i
+                .amounts
+                .iter()
+                .map(|a| GroceryAmount {
+                    quantity: Some(domain::grocery::format_amount_quantity(a)),
+                    unit: a.unit.clone(),
+                })
+                .collect(),
+            section: i.section.into(),
+            checked: i.checked,
+            manual: i.manual,
+            staple: v.staple,
+            recipe_ids: i.recipe_ids,
+        }
+    }
+}
+
+impl From<app::GroceryListView> for GroceryList {
+    fn from(v: app::GroceryListView) -> Self {
+        Self {
+            id: v.id,
+            updated_at: v.updated_at,
+            recipes: v
+                .recipes
+                .into_iter()
+                .map(|r| GroceryRecipe {
+                    recipe_id: r.recipe_id,
+                    title: r.title,
+                    scale: r.scale,
+                    servings: r.servings,
+                    image_url: r.image_file.as_deref().map(media_url),
+                })
+                .collect(),
+            items: v.items.into_iter().map(Into::into).collect(),
         }
     }
 }

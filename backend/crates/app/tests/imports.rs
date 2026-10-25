@@ -61,6 +61,7 @@ impl World {
             sessions: store.clone(),
             settings: store.clone(),
             tags: store.clone(),
+            grocery: store.clone(),
             health: store.clone(),
             media: media.clone(),
             backup: Arc::new(adapter_memory::MemoryBackup::default()),

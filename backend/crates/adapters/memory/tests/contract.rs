@@ -17,7 +17,8 @@ fn stack(clock: Arc<dyn Clock>) -> Stack {
         sessions: store.clone(),
         health: store.clone(),
         settings: store.clone(),
-        tags: store,
+        tags: store.clone(),
+        grocery: store,
     }
 }
 
@@ -43,6 +44,11 @@ async fn accounts_meet_the_contract() {
     contract::settings_repo(stack).await;
     contract::tag_repo(stack).await;
     contract::image_repo(stack).await;
+}
+
+#[tokio::test]
+async fn groceries_meet_the_contract() {
+    contract::grocery_repo(stack).await;
 }
 
 #[tokio::test]

@@ -1,10 +1,13 @@
 //! Storage ports. Each method is atomic: it either does everything it says or leaves nothing behind.
 
+use std::collections::{HashMap, HashSet};
+
 use async_trait::async_trait;
 use domain::{
-    DomainResult, Image, NewUser, Page, Recipe, RecipeInput, RecipeSummary, SearchQuery, Settings,
-    TagCount, User,
+    DomainResult, Image, Ingredient, NewUser, Page, Recipe, RecipeInput, RecipeSummary,
+    SearchQuery, Settings, TagCount, User,
     chrono::{DateTime, Utc},
+    grocery::{Amount, GeneratedItem, Section},
     uuid::Uuid,
 };
 
@@ -183,4 +186,165 @@ pub trait TagRepo: Send + Sync {
 pub trait StorageHealth: Send + Sync {
     /// Succeeds when the storage answers a trivial query; `Internal` when it does not.
     async fn ping(&self) -> DomainResult<()>;
+}
+
+/// The household's one active grocery list.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroceryList {
+    pub id: Uuid,
+    /// The clock's now at the last write; every write moves it.
+    pub updated_at: DateTime<Utc>,
+}
+
+/// A live recipe on the list, with what a recompute needs from it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListedRecipe {
+    pub recipe_id: Uuid,
+    pub scale: f64,
+    pub title: String,
+    pub servings: Option<String>,
+    /// The main photo's file name as stored (the household `plate_treatment` setting is not applied).
+    pub image_file: Option<String>,
+    pub ingredients: Vec<Ingredient>,
+}
+
+/// One visible item of the list. `key` is the merge key (generated items: unique among them; a manual item's key is
+/// that of its name, shared with any generated item of that name).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroceryItem {
+    pub id: Uuid,
+    pub key: String,
+    pub name: String,
+    pub amounts: Vec<Amount>,
+    pub section: Section,
+    pub checked: bool,
+    pub manual: bool,
+    pub recipe_ids: Vec<Uuid>,
+}
+
+impl GroceryItem {
+    /// `amounts` without any that holds a NaN or an infinity (an amount nobody can shop for). Storage must never
+    /// write one: it would not read back.
+    pub fn finite_amounts(amounts: Vec<Amount>) -> Vec<Amount> {
+        amounts
+            .into_iter()
+            .filter(|a| a.min.is_finite() && a.max.is_none_or(f64::is_finite))
+            .collect()
+    }
+
+    /// Whether two amount lists mean the same, whatever their order: each amount has a partner with the same unit
+    /// and quantities that agree to far more digits than anyone shops with (amounts go through `jsonb` and back,
+    /// which may move the last digit of a float).
+    pub fn same_amounts(a: &[Amount], b: &[Amount]) -> bool {
+        let close = |x: f64, y: f64| (x - y).abs() <= 1e-9 * x.abs().max(y.abs());
+        let same = |x: &Amount, y: &Amount| {
+            x.unit == y.unit
+                && close(x.min, y.min)
+                && match (x.max, y.max) {
+                    (None, None) => true,
+                    (Some(p), Some(q)) => close(p, q),
+                    _ => false,
+                }
+        };
+        let mut left: Vec<&Amount> = b.iter().collect();
+        a.len() == b.len()
+            && a.iter()
+                .all(|x| match left.iter().position(|y| same(x, y)) {
+                    Some(i) => {
+                        left.swap_remove(i);
+                        true
+                    }
+                    None => false,
+                })
+    }
+}
+
+/// A manual item to add; already parsed by the service.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NewGroceryItem {
+    pub key: String,
+    pub name: String,
+    pub amounts: Vec<Amount>,
+    pub section: Section,
+}
+
+/// What [`GroceryRepo::recompute`] runs under the list lock: the list's live recipes and the section overrides in,
+/// the full set of generated items out. Pure and quick (it runs while the list is locked).
+pub type Compute =
+    dyn Fn(&[ListedRecipe], &HashMap<String, Section>) -> Vec<GeneratedItem> + Send + Sync;
+
+/// The grocery list (GRO), its section overrides and its staples. Storage only: what to put on the list is decided
+/// by `domain::grocery` and the service. There is one list; `get_or_create_list` makes it on first use and every
+/// other method takes its id. Every method that changes the list sets its `updated_at` to the clock's now.
+///
+/// A **cleared** item is one the household crossed off for good (a ticked item cleared, or a generated item
+/// removed): it stays stored, hidden from every method below, so a recompute does not bring it back until its
+/// amounts change. A manual item is deleted instead of cleared.
+#[async_trait]
+pub trait GroceryRepo: Send + Sync {
+    /// The list, created empty on first use. Two concurrent first calls get the same list.
+    async fn get_or_create_list(&self) -> DomainResult<GroceryList>;
+
+    /// The list's recipes that are live (soft-deleted and purged ones are not listed; a recipe restored within the
+    /// window is back, with its scale), in the order they were put on the list, then by id.
+    async fn recipes(&self, list_id: Uuid) -> DomainResult<Vec<ListedRecipe>>;
+
+    /// The visible (not cleared) items, in no particular order.
+    async fn items(&self, list_id: Uuid) -> DomainResult<Vec<GroceryItem>>;
+
+    /// A visible item, or `None`.
+    async fn item(&self, id: Uuid) -> DomainResult<Option<GroceryItem>>;
+
+    /// Puts a live recipe on the list at `scale`, or sets the scale of one already there. `NotFound` when the
+    /// recipe is missing or deleted. Does not touch the items: run [`GroceryRepo::recompute`] after.
+    ///
+    /// **Locking.** Every method that changes the list first takes the list's lock (one writer at a time), so the
+    /// order they are called in is the order they take effect, and no two of them can wait on each other.
+    async fn add_recipe(&self, list_id: Uuid, recipe_id: Uuid, scale: f64) -> DomainResult<()>;
+
+    /// Takes a recipe off the list. `NotFound` when it is not on it (a deleted recipe still on the list can be
+    /// removed). Does not touch the items.
+    async fn remove_recipe(&self, list_id: Uuid, recipe_id: Uuid) -> DomainResult<()>;
+
+    /// Makes the generated (non-manual) items equal to `compute(recipes, overrides)`, all in one unit while the list
+    /// is locked, so two concurrent calls run one after the other and each sees every recipe already saved. Per
+    /// computed key: no such item yet, add it; an item of that key (even a cleared one) is updated to the computed
+    /// name, amounts, section and recipes, and when the **amounts** differ it is also un-ticked and un-cleared
+    /// (you need more); items whose key is no longer computed are deleted. Manual items are never touched. Nothing
+    /// is written, and `updated_at` does not move, when the result equals what is stored (amounts are compared with
+    /// [`GroceryItem::same_amounts`]). An amount that is not finite is stored as no amount, and a stored amount that
+    /// cannot be read back is read as none.
+    async fn recompute(&self, list_id: Uuid, compute: &Compute) -> DomainResult<()>;
+
+    /// Adds a manual item. A manual item never merges with another. Amounts that are not finite are dropped.
+    async fn add_manual(&self, list_id: Uuid, item: NewGroceryItem) -> DomainResult<GroceryItem>;
+
+    /// Applies one PATCH of a visible item in one unit (all or nothing) and returns the item as it is after.
+    /// `checked` ticks or unticks it. `section` is remembered as the household's choice for the item's key and
+    /// moves every item of that key (manual or generated) there. `staple` marks or unmarks the key. `NotFound` for
+    /// an unknown or cleared item; nothing is changed then.
+    async fn update_item(
+        &self,
+        id: Uuid,
+        checked: Option<bool>,
+        section: Option<Section>,
+        staple: Option<bool>,
+    ) -> DomainResult<GroceryItem>;
+
+    /// Removes a visible item from the list: a manual one is deleted, a generated one cleared. `NotFound` for an
+    /// unknown or cleared one.
+    async fn clear_item(&self, id: Uuid) -> DomainResult<()>;
+
+    /// [`GroceryRepo::clear_item`] for every ticked item.
+    async fn clear_checked(&self, list_id: Uuid) -> DomainResult<()>;
+
+    /// Removes every recipe and every item (cleared ones too). Overrides and staples stay.
+    async fn clear_all(&self, list_id: Uuid) -> DomainResult<()>;
+
+    /// The household's section choices by merge key.
+    async fn overrides(&self) -> DomainResult<HashMap<String, Section>>;
+
+    /// Merge keys of the household's staples ("always have it"). A new store starts with salt, black pepper, pepper
+    /// and water.
+    async fn staples(&self) -> DomainResult<HashSet<String>>;
 }

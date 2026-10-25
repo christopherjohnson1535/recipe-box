@@ -104,6 +104,15 @@ Priority: **Must** = first usable version, **Should** = next, **Could** = nice t
 | OPS-6 | Backup and restore of the database and photos with one documented command each | Must |
 | OPS-7 | Deploy guide covering: home PC/server, a small VPS, and a managed container host | Must |
 
+### 8. Groceries (GRO)
+| ID | Requirement | Priority |
+|---|---|---|
+| GRO-1 | Add one or more recipes (at a chosen servings scale) to a grocery list; the list combines their ingredients | Should |
+| GRO-2 | Items are grouped into store sections in this fixed order: Produce, Meat, Fridge, Freezer, Pantry (plus "Other" for anything unknown) | Should |
+| GRO-3 | Same ingredient from several recipes is merged when units agree ("2 onions" + "1 onion" → "3 onions"); otherwise listed together under one name with each amount | Should |
+| GRO-4 | One shared list for the household; items can be ticked off, added by hand, moved to another section, and removed; moving an item teaches the app that section for next time | Should |
+| GRO-5 | Send the list to Google Tasks; copy/share as plain text for any other app | Could |
+
 ## Non-functional requirements
 | Area | Requirement |
 |---|---|

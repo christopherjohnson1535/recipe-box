@@ -305,6 +305,7 @@ mod tests {
             sessions: store.clone(),
             settings: store.clone(),
             tags: store.clone(),
+            grocery: store.clone(),
             health: store.clone(),
             media: Arc::new(MemoryMedia::default()),
             backup: Arc::new(adapter_memory::MemoryBackup::default()),

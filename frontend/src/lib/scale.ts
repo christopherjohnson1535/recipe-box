@@ -5,11 +5,11 @@ const GLYPHS: Record<string, number> = { "½": 1 / 2, "⅓": 1 / 3, "⅔": 2 / 3
 const EIGHTHS = ["", "⅛", "¼", "⅜", "½", "⅝", "¾", "⅞"];
 const G = Object.keys(GLYPHS).join("");
 
-/** Regex source for one number: "1,000", "1 1/2", "1-1/2", "1½", "1/2", "2.5", "½", "3". Reused by the duration finder in recipe.ts. */
-export const NUMBER = `\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+\\s+\\d+/\\d+|\\d+-\\d+/\\d+|\\d+[${G}]|\\d+/\\d+|\\d+(?:\\.\\d+)?|[${G}]`;
+/** Regex source for one number: "1,000", "1 1/2", "1-1/2", "1½", "1 ½", "1/2", "2.5", "½", "3". Reused by the duration finder in recipe.ts. */
+export const NUMBER = `\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+\\s+\\d+/\\d+|\\d+-\\d+/\\d+|\\d+\\s*[${G}]|\\d+/\\d+|\\d+(?:\\.\\d+)?|[${G}]`;
 const RANGE = "(?:\\s*[-–]\\s*|\\s+to\\s+)";
 const UNIT =
-  "(?:lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|litres?|tsp|tbsp|teaspoons?|tablespoons?|cups?|cloves?|pinch(?:es)?|dash(?:es)?|cans?|sticks?|slices?|bunch(?:es)?|sprigs?|heads?|stalks?|pieces?|packages?|handfuls?|quarts?|qt|pints?|pt|gal)";
+  "(?:lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|millilitres?|l|liters?|litres?|tsps?|tbsps?|teaspoons?|tablespoons?|cups?|cloves?|pinch(?:es)?|dash(?:es)?|cans?|tins?|jars?|bags?|sticks?|slices?|bunch(?:es)?|sprigs?|heads?|stalks?|pieces?|packages?|pkgs?|handfuls?|quarts?|qt|pints?|pt|gal|gallons?)";
 // Number, optional range end, optional unit, then a space, comma or the end: "14-oz can" and "350°F" don't match.
 const QUANTITY = new RegExp(`^\\s*(${NUMBER})(?:${RANGE}(${NUMBER}))?(?:\\s*(${UNIT})\\.?)?(?=\\s|,(?!\\d)|$)`, "i");
 
@@ -41,7 +41,7 @@ export function formatNumber(value: number): string {
 
 // "1 cup" → "2 cups", "2 cups" → "1 cup"; abbreviations (lb, tsp, g) never change.
 function pluralize(unit: string, value: number): string {
-  const m = /^(cup|clove|can|teaspoon|tablespoon|pound|ounce|stick|slice|quart|pint|bunch|pinch|dash|sprig|head|stalk|piece|package|handful)(?:es|s)?$/i.exec(unit);
+  const m = /^(cup|clove|can|tin|jar|bag|teaspoon|tablespoon|pound|ounce|stick|slice|quart|pint|gallon|bunch|pinch|dash|sprig|head|stalk|piece|package|handful)(?:es|s)?$/i.exec(unit);
   if (!m) return unit;
   return m[1] + (value > 1 ? (/(ch|sh)$/i.test(m[1]) ? "es" : "s") : "");
 }
@@ -49,9 +49,12 @@ function pluralize(unit: string, value: number): string {
 /** "1⁄2" (fraction slash) reads as "1/2". */
 const slashed = (text: string) => text.replace(/\u2044/g, "/");
 
-// A second amount after the first ("2 cups plus 2 tbsp", "1 cup/240 ml", "1 1/2-inch piece" read as "1" + "1/2-inch"):
-// scaling only the first would give a wrong recipe, so such a line is left as written.
-const SECOND_AMOUNT = /^(?:(?:plus|and|\+)\s+\d|\S*\/\s*\d|\s*\d+\/\d)/i;
+// A second amount after the first ("2 cups plus 2 tbsp", "1 cup/240 ml", "1 1/2-inch piece" read as "1" + "1/2-inch",
+// "2 x 400g tins"): scaling only the first would give a wrong recipe, so such a line is left as written.
+const SECOND_AMOUNT = new RegExp(`^(?:(?:plus|and|\\+)\\s+\\d|\\S*\\/\\s*\\d|\\s*\\d+\\/\\d|[x×]\\s*\\d|[${G}])`, "i");
+
+/** Largest quantity a line may carry; beyond it, at zero, or not a number at all ("1/0"), the line has no quantity. */
+const MAX_AMOUNT = 1e9;
 
 /**
  * Splits "4 lb bone-in short ribs" into the quantity with its unit ("4 lb", shown in its own column) and the rest.
@@ -65,6 +68,8 @@ export function splitIngredient(text: string): { quantity: string | null; rest: 
   if (!m) return { quantity: null, rest: text };
   const rest = t.slice(m[0].length);
   if (SECOND_AMOUNT.test(rest.trimStart())) return { quantity: null, rest: text };
+  const [a, b] = [parseNumber(m[1]), m[2] ? parseNumber(m[2]) : 0];
+  if (![a, b].every((v) => Number.isFinite(v) && v <= MAX_AMOUNT) || Math.max(a, b) <= 0) return { quantity: null, rest: text };
   return { quantity: m[0].trim(), rest: rest.trimStart() };
 }
 

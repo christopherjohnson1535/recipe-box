@@ -4,7 +4,7 @@
 mod search;
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::{
         Arc, Mutex, MutexGuard,
         atomic::{AtomicU64, Ordering},
@@ -16,11 +16,13 @@ use domain::{
     DomainError, DomainResult, Image, NewUser, Page, RESTORE_WINDOW_MINUTES, ROLE_ADMIN, Recipe,
     RecipeInput, RecipeSummary, SearchQuery, Settings, Sort, TagCount, User, UserRef,
     chrono::{DateTime, Duration, Utc},
+    grocery::Section,
     uuid::Uuid,
 };
 use ports::{
-    Clock, EncodedImage, ImageCodec, ImageRepo, MediaStore, PasswordHasher, RecipeRepo,
-    SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+    Clock, Compute, EncodedImage, GroceryItem, GroceryList, GroceryRepo, ImageCodec, ImageRepo,
+    ListedRecipe, MediaStore, NewGroceryItem, PasswordHasher, RecipeRepo, SessionRepo,
+    SessionTokens, SettingsRepo, StorageHealth, TagRepo, UserRepo,
 };
 
 struct StoredUser {
@@ -38,6 +40,21 @@ struct StoredRecipe {
     deleted_at: Option<DateTime<Utc>>,
 }
 
+struct StoredGroceryItem {
+    item: GroceryItem,
+    cleared: bool,
+}
+
+/// The one grocery list and the household's choices that outlive it.
+struct Grocery {
+    list: Option<GroceryList>,
+    /// `(recipe id, scale, added at)`.
+    recipes: Vec<(Uuid, f64, DateTime<Utc>)>,
+    items: Vec<StoredGroceryItem>,
+    overrides: HashMap<String, Section>,
+    staples: HashSet<String>,
+}
+
 struct State {
     users: HashMap<Uuid, StoredUser>,
     /// token hash -> (user id, expires at)
@@ -45,9 +62,30 @@ struct State {
     images: HashMap<Uuid, Image>,
     recipes: HashMap<Uuid, StoredRecipe>,
     settings: Settings,
+    grocery: Grocery,
 }
 
 impl State {
+    /// The list's live recipes in the order they were added.
+    fn listed_recipes(&self) -> Vec<ListedRecipe> {
+        let mut on_list = self.grocery.recipes.clone();
+        on_list.sort_by_key(|(id, _, added_at)| (*added_at, *id));
+        on_list
+            .into_iter()
+            .filter_map(|(id, scale, _)| {
+                let r = self.recipes.get(&id).filter(|r| r.deleted_at.is_none())?;
+                Some(ListedRecipe {
+                    recipe_id: id,
+                    scale,
+                    title: r.input.title.clone(),
+                    servings: r.input.servings.clone(),
+                    image_file: self.file(r.input.image_id).map(|f| f.file_name.clone()),
+                    ingredients: r.input.ingredients.clone(),
+                })
+            })
+            .collect()
+    }
+
     fn user_ref(&self, id: Option<Uuid>) -> Option<UserRef> {
         let u = &self.users.get(&id?)?.user;
         Some(UserRef {
@@ -148,6 +186,15 @@ impl MemoryStore {
                 recipes: HashMap::new(),
                 settings: Settings {
                     plate_treatment: true,
+                },
+                grocery: Grocery {
+                    list: None,
+                    recipes: Vec::new(),
+                    items: Vec::new(),
+                    overrides: HashMap::new(),
+                    staples: ["salt", "black pepper", "pepper", "water"]
+                        .map(String::from)
+                        .into(),
                 },
             }),
         }
@@ -273,6 +320,10 @@ impl RecipeRepo for MemoryStore {
         let before = s.recipes.len();
         s.recipes
             .retain(|_, r| !r.deleted_at.is_some_and(|d| d < cutoff));
+        let State {
+            recipes, grocery, ..
+        } = &mut *s;
+        grocery.recipes.retain(|(id, ..)| recipes.contains_key(id));
         Ok((before - s.recipes.len()) as u64)
     }
 
@@ -598,6 +649,260 @@ impl TagRepo for MemoryStore {
             .into_iter()
             .map(|(name, count)| TagCount { name, count })
             .collect())
+    }
+}
+
+fn no_item() -> DomainError {
+    DomainError::NotFound("No such item.".into())
+}
+
+#[async_trait]
+impl GroceryRepo for MemoryStore {
+    async fn get_or_create_list(&self) -> DomainResult<GroceryList> {
+        let now = self.clock.now();
+        let mut s = self.lock();
+        Ok(s.grocery
+            .list
+            .get_or_insert_with(|| GroceryList {
+                id: Uuid::new_v4(),
+                updated_at: now,
+            })
+            .clone())
+    }
+
+    async fn recipes(&self, _list_id: Uuid) -> DomainResult<Vec<ListedRecipe>> {
+        Ok(self.lock().listed_recipes())
+    }
+
+    async fn items(&self, _list_id: Uuid) -> DomainResult<Vec<GroceryItem>> {
+        let s = self.lock();
+        Ok(s.grocery
+            .items
+            .iter()
+            .filter(|i| !i.cleared)
+            .map(|i| i.item.clone())
+            .collect())
+    }
+
+    async fn item(&self, id: Uuid) -> DomainResult<Option<GroceryItem>> {
+        let s = self.lock();
+        Ok(s.grocery
+            .items
+            .iter()
+            .find(|i| i.item.id == id && !i.cleared)
+            .map(|i| i.item.clone()))
+    }
+
+    async fn add_recipe(&self, _list_id: Uuid, recipe_id: Uuid, scale: f64) -> DomainResult<()> {
+        let now = self.clock.now();
+        let mut s = self.lock();
+        if !s
+            .recipes
+            .get(&recipe_id)
+            .is_some_and(|r| r.deleted_at.is_none())
+        {
+            return Err(not_found());
+        }
+        let g = &mut s.grocery;
+        match g.recipes.iter_mut().find(|(id, ..)| *id == recipe_id) {
+            Some(on_list) => on_list.1 = scale,
+            None => g.recipes.push((recipe_id, scale, now)),
+        }
+        g.touch(now);
+        Ok(())
+    }
+
+    async fn remove_recipe(&self, _list_id: Uuid, recipe_id: Uuid) -> DomainResult<()> {
+        let now = self.clock.now();
+        let g = &mut self.lock().grocery;
+        let before = g.recipes.len();
+        g.recipes.retain(|(id, ..)| *id != recipe_id);
+        if g.recipes.len() == before {
+            return Err(DomainError::NotFound(
+                "That recipe is not on the list.".into(),
+            ));
+        }
+        g.touch(now);
+        Ok(())
+    }
+
+    async fn recompute(&self, list_id: Uuid, compute: &Compute) -> DomainResult<()> {
+        let now = self.clock.now();
+        let mut s = self.lock();
+        if s.grocery.list.as_ref().is_none_or(|l| l.id != list_id) {
+            return Err(DomainError::NotFound("No such list.".into()));
+        }
+        let computed = compute(&s.listed_recipes(), &s.grocery.overrides);
+        let g = &mut s.grocery;
+        let keys: HashSet<&str> = computed.iter().map(|c| c.key.as_str()).collect();
+        let before = g.items.len();
+        g.items
+            .retain(|i| i.item.manual || keys.contains(i.item.key.as_str()));
+        let mut changed = g.items.len() != before;
+        for mut c in computed {
+            c.amounts = GroceryItem::finite_amounts(c.amounts);
+            let existing = g
+                .items
+                .iter_mut()
+                .find(|i| !i.item.manual && i.item.key == c.key);
+            let Some(stored) = existing else {
+                g.items.push(StoredGroceryItem {
+                    item: GroceryItem {
+                        id: Uuid::new_v4(),
+                        key: c.key,
+                        name: c.name,
+                        amounts: c.amounts,
+                        section: c.section,
+                        checked: false,
+                        manual: false,
+                        recipe_ids: c.recipe_ids,
+                    },
+                    cleared: false,
+                });
+                changed = true;
+                continue;
+            };
+            let item = &mut stored.item;
+            let more = !GroceryItem::same_amounts(&item.amounts, &c.amounts);
+            if more
+                || item.name != c.name
+                || item.section != c.section
+                || item.recipe_ids != c.recipe_ids
+            {
+                (item.name, item.amounts, item.section, item.recipe_ids) =
+                    (c.name, c.amounts, c.section, c.recipe_ids);
+                if more {
+                    item.checked = false;
+                    stored.cleared = false;
+                }
+                changed = true;
+            }
+        }
+        if changed {
+            g.touch(now);
+        }
+        Ok(())
+    }
+
+    async fn add_manual(&self, _list_id: Uuid, new: NewGroceryItem) -> DomainResult<GroceryItem> {
+        let now = self.clock.now();
+        let g = &mut self.lock().grocery;
+        let item = GroceryItem {
+            id: Uuid::new_v4(),
+            key: new.key,
+            name: new.name,
+            amounts: GroceryItem::finite_amounts(new.amounts),
+            section: new.section,
+            checked: false,
+            manual: true,
+            recipe_ids: Vec::new(),
+        };
+        g.items.push(StoredGroceryItem {
+            item: item.clone(),
+            cleared: false,
+        });
+        g.touch(now);
+        Ok(item)
+    }
+
+    async fn update_item(
+        &self,
+        id: Uuid,
+        checked: Option<bool>,
+        section: Option<Section>,
+        staple: Option<bool>,
+    ) -> DomainResult<GroceryItem> {
+        let now = self.clock.now();
+        let g = &mut self.lock().grocery;
+        let key = g
+            .items
+            .iter()
+            .find(|i| i.item.id == id && !i.cleared)
+            .ok_or_else(no_item)?
+            .item
+            .key
+            .clone();
+        if let Some(checked) = checked {
+            for i in g.items.iter_mut().filter(|i| i.item.id == id) {
+                i.item.checked = checked;
+            }
+        }
+        if let Some(section) = section {
+            g.overrides.insert(key.clone(), section);
+            for i in g.items.iter_mut().filter(|i| i.item.key == key) {
+                i.item.section = section;
+            }
+        }
+        match staple {
+            Some(true) => {
+                g.staples.insert(key);
+            }
+            Some(false) => {
+                g.staples.remove(&key);
+            }
+            None => {}
+        }
+        g.touch(now);
+        Ok(g.items
+            .iter()
+            .find(|i| i.item.id == id)
+            .map(|i| i.item.clone())
+            .expect("the item was just found"))
+    }
+
+    async fn clear_item(&self, id: Uuid) -> DomainResult<()> {
+        let now = self.clock.now();
+        let g = &mut self.lock().grocery;
+        if !g.items.iter().any(|i| i.item.id == id && !i.cleared) {
+            return Err(no_item());
+        }
+        g.clear_where(|i| i.item.id == id);
+        g.touch(now);
+        Ok(())
+    }
+
+    async fn clear_checked(&self, _list_id: Uuid) -> DomainResult<()> {
+        let now = self.clock.now();
+        let g = &mut self.lock().grocery;
+        g.clear_where(|i| i.item.checked);
+        g.touch(now);
+        Ok(())
+    }
+
+    async fn clear_all(&self, _list_id: Uuid) -> DomainResult<()> {
+        let now = self.clock.now();
+        let g = &mut self.lock().grocery;
+        g.recipes.clear();
+        g.items.clear();
+        g.touch(now);
+        Ok(())
+    }
+
+    async fn overrides(&self) -> DomainResult<HashMap<String, Section>> {
+        Ok(self.lock().grocery.overrides.clone())
+    }
+
+    async fn staples(&self) -> DomainResult<HashSet<String>> {
+        Ok(self.lock().grocery.staples.clone())
+    }
+}
+
+impl Grocery {
+    fn touch(&mut self, now: DateTime<Utc>) {
+        if let Some(list) = &mut self.list {
+            list.updated_at = now;
+        }
+    }
+
+    /// Removes the visible items `pick` selects from the list: manual ones are deleted, generated ones cleared.
+    fn clear_where(&mut self, pick: impl Fn(&StoredGroceryItem) -> bool) {
+        self.items.retain_mut(|i| {
+            if i.cleared || !pick(i) {
+                return true;
+            }
+            i.cleared = !i.item.manual;
+            !i.item.manual
+        });
     }
 }
 

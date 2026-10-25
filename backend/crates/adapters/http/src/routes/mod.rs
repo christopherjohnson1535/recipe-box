@@ -1,7 +1,7 @@
 use axum::{
     Router,
     extract::{DefaultBodyLimit, FromRef},
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
 };
 use tower_http::trace::TraceLayer;
 
@@ -9,6 +9,7 @@ use crate::{HttpConfig, HttpState, error::AppError};
 
 pub mod auth;
 pub mod export;
+pub mod grocery;
 pub mod health;
 pub mod imports;
 pub mod media;
@@ -58,6 +59,18 @@ where
         )
         .route("/api/recipes/{id}/restore", post(recipes::restore))
         .route("/api/settings", get(settings::get).put(settings::update))
+        .route("/api/grocery", get(grocery::get).delete(grocery::clear))
+        .route("/api/grocery/recipes", post(grocery::add_recipe))
+        .route(
+            "/api/grocery/recipes/{recipeId}",
+            delete(grocery::remove_recipe),
+        )
+        .route("/api/grocery/items", post(grocery::add_item))
+        .route(
+            "/api/grocery/items/{id}",
+            patch(grocery::update_item).delete(grocery::remove_item),
+        )
+        .route("/api/grocery/clear-checked", post(grocery::clear_checked))
         .route("/api/tags", get(tags::list))
         .route("/media/{file_name}", get(media::serve))
         .route("/api/export", get(export::export_zip))

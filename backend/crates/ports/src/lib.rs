@@ -21,7 +21,8 @@ mod repos;
 pub mod contract;
 
 pub use repos::{
-    ImageRepo, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+    Compute, GroceryItem, GroceryList, GroceryRepo, ImageRepo, ListedRecipe, NewGroceryItem,
+    RecipeRepo, SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
 };
 
 /// The one source of "now" for every time rule (restore window, session expiry, purge). Repositories are built
