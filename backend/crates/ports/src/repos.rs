@@ -19,6 +19,11 @@ pub trait RecipeRepo: Send + Sync {
     /// `Validation` when `image_id` or a photo id names no image; nothing is saved then.
     async fn create(&self, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe>;
 
+    /// Saves all of `inputs` as new recipes in one unit (all or nothing) and returns their new ids in order. Same
+    /// rules as [`RecipeRepo::create`] for each; if any fails, nothing at all is saved, not even a deleted row.
+    async fn create_many(&self, user_id: Uuid, inputs: Vec<RecipeInput>)
+    -> DomainResult<Vec<Uuid>>;
+
     /// A live recipe, or `None` when there is none (never existed, deleted, purged). Image fields are file names
     /// as stored: the household `plate_treatment` setting that decides whether `image_display_file` is shown is
     /// applied by the service, not here.

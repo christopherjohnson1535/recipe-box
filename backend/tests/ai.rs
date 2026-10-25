@@ -315,6 +315,7 @@ async fn config_debug_hides_the_key_and_ai_enum_follows_config() {
         anthropic_api_key: Some(Secret::new(KEY)),
         ai_model: "m".into(),
         max_upload_mb: 2,
+        max_backup_mb: 8,
     };
     let shown = format!("{config:?}");
     assert!(

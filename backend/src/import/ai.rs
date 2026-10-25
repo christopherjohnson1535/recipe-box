@@ -106,6 +106,7 @@ mod tests {
             anthropic_api_key: key.map(Secret::new),
             ai_model: "test-model".into(),
             max_upload_mb: 1,
+            max_backup_mb: 8,
         }
     }
 

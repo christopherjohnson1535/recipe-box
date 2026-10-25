@@ -6,6 +6,7 @@
 //! Build the lot with [`Services::new`] from a [`Deps`].
 
 mod auth;
+mod export;
 mod imports;
 mod maintenance;
 mod media;
@@ -16,12 +17,13 @@ mod users;
 use std::sync::Arc;
 
 use ports::{
-    Clock, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader, PasswordHasher,
-    RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo,
-    TaskSpawner, UserRepo,
+    BackupFormat, Clock, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader,
+    PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo,
+    StorageHealth, TagRepo, TaskSpawner, UserRepo,
 };
 
 pub use auth::{AuthService, NewSession};
+pub use export::{ExportJob, ExportService, ImportReport};
 pub use imports::{
     Capabilities, ImportNotes, ImportService, Imported, NoneExtractor, PhotoFailure,
 };
@@ -42,6 +44,7 @@ pub struct Deps {
     pub tags: Arc<dyn TagRepo>,
     pub health: Arc<dyn StorageHealth>,
     pub media: Arc<dyn MediaStore>,
+    pub backup: Arc<dyn BackupFormat>,
     pub hasher: Arc<dyn PasswordHasher>,
     pub tokens: Arc<dyn SessionTokens>,
     pub codec: Arc<dyn ImageCodec>,
@@ -57,24 +60,6 @@ pub struct Deps {
     pub session_days: i64,
     /// Counts wrong passwords. One per process: build it once and clone the `Arc` into every `Deps`.
     pub throttle: Arc<Throttle>,
-}
-
-/// Backup export and import (ACC-5): not built yet, both answer `NotImplemented`.
-#[derive(Clone, Default)]
-pub struct ExportService;
-
-impl ExportService {
-    pub fn export(&self) -> domain::DomainResult<()> {
-        Err(domain::DomainError::NotImplemented(
-            "Export is not built yet.".into(),
-        ))
-    }
-
-    pub fn import_backup(&self) -> domain::DomainResult<()> {
-        Err(domain::DomainError::NotImplemented(
-            "Importing an export is not built yet.".into(),
-        ))
-    }
 }
 
 /// All services, ready to share (every field is cheap to clone).
@@ -102,7 +87,7 @@ impl Services {
             tags: TagService::new(&d),
             media: MediaService::new(&d),
             imports: ImportService::new(&d),
-            export: ExportService,
+            export: ExportService::new(&d),
             maintenance: Maintenance::new(&d),
         }
     }

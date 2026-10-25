@@ -53,20 +53,25 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 409:
+        response_409 = ErrorBody.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 413:
         response_413 = ErrorBody.from_dict(response.json())
 
         return response_413
 
+    if response.status_code == 415:
+        response_415 = ErrorBody.from_dict(response.json())
+
+        return response_415
+
     if response.status_code == 500:
         response_500 = ErrorBody.from_dict(response.json())
 
         return response_500
-
-    if response.status_code == 501:
-        response_501 = ErrorBody.from_dict(response.json())
-
-        return response_501
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -90,7 +95,19 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> Response[ErrorBody | ImportSummary]:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -119,7 +136,19 @@ def sync(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> ErrorBody | ImportSummary | None:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -143,7 +172,19 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> Response[ErrorBody | ImportSummary]:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.
@@ -170,7 +211,19 @@ async def asyncio(
     client: AuthenticatedClient,
     body: ImportExportForm,
 ) -> ErrorBody | ImportSummary | None:
-    """Restores a backup zip, skipping recipes whose id exists. Admin only.
+    """Restores a backup zip. Admin only.
+
+     Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked
+    and re-encoded
+    like uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is
+    skipped, which
+    only happens when the archive is imported back into the box it was exported from (ids in another box
+    are
+    different, so importing the same zip twice into another box adds every recipe twice). All or
+    nothing: if
+    anything is wrong, or saving fails, no recipe is kept and the photos stored for the import are
+    removed. One import
+    runs at a time (`409 conflict` for a second). It can take a minute or more for a large archive.
 
     Args:
         body (ImportExportForm): Multipart body of `POST /api/import/export`.

@@ -14,8 +14,8 @@ class ImportSummary:
     """Result of importing a backup zip.
 
     Attributes:
-        imported (int):
-        skipped (int):
+        imported (int): Recipes added.
+        skipped (int): Recipes left out because a recipe with their id already exists.
     """
 
     imported: int

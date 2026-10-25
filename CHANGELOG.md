@@ -20,6 +20,9 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
   backs up a seeded stack, wipes its volumes, restores and compares every table and photo. A restore rebuilds the schema
   exactly, validates the photo archive first and swaps photos in by rename; `--stop-api` makes a fully consistent backup. Cron, off-site copy and Fly steps
   in the wiki.
+- Export and import all recipes (#20, ACC-5): admins download one zip of every recipe and photo and import it back from
+  Settings. Import is all-or-nothing, re-validates every recipe and photo, gives everything new ids, and refuses
+  zip bombs and path tricks. Format documented in `docs/API.md`; `MAX_BACKUP_MB` caps the upload.
 - HTTPS deploy guides (#17): Tailscale at home, a VPS with the Caddy profile, and Fly.io (with `deploy/fly/` config), plus a
   `COOKIE_SECURE` table; the Tailscale steps no longer ask for `WEB_BIND=0.0.0.0`.
 - Release process (#18): a `v*` tag publishes amd64 + arm64 images to GHCR only after the full CI suite passes,

@@ -204,11 +204,12 @@
         "tags": [
           "export"
         ],
-        "summary": "Backup zip with `recipes.json` and `media/*`. Admin only.",
+        "summary": "Backup zip of every recipe and photo. Admin only.",
+        "description": "`recipes.json` and `media/*`; the format is in docs/API.md. Streamed: the answer starts before the zip is complete,\nand a failure part-way ends the connection early.",
         "operationId": "exportAll",
         "responses": {
           "200": {
-            "description": "The backup zip.",
+            "description": "The backup zip, as an attachment.",
             "content": {
               "application/zip": {
                 "schema": {
@@ -239,16 +240,6 @@
           },
           "500": {
             "description": "Something went wrong on the server (`internal`).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not built yet (`not_implemented`); every call returns this today.",
             "content": {
               "application/json": {
                 "schema": {
@@ -360,7 +351,8 @@
         "tags": [
           "export"
         ],
-        "summary": "Restores a backup zip, skipping recipes whose id exists. Admin only.",
+        "summary": "Restores a backup zip. Admin only.",
+        "description": "Every recipe in the archive is added with a new id, owned by the caller, and its photos are checked and re-encoded\nlike uploads. The one exception: a recipe whose archive id equals the id of a live recipe here is skipped, which\nonly happens when the archive is imported back into the box it was exported from (ids in another box are\ndifferent, so importing the same zip twice into another box adds every recipe twice). All or nothing: if\nanything is wrong, or saving fails, no recipe is kept and the photos stored for the import are removed. One import\nruns at a time (`409 conflict` for a second). It can take a minute or more for a large archive.",
         "operationId": "importExport",
         "requestBody": {
           "content": {
@@ -384,7 +376,7 @@
             }
           },
           "400": {
-            "description": "Missing or unreadable `file` (`validation`).",
+            "description": "Missing `file`, or not a valid export: not a zip, unknown or oversized entries, bad JSON, a newer format version, a recipe that fails the usual recipe rules (`validation`). Nothing is imported.",
             "content": {
               "application/json": {
                 "schema": {
@@ -413,8 +405,28 @@
               }
             }
           },
+          "409": {
+            "description": "Another import is still running (`conflict`). Wait for it to finish.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "413": {
-            "description": "Upload over `MAX_UPLOAD_MB` (`too_large`).",
+            "description": "Upload over `MAX_BACKUP_MB` (`too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "A photo in the archive is not an image we can read (`unsupported_media`). Nothing is imported.",
             "content": {
               "application/json": {
                 "schema": {
@@ -425,16 +437,6 @@
           },
           "500": {
             "description": "Something went wrong on the server (`internal`).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not built yet (`not_implemented`); every call returns this today.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2275,11 +2277,13 @@
         "properties": {
           "imported": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Recipes added."
           },
           "skipped": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Recipes left out because a recipe with their id already exists."
           }
         }
       },

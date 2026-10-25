@@ -366,22 +366,37 @@ impl PgRecipeRepo {
 #[async_trait]
 impl RecipeRepo for PgRecipeRepo {
     async fn create(&self, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe> {
+        let mut ids = self.create_many(user_id, vec![input]).await?;
+        let id = ids.pop().ok_or_else(not_found)?;
+        self.load(id).await?.ok_or_else(not_found)
+    }
+
+    async fn create_many(
+        &self,
+        user_id: Uuid,
+        inputs: Vec<RecipeInput>,
+    ) -> DomainResult<Vec<Uuid>> {
         let now = self.clock.now();
         let mut tx = self.pool.begin().await.map_err(db)?;
-        check_images(&mut tx, &input).await?;
-        let id: Uuid = sqlx::query_scalar(
-            "insert into recipes (title, created_by, updated_by, created_at, updated_at)
-             values ($1, $2, $2, $3, $3) returning id",
-        )
-        .bind(&input.title)
-        .bind(user_id)
-        .bind(now)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(db)?;
-        save(&mut tx, id, user_id, now, &input).await?;
+        let mut ids = Vec::with_capacity(inputs.len());
+        for input in &inputs {
+            check_images(&mut tx, input).await?;
+            let id: Uuid = sqlx::query_scalar(
+                "insert into recipes (title, created_by, updated_by, created_at, updated_at)
+                 values ($1, $2, $2, $3, $3) returning id",
+            )
+            .bind(&input.title)
+            .bind(user_id)
+            .bind(now)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(db)?;
+            save(&mut tx, id, user_id, now, input).await?;
+            ids.push(id);
+        }
+        // Dropping `tx` on any early return above rolls everything back.
         tx.commit().await.map_err(db)?;
-        self.load(id).await?.ok_or_else(not_found)
+        Ok(ids)
     }
 
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>> {

@@ -5,6 +5,7 @@ import { EditionController } from "@/components/edition/EditionController";
 import { AppearanceSection } from "./AppearanceSection";
 import { HouseholdSection } from "./HouseholdSection";
 import { PasswordForm } from "./PasswordForm";
+import { ExportSection } from "./ExportSection";
 import { PhotosSection } from "./PhotosSection";
 import { SettingsView } from "./SettingsView";
 
@@ -277,5 +278,45 @@ describe("PhotosSection", () => {
     cleanup();
     render(<SettingsView me={sam} users={[]} capabilities={caps} settings={{ plateTreatment: true }} />);
     expect(screen.queryByLabelText(label)).toBeNull();
+  });
+});
+
+describe("ExportSection", () => {
+  const zip = () => new File(["PK"], "backup.zip", { type: "application/zip" });
+  const choose = (file: File) => fireEvent.change(screen.getByLabelText("Import export"), { target: { files: [file] } });
+
+  it("downloads through a plain link so the browser streams it", () => {
+    render(<ExportSection api={{ importExport: vi.fn() } as never} />);
+    const link = screen.getByRole("link", { name: "Download export" });
+    expect(link.getAttribute("href")).toBe("/api/export");
+    expect(link.hasAttribute("download")).toBe(true);
+  });
+
+  it("imports the chosen file and says what was added and skipped", async () => {
+    const importExport = vi.fn().mockResolvedValue({ imported: 3, skipped: 1 });
+    render(<ExportSection api={{ importExport } as never} />);
+    const file = zip();
+    choose(file);
+    await screen.findByText("Added 3 recipes; skipped 1 recipe already in the box.");
+    expect(importExport).toHaveBeenCalledWith(file);
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("shows the server's reason and keeps the page as it was when the import fails", async () => {
+    const importExport = vi.fn().mockRejectedValue(new ApiError(400, "validation", "That file is not a Recipe Box export: it is not a readable zip file."));
+    render(<ExportSection api={{ importExport } as never} />);
+    choose(zip());
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("not a Recipe Box export");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("is shown to admins only", () => {
+    const caps = { ai: false, provider: "none" } as const;
+    render(<SettingsView me={chris} users={[chris]} capabilities={caps} />);
+    expect(screen.getByRole("heading", { name: "Export and import" })).toBeTruthy();
+    cleanup();
+    render(<SettingsView me={sam} users={[]} capabilities={caps} />);
+    expect(screen.queryByRole("heading", { name: "Export and import" })).toBeNull();
   });
 });

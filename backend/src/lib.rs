@@ -1,6 +1,7 @@
 //! Recipe Box API: library crate so integration tests can build the router against a test database.
 
 pub mod auth;
+pub mod backup;
 pub mod clock;
 pub mod config;
 pub mod error;

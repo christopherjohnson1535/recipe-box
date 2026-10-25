@@ -22,10 +22,10 @@ Every non-2xx response:
 | 401 | `unauthenticated` | no/expired session |
 | 403 | `forbidden` | not admin; setup already done |
 | 404 | `not_found` | |
-| 409 | `conflict` | username taken; restore window passed |
+| 409 | `conflict` | username taken; restore window passed; a backup import is already running |
 | 405 | `method_not_allowed` | known path, wrong method |
 | 429 | `rate_limited` | too many wrong passwords on `POST /api/auth/login` or on `PUT /api/users/:id/password` with a `currentPassword`; see "Password throttling". Has a `Retry-After` header (seconds) and a message that says how long to wait |
-| 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`, `/api/import/export`), or any other request body over 1 MB |
+| 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`), a backup over `MAX_BACKUP_MB` (`/api/import/export`), or any other request body over 1 MB |
 | 415 | `unsupported_media` | not an image we can decode, or over 10,000 px a side / 40 megapixels |
 | 422 | `no_recipe_found` | page/photo had no recipe |
 | 422 | `ai_disabled` | AI needed but `AI_PROVIDER=none` |
@@ -158,5 +158,81 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   message as a bad login); an admin resetting **someone else's** doesn't. Password at least 10 characters. Ends that
   user's other sessions (the caller's current session stays when it is their own password). `DELETE` ends the deleted
   user's sessions and refuses yourself and the last admin.
-- **Export (admin)**: `GET /api/export` is a zip with `recipes.json` + `media/*`; `POST /api/import/export` skips
-  recipes whose id exists. Both return 501 until the export issue lands; the spec records the intended success shapes.
+- **Export and import (admin, ACC-5).** `GET /api/export` streams every live recipe and its photos as a zip
+  (`application/zip`, `Content-Disposition: attachment; filename="recipe-box-export-YYYY-MM-DD.zip"`, `Cache-Control:
+  no-store`). It is built chunk by chunk, so memory use does not grow with the number of photos; a failure part-way cuts
+  the connection short (the zip is then incomplete, as the missing end-of-archive record shows). Deleted recipes are
+  not included; a photo whose file has gone missing is left out with the references to it (the server logs it).
+  Renditions are not exported (they are made again). The box has one household, so "all live recipes" is the scope.
+  `POST /api/import/export` (multipart, field `file`, at most `MAX_BACKUP_MB`, default 512 MB; `413 too_large` above) takes
+  such a zip and answers `200 {"imported": n, "skipped": n}`. The upload is spooled to a temporary file, not held in
+  memory. Rules:
+  - **Ids are never trusted.** Every imported recipe and photo gets a new id, belongs to the importing admin
+    (`createdBy`/`updatedBy`), and gets fresh timestamps. Owners, timestamps and addresses in the file are ignored.
+  - **Skipped.** A recipe is skipped only when its archive id equals the id of a live recipe in this box. That is the
+    case when you import an export back into the box it came from (it then changes nothing). It is also skipped when
+    the archive holds the same id twice. An export from another box has ids this box has never seen, so every recipe
+    is added with a new id, and importing the same zip a second time into that box adds them all again (duplicates).
+    Deleting a recipe first makes its id free again.
+  - **Validated.** Every recipe goes through the same rules as `POST /api/recipes` (lengths, counts, `sourceUrl` must
+    be http(s), non-negative minutes, tag limits; lengths are checked as a recipe, not truncated). Every photo goes
+    through the same decode and re-encode as `POST /api/media` (so HEIC/PNG/WebP are accepted, scripts and non-images
+    are not, and the pixel limits apply), then gets its rendition.
+  - **All or nothing.** The archive is checked first, then every recipe, then the photos are stored, then all the
+    recipes are saved in one database transaction. If anything fails, no recipe row exists afterwards (not even a
+    deleted one) and the photos stored for this import are deleted (photos that were there before are untouched), and
+    the error is returned: `400 validation` (message says what, and which recipe), `415 unsupported_media` (a photo is
+    not an image), `413 too_large`, `500 internal` (the database failed). A success is never partial. The import
+    keeps running to its end, or undoes itself, even if the browser disconnects.
+  - **One at a time.** While an import runs, a second one is refused with `409 conflict` ("Another import is already
+    running…") and nothing is read from it. Try again when the first has finished.
+  - **How long.** The import is synchronous: the answer comes when it is done, after every photo is decoded and
+    re-encoded, so a large archive takes a while. Through the web container the wait is limited to about five
+    minutes (Node's default); an archive that takes longer still finishes on the server, but the browser then sees
+    `api_unreachable`. Check the recipe list before trying again.
+  - **Hostile archives.** Refused as `400 validation` before anything is read: more than 50,000 entries; a name other than
+    `recipes.json`, `media/` or `media/<uuid>.jpg` (so any absolute, `..`, backslash, nested or oddly-cased path); duplicate
+    names; encrypted entries; compression other than stored/deflate; overlapping entries (shared bytes); an entry
+    that declares more than 64 MB (`recipes.json`) or `MAX_UPLOAD_MB` (a photo); more than 4 GB declared in total. Sizes are
+    enforced again while reading, so an entry that lies about its size is cut off at the limit rather than expanded.
+    Nothing in the archive is ever used to build a path on disk. More than 10,000 recipes, a manifest that is not valid JSON of
+    this format, a recipe that names a photo the archive lacks, and a `version` above the one this server knows
+    (`400`, "made by a newer version") are refused too.
+  - Members get `403 forbidden`, signed-out callers `401`, on both routes.
+
+  **Backup archive format, version 1.** A zip file with exactly these entries:
+
+  | Entry | Content |
+  |---|---|
+  | `media/<uuid>.jpg` | One per photo: the stored JPEG (no rendition). `<uuid>` is the photo's id *in the archive*, lower-case canonical form. Stored, not compressed. |
+  | `recipes.json` | UTF-8 JSON, deflated, written after the photos. |
+
+  `recipes.json`:
+
+  ```json
+  {
+    "format": "recipe-box-export",
+    "version": 1,
+    "exportedAt": "2026-10-24T12:00:00Z",
+    "recipes": [
+      {
+        "id": "uuid",                    // the id in the box it came from; only used to skip repeats
+        "title": "Pancakes",             // required, the rest may be missing and then take the default shown
+        "description": "",
+        "ingredients": [{ "text": "2 cups flour", "section": null }],
+        "steps": [{ "text": "Mix.", "section": null }],
+        "servings": null, "prepMinutes": null, "cookMinutes": null, "totalMinutes": null,
+        "notes": "",
+        "sourceUrl": null, "sourceName": null,
+        "sourceType": "manual",          // manual | link | photo | text
+        "imageId": null,                 // main photo: an id of a media/<uuid>.jpg entry, or null
+        "photoImageIds": [],             // photos in order: ids of media entries
+        "tags": []
+      }
+    ]
+  }
+  ```
+
+  Field names and rules are those of `RecipeInput`; unknown fields are ignored. `format` must be `recipe-box-export`
+  and `version` a whole number from 1 up to the server's version. A change that older readers could misread raises
+  `version`; adding optional fields does not. Every id in `imageId`/`photoImageIds` must have a `media/` entry.

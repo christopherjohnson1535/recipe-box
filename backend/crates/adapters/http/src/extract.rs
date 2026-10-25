@@ -98,6 +98,7 @@ mod tests {
         HttpConfig {
             cookie_secure,
             max_upload_bytes: 1,
+            max_backup_bytes: 1,
             version: "test",
         }
     }

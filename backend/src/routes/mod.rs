@@ -14,6 +14,7 @@ pub fn router(state: AppState) -> Router {
         config: HttpConfig {
             cookie_secure: state.config.cookie_secure,
             max_upload_bytes: state.config.max_upload_bytes(),
+            max_backup_bytes: state.config.max_backup_bytes(),
             version: env!("CARGO_PKG_VERSION"),
         },
     };

@@ -39,6 +39,18 @@ pub const MAX_PHOTOS: usize = 6;
 /// Largest web page a link import reads (5 MB).
 pub const PAGE_MAX_BYTES: usize = 5 * 1024 * 1024;
 
+/// Most recipes one backup archive may hold (ACC-5).
+pub const BACKUP_MAX_RECIPES: usize = 10_000;
+
+/// Most entries (files and folders) in a backup archive.
+pub const BACKUP_MAX_ENTRIES: usize = 50_000;
+
+/// Most bytes a backup archive may expand to in all (declared sizes, and re-checked while reading).
+pub const BACKUP_MAX_TOTAL_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+/// Most bytes `recipes.json` may expand to.
+pub const BACKUP_MAX_MANIFEST_BYTES: u64 = 64 * 1024 * 1024;
+
 /// Which recipe extractor is configured (`AI_PROVIDER`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AiProvider {

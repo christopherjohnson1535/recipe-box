@@ -41,11 +41,6 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
         return response_500
 
-    if response.status_code == 501:
-        response_501 = ErrorBody.from_dict(response.json())
-
-        return response_501
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -65,7 +60,11 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ErrorBody | File]:
-    """Backup zip with `recipes.json` and `media/*`. Admin only.
+    """Backup zip of every recipe and photo. Admin only.
+
+     `recipes.json` and `media/*`; the format is in docs/API.md. Streamed: the answer starts before the
+    zip is complete,
+    and a failure part-way ends the connection early.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -88,7 +87,11 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> ErrorBody | File | None:
-    """Backup zip with `recipes.json` and `media/*`. Admin only.
+    """Backup zip of every recipe and photo. Admin only.
+
+     `recipes.json` and `media/*`; the format is in docs/API.md. Streamed: the answer starts before the
+    zip is complete,
+    and a failure part-way ends the connection early.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -107,7 +110,11 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ErrorBody | File]:
-    """Backup zip with `recipes.json` and `media/*`. Admin only.
+    """Backup zip of every recipe and photo. Admin only.
+
+     `recipes.json` and `media/*`; the format is in docs/API.md. Streamed: the answer starts before the
+    zip is complete,
+    and a failure part-way ends the connection early.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -128,7 +135,11 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> ErrorBody | File | None:
-    """Backup zip with `recipes.json` and `media/*`. Admin only.
+    """Backup zip of every recipe and photo. Admin only.
+
+     `recipes.json` and `media/*`; the format is in docs/API.md. Streamed: the answer starts before the
+    zip is complete,
+    and a failure part-way ends the connection early.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

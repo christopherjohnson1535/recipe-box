@@ -242,6 +242,14 @@ off-site copies: wiki page `docs/wiki/Backup-and-Restore.md`. Reference:
   objects after the backup); photo files changing mid-archive other than through a stand-in `tar`.
 - The in-app zip export (ACC-5) is a different feature: portable recipes and photos, no accounts.
 
+Admins can also download every recipe and photo as one zip from **Settings > Export and import**, and restore such a
+zip there (it adds recipes; it does not replace the database). The zip is uploaded to a temporary file, so the largest
+one accepted is `MAX_BACKUP_MB` (default 512); a reverse proxy in front of the web container must allow a request
+that large (the bundled Caddy does). An import answers only when it has finished, and the web container waits about
+five minutes for that (Node's default); a bigger archive still completes on the server, so check the recipe list
+before trying again. Only one import runs at a time. This is a portable copy of your recipes, not a replacement for `backup.sh`:
+it leaves out accounts and settings.
+
 ## Health
 - `GET /api/health` through the web port → `{"status":"ok","db":"ok"}`.
 - `docker compose ps` shows `healthy` for `db` and `api`.

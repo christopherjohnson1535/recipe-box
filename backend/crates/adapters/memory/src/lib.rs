@@ -153,6 +153,11 @@ impl MemoryStore {
         }
     }
 
+    /// How many recipe rows the store holds, soft-deleted ones included (for tests of all-or-nothing writes).
+    pub fn recipe_rows(&self) -> usize {
+        self.lock().recipes.len()
+    }
+
     fn lock(&self) -> MutexGuard<'_, State> {
         self.state.lock().expect("memory store lock")
     }
@@ -181,6 +186,36 @@ impl RecipeRepo for MemoryStore {
         let recipe = s.recipe(&stored);
         s.recipes.insert(id, stored);
         Ok(recipe)
+    }
+
+    async fn create_many(
+        &self,
+        user_id: Uuid,
+        inputs: Vec<RecipeInput>,
+    ) -> DomainResult<Vec<Uuid>> {
+        let mut s = self.lock();
+        for input in &inputs {
+            s.check_images(input)?;
+        }
+        let now = self.clock.now();
+        let mut ids = Vec::with_capacity(inputs.len());
+        for input in inputs {
+            let id = Uuid::new_v4();
+            s.recipes.insert(
+                id,
+                StoredRecipe {
+                    id,
+                    input,
+                    created_by: Some(user_id),
+                    updated_by: Some(user_id),
+                    created_at: now,
+                    updated_at: now,
+                    deleted_at: None,
+                },
+            );
+            ids.push(id);
+        }
+        Ok(ids)
     }
 
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>> {
@@ -707,5 +742,118 @@ impl ImageCodec for FakeImageCodec {
 
     async fn render_display(&self, _id: Uuid, jpeg: Vec<u8>) -> DomainResult<Vec<u8>> {
         Ok([b"display:".as_slice(), &jpeg].concat())
+    }
+}
+
+/// What a [`MemoryBackup`] writer was given, in call order.
+#[derive(Default)]
+pub struct WrittenBackup {
+    pub photos: Vec<(Uuid, Vec<u8>)>,
+    pub recipes: Vec<domain::BackupRecipe>,
+}
+
+type Opened = DomainResult<(Vec<domain::BackupRecipe>, HashMap<Uuid, Vec<u8>>)>;
+
+/// A scripted [`BackupFormat`] for service tests. Writers record what they are given in [`MemoryBackup::written`]
+/// and emit one placeholder byte per call. `open` ignores the path and serves what [`MemoryBackup::serve`] set
+/// once (or its error), with no limit checks: those belong to the real format.
+#[derive(Default)]
+pub struct MemoryBackup {
+    written: Arc<Mutex<WrittenBackup>>,
+    serving: Arc<Mutex<Option<Opened>>>,
+}
+
+impl MemoryBackup {
+    /// The recipes and photos (by archive image id) the next `open` finds.
+    pub fn serve(&self, recipes: Vec<domain::BackupRecipe>, photos: HashMap<Uuid, Vec<u8>>) {
+        *self.serving.lock().expect("backup lock") = Some(Ok((recipes, photos)));
+    }
+
+    /// Makes the next `open` fail with `error`.
+    pub fn refuse(&self, error: DomainError) {
+        *self.serving.lock().expect("backup lock") = Some(Err(error));
+    }
+
+    /// Takes what writers have been given so far.
+    pub fn written(&self) -> WrittenBackup {
+        std::mem::take(&mut *self.written.lock().expect("backup lock"))
+    }
+}
+
+struct MemoryBackupWriter(Arc<Mutex<WrittenBackup>>);
+
+impl ports::BackupWriter for MemoryBackupWriter {
+    fn photo(&mut self, image_id: Uuid, jpeg: &[u8]) -> DomainResult<Vec<u8>> {
+        self.0
+            .lock()
+            .expect("backup lock")
+            .photos
+            .push((image_id, jpeg.to_vec()));
+        Ok(vec![b'p'])
+    }
+
+    fn finish(
+        &mut self,
+        _exported_at: DateTime<Utc>,
+        recipes: &[domain::BackupRecipe],
+    ) -> DomainResult<Vec<u8>> {
+        self.0.lock().expect("backup lock").recipes = recipes
+            .iter()
+            .map(|r| domain::BackupRecipe {
+                id: r.id,
+                input: RecipeInput {
+                    title: r.input.title.clone(),
+                    image_id: r.input.image_id,
+                    photo_image_ids: r.input.photo_image_ids.clone(),
+                    ..Default::default()
+                },
+            })
+            .collect();
+        Ok(vec![b'r'])
+    }
+}
+
+struct MemoryBackupReader {
+    recipes: Mutex<Option<Vec<domain::BackupRecipe>>>,
+    photos: HashMap<Uuid, Vec<u8>>,
+}
+
+#[async_trait]
+impl ports::BackupReader for MemoryBackupReader {
+    async fn recipes(&self) -> DomainResult<Vec<domain::BackupRecipe>> {
+        Ok(self
+            .recipes
+            .lock()
+            .expect("backup lock")
+            .take()
+            .unwrap_or_default())
+    }
+
+    async fn photo(&self, image_id: Uuid) -> DomainResult<Option<Vec<u8>>> {
+        Ok(self.photos.get(&image_id).cloned())
+    }
+}
+
+#[async_trait]
+impl ports::BackupFormat for MemoryBackup {
+    fn writer(&self) -> Box<dyn ports::BackupWriter> {
+        Box::new(MemoryBackupWriter(self.written.clone()))
+    }
+
+    async fn open(
+        &self,
+        _path: std::path::PathBuf,
+        _limits: domain::BackupLimits,
+    ) -> DomainResult<Box<dyn ports::BackupReader>> {
+        let (recipes, photos) = self
+            .serving
+            .lock()
+            .expect("backup lock")
+            .take()
+            .ok_or_else(|| DomainError::validation("nothing to open"))??;
+        Ok(Box::new(MemoryBackupReader {
+            recipes: Mutex::new(Some(recipes)),
+            photos,
+        }))
     }
 }

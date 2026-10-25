@@ -41,6 +41,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-claude-sonnet-5-5}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      MAX_BACKUP_MB: ${MAX_BACKUP_MB:-512}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - media:/data/media

@@ -32,8 +32,11 @@ where
     // Multipart routes get the large `MAX_UPLOAD_MB` limit; everything else is JSON and stays small.
     let uploads = Router::new()
         .route("/api/media", post(media::upload))
-        .route("/api/import/export", post(export::import_zip))
         .layer(DefaultBodyLimit::max(config.max_upload_bytes));
+    // A backup holds many photos, so it has its own, larger limit; it is spooled to disk, never held in memory.
+    let backups = Router::new()
+        .route("/api/import/export", post(export::import_zip))
+        .layer(DefaultBodyLimit::max(config.max_backup_bytes + (64 << 10)));
     // Photo import takes up to MAX_PHOTOS files (each still checked against the 1x limit) plus multipart framing.
     let photos = Router::new()
         .route("/api/import/photo", post(imports::from_photo))
@@ -66,6 +69,7 @@ where
         .route("/api/users/{id}/password", put(users::set_password))
         .layer(DefaultBodyLimit::max(JSON_BODY_LIMIT))
         .merge(uploads)
+        .merge(backups)
         .merge(photos)
 }
 
