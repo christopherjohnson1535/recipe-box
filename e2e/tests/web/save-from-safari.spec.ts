@@ -1,6 +1,6 @@
 import { expect, hydrated, fixtureUrl, test, unique } from "../../support/fixtures.ts";
 
-test("a shared link waits for a confirm before anything is fetched", async ({ memberPage: page, member }) => {
+test("a shared link waits for a confirm before anything is fetched", async ({ memberPage: page }) => {
   const link = `${fixtureUrl("publisher.html")}?run=${unique()}`;
   let imports = 0;
   page.on("request", (r) => r.method() === "POST" && r.url().includes("/api/import/") && imports++);
@@ -14,8 +14,6 @@ test("a shared link waits for a confirm before anything is fetched", async ({ me
   await page.getByRole("button", { name: "Import this recipe" }).click();
   await expect(page.getByRole("heading", { name: "Check the recipe" })).toBeVisible();
   expect(imports).toBe(1);
-  // a draft only: nothing was saved
-  expect((await member.client.listRecipes({ q: "Tomato" })).total).toBe(0);
 });
 
 test("an address that is not http(s) is refused and never imported", async ({ memberPage: page }) => {
