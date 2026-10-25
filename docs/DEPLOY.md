@@ -190,35 +190,56 @@ off-site copies: wiki page `docs/wiki/Backup-and-Restore.md`. Reference:
 
 - **What a backup is.** A folder `backups/<UTC time>/` with `db.dump` (`pg_dump --format=custom`, no owners or grants),
   `media.tar`, `backup.info` (counts and versions, derived from the dump itself) and `SHA256SUMS`. Created with mode
-  700/600. The database is dumped first, then the photos, so a photo can outlive its recipe in a backup but never the
-  reverse. The folder is written under `.partial-*` and renamed on success; both files are read back before that.
+  700/600. The folder is written under `.partial-*` and renamed on success; both files are read back in full first
+  (`pg_restore -f /dev/null` on the dump, `tar -xOf` on the photos).
+- **Consistency.** The dump is one snapshot; the photos are archived right after it, while the API runs. A photo
+  uploaded in between is in the archive with no recipe (harmless); a photo deleted in between leaves a recipe whose
+  image is missing. Photos are written once (temp file, then rename) and never modified, so archiving does not see torn
+  files; GNU tar's exit 1 ("file changed as we read it" / file vanished) is tolerated with a warning, any other tar
+  error fails the backup. `sh scripts/backup.sh --stop-api` stops the API for the duration (restarting it afterwards,
+  also on failure) and is exactly consistent; use it before upgrades and moves. In `direct` mode it checks that nothing
+  is connected instead (stop the API yourself).
 - **No secrets.** The dump excludes the `sessions` table data (token hashes). `.env`, `POSTGRES_PASSWORD` and
   `ANTHROPIC_API_KEY` are never read. It does contain accounts with argon2 password hashes and all recipes: private,
   but not secret-free. The test suite greps every backup file for the stack's database password, API key and the
   users' passwords.
 - **Settings** (environment, also for cron): `BACKUP_DIR` (default `backups`, relative to the repo folder),
   `BACKUP_KEEP` (default 14 timestamped backups; `0` = keep all; only `YYYYMMDD-HHMMSS` folders are pruned, after a
-  successful run), `BACKUP_NAME` (explicit folder name, never pruned), `BACKUP_MODE` (`compose`, the default, uses
+  successful run), `BACKUP_NAME` (explicit folder name, never pruned; a name that looks like a timestamp is refused), `BACKUP_MODE` (`compose`, the default, uses
   the `db` and `api` services of whatever `COMPOSE_FILE` selects, so the production override works too; `direct`
   uses `DATABASE_URL` + `MEDIA_DIR` and local `psql`/`pg_dump`/`pg_restore` 16+, for installs without Docker).
-- **Restore safety.** Verifies `SHA256SUMS`; exit 3 for a backup with a database version above the running one
-  (newest row of `_sqlx_migrations`, compared with what the running API applied) or from a newer PostgreSQL major;
-  exit 3 when the target holds any user, recipe or photo file unless `--force`, and then writes
-  `backups/pre-restore-<time>` first; asks for `yes` unless `--yes`; stops `api`, restores the database in a single
-  transaction (`--clean --if-exists --single-transaction --exit-on-error`: all or nothing), unpacks the photos beside
-  the old ones and swaps them in only when the archive read cleanly, starts `api`, and compares users, recipes and
-  photo files with the backup (exit 1 on a mismatch). An older backup restores as is; the API migrates it on start.
-  The API is restarted even when the restore fails. Exit codes: 0 done, 1 failed or cancelled, 2 usage, 3 refused.
+- **Restore safety.** In this order: verifies `SHA256SUMS` (which must list `db.dump`, `media.tar` and `backup.info`);
+  rejects a photo archive with absolute or `..` member names or anything but regular files and directories (checked with
+  `tar -tvf`); reads the whole dump (`pg_restore -f /dev/null`); exit 3 for a backup with a database version above the
+  running one (newest row of `_sqlx_migrations`, compared with what the running API applied) or from a newer PostgreSQL
+  major; exit 3 when the target holds any user, recipe or photo file unless `--force`; direct mode also checks
+  `MEDIA_DIR` (absolute, not `/`, an existing folder with no sub-folders, else exit 2 or 3); asks for `yes` unless
+  `--yes`. Then, before anything is replaced, unpacks the photos into `.restore-incoming` inside the photo folder (same
+  filesystem, a full trial extraction that also checks the file count; modes set to 755/644, ownership copied from
+  the photo folder when run as root); only then stops `api`, takes the `backups/pre-restore-<time>` safety backup
+  (`BACKUP_KEEP=0`, so it never prunes, and after the stop so no write is lost), replaces the database, swaps the
+  photos by renames (`.restore-old` holds the previous ones until the swap worked and is put back on failure), starts
+  `api`, and compares users, recipes and photo files with the backup (exit 1 on a mismatch).
+  The database step runs `DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION CURRENT_USER;` and the
+  archive (rendered to SQL by `pg_restore -f`, in a temp file first) inside one `psql --single-transaction`, so the
+  result is exactly the backup: tables a newer release added are gone, and a failure leaves the database untouched.
+  The API migrates an older backup when it starts. The API is restarted even when the restore fails. A leftover
+  `.restore-old` (a crash mid-swap) makes the next restore refuse until you look at it. Exit codes: 0 done, 1 failed or
+  cancelled, 2 usage, 3 refused.
 - **Scheduling** is cron / Task Scheduler on the host (examples in the wiki page). There is deliberately no backup
   container in the Compose file: it would need the Docker socket, which is root on the host, to do what one cron line
   does.
 - **Fly.io and other managed hosts**: see `docs/wiki/Deploy-Fly.md`, "Upgrade and backups"; the Compose-based scripts do not apply there.
 - **Tests.** `e2e/tests/backup/backup-restore.spec.ts` (Playwright, TypeScript) seeds a stack (accounts, recipes with
   several photos, a deleted recipe), runs the real scripts, wipes the stack's volumes, restores and asserts every
-  recipe, every photo's bytes, search, tags and trash are identical, plus the refusals above and retention. CI job
+  recipe, every photo's bytes, search, tags and trash are identical, every table's rows and the schema's shape match
+  (including the singleton settings table), an older backup removes tables added later, unsafe or unpackable photo
+  archives and incomplete checksum files change nothing, plus the refusals above and retention. Direct-mode-only cases
+  (`e2e/tests/backup/direct-mode.spec.ts`: `MEDIA_DIR` guard, tar warnings) run in the native run only. CI job
   `backup` runs it against `docker-compose.backup-e2e.yml` (`cd e2e && npm run test:backup:compose`); without Docker
   `npm run test:backup` runs the same file against local Postgres and a cargo-built API (`BACKUP_MODE=direct`).
-  Not covered: restoring a backup older than the running schema (needs a real older release image).
+  Not covered: restoring a backup made by a real older release image (the test fakes "a newer release" by adding
+  objects after the backup); photo files changing mid-archive other than through a stand-in `tar`.
 - The in-app zip export (ACC-5) is a different feature: portable recipes and photos, no accounts.
 
 ## Health

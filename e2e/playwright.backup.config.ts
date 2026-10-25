@@ -4,6 +4,8 @@ import { defineConfig } from "@playwright/test";
 // the shared e2e stack, because the test wipes the volumes. One worker, one ordered story, no retries.
 export default defineConfig({
   testDir: "tests/backup",
+  // direct-mode.spec.ts covers what only exists without Docker (BACKUP_MODE=direct).
+  testIgnore: process.env.E2E_STACK === "compose" ? "**/direct-mode.spec.ts" : undefined,
   fullyParallel: false,
   workers: 1,
   retries: 0,

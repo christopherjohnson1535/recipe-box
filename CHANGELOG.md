@@ -17,7 +17,8 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 - Backup and restore you can trust (#19): `scripts/backup.sh` checksums and verifies each backup, leaves out sign-in sessions and
   secrets, and prunes old ones (`BACKUP_KEEP`); `scripts/restore.sh` asks first, refuses to overwrite existing data without
   `--force` (saving a safety backup), refuses newer-version backups and restores the database in one transaction. A CI job
-  backs up a seeded stack, wipes its volumes, restores and compares every recipe and photo. Cron, off-site copy and Fly steps
+  backs up a seeded stack, wipes its volumes, restores and compares every table and photo. A restore rebuilds the schema
+  exactly, validates the photo archive first and swaps photos in by rename; `--stop-api` makes a fully consistent backup. Cron, off-site copy and Fly steps
   in the wiki.
 - HTTPS deploy guides (#17): Tailscale at home, a VPS with the Caddy profile, and Fly.io (with `deploy/fly/` config), plus a
   `COOKIE_SECURE` table; the Tailscale steps no longer ask for `WEB_BIND=0.0.0.0`.

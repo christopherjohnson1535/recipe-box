@@ -1,5 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, openSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,11 +26,15 @@ export interface BackupStack {
   readonly backupDir: string;
   /** Strings from the stack's configuration that must never end up inside a backup. */
   readonly secrets: string[];
+  /** The photo folder's top-level entries as "mode name" (octal mode), sorted. */
+  mediaListing(): Promise<string[]>;
   /** An empty, healthy stack. Destroys whatever the stack held, volumes included. */
   fresh(): Promise<void>;
   script(name: "backup" | "restore", args: string[], opts?: { input?: string; env?: Record<string, string> }): Promise<ScriptResult>;
   /** One value from the database. */
   sql(query: string): Promise<string>;
+  /** A db.dump archive as the plain SQL pg_restore prints (the archive itself is compressed). */
+  dumpAsSql(dump: string): string;
   stop(): Promise<void>;
 }
 
@@ -40,7 +44,7 @@ export function createBackupStack(): BackupStack {
 
 function cleanEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
   const env = { ...process.env };
-  for (const k of ["BACKUP_MODE", "BACKUP_DIR", "BACKUP_KEEP", "BACKUP_NAME", "DATABASE_URL", "MEDIA_DIR", "COMPOSE_FILE", "COMPOSE_PROJECT_NAME"]) delete env[k];
+  for (const k of ["BACKUP_MODE", "BACKUP_DIR", "BACKUP_KEEP", "BACKUP_NAME", "BACKUP_API_STOPPED", "DATABASE_URL", "MEDIA_DIR", "COMPOSE_FILE", "COMPOSE_PROJECT_NAME"]) delete env[k];
   return { ...env, ...extra };
 }
 
@@ -78,6 +82,24 @@ class ComposeStack implements BackupStack {
 
   async sql(query: string) {
     return this.compose(["exec", "-T", "db", "psql", "-U", "recipes", "-d", "recipes", "-X", "-q", "-t", "-A", "-c", query], "pipe").trim();
+  }
+
+  async mediaListing() {
+    const out = this.compose(
+      ["run", "--rm", "--no-deps", "-T", "--entrypoint", "sh", "api", "-c", 'find /data/media -mindepth 1 -maxdepth 1 -exec stat -c "%a %f" {} +'],
+      "pipe",
+    );
+    return out.split("\n").filter(Boolean).sort();
+  }
+
+  dumpAsSql(dump: string) {
+    return execFileSync("docker", ["compose", "exec", "-T", "db", "pg_restore", "-f", "-"], {
+      cwd: ROOT,
+      env: cleanEnv(this.env),
+      input: readFileSync(dump),
+      encoding: "utf8",
+      maxBuffer: 256 * 1024 * 1024,
+    });
   }
 
   async stop() {
@@ -127,6 +149,13 @@ class NativeStack implements BackupStack {
     const exited = new Promise<void>((r) => api.once("exit", () => r()));
     api.kill("SIGTERM");
     await exited;
+    // The process is gone, but Postgres notices the closed connections a moment later; the restore script (rightly)
+    // refuses while any are left. Wait for them to be gone, as an operator would by running the command a second later.
+    const deadline = Date.now() + 15_000;
+    while (this.psql(this.admin, `select count(*) from pg_stat_activity where datname = '${this.dbName}'`) !== "0") {
+      if (Date.now() > deadline) throw new Error("connections to the database did not close after the API stopped");
+      await new Promise((r) => setTimeout(r, 25));
+    }
   }
 
   async fresh() {
@@ -140,7 +169,7 @@ class NativeStack implements BackupStack {
 
   async script(name: "backup" | "restore", args: string[], opts: { input?: string; env?: Record<string, string> } = {}) {
     const env = cleanEnv({ BACKUP_MODE: "direct", DATABASE_URL: this.dbUrl, MEDIA_DIR: this.media, BACKUP_DIR: this.backupDir, ...opts.env });
-    if (name === "backup") return runScript(name, args, env, opts.input);
+    if (name === "backup" && !args.includes("--stop-api")) return runScript(name, args, env, opts.input);
     await this.stopApi(); // without Docker the script cannot stop the API; the operator does
     try {
       return await runScript(name, args, env, opts.input);
@@ -151,6 +180,16 @@ class NativeStack implements BackupStack {
 
   async sql(query: string) {
     return this.psql(this.dbUrl, query);
+  }
+
+  async mediaListing() {
+    return readdirSync(this.media)
+      .map((name) => `${(statSync(path.join(this.media, name)).mode & 0o777).toString(8)} ${name}`)
+      .sort();
+  }
+
+  dumpAsSql(dump: string) {
+    return execFileSync("pg_restore", ["-f", "-", dump], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
   }
 
   async stop() {

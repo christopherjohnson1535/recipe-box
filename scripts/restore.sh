@@ -4,15 +4,18 @@
 #   sh scripts/restore.sh backups/<timestamp> [--yes] [--force]
 #
 # The stack must be up (the database must be reachable). The script:
-#   1. checks the backup is complete and unchanged (SHA256SUMS);
+#   1. checks the backup is complete and unchanged (SHA256SUMS lists db.dump, media.tar and backup.info and they match),
+#      that the photo archive holds only plain files inside the photo folder, and that both files read cleanly;
 #   2. refuses a backup from a NEWER version of Recipe Box than the one running, or from a newer PostgreSQL;
-#   3. refuses to touch a database that already holds recipes, accounts or photos unless you pass --force, and then
-#      takes a safety backup of it first (backups/pre-restore-<time>);
+#   3. refuses to touch a database that already holds recipes, accounts or photos unless you pass --force;
 #   4. asks you to type yes (skip with --yes, for scripts);
-#   5. stops the API, replaces the database (one transaction: all or nothing) and the photos, starts the API, and
-#      checks the counts against the backup.
+#   5. unpacks the photos beside the current ones (a full test: a bad archive stops here, nothing changed), stops the
+#      API, takes a safety backup of what is there (backups/pre-restore-<time>, only with --force on existing data),
+#      replaces the database (one transaction: all or nothing; the schema is rebuilt so it matches the backup exactly),
+#      swaps the photos in (renames; the old ones are put back if that fails), starts the API, and checks the counts.
 # An older backup is fine: the API upgrades the database itself when it starts.
-# Exit codes: 0 done, 1 failed or cancelled, 2 wrong usage, 3 refused (not empty without --force, or newer backup).
+# Exit codes: 0 done, 1 failed or cancelled, 2 wrong usage, 3 refused (not empty without --force, newer backup, MEDIA_DIR).
+# shellcheck disable=SC2016  # snippets for `sh -c` / `docker compose exec` are single-quoted on purpose
 set -eu
 
 dir=""
@@ -22,7 +25,7 @@ for arg in "$@"; do
   case $arg in
     --yes) yes=1 ;;
     --force) force=1 ;;
-    -h | --help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "unknown option $arg (see --help)" >&2; exit 2 ;;
     *) [ -z "$dir" ] || { echo "only one backup folder, please" >&2; exit 2; }; dir=$arg ;;
   esac
@@ -30,6 +33,7 @@ done
 [ -n "$dir" ] || { echo "usage: sh scripts/restore.sh backups/<timestamp> [--yes] [--force]" >&2; exit 2; }
 case $dir in /*) ;; *) dir="$PWD/$dir" ;; esac # relative to where you are, before the library moves to the repo folder
 
+# shellcheck source=backup-lib.sh
 . "$(dirname "$0")/backup-lib.sh"
 umask 077
 
@@ -38,7 +42,14 @@ for f in db.dump media.tar backup.info SHA256SUMS; do
   [ -f "$dir/$f" ] || die "$dir is not a complete backup: $f is missing"
 done
 (cd "$dir" && sha -c SHA256SUMS >/dev/null 2>&1) || die "$dir does not match its SHA256SUMS: the backup is damaged or was changed. Nothing was restored."
+# A checksum file that leaves a file out would let that file be swapped unnoticed.
+for f in db.dump media.tar backup.info; do
+  pattern="^[0-9a-f]{64} [ *]$(printf '%s' "$f" | sed 's/\./\\./g')\$"
+  grep -Eq "$pattern" "$dir/SHA256SUMS" || die "SHA256SUMS in $dir does not list $f: the backup cannot be verified. Nothing was restored."
+done
 grep -qx 'format=1' "$dir/backup.info" || die "$dir was made by a different version of these scripts (backup.info has no format=1)"
+tar_check_members "$dir/media.tar"
+db_readdump -f /dev/null <"$dir/db.dump" || die "the database dump in $dir cannot be read. Nothing was restored."
 
 backup_version=$(dump_version "$dir/db.dump")
 backup_major=$(dump_pg_major "$dir/db.dump")
@@ -47,6 +58,7 @@ want_recipes=$(dump_count "$dir/db.dump" recipes)
 want_photos=$(tar -tf "$dir/media.tar" | grep -vc '/$' || true)
 
 # --- 2 and 3. is it safe to restore here? --------------------------------------------------------------------------
+media_dir_guard
 echo "select 1" | db_psql >/dev/null || die "cannot reach the database. Is the stack running? (docker compose up -d)"
 have_version=$(schema_version)
 have_major=$(pg_major)
@@ -73,7 +85,7 @@ echo "Backup:   $dir"
 sed 's/^/          /' "$dir/backup.info"
 echo "Here now: $have_recipes recipes, $have_users accounts, $have_photos photo files (database version $have_version)"
 if [ "$backup_version" -lt "$have_version" ]; then
-  echo "Note:     the backup is older ($backup_version); it is restored as is and the API upgrades it when it starts."
+  echo "Note:     the backup is older ($backup_version); it is restored as is, tables a newer release added are removed, and the API upgrades it when it starts."
 fi
 if [ "$have_version" -eq 0 ]; then
   echo "Note:     the API has not run here yet, so the database version could not be compared. If it will not start afterwards, run a newer release."
@@ -87,30 +99,33 @@ if [ "$yes" = 0 ]; then
 fi
 
 # --- 5. restore ----------------------------------------------------------------------------------------------------
-if [ "$nonempty" = 1 ]; then
-  safety=$(date -u +pre-restore-%Y%m%d-%H%M%S)
-  echo "Taking a safety backup of the current data first: ${BACKUP_DIR:-backups}/$safety"
-  BACKUP_NAME=$safety sh "$ROOT/scripts/backup.sh" >/dev/null </dev/null || die "the safety backup failed, so nothing was changed"
-fi
-
 api_stopped=0
+staged=0
 finish() {
+  if [ "$staged" = 1 ]; then media_unstage || echo "warning: could not remove the unpacked photos (.restore-incoming in the photo folder); delete it by hand" >&2; fi
   if [ "$api_stopped" = 1 ]; then api_start || echo "The API did not start. Check: docker compose logs api" >&2; fi
 }
 trap finish EXIT
 trap 'exit 130' INT TERM
 
+# The photos are unpacked first, beside the current ones: a bad archive stops here with nothing changed.
+staged=1
+media_stage "$want_photos" <"$dir/media.tar" || die "the photo archive could not be unpacked, so nothing was changed."
+
 api_stop
 api_stopped=1
-db_restore <"$dir/db.dump" || die "the database restore failed. It ran in one transaction, so the database is as it was. Restarting the API."
 
-# The new photos are unpacked beside the old ones first and swapped in only when the archive read cleanly.
-media_run 'd=$1; inc=$d/.restore-incoming
-rm -rf "$inc"; mkdir -p "$inc"
-if ! tar --no-same-owner -C "$inc" -xf -; then rm -rf "$inc"; echo "the photo archive could not be unpacked; photos left unchanged" >&2; exit 1; fi
-find "$d" -mindepth 1 -maxdepth 1 ! -name .restore-incoming -exec rm -rf {} +
-find "$inc" -mindepth 1 -maxdepth 1 -exec mv {} "$d"/ \;
-rmdir "$inc"' <"$dir/media.tar" || die "the database was restored but the photos were not (the archive could not be unpacked). Run this restore again; the safety backup, if one was made, is in ${BACKUP_DIR:-backups}."
+if [ "$nonempty" = 1 ]; then
+  # With the API stopped, so no write is lost between this copy and the replacement. No pruning: BACKUP_KEEP must not
+  # delete the very backup that is being restored.
+  safety=$(date -u +pre-restore-%Y%m%d-%H%M%S)
+  echo "Taking a safety backup of the current data first: ${BACKUP_DIR:-backups}/$safety"
+  BACKUP_NAME=$safety BACKUP_KEEP=0 BACKUP_API_STOPPED=1 sh "$ROOT/scripts/backup.sh" >/dev/null </dev/null || die "the safety backup failed, so nothing was changed"
+fi
+
+db_restore <"$dir/db.dump" || die "the database restore failed. It ran in one transaction, so the database is as it was. Restarting the API."
+media_swap || die "the database was restored but the photos could not be swapped in (the previous photos were put back). Run this restore again; the safety backup, if one was made, is in ${BACKUP_DIR:-backups}."
+staged=0
 
 api_start
 api_stopped=0

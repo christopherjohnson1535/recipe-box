@@ -76,8 +76,10 @@ in the same formats the scripts use:
    (`/tmp` is wiped on restart; the volume itself is only read.)
 3. Copy both files off your computer too, see "Copy backups off the machine" in [[Backup and Restore]].
 
-To restore: stop the api (`fly scale count 0 -a recipe-box-api-<you>`), `pg_restore -d "<url>" --clean --if-exists
---no-owner --no-acl --single-transaction --exit-on-error db.dump`, upload and unpack `media.tar` into `/data/media`
+To restore: stop the api (`fly scale count 0 -a recipe-box-api-<you>`), then rebuild the schema and load the dump
+(`psql "<url>" -c "drop schema public cascade; create schema public"`, then `pg_restore -d "<url>" --no-owner
+--no-acl --single-transaction --exit-on-error db.dump`; dropping the schema first removes tables a newer release
+added, which `--clean` alone would leave behind), upload and unpack `media.tar` into `/data/media`
 as user 10001 (so the `chown` step above does not have to be repeated), then scale the api back to 1. The scripts'
 `BACKUP_MODE=direct` does the database and photo steps for you where you can reach both from one computer
 (`DATABASE_URL`, `MEDIA_DIR`); on Fly the photo folder is only reachable through `fly ssh`, so the manual steps above

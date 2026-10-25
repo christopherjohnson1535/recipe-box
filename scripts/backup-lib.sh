@@ -1,5 +1,6 @@
 # Shared by backup.sh and restore.sh (OPS-6). Source it; do not run it.
 # shellcheck shell=sh
+# shellcheck disable=SC2016  # the snippets handed to `sh -c` / `docker compose exec` are single-quoted on purpose
 #
 # Two ways to reach the data, chosen with BACKUP_MODE:
 #   compose (default)  the Compose stack in this folder: `db` and `api` services, `docker compose` must work here.
@@ -11,7 +12,7 @@
 export MSYS_NO_PATHCONV=1
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-cd "$ROOT"
+cd "$ROOT" || exit 1
 
 MODE=${BACKUP_MODE:-compose}
 MEDIA_IN_CONTAINER=/data/media
@@ -21,11 +22,12 @@ die() { # die <message> [exit code]
   exit "${2:-1}"
 }
 
+command -v tar >/dev/null 2>&1 || die "tar is not installed or not on the PATH"
 case $MODE in
   compose) command -v docker >/dev/null 2>&1 || die "docker is not installed or not on the PATH" ;;
   direct)
     [ -n "${DATABASE_URL:-}" ] && [ -n "${MEDIA_DIR:-}" ] || die "BACKUP_MODE=direct needs DATABASE_URL and MEDIA_DIR" 2
-    for tool in psql pg_dump pg_restore tar; do
+    for tool in psql pg_dump pg_restore; do
       command -v "$tool" >/dev/null 2>&1 || die "$tool is not installed or not on the PATH"
     done
     ;;
@@ -56,12 +58,34 @@ db_dump() {
   fi
 }
 
-# Archive on stdin, replaces the schema in one transaction: it applies completely or not at all.
+# Archive on stdin. Replaces the whole `public` schema in ONE transaction, so it applies completely or not at all:
+# the schema is dropped and recreated (owned by the connecting role, the same grants a fresh database has) and the
+# archive is then loaded as plain SQL. Dropping it is what makes an older backup restore EXACTLY: tables a newer release
+# added since are gone too, instead of lingering and breaking the next upgrade. The archive is turned into SQL in a
+# temporary file first, so an archive that fails halfway never reaches the database.
+RESTORE_SH=$(
+  cat <<'EOS'
+set -eu
+t=$(mktemp)
+trap 'rm -f "$t" "$t.body"' EXIT
+cat >"$t" <<'SQL'
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public AUTHORIZATION CURRENT_USER;
+COMMENT ON SCHEMA public IS 'standard public schema';
+GRANT USAGE ON SCHEMA public TO PUBLIC;
+SQL
+pg_restore --no-owner --no-acl -f "$t.body"
+cat "$t.body" >>"$t"
+runpsql --single-transaction -f "$t" >/dev/null
+EOS
+)
 db_restore() {
   if [ "$MODE" = compose ]; then
-    docker compose exec -T db sh -c 'exec pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-acl --single-transaction --exit-on-error'
+    docker compose exec -T db sh -c 'runpsql() { psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"; }
+'"$RESTORE_SH"
   else
-    pg_restore -d "$DATABASE_URL" --clean --if-exists --no-owner --no-acl --single-transaction --exit-on-error
+    sh -c 'runpsql() { psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 "$@"; }
+'"$RESTORE_SH"
   fi
 }
 
@@ -115,7 +139,84 @@ media_run() { # <snippet>
 }
 
 media_count() { # photo files currently stored (a one-off container, so it works while the API is down or restarting)
-  media_run 'find "$1" -type f ! -path "*/.restore-incoming/*" | wc -l' </dev/null | tr -d ' \r'
+  media_run 'find "$1" -type f ! -path "*/.restore-incoming/*" ! -path "*/.restore-old/*" | wc -l' </dev/null | tr -d ' \r'
+}
+
+# Direct mode empties MEDIA_DIR on restore, so look hard at it first. It must be a real absolute path (not / and not
+# relative) and look like what the API keeps there: plain files in one flat folder. A folder that holds other folders
+# (your home, /var, /) is not the photo folder, and nothing is touched. Compose mode always uses /data/media.
+media_dir_guard() {
+  [ "$MODE" = direct ] || return 0
+  d=$MEDIA_DIR
+  case $d in /*) ;; *) die "MEDIA_DIR must be an absolute path, not '$d'. Nothing was changed." 2 ;; esac
+  trimmed=$d
+  while [ "${trimmed%/}" != "$trimmed" ]; do trimmed=${trimmed%/}; done
+  [ -n "$trimmed" ] || die "MEDIA_DIR must not be /. Nothing was changed." 2
+  case /$trimmed/ in */../* | */./*) die "MEDIA_DIR must not contain . or .. parts ('$d'). Nothing was changed." 2 ;; esac
+  [ -d "$d" ] || die "MEDIA_DIR '$d' is not a folder. Nothing was changed." 2
+  sub=$(find "$d" -mindepth 1 -maxdepth 1 -type d ! -name '.restore-*' ! -name lost+found | head -n 1)
+  [ -z "$sub" ] || die "MEDIA_DIR '$d' holds folders (for example $(basename "$sub")). The API keeps photos as plain files in one folder, so this does not look like the photo folder. Nothing was changed." 3
+}
+
+# Refuse a photo archive that could write outside the photo folder or create anything but plain files and folders
+# (absolute or .. names, symlinks, hardlinks, devices, pipes). Read with the host's tar; the first character of each
+# `tar -tv` line is the member type.
+tar_check_members() { # <archive>
+  names=$(mktemp)
+  verbose=$(mktemp)
+  if ! tar -tf "$1" >"$names" 2>/dev/null || ! tar -tvf "$1" >"$verbose" 2>/dev/null; then
+    rm -f "$names" "$verbose"
+    die "the photo archive cannot be read"
+  fi
+  if [ "$(wc -l <"$names")" != "$(wc -l <"$verbose")" ]; then
+    rm -f "$names" "$verbose"
+    die "the photo archive has unusual file names (a line break in one): refusing it. Nothing was changed."
+  fi
+  bad=""
+  grep -Eq '^/|(^|/)\.\.(/|$)' "$names" && bad="a path that is absolute or contains .."
+  [ -z "$bad" ] && [ -n "$(cut -c1 "$verbose" | grep -v '^[-d]$' | head -n 1)" ] && bad="something that is not a plain file or folder (a link, device or pipe)"
+  rm -f "$names" "$verbose"
+  [ -z "$bad" ] || die "the photo archive is unsafe: it holds $bad. Nothing was changed."
+}
+
+# Unpack the photo archive on stdin into <MEDIA_DIR>/.restore-incoming, the same filesystem as the photos so that moving
+# them in later is a rename. A full test extraction: it fails now, with nothing else touched, if the archive is bad.
+# Files get explicit modes (folders 755, files 644) so the API, which may run as another user than the operator, can
+# read them; run as root, ownership is copied from the photo folder.
+media_stage() { # <expected number of files>
+  case $1 in '' | *[!0-9]*) die "internal error: file count '$1'" ;; esac
+  media_run "want=$1"'; d=$1; inc=$d/.restore-incoming; old=$d/.restore-old
+umask 022
+if [ -e "$old" ]; then echo "$old is left from an interrupted restore: move its contents back into $d or delete it, then run again" >&2; exit 1; fi
+rm -rf "$inc"
+mkdir "$inc" || exit 1
+if ! tar --no-same-owner -C "$inc" -xf -; then rm -rf "$inc"; echo "the photo archive could not be unpacked" >&2; exit 1; fi
+got=$(find "$inc" -type f | wc -l | tr -d " ")
+if [ "$got" != "$want" ]; then rm -rf "$inc"; echo "the photo archive holds $got files after unpacking, expected $want" >&2; exit 1; fi
+find "$inc" -type d -exec chmod 755 {} + && find "$inc" -type f -exec chmod 644 {} + || { rm -rf "$inc"; echo "could not set permissions on the unpacked photos" >&2; exit 1; }
+if [ "$(id -u)" = 0 ]; then chown -R "$(stat -c %u:%g "$d")" "$inc" || { rm -rf "$inc"; echo "could not set the owner of the unpacked photos" >&2; exit 1; }; fi'
+}
+
+# Swap the staged photos in: the current ones are renamed aside, the new ones renamed in, the old ones deleted after
+# that. A failure on the way puts the old ones back. (Renames only, inside MEDIA_DIR: it can be a mount point.)
+media_swap() {
+  media_run 'd=$1; inc=$d/.restore-incoming; old=$d/.restore-old
+[ -d "$inc" ] || { echo "no unpacked photos to swap in" >&2; exit 1; }
+[ ! -e "$old" ] || { echo "$old is left from an interrupted restore" >&2; exit 1; }
+mkdir "$old" || exit 1
+moveall() { find "$1" -mindepth 1 -maxdepth 1 ! -name .restore-incoming ! -name .restore-old -exec sh -c '"'"'dest=$1; shift; mv -- "$@" "$dest"/'"'"' sh "$2" {} +; }
+if ! moveall "$d" "$old"; then moveall "$old" "$d"; rmdir "$old"; echo "could not move the current photos aside; they are as they were" >&2; exit 1; fi
+if ! moveall "$inc" "$d"; then
+  find "$d" -mindepth 1 -maxdepth 1 ! -name .restore-incoming ! -name .restore-old -exec rm -rf {} +
+  moveall "$old" "$d"; rmdir "$old"
+  echo "could not move the restored photos in; the previous photos were put back" >&2; exit 1
+fi
+rm -rf "$old" || echo "warning: could not delete $old; remove it by hand" >&2
+rmdir "$inc" 2>/dev/null || rm -rf "$inc"' </dev/null
+}
+
+media_unstage() { # drop an unpacked-but-unused copy
+  media_run 'rm -rf "$1/.restore-incoming"' </dev/null
 }
 
 # --- the API ------------------------------------------------------------------------------------------------------
