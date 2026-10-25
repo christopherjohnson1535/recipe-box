@@ -739,7 +739,8 @@ impl GroceryRepo for MemoryStore {
         g.items
             .retain(|i| i.item.manual || keys.contains(i.item.key.as_str()));
         let mut changed = g.items.len() != before;
-        for c in computed {
+        for mut c in computed {
+            c.amounts = GroceryItem::finite_amounts(c.amounts);
             let existing = g
                 .items
                 .iter_mut()
@@ -762,7 +763,7 @@ impl GroceryRepo for MemoryStore {
                 continue;
             };
             let item = &mut stored.item;
-            let more = item.amounts != c.amounts;
+            let more = !GroceryItem::same_amounts(&item.amounts, &c.amounts);
             if more
                 || item.name != c.name
                 || item.section != c.section
@@ -790,7 +791,7 @@ impl GroceryRepo for MemoryStore {
             id: Uuid::new_v4(),
             key: new.key,
             name: new.name,
-            amounts: new.amounts,
+            amounts: GroceryItem::finite_amounts(new.amounts),
             section: new.section,
             checked: false,
             manual: true,
@@ -804,28 +805,49 @@ impl GroceryRepo for MemoryStore {
         Ok(item)
     }
 
-    async fn set_checked(&self, id: Uuid, checked: bool) -> DomainResult<()> {
+    async fn update_item(
+        &self,
+        id: Uuid,
+        checked: Option<bool>,
+        section: Option<Section>,
+        staple: Option<bool>,
+    ) -> DomainResult<GroceryItem> {
         let now = self.clock.now();
         let g = &mut self.lock().grocery;
-        let stored = g
+        let key = g
             .items
-            .iter_mut()
+            .iter()
             .find(|i| i.item.id == id && !i.cleared)
-            .ok_or_else(no_item)?;
-        stored.item.checked = checked;
-        g.touch(now);
-        Ok(())
-    }
-
-    async fn set_section(&self, _list_id: Uuid, key: &str, section: Section) -> DomainResult<()> {
-        let now = self.clock.now();
-        let g = &mut self.lock().grocery;
-        g.overrides.insert(key.to_string(), section);
-        for i in g.items.iter_mut().filter(|i| i.item.key == key) {
-            i.item.section = section;
+            .ok_or_else(no_item)?
+            .item
+            .key
+            .clone();
+        if let Some(checked) = checked {
+            for i in g.items.iter_mut().filter(|i| i.item.id == id) {
+                i.item.checked = checked;
+            }
+        }
+        if let Some(section) = section {
+            g.overrides.insert(key.clone(), section);
+            for i in g.items.iter_mut().filter(|i| i.item.key == key) {
+                i.item.section = section;
+            }
+        }
+        match staple {
+            Some(true) => {
+                g.staples.insert(key);
+            }
+            Some(false) => {
+                g.staples.remove(&key);
+            }
+            None => {}
         }
         g.touch(now);
-        Ok(())
+        Ok(g.items
+            .iter()
+            .find(|i| i.item.id == id)
+            .map(|i| i.item.clone())
+            .expect("the item was just found"))
     }
 
     async fn clear_item(&self, id: Uuid) -> DomainResult<()> {
@@ -862,18 +884,6 @@ impl GroceryRepo for MemoryStore {
 
     async fn staples(&self) -> DomainResult<HashSet<String>> {
         Ok(self.lock().grocery.staples.clone())
-    }
-
-    async fn set_staple(&self, _list_id: Uuid, key: &str, staple: bool) -> DomainResult<()> {
-        let now = self.clock.now();
-        let g = &mut self.lock().grocery;
-        if staple {
-            g.staples.insert(key.to_string());
-        } else {
-            g.staples.remove(key);
-        }
-        g.touch(now);
-        Ok(())
     }
 }
 

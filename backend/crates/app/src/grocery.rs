@@ -1,7 +1,7 @@
 //! The grocery list (GRO): what goes on it, and the rules for changing it. The storage and the line parsing are
 //! elsewhere (`GroceryRepo`, `domain::grocery`); this decides when to recompute and what each change means.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use domain::{
     DomainError, DomainResult,
@@ -57,20 +57,6 @@ pub struct GroceryService {
     repo: Arc<dyn GroceryRepo>,
 }
 
-/// Whether the items no longer match the list's live recipes: an item names a recipe that is gone from the list
-/// (deleted), or a live recipe that has lines contributes to no item (restored after a delete).
-fn stale(recipes: &[ListedRecipe], items: &[GroceryItem]) -> bool {
-    let live: HashSet<Uuid> = recipes.iter().map(|r| r.recipe_id).collect();
-    let used: HashSet<Uuid> = items
-        .iter()
-        .flat_map(|i| i.recipe_ids.iter().copied())
-        .collect();
-    used.iter().any(|id| !live.contains(id))
-        || recipes.iter().any(|r| {
-            !used.contains(&r.recipe_id) && r.ingredients.iter().any(|i| !i.text.trim().is_empty())
-        })
-}
-
 impl GroceryService {
     pub(crate) fn new(d: &Deps) -> Self {
         Self {
@@ -78,13 +64,11 @@ impl GroceryService {
         }
     }
 
-    /// The list, made on first use. A recipe deleted (or restored) since the last write is reflected first.
+    /// The list, made on first use. The items are rebuilt from the list's recipes as they are now first, so a
+    /// recipe edited, deleted or restored since the last write shows up. That writes (and moves `updated_at`)
+    /// only when something came out different.
     pub async fn get(&self) -> DomainResult<GroceryListView> {
         let list = self.repo.get_or_create_list().await?;
-        let (recipes, items) = self.load(&list).await?;
-        if !stale(&recipes, &items) {
-            return self.view(list, recipes, items).await;
-        }
         self.recompute(&list).await?;
         self.current().await
     }
@@ -115,13 +99,16 @@ impl GroceryService {
         self.current().await
     }
 
-    /// Adds a manual item: `text` (1-200 characters once trimmed) is read like an ingredient line. The section is
-    /// the one given, else the household's choice for the name, else the built-in guess.
+    /// Adds a manual item: `text` (1-200 characters once NULs are dropped and it is trimmed) is read like an
+    /// ingredient line. The section is the one given, else the household's choice for the name, else the built-in
+    /// guess.
     pub async fn add_item(
         &self,
         text: &str,
         section: Option<Section>,
     ) -> DomainResult<GroceryItemView> {
+        // Postgres text cannot hold a NUL; recipe input drops them the same way.
+        let text = text.replace('\0', "");
         let text = text.trim();
         if !(1..=MAX_GROCERY_TEXT_CHARS).contains(&text.chars().count()) {
             return Err(DomainError::validation(format!(
@@ -159,18 +146,10 @@ impl GroceryService {
         if patch == ItemPatch::default() {
             return Err(DomainError::validation("Send checked, section or staple."));
         }
-        let item = self.repo.item(id).await?.ok_or_else(no_item)?;
-        let list = self.repo.get_or_create_list().await?;
-        if let Some(checked) = patch.checked {
-            self.repo.set_checked(id, checked).await?;
-        }
-        if let Some(section) = patch.section {
-            self.repo.set_section(list.id, &item.key, section).await?;
-        }
-        if let Some(staple) = patch.staple {
-            self.repo.set_staple(list.id, &item.key, staple).await?;
-        }
-        let item = self.repo.item(id).await?.ok_or_else(no_item)?;
+        let item = self
+            .repo
+            .update_item(id, patch.checked, patch.section, patch.staple)
+            .await?;
         let staple = self.repo.staples().await?.contains(&item.key);
         Ok(GroceryItemView { item, staple })
     }
@@ -257,8 +236,4 @@ impl GroceryService {
                 .collect(),
         })
     }
-}
-
-fn no_item() -> DomainError {
-    DomainError::NotFound("No such item.".into())
 }

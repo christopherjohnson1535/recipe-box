@@ -19,6 +19,9 @@ pub async fn grocery_repo<F: Fn(Arc<dyn Clock>) -> Stack>(make: F) {
     recompute_keeps_ticks_until_amounts_change(&make).await;
     recompute_sees_recipes_and_overrides(&make).await;
     concurrent_recomputes_each_see_every_recipe(&make).await;
+    non_finite_amounts_are_not_stored(&make).await;
+    reordered_amounts_are_the_same_amounts(&make).await;
+    patching_an_item_is_one_unit(&make).await;
     manual_items(&make).await;
     clearing_items(&make).await;
     sections_are_remembered(&make).await;
@@ -68,6 +71,43 @@ async fn one(c: &Ctx, list: &GroceryList, key: &str) -> GroceryItem {
 
 async fn keys(c: &Ctx, list: &GroceryList) -> Vec<String> {
     visible(c, list).await.into_iter().map(|i| i.key).collect()
+}
+
+async fn tick(c: &Ctx, id: Uuid, on: bool) {
+    c.s.grocery
+        .update_item(id, Some(on), None, None)
+        .await
+        .unwrap();
+}
+
+/// An item with this key to patch: the visible one, else a manual one made for the purpose.
+async fn item_for(c: &Ctx, list: &GroceryList, key: &str) -> Uuid {
+    if let Some(i) = visible(c, list).await.into_iter().find(|i| i.key == key) {
+        return i.id;
+    }
+    let new = NewGroceryItem {
+        key: key.into(),
+        name: key.into(),
+        amounts: vec![],
+        section: Section::Other,
+    };
+    c.s.grocery.add_manual(list.id, new).await.unwrap().id
+}
+
+async fn file_under(c: &Ctx, list: &GroceryList, key: &str, section: Section) {
+    let id = item_for(c, list, key).await;
+    c.s.grocery
+        .update_item(id, None, Some(section), None)
+        .await
+        .unwrap();
+}
+
+async fn mark_staple(c: &Ctx, list: &GroceryList, key: &str, staple: bool) {
+    let id = item_for(c, list, key).await;
+    c.s.grocery
+        .update_item(id, None, None, Some(staple))
+        .await
+        .unwrap();
 }
 
 async fn updated_at(c: &Ctx) -> domain::chrono::DateTime<domain::chrono::Utc> {
@@ -300,8 +340,8 @@ async fn recompute_keeps_ticks_until_amounts_change<F: Fn(Arc<dyn Clock>) -> Sta
     set_generated(&c, &list, vec![eggs(2.0), flour(1.0)]).await;
     let egg = one(&c, &list, "egg").await;
     let flour_id = one(&c, &list, "flour").await.id;
-    c.s.grocery.set_checked(egg.id, true).await.unwrap();
-    c.s.grocery.set_checked(flour_id, true).await.unwrap();
+    tick(&c, egg.id, true).await;
+    tick(&c, flour_id, true).await;
 
     // Same amounts: ticks stay, even when the name, section or recipes change.
     let mut moved = eggs(2.0);
@@ -341,13 +381,13 @@ async fn recompute_keeps_ticks_until_amounts_change<F: Fn(Arc<dyn Clock>) -> Sta
     };
     set_generated(&c, &list, vec![eggs(3.0), flour(2.0), third()]).await;
     let rice = one(&c, &list, "rice").await.id;
-    c.s.grocery.set_checked(rice, true).await.unwrap();
+    tick(&c, rice, true).await;
     set_generated(&c, &list, vec![eggs(3.0), flour(2.0), third()]).await;
     assert!(one(&c, &list, "rice").await.checked);
     set_generated(&c, &list, vec![eggs(3.0), flour(2.0)]).await;
 
     // A different unit is a change too; so is going from an amount to none.
-    c.s.grocery.set_checked(flour_id, true).await.unwrap();
+    tick(&c, flour_id, true).await;
     set_generated(
         &c,
         &list,
@@ -365,10 +405,7 @@ async fn recompute_sees_recipes_and_overrides<F: Fn(Arc<dyn Clock>) -> Stack>(ma
     let list = c.s.grocery.get_or_create_list().await.unwrap();
     let id = c.add("Pie", &["2 apples"], None, &[]).await;
     c.s.grocery.add_recipe(list.id, id, 1.5).await.unwrap();
-    c.s.grocery
-        .set_section(list.id, "apple", Section::Fridge)
-        .await
-        .unwrap();
+    file_under(&c, &list, "apple", Section::Fridge).await;
     type Seen = Option<(Vec<ListedRecipe>, HashMap<String, Section>)>;
     let seen: Arc<Mutex<Seen>> = Arc::default();
     let sink = seen.clone();
@@ -428,6 +465,151 @@ async fn concurrent_recomputes_each_see_every_recipe<F: Fn(Arc<dyn Clock>) -> St
     assert_eq!(keys(&c, &list).await, ["apple", "pear"]);
 }
 
+/// An amount that is NaN or infinite would not read back (JSON has no such number): storage drops it, so the list
+/// stays readable.
+async fn non_finite_amounts_are_not_stored<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let list = c.s.grocery.get_or_create_list().await.unwrap();
+    let bad = || {
+        vec![
+            amount(f64::INFINITY, Some("cup")),
+            amount(f64::NAN, None),
+            Amount {
+                min: 1.0,
+                max: Some(f64::INFINITY),
+                unit: None,
+            },
+            amount(2.0, Some("g")),
+        ]
+    };
+    set_generated(
+        &c,
+        &list,
+        vec![
+            computed("rice", bad(), Section::Pantry),
+            computed("oats", vec![amount(f64::NAN, None)], Section::Pantry),
+        ],
+    )
+    .await;
+    assert_eq!(
+        one(&c, &list, "rice").await.amounts,
+        [amount(2.0, Some("g"))]
+    );
+    assert!(one(&c, &list, "oats").await.amounts.is_empty());
+
+    let new = NewGroceryItem {
+        key: "milk".into(),
+        name: "milk".into(),
+        amounts: bad(),
+        section: Section::Fridge,
+    };
+    let milk = c.s.grocery.add_manual(list.id, new).await.unwrap();
+    assert_eq!(milk.amounts, [amount(2.0, Some("g"))]);
+    assert_eq!(one(&c, &list, "milk").await.amounts, milk.amounts);
+
+    // The same result again is no change.
+    let stamp = updated_at(&c).await;
+    c.clock.advance(Duration::seconds(1));
+    set_generated(
+        &c,
+        &list,
+        vec![
+            computed("rice", bad(), Section::Pantry),
+            computed("oats", vec![amount(f64::NAN, None)], Section::Pantry),
+        ],
+    )
+    .await;
+    assert_eq!(updated_at(&c).await, stamp);
+}
+
+/// `build_items` lists amounts in the order the recipes were added; the same totals in another order are the same.
+async fn reordered_amounts_are_the_same_amounts<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let list = c.s.grocery.get_or_create_list().await.unwrap();
+    let milk = |amounts| computed("milk", amounts, Section::Fridge);
+    let (cup, tbsp) = (amount(1.0, Some("cup")), amount(3.0, Some("tbsp")));
+    set_generated(&c, &list, vec![milk(vec![cup.clone(), tbsp.clone()])]).await;
+    let id = one(&c, &list, "milk").await.id;
+    tick(&c, id, true).await;
+
+    let stamp = updated_at(&c).await;
+    c.clock.advance(Duration::seconds(1));
+    set_generated(&c, &list, vec![milk(vec![tbsp.clone(), cup.clone()])]).await;
+    assert!(
+        one(&c, &list, "milk").await.checked,
+        "same totals, still ticked"
+    );
+    assert_eq!(updated_at(&c).await, stamp, "and nothing was written");
+
+    set_generated(&c, &list, vec![milk(vec![tbsp, amount(2.0, Some("cup"))])]).await;
+    assert!(
+        !one(&c, &list, "milk").await.checked,
+        "a different total is more"
+    );
+}
+
+async fn patching_an_item_is_one_unit<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let list = c.s.grocery.get_or_create_list().await.unwrap();
+    set_generated(
+        &c,
+        &list,
+        vec![
+            computed("rice", vec![amount(1.0, Some("cup"))], Section::Pantry),
+            computed("kale", vec![], Section::Produce),
+        ],
+    )
+    .await;
+    let rice = one(&c, &list, "rice").await.id;
+
+    c.clock.advance(Duration::seconds(1));
+    let after =
+        c.s.grocery
+            .update_item(rice, Some(true), Some(Section::Fridge), Some(true))
+            .await
+            .unwrap();
+    assert_eq!(
+        (after.id, after.checked, after.section),
+        (rice, true, Section::Fridge)
+    );
+    assert_eq!(after, one(&c, &list, "rice").await);
+    assert_eq!(
+        c.s.grocery.overrides().await.unwrap(),
+        HashMap::from([("rice".to_string(), Section::Fridge)])
+    );
+    assert!(c.s.grocery.staples().await.unwrap().contains("rice"));
+    assert_eq!(updated_at(&c).await, c.clock.now());
+    assert_eq!(one(&c, &list, "kale").await.section, Section::Produce);
+
+    // Only what is sent changes.
+    let after =
+        c.s.grocery
+            .update_item(rice, Some(false), None, Some(false))
+            .await
+            .unwrap();
+    assert_eq!((after.checked, after.section), (false, Section::Fridge));
+    assert!(!c.s.grocery.staples().await.unwrap().contains("rice"));
+
+    // A cleared or unknown item changes nothing, not even the household's choices.
+    tick(&c, rice, true).await;
+    c.s.grocery.clear_checked(list.id).await.unwrap();
+    let stamp = updated_at(&c).await;
+    c.clock.advance(Duration::seconds(1));
+    for id in [rice, Uuid::new_v4()] {
+        let r =
+            c.s.grocery
+                .update_item(id, Some(true), Some(Section::Freezer), Some(true))
+                .await;
+        assert!(matches!(r, Err(DomainError::NotFound(_))), "{r:?}");
+    }
+    assert_eq!(
+        c.s.grocery.overrides().await.unwrap(),
+        HashMap::from([("rice".to_string(), Section::Fridge)])
+    );
+    assert!(!c.s.grocery.staples().await.unwrap().contains("rice"));
+    assert_eq!(updated_at(&c).await, stamp);
+}
+
 async fn manual_items<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
     let c = Ctx::new(make).await;
     let list = c.s.grocery.get_or_create_list().await.unwrap();
@@ -467,7 +649,7 @@ async fn manual_items<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
     assert_eq!(visible(&c, &list).await.len(), 3);
 
     c.clock.advance(Duration::seconds(1));
-    c.s.grocery.set_checked(potatoes.id, true).await.unwrap();
+    tick(&c, potatoes.id, true).await;
     assert_eq!(updated_at(&c).await, c.clock.now());
     assert!(
         c.s.grocery
@@ -477,7 +659,7 @@ async fn manual_items<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
             .unwrap()
             .checked
     );
-    c.s.grocery.set_checked(potatoes.id, false).await.unwrap();
+    tick(&c, potatoes.id, false).await;
     assert!(
         !c.s.grocery
             .item(potatoes.id)
@@ -486,14 +668,17 @@ async fn manual_items<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
             .unwrap()
             .checked
     );
-    let unknown = c.s.grocery.set_checked(Uuid::new_v4(), true).await;
+    let unknown =
+        c.s.grocery
+            .update_item(Uuid::new_v4(), Some(true), None, None)
+            .await;
     assert!(
         matches!(unknown, Err(DomainError::NotFound(_))),
         "{unknown:?}"
     );
 
     // Recomputing leaves manual items alone, even when nothing is computed.
-    c.s.grocery.set_checked(second.id, true).await.unwrap();
+    tick(&c, second.id, true).await;
     set_generated(&c, &list, vec![]).await;
     let left = visible(&c, &list).await;
     assert_eq!(left.len(), 2);
@@ -540,7 +725,7 @@ async fn clearing_items<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
         None,
         "a cleared item is invisible"
     );
-    let ticked = c.s.grocery.set_checked(g1, true).await;
+    let ticked = c.s.grocery.update_item(g1, Some(true), None, None).await;
     assert!(
         matches!(ticked, Err(DomainError::NotFound(_))),
         "{ticked:?}"
@@ -554,7 +739,7 @@ async fn clearing_items<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
 
     // Every ticked item at once.
     for id in [m2, g2] {
-        c.s.grocery.set_checked(id, true).await.unwrap();
+        tick(&c, id, true).await;
     }
     c.clock.advance(Duration::seconds(1));
     c.s.grocery.clear_checked(list.id).await.unwrap();
@@ -600,10 +785,7 @@ async fn sections_are_remembered<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
     .await;
 
     c.clock.advance(Duration::seconds(1));
-    c.s.grocery
-        .set_section(list.id, "tofu", Section::Fridge)
-        .await
-        .unwrap();
+    file_under(&c, &list, "tofu", Section::Fridge).await;
     assert_eq!(updated_at(&c).await, c.clock.now());
     let tofu: Vec<_> = visible(&c, &list)
         .await
@@ -618,14 +800,8 @@ async fn sections_are_remembered<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
         Section::Fridge
     );
 
-    c.s.grocery
-        .set_section(list.id, "tofu", Section::Freezer)
-        .await
-        .unwrap();
-    c.s.grocery
-        .set_section(list.id, "kale", Section::Produce)
-        .await
-        .unwrap();
+    file_under(&c, &list, "tofu", Section::Freezer).await;
+    file_under(&c, &list, "kale", Section::Produce).await;
     assert_eq!(
         c.s.grocery.overrides().await.unwrap(),
         HashMap::from([
@@ -653,11 +829,8 @@ async fn clearing_everything_keeps_the_household_choices<F: Fn(Arc<dyn Clock>) -
         )
         .await
         .unwrap();
-    c.s.grocery
-        .set_section(list.id, "kale", Section::Produce)
-        .await
-        .unwrap();
-    c.s.grocery.set_staple(list.id, "kale", true).await.unwrap();
+    file_under(&c, &list, "kale", Section::Produce).await;
+    mark_staple(&c, &list, "kale", true).await;
     let hidden = one(&c, &list, "kale").await.id;
     c.s.grocery.clear_item(hidden).await.unwrap();
 
@@ -686,23 +859,11 @@ async fn staples<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
     assert_eq!(start, ["black pepper", "pepper", "salt", "water"]);
 
     c.clock.advance(Duration::seconds(1));
-    c.s.grocery
-        .set_staple(list.id, "flour", true)
-        .await
-        .unwrap();
+    mark_staple(&c, &list, "flour", true).await;
     assert_eq!(updated_at(&c).await, c.clock.now());
-    c.s.grocery
-        .set_staple(list.id, "flour", true)
-        .await
-        .unwrap();
-    c.s.grocery
-        .set_staple(list.id, "salt", false)
-        .await
-        .unwrap();
-    c.s.grocery
-        .set_staple(list.id, "never marked", false)
-        .await
-        .unwrap();
+    mark_staple(&c, &list, "flour", true).await;
+    mark_staple(&c, &list, "salt", false).await;
+    mark_staple(&c, &list, "never marked", false).await;
     let mut now: Vec<String> = c.s.grocery.staples().await.unwrap().into_iter().collect();
     now.sort();
     assert_eq!(now, ["black pepper", "flour", "pepper", "water"]);

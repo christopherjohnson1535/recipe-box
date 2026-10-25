@@ -2,6 +2,7 @@
 //! Skips with a message when `TEST_DATABASE_URL` is unset.
 
 use std::{
+    collections::HashMap,
     str::FromStr,
     sync::{Arc, Mutex},
 };
@@ -10,9 +11,12 @@ use adapter_postgres::{
     PgGroceryRepo, PgImageRepo, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth,
     PgTagRepo, PgUserRepo, migrate,
 };
-use domain::uuid::Uuid;
+use domain::{
+    grocery::{GeneratedItem, Section},
+    uuid::Uuid,
+};
 use ports::{
-    Clock,
+    Clock, ListedRecipe,
     contract::{self, Capabilities, Stack},
 };
 use sqlx::{
@@ -156,4 +160,109 @@ async fn storage_answers_its_ping() {
     let Some(db) = Schemas::new() else { return };
     let s = db.stack(Arc::new(contract::ManualClock::default()));
     contract::storage_health(&*s.health).await;
+}
+
+/// One generated item per recipe, keyed by its first ingredient line.
+fn from_recipes(recipes: &[ListedRecipe], _: &HashMap<String, Section>) -> Vec<GeneratedItem> {
+    recipes
+        .iter()
+        .map(|r| GeneratedItem {
+            key: r.ingredients[0].text.clone(),
+            name: r.ingredients[0].text.clone(),
+            amounts: vec![],
+            section: Section::Other,
+            recipe_ids: vec![r.recipe_id],
+        })
+        .collect()
+}
+
+/// The list lock, forced: A's recompute has read its recipes and is about to write when B adds a recipe and
+/// recomputes. With the lock B waits for A, so B's recompute sees both recipes; without it B finishes inside A's
+/// window and A then overwrites B's items with a set that lacks them. A waits for B only briefly (a bounded wait
+/// that B never meets while the lock holds), so this is also the case that proves the lock by failing without it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn overlapping_recomputes_cannot_overwrite_each_other() {
+    use std::{sync::mpsc, time::Duration};
+
+    use domain::{Ingredient, NewUser, ROLE_ADMIN, RecipeInput};
+
+    let Some(db) = Schemas::new() else { return };
+    let s = db.stack(Arc::new(contract::ManualClock::default()));
+    let user = s
+        .users
+        .create(NewUser {
+            username: "tester".into(),
+            display_name: "Tester".into(),
+            password_hash: "hash".into(),
+            role: ROLE_ADMIN.into(),
+        })
+        .await
+        .unwrap()
+        .id;
+    let recipe = |title: &str, line: &str| RecipeInput {
+        title: title.into(),
+        ingredients: vec![Ingredient {
+            text: line.into(),
+            section: None,
+        }],
+        ..Default::default()
+    };
+    let apple = s
+        .recipes
+        .create(user, recipe("A", "apple"))
+        .await
+        .unwrap()
+        .id;
+    let pear = s
+        .recipes
+        .create(user, recipe("B", "pear"))
+        .await
+        .unwrap()
+        .id;
+    let list = s.grocery.get_or_create_list().await.unwrap();
+
+    let (inside_tx, inside_rx) = tokio::sync::oneshot::channel();
+    let (done_tx, done_rx) = mpsc::channel::<()>();
+    let (inside_tx, done_rx) = (
+        std::sync::Mutex::new(Some(inside_tx)),
+        std::sync::Mutex::new(done_rx),
+    );
+    let b = {
+        let (grocery, list_id) = (s.grocery.clone(), list.id);
+        tokio::spawn(async move {
+            inside_rx.await.unwrap();
+            grocery.add_recipe(list_id, pear, 1.0).await.unwrap();
+            grocery.recompute(list_id, &from_recipes).await.unwrap();
+            let _ = done_tx.send(());
+        })
+    };
+
+    s.grocery.add_recipe(list.id, apple, 1.0).await.unwrap();
+    s.grocery
+        .recompute(list.id, &move |recipes, overrides| {
+            let items = from_recipes(recipes, overrides);
+            if let Some(tx) = inside_tx.lock().unwrap().take() {
+                let _ = tx.send(());
+                // Hold the computed set while B tries to get its recipe in.
+                let _ = done_rx
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_millis(750));
+            }
+            items
+        })
+        .await
+        .unwrap();
+    b.await.unwrap();
+
+    let mut keys: Vec<String> = s
+        .grocery
+        .items(list.id)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|i| i.key)
+        .collect();
+    keys.sort();
+    assert_eq!(keys, ["apple", "pear"]);
 }

@@ -13,7 +13,12 @@ use domain::{
     uuid::Uuid,
 };
 use ports::{Clock, Compute, GroceryItem, GroceryList, GroceryRepo, ListedRecipe, NewGroceryItem};
-use sqlx::{Executor, PgPool, Postgres, error::ErrorKind, types::Json};
+use serde::Deserialize;
+use sqlx::{
+    Executor, PgConnection, PgPool, Postgres,
+    error::ErrorKind,
+    types::{Json, JsonValue},
+};
 
 use crate::{
     error::{db, violation},
@@ -38,11 +43,24 @@ struct ItemRow {
     id: Uuid,
     key: String,
     name: String,
-    amounts: Json<Vec<Amount>>,
+    amounts: JsonValue,
     section: String,
     checked: bool,
     manual: bool,
     recipe_ids: Vec<Uuid>,
+}
+
+/// The stored amounts, minus any that cannot be read (a `null` quantity, a wrong shape) or are not finite: such an
+/// amount reads as no amount, so one bad row cannot fail the whole list.
+fn read_amounts(stored: JsonValue) -> Vec<Amount> {
+    let JsonValue::Array(all) = stored else {
+        return Vec::new();
+    };
+    GroceryItem::finite_amounts(
+        all.into_iter()
+            .filter_map(|a| Amount::deserialize(a).ok())
+            .collect(),
+    )
 }
 
 impl TryFrom<ItemRow> for GroceryItem {
@@ -53,7 +71,7 @@ impl TryFrom<ItemRow> for GroceryItem {
             id: r.id,
             key: r.key,
             name: r.name,
-            amounts: r.amounts.0,
+            amounts: read_amounts(r.amounts),
             section: Section::parse(&r.section)
                 .ok_or_else(|| DomainError::Internal(format!("unknown section {:?}", r.section)))?,
             checked: r.checked,
@@ -81,20 +99,29 @@ fn no_item() -> DomainError {
     DomainError::NotFound("No such item.".into())
 }
 
-/// Amounts go through `jsonb` and back, which may move the last digit of a float. They are the same when they
-/// agree to far more digits than anyone shops with.
-fn same_amounts(a: &[Amount], b: &[Amount]) -> bool {
-    let close = |x: f64, y: f64| (x - y).abs() <= 1e-9 * x.abs().max(y.abs());
-    a.len() == b.len()
-        && a.iter().zip(b).all(|(x, y)| {
-            x.unit == y.unit
-                && close(x.min, y.min)
-                && match (x.max, y.max) {
-                    (None, None) => true,
-                    (Some(p), Some(q)) => close(p, q),
-                    _ => false,
-                }
-        })
+/// Takes the list's row lock. Every method that changes the list calls this first, so writers queue on the list
+/// and never wait on each other's item rows.
+async fn lock_list(tx: &mut PgConnection, list_id: Uuid) -> DomainResult<()> {
+    let locked: Option<Uuid> =
+        sqlx::query_scalar("select id from grocery_list where id = $1 for update")
+            .bind(list_id)
+            .fetch_optional(tx)
+            .await
+            .map_err(db)?;
+    locked.map(|_| ()).ok_or_else(no_list)
+}
+
+/// The list an item is on, locked. `NotFound` when there is no such item.
+async fn lock_list_of(tx: &mut PgConnection, item_id: Uuid) -> DomainResult<Uuid> {
+    let list_id: Option<Uuid> =
+        sqlx::query_scalar("select list_id from grocery_item where id = $1")
+            .bind(item_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db)?;
+    let list_id = list_id.ok_or_else(no_item)?;
+    lock_list(tx, list_id).await?;
+    Ok(list_id)
 }
 
 async fn touch(
@@ -203,8 +230,10 @@ impl GroceryRepo for PgGroceryRepo {
     }
 
     async fn add_recipe(&self, list_id: Uuid, recipe_id: Uuid, scale: f64) -> DomainResult<()> {
-        let now = self.clock.now();
         let mut tx = self.pool.begin().await.map_err(db)?;
+        lock_list(&mut tx, list_id).await?;
+        // Stamped once the lock is ours, so `added_at` order is the order the recipes were put on the list.
+        let now = self.clock.now();
         let done = sqlx::query(
             "insert into grocery_list_recipe (list_id, recipe_id, scale, added_at)
              select $1, id, $3, $4 from recipes where id = $2 and deleted_at is null
@@ -217,7 +246,7 @@ impl GroceryRepo for PgGroceryRepo {
         .execute(&mut *tx)
         .await
         .map_err(|e| match violation(&e) {
-            // An unknown list, or a recipe purged between the check and the insert.
+            // A recipe purged between the check and the insert.
             Some(ErrorKind::ForeignKeyViolation) => {
                 DomainError::NotFound("Recipe not found.".into())
             }
@@ -231,8 +260,8 @@ impl GroceryRepo for PgGroceryRepo {
     }
 
     async fn remove_recipe(&self, list_id: Uuid, recipe_id: Uuid) -> DomainResult<()> {
-        let now = self.clock.now();
         let mut tx = self.pool.begin().await.map_err(db)?;
+        lock_list(&mut tx, list_id).await?;
         let done =
             sqlx::query("delete from grocery_list_recipe where list_id = $1 and recipe_id = $2")
                 .bind(list_id)
@@ -245,21 +274,15 @@ impl GroceryRepo for PgGroceryRepo {
                 "That recipe is not on the list.".into(),
             ));
         }
-        touch(&mut *tx, list_id, now).await?;
+        touch(&mut *tx, list_id, self.clock.now()).await?;
         tx.commit().await.map_err(db)
     }
 
-    // The row lock serialises concurrent recomputes: the second waits, then reads the recipes the first saw too.
+    // The list lock serialises concurrent recomputes: the second waits, then reads the recipes the first saw too.
     async fn recompute(&self, list_id: Uuid, compute: &Compute) -> DomainResult<()> {
-        let now = self.clock.now();
         let mut tx = self.pool.begin().await.map_err(db)?;
-        let locked: Option<Uuid> =
-            sqlx::query_scalar("select id from grocery_list where id = $1 for update")
-                .bind(list_id)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(db)?;
-        locked.ok_or_else(no_list)?;
+        lock_list(&mut tx, list_id).await?;
+        let now = self.clock.now();
         let recipes = listed_recipes(&mut *tx, list_id).await?;
         let overrides = section_overrides(&mut *tx).await?;
         let computed = compute(&recipes, &overrides);
@@ -271,12 +294,15 @@ impl GroceryRepo for PgGroceryRepo {
             .fetch_all(&mut *tx)
             .await
             .map_err(db)?;
-        let mut stored: HashMap<String, ItemRow> =
-            stored.into_iter().map(|r| (r.key.clone(), r)).collect();
+        let mut stored: HashMap<String, GroceryItem> = stored
+            .into_iter()
+            .map(|r| GroceryItem::try_from(r).map(|i| (i.key.clone(), i)))
+            .collect::<DomainResult<_>>()?;
 
         let mut changed = false;
         for c in &computed {
             let section = c.section.as_str();
+            let amounts = GroceryItem::finite_amounts(c.amounts.clone());
             match stored.remove(&c.key) {
                 None => {
                     sqlx::query(
@@ -287,7 +313,7 @@ impl GroceryRepo for PgGroceryRepo {
                     .bind(list_id)
                     .bind(&c.key)
                     .bind(&c.name)
-                    .bind(Json(&c.amounts))
+                    .bind(Json(&amounts))
                     .bind(section)
                     .bind(&c.recipe_ids)
                     .execute(&mut *tx)
@@ -296,10 +322,10 @@ impl GroceryRepo for PgGroceryRepo {
                     changed = true;
                 }
                 Some(old) => {
-                    let more = !same_amounts(&old.amounts.0, &c.amounts);
+                    let more = !GroceryItem::same_amounts(&old.amounts, &amounts);
                     if !(more
                         || old.name != c.name
-                        || old.section != section
+                        || old.section != c.section
                         || old.recipe_ids != c.recipe_ids)
                     {
                         continue;
@@ -312,7 +338,7 @@ impl GroceryRepo for PgGroceryRepo {
                     )
                     .bind(old.id)
                     .bind(&c.name)
-                    .bind(Json(&c.amounts))
+                    .bind(Json(&amounts))
                     .bind(section)
                     .bind(&c.recipe_ids)
                     .bind(more)
@@ -340,8 +366,8 @@ impl GroceryRepo for PgGroceryRepo {
     }
 
     async fn add_manual(&self, list_id: Uuid, item: NewGroceryItem) -> DomainResult<GroceryItem> {
-        let now = self.clock.now();
         let mut tx = self.pool.begin().await.map_err(db)?;
+        lock_list(&mut tx, list_id).await?;
         let sql = format!(
             "insert into grocery_item (id, list_id, key, name, amounts, section, manual)
              values ($1, $2, $3, $4, $5, $6, true) returning {ITEM_COLUMNS}"
@@ -351,105 +377,136 @@ impl GroceryRepo for PgGroceryRepo {
             .bind(list_id)
             .bind(&item.key)
             .bind(&item.name)
-            .bind(Json(&item.amounts))
+            .bind(Json(GroceryItem::finite_amounts(item.amounts)))
             .bind(item.section.as_str())
             .fetch_one(&mut *tx)
             .await
-            .map_err(|e| match violation(&e) {
-                Some(ErrorKind::ForeignKeyViolation) => no_list(),
-                _ => db(e),
-            })?;
-        touch(&mut *tx, list_id, now).await?;
+            .map_err(db)?;
+        touch(&mut *tx, list_id, self.clock.now()).await?;
         tx.commit().await.map_err(db)?;
         row.try_into()
     }
 
-    async fn set_checked(&self, id: Uuid, checked: bool) -> DomainResult<()> {
-        let done = sqlx::query(
-            "with u as (update grocery_item set checked = $2 where id = $1 and not cleared returning list_id)
-             update grocery_list set updated_at = $3 where id in (select list_id from u)",
-        )
-        .bind(id)
-        .bind(checked)
-        .bind(self.clock.now())
-        .execute(&self.pool)
-        .await
-        .map_err(db)?;
-        if done.rows_affected() == 0 {
-            return Err(no_item());
-        }
-        Ok(())
-    }
-
-    async fn set_section(&self, list_id: Uuid, key: &str, section: Section) -> DomainResult<()> {
-        let now = self.clock.now();
+    async fn update_item(
+        &self,
+        id: Uuid,
+        checked: Option<bool>,
+        section: Option<Section>,
+        staple: Option<bool>,
+    ) -> DomainResult<GroceryItem> {
         let mut tx = self.pool.begin().await.map_err(db)?;
-        sqlx::query(
-            "insert into grocery_section_override (key, section) values ($1, $2)
-             on conflict (key) do update set section = excluded.section",
-        )
-        .bind(key)
-        .bind(section.as_str())
-        .execute(&mut *tx)
-        .await
-        .map_err(db)?;
-        sqlx::query("update grocery_item set section = $3 where list_id = $1 and key = $2")
-            .bind(list_id)
-            .bind(key)
+        let list_id = lock_list_of(&mut tx, id).await?;
+        let sql = format!("select {ITEM_COLUMNS} from grocery_item where id = $1 and not cleared");
+        let key = sqlx::query_as::<_, ItemRow>(sqlx::AssertSqlSafe(sql))
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db)?
+            .ok_or_else(no_item)?
+            .key;
+        if let Some(checked) = checked {
+            sqlx::query("update grocery_item set checked = $2 where id = $1")
+                .bind(id)
+                .bind(checked)
+                .execute(&mut *tx)
+                .await
+                .map_err(db)?;
+        }
+        if let Some(section) = section {
+            sqlx::query(
+                "insert into grocery_section_override (key, section) values ($1, $2)
+                 on conflict (key) do update set section = excluded.section",
+            )
+            .bind(&key)
             .bind(section.as_str())
             .execute(&mut *tx)
             .await
             .map_err(db)?;
-        touch(&mut *tx, list_id, now).await?;
-        tx.commit().await.map_err(db)
+            sqlx::query("update grocery_item set section = $3 where list_id = $1 and key = $2")
+                .bind(list_id)
+                .bind(&key)
+                .bind(section.as_str())
+                .execute(&mut *tx)
+                .await
+                .map_err(db)?;
+        }
+        if let Some(staple) = staple {
+            let sql = if staple {
+                "insert into grocery_staple (key) values ($1) on conflict do nothing"
+            } else {
+                "delete from grocery_staple where key = $1"
+            };
+            sqlx::query(sql)
+                .bind(&key)
+                .execute(&mut *tx)
+                .await
+                .map_err(db)?;
+        }
+        touch(&mut *tx, list_id, self.clock.now()).await?;
+        let sql = format!("select {ITEM_COLUMNS} from grocery_item where id = $1");
+        let row = sqlx::query_as::<_, ItemRow>(sqlx::AssertSqlSafe(sql))
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(db)?;
+        tx.commit().await.map_err(db)?;
+        row.try_into()
     }
 
     async fn clear_item(&self, id: Uuid) -> DomainResult<()> {
-        let done = sqlx::query(
-            "with d as (delete from grocery_item where id = $1 and manual returning list_id),
+        let mut tx = self.pool.begin().await.map_err(db)?;
+        let list_id = lock_list_of(&mut tx, id).await?;
+        let changed: i64 = sqlx::query_scalar(
+            "with d as (delete from grocery_item where id = $1 and manual returning id),
                   c as (update grocery_item set cleared = true where id = $1 and not manual and not cleared
-                        returning list_id)
-             update grocery_list set updated_at = $2
-             where id in (select list_id from d union all select list_id from c)",
+                        returning id)
+             select (select count(*) from d) + (select count(*) from c)",
         )
         .bind(id)
-        .bind(self.clock.now())
-        .execute(&self.pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(db)?;
-        if done.rows_affected() == 0 {
+        if changed == 0 {
             return Err(no_item());
         }
-        Ok(())
+        touch(&mut *tx, list_id, self.clock.now()).await?;
+        tx.commit().await.map_err(db)
     }
 
     async fn clear_checked(&self, list_id: Uuid) -> DomainResult<()> {
+        let mut tx = self.pool.begin().await.map_err(db)?;
+        lock_list(&mut tx, list_id).await?;
+        sqlx::query("delete from grocery_item where list_id = $1 and manual and checked")
+            .bind(list_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(db)?;
         sqlx::query(
-            "with d as (delete from grocery_item where list_id = $1 and manual and checked),
-                  c as (update grocery_item set cleared = true
-                        where list_id = $1 and not manual and checked and not cleared)
-             update grocery_list set updated_at = $2 where id = $1",
+            "update grocery_item set cleared = true where list_id = $1 and not manual and checked and not cleared",
         )
         .bind(list_id)
-        .bind(self.clock.now())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(db)?;
-        Ok(())
+        touch(&mut *tx, list_id, self.clock.now()).await?;
+        tx.commit().await.map_err(db)
     }
 
     async fn clear_all(&self, list_id: Uuid) -> DomainResult<()> {
-        sqlx::query(
-            "with r as (delete from grocery_list_recipe where list_id = $1),
-                  i as (delete from grocery_item where list_id = $1)
-             update grocery_list set updated_at = $2 where id = $1",
-        )
-        .bind(list_id)
-        .bind(self.clock.now())
-        .execute(&self.pool)
-        .await
-        .map_err(db)?;
-        Ok(())
+        let mut tx = self.pool.begin().await.map_err(db)?;
+        lock_list(&mut tx, list_id).await?;
+        sqlx::query("delete from grocery_list_recipe where list_id = $1")
+            .bind(list_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(db)?;
+        sqlx::query("delete from grocery_item where list_id = $1")
+            .bind(list_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(db)?;
+        touch(&mut *tx, list_id, self.clock.now()).await?;
+        tx.commit().await.map_err(db)
     }
 
     async fn overrides(&self) -> DomainResult<HashMap<String, Section>> {
@@ -462,21 +519,5 @@ impl GroceryRepo for PgGroceryRepo {
             .await
             .map_err(db)?;
         Ok(keys.into_iter().collect())
-    }
-
-    async fn set_staple(&self, list_id: Uuid, key: &str, staple: bool) -> DomainResult<()> {
-        let sql = if staple {
-            "insert into grocery_staple (key) values ($1) on conflict do nothing"
-        } else {
-            "delete from grocery_staple where key = $1"
-        };
-        let mut tx = self.pool.begin().await.map_err(db)?;
-        sqlx::query(sql)
-            .bind(key)
-            .execute(&mut *tx)
-            .await
-            .map_err(db)?;
-        touch(&mut *tx, list_id, self.clock.now()).await?;
-        tx.commit().await.map_err(db)
     }
 }
