@@ -4,13 +4,13 @@ use adapter_fs_media::FsMediaStore;
 use adapter_html::HtmlPageReader;
 use adapter_http_fetch::HttpPageFetcher;
 use adapter_postgres::{
-    PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo,
-    PgUserRepo,
+    PgGroceryRepo, PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo, PgSettingsRepo,
+    PgStorageHealth, PgTagRepo, PgUserRepo,
 };
 use app::{Deps, Services};
 use ports::{
-    ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo, SessionRepo, SettingsRepo,
-    SpawnedTask, StorageHealth, TagRepo, TaskSpawner, UserRepo,
+    GroceryRepo, ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo, SessionRepo,
+    SettingsRepo, SpawnedTask, StorageHealth, TagRepo, TaskSpawner, UserRepo,
 };
 
 use crate::{
@@ -42,6 +42,7 @@ pub struct AppState {
     pub sessions: Arc<dyn SessionRepo>,
     pub settings: Arc<dyn SettingsRepo>,
     pub tags: Arc<dyn TagRepo>,
+    pub grocery: Arc<dyn GroceryRepo>,
     pub media: Arc<dyn MediaStore>,
     pub health: Arc<dyn StorageHealth>,
     pub config: Arc<Config>,
@@ -69,6 +70,7 @@ impl AppState {
             sessions: self.sessions.clone(),
             settings: self.settings.clone(),
             tags: self.tags.clone(),
+            grocery: self.grocery.clone(),
             health: self.health.clone(),
             media: self.media.clone(),
             backup: Arc::new(crate::backup::ZipBackup),
@@ -108,8 +110,9 @@ impl AppState {
             images: Arc::new(PgImageRepo::new(pool.clone(), port_clock.clone())),
             users: Arc::new(PgUserRepo::new(pool.clone(), port_clock.clone())),
             sessions: Arc::new(PgSessionRepo::new(pool.clone(), port_clock.clone())),
-            settings: Arc::new(PgSettingsRepo::new(pool.clone(), port_clock)),
+            settings: Arc::new(PgSettingsRepo::new(pool.clone(), port_clock.clone())),
             tags: Arc::new(PgTagRepo::new(pool.clone())),
+            grocery: Arc::new(PgGroceryRepo::new(pool.clone(), port_clock)),
             media: Arc::new(FsMediaStore::new(config.media_dir.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
             config: Arc::new(config),

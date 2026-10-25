@@ -12,7 +12,7 @@ use utoipa::{
     },
 };
 
-use super::{auth, export, health, imports, media, recipes, settings, setup, tags, users};
+use super::{auth, export, grocery, health, imports, media, recipes, settings, setup, tags, users};
 use crate::extract::COOKIE_NAME;
 
 #[derive(OpenApi)]
@@ -26,6 +26,7 @@ use crate::extract::COOKIE_NAME;
     tags(
         (name = "auth", description = "Sign in, sign out and the current user."),
         (name = "export", description = "Download or restore the whole recipe box as a ZIP."),
+        (name = "grocery", description = "The household grocery list: recipes, items, sections and staples."),
         (name = "health", description = "Liveness and database check."),
         (name = "import", description = "Turn links, text and photos into recipe drafts; nothing is saved."),
         (name = "media", description = "Upload and serve recipe images."),
@@ -50,6 +51,14 @@ use crate::extract::COOKIE_NAME;
         recipes::restore,
         settings::get,
         settings::update,
+        grocery::get,
+        grocery::clear,
+        grocery::add_recipe,
+        grocery::remove_recipe,
+        grocery::add_item,
+        grocery::update_item,
+        grocery::remove_item,
+        grocery::clear_checked,
         tags::list,
         media::upload,
         media::serve,
