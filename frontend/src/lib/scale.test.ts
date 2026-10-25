@@ -98,6 +98,35 @@ describe("scaleIngredient", () => {
     expect(splitIngredient("1,000 g flour")).toEqual({ quantity: "1,000 g", rest: "flour" });
   });
 
+  it("reads a space before a unicode fraction as one number", () => {
+    expect(splitIngredient("1 ½ cups flour")).toEqual({ quantity: "1 ½ cups", rest: "flour" });
+    expect(splitIngredient("2 ¼ tsp salt")).toEqual({ quantity: "2 ¼ tsp", rest: "salt" });
+    expect(scaleIngredient("1 ½ cups flour", 2)).toBe("3 cups flour");
+    expect(scaleIngredient("1 ½ cups flour", 0.5)).toBe("¾ cup flour");
+    expect(scaleIngredient("3 ¾ cups flour", 2)).toBe("7½ cups flour");
+    expect(scaleQuantity("1 ½ cups", 1)).toBe("1½ cups");
+    expect(parseNumber("1 ½")).toBe(1.5);
+    // "1 ½-inch piece" is a size, not a quantity of one.
+    expect(scaleIngredient("1 ½-inch piece ginger", 2)).toBe("1 ½-inch piece ginger");
+  });
+
+  it.each(["1/0 cup flour", "0/0 g sugar", `${"9".repeat(400)} g flour`, "99999999999999999999 g flour", "0 cups water", "0/5 cup sugar", "2 x 400g tins tomatoes", "2 × 400 g tins tomatoes"])(
+    "leaves %s as written (no usable amount)",
+    (text) => {
+      expect(splitIngredient(text)).toEqual({ quantity: null, rest: text });
+      expect(scaleIngredient(text, 2)).toBe(text);
+    },
+  );
+
+  it("reads the larger unit spellings", () => {
+    expect(scaleIngredient("1 gallon milk", 2)).toBe("2 gallons milk");
+    expect(scaleIngredient("2 tbsps butter", 2)).toBe("4 tbsps butter");
+    expect(scaleIngredient("1 jar salsa", 3)).toBe("3 jars salsa");
+    expect(splitIngredient("500 milliliters milk")).toEqual({ quantity: "500 milliliters", rest: "milk" });
+    expect(splitIngredient("1 (8 oz) pkg cream cheese")).toEqual({ quantity: "1", rest: "(8 oz) pkg cream cheese" });
+    expect(splitIngredient("1,000,000,000 g flour").quantity).toBe("1,000,000,000 g");
+  });
+
   it("sets a servings range with an en dash", () => {
     expect(scaleServings("6-8", 1)).toBe("6–8");
     expect(scaleServings("6-8", 2)).toBe("12–16");
