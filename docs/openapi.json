@@ -256,6 +256,512 @@
         ]
       }
     },
+    "/api/grocery": {
+      "get": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "The list, made empty on first use. A recipe deleted since the last write is already gone from it.",
+        "operationId": "getGroceryList",
+        "responses": {
+          "200": {
+            "description": "The list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Empties the list: recipes and items. The household's section choices and staples are kept.",
+        "operationId": "clearGroceryList",
+        "responses": {
+          "204": {
+            "description": "The list is empty."
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/grocery/clear-checked": {
+      "post": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Clears every ticked item the way `DELETE /api/grocery/items/{id}` does.",
+        "operationId": "clearCheckedGroceryItems",
+        "responses": {
+          "200": {
+            "description": "The list now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/grocery/items": {
+      "post": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Adds an item by hand.",
+        "operationId": "addGroceryItem",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddGroceryItem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`text` empty or over 200 characters, or an unknown `section` (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over the size limit (`too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/grocery/items/{id}": {
+      "delete": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Deletes a manual item; clears a generated one, which stays off the list until its amounts change.",
+        "operationId": "removeGroceryItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Item id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The item is off the list."
+          },
+          "400": {
+            "description": "Malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Ticks, moves or marks an item. A new `section` is remembered for the item's name.",
+        "operationId": "updateGroceryItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Item id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroceryItem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The item now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No field given, an unknown `section` or a malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/grocery/recipes": {
+      "post": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Puts a live recipe on the list, or sets the scale of one already there, and rebuilds the items.",
+        "operationId": "addGroceryRecipe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddGroceryRecipe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The list now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing `recipeId` or a `scale` outside 0.25-10 (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such recipe, or deleted (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over the size limit (`too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/grocery/recipes/{recipeId}": {
+      "delete": {
+        "tags": [
+          "grocery"
+        ],
+        "summary": "Takes a recipe off the list and rebuilds the items.",
+        "operationId": "removeGroceryRecipe",
+        "parameters": [
+          {
+            "name": "recipeId",
+            "in": "path",
+            "description": "Recipe id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The recipe is not on the list (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -2078,6 +2584,54 @@
   },
   "components": {
     "schemas": {
+      "AddGroceryItem": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "section": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GrocerySection",
+                "description": "Without it the section is the household's choice for the name, else a built-in guess."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": "string",
+            "description": "Read like an ingredient line (\"2 lb potatoes\"); 1 to 200 characters once trimmed."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AddGroceryRecipe": {
+        "type": "object",
+        "required": [
+          "recipeId"
+        ],
+        "properties": {
+          "recipeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scale": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "0.25 to 10; default 1. Setting it for a recipe already on the list rescales it.",
+            "default": 1.0,
+            "maximum": 10,
+            "minimum": 0.25
+          }
+        },
+        "additionalProperties": false
+      },
       "AiProvider": {
         "type": "string",
         "description": "Mirrors the values `AI_PROVIDER` accepts (checked in `Config::from_env`).",
@@ -2199,6 +2753,160 @@
             "description": "Photo import only: the photos were stored but no draft could be made."
           }
         }
+      },
+      "GroceryAmount": {
+        "type": "object",
+        "description": "One amount of a grocery item: `quantity` as a cook writes it (`1½`, `2–3`), `unit` in its short form.",
+        "required": [
+          "quantity",
+          "unit"
+        ],
+        "properties": {
+          "quantity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "GroceryItem": {
+        "type": "object",
+        "description": "Several amounts mean different units side by side; none means \"no amount\".",
+        "required": [
+          "id",
+          "name",
+          "amounts",
+          "section",
+          "checked",
+          "manual",
+          "staple",
+          "recipeIds"
+        ],
+        "properties": {
+          "amounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroceryAmount"
+            }
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manual": {
+            "type": "boolean",
+            "description": "Added by hand rather than made from a recipe."
+          },
+          "name": {
+            "type": "string"
+          },
+          "recipeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "section": {
+            "$ref": "#/components/schemas/GrocerySection"
+          },
+          "staple": {
+            "type": "boolean",
+            "description": "Always has it at home: shown, but the client hides it unless asked."
+          }
+        }
+      },
+      "GroceryList": {
+        "type": "object",
+        "required": [
+          "id",
+          "updatedAt",
+          "recipes",
+          "items"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroceryItem"
+            },
+            "description": "By section in shopping order, then by name. Cleared items are not returned."
+          },
+          "recipes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroceryRecipe"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Changes on every write: refetch when it differs from what you hold."
+          }
+        }
+      },
+      "GroceryRecipe": {
+        "type": "object",
+        "required": [
+          "recipeId",
+          "title",
+          "scale",
+          "servings",
+          "imageUrl"
+        ],
+        "properties": {
+          "imageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recipeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scale": {
+            "type": "number",
+            "format": "double",
+            "description": "The factor the recipe page uses (½× is 0.5)."
+          },
+          "servings": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The recipe's servings text scaled by `scale` (`\"4-6\"` at 0.5 is `\"2–3\"`)."
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "GrocerySection": {
+        "type": "string",
+        "description": "A store section, in shopping order.",
+        "enum": [
+          "produce",
+          "meat",
+          "fridge",
+          "freezer",
+          "pantry",
+          "other"
+        ]
       },
       "Health": {
         "type": "object",
@@ -3000,6 +3708,36 @@
           }
         }
       },
+      "UpdateGroceryItem": {
+        "type": "object",
+        "description": "At least one field.",
+        "properties": {
+          "checked": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "section": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GrocerySection",
+                "description": "Also remembered for the item's name, so the next list files it there."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "staple": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "UploadForm": {
         "type": "object",
         "description": "Multipart body of `POST /api/media`.",
@@ -3081,6 +3819,10 @@
     {
       "name": "export",
       "description": "Download or restore the whole recipe box as a ZIP."
+    },
+    {
+      "name": "grocery",
+      "description": "The household grocery list: recipes, items, sections and staples."
     },
     {
       "name": "health",

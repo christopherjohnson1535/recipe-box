@@ -76,6 +76,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/grocery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The list, made empty on first use. A recipe deleted since the last write is already gone from it. */
+        get: operations["getGroceryList"];
+        put?: never;
+        post?: never;
+        /** Empties the list: recipes and items. The household's section choices and staples are kept. */
+        delete: operations["clearGroceryList"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grocery/clear-checked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clears every ticked item the way `DELETE /api/grocery/items/{id}` does. */
+        post: operations["clearCheckedGroceryItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grocery/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adds an item by hand. */
+        post: operations["addGroceryItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grocery/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes a manual item; clears a generated one, which stays off the list until its amounts change. */
+        delete: operations["removeGroceryItem"];
+        options?: never;
+        head?: never;
+        /** Ticks, moves or marks an item. A new `section` is remembered for the item's name. */
+        patch: operations["updateGroceryItem"];
+        trace?: never;
+    };
+    "/api/grocery/recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Puts a live recipe on the list, or sets the scale of one already there, and rebuilds the items. */
+        post: operations["addGroceryRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grocery/recipes/{recipeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Takes a recipe off the list and rebuilds the items. */
+        delete: operations["removeGroceryRecipe"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -392,6 +496,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddGroceryItem: {
+            section?: components["schemas"]["GrocerySection"] | null;
+            /** @description Read like an ingredient line ("2 lb potatoes"); 1 to 200 characters once trimmed. */
+            text: string;
+        };
+        AddGroceryRecipe: {
+            /** Format: uuid */
+            recipeId: string;
+            /**
+             * Format: double
+             * @description 0.25 to 10; default 1. Setting it for a recipe already on the list rescales it.
+             * @default 1
+             */
+            scale?: number | null;
+        };
         /**
          * @description Mirrors the values `AI_PROVIDER` accepts (checked in `Config::from_env`).
          * @enum {string}
@@ -436,6 +555,55 @@ export interface components {
             /** @description Photo import only: the photos were stored but no draft could be made. */
             photoImageIds?: string[] | null;
         };
+        /** @description One amount of a grocery item: `quantity` as a cook writes it (`1½`, `2–3`), `unit` in its short form. */
+        GroceryAmount: {
+            quantity: string | null;
+            unit: string | null;
+        };
+        /** @description Several amounts mean different units side by side; none means "no amount". */
+        GroceryItem: {
+            amounts: components["schemas"]["GroceryAmount"][];
+            checked: boolean;
+            /** Format: uuid */
+            id: string;
+            /** @description Added by hand rather than made from a recipe. */
+            manual: boolean;
+            name: string;
+            recipeIds: string[];
+            section: components["schemas"]["GrocerySection"];
+            /** @description Always has it at home: shown, but the client hides it unless asked. */
+            staple: boolean;
+        };
+        GroceryList: {
+            /** Format: uuid */
+            id: string;
+            /** @description By section in shopping order, then by name. Cleared items are not returned. */
+            items: components["schemas"]["GroceryItem"][];
+            recipes: components["schemas"]["GroceryRecipe"][];
+            /**
+             * Format: date-time
+             * @description Changes on every write: refetch when it differs from what you hold.
+             */
+            updatedAt: string;
+        };
+        GroceryRecipe: {
+            imageUrl: string | null;
+            /** Format: uuid */
+            recipeId: string;
+            /**
+             * Format: double
+             * @description The factor the recipe page uses (½× is 0.5).
+             */
+            scale: number;
+            /** @description The recipe's servings text scaled by `scale` (`"4-6"` at 0.5 is `"2–3"`). */
+            servings: string | null;
+            title: string;
+        };
+        /**
+         * @description A store section, in shopping order.
+         * @enum {string}
+         */
+        GrocerySection: "produce" | "meat" | "fridge" | "freezer" | "pantry" | "other";
         Health: {
             db: string;
             status: string;
@@ -713,6 +881,12 @@ export interface components {
             count: number;
             name: string;
         };
+        /** @description At least one field. */
+        UpdateGroceryItem: {
+            checked?: boolean | null;
+            section?: components["schemas"]["GrocerySection"] | null;
+            staple?: boolean | null;
+        };
         /** @description Multipart body of `POST /api/media`. */
         UploadForm: {
             /**
@@ -914,6 +1088,408 @@ export interface operations {
             };
             /** @description Not an admin (`forbidden`). */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getGroceryList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    clearGroceryList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list is empty. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    clearCheckedGroceryItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    addGroceryItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddGroceryItem"];
+            };
+        };
+        responses: {
+            /** @description The new item. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryItem"];
+                };
+            };
+            /** @description `text` empty or over 200 characters, or an unknown `section` (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Body over the size limit (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    removeGroceryItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Item id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item is off the list. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed id (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No such item (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    updateGroceryItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Item id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGroceryItem"];
+            };
+        };
+        responses: {
+            /** @description The item now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryItem"];
+                };
+            };
+            /** @description No field given, an unknown `section` or a malformed id (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No such item (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    addGroceryRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddGroceryRecipe"];
+            };
+        };
+        responses: {
+            /** @description The list now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Missing `recipeId` or a `scale` outside 0.25-10 (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No such recipe, or deleted (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Body over the size limit (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    removeGroceryRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Recipe id */
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Malformed id (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The recipe is not on the list (`not_found`). */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
