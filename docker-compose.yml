@@ -65,6 +65,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Fails the https profile at once, with a message, when PUBLIC_HOSTNAME is empty or only whitespace (Caddy would otherwise restart in
+  # a loop). Not a `${PUBLIC_HOSTNAME:?}` on caddy: Compose interpolates every service, so that would break the
+  # default stack too.
+  hostname-check:
+    profiles: ["https"]
+    image: caddy:2-alpine
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-}
+    entrypoint: ["sh", "-c", 'case "$$PUBLIC_HOSTNAME" in *[![:space:]]*) ;; *) echo "PUBLIC_HOSTNAME is empty: set it in .env for the https profile" >&2; exit 1 ;; esac']
+    restart: "no"
+
   caddy:
     profiles: ["https"]
     image: caddy:2-alpine
@@ -78,7 +89,10 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - web
+      web:
+        condition: service_started
+      hostname-check:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:

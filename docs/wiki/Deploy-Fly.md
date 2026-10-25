@@ -58,11 +58,19 @@ Change the tag in both toml files and run both `fly deploy` commands (add `--ha=
 [[Backup and Restore]] expect the Compose stack, so on Fly use the cluster's backups for the database and
 `fly ssh sftp` / `fly ssh console` to copy `/data/media`.
 
+## Sign-in throttle settings
+Leave `TRUST_PROXY_HEADERS` unset (off) on the web app. With it off, the web app sends the API no visitor address, so per-address throttling is effectively off on Fly and only the per-username limit protects sign-in. That is safe, but it is the only protection. Do not turn it on until you have confirmed that Fly's edge sets or overwrites `X-Forwarded-For` (rather than appending to a client-sent value) in front of the web app: Recipe Box reads only that header's right-most entry, and Fly's documentation names `Fly-Client-IP` as the visitor's address, which Recipe Box does not read. Not confirmed when this page was written; check the header against Fly's "request headers" page, for example with a small echo app, before enabling it.
+
+On the api, `TRUSTED_PROXIES` is set in `deploy/fly/api.fly.toml` to `fdaa::/16`, Fly's private (6PN) network, so the web app's private address counts as a proxy. Verify the range against Fly's private-networking page for your organisation. If `TRUSTED_PROXIES` were wrong (not covering the web app's address), the API would treat the web app as the client and every visitor would share one address bucket, so about 20 wrong tries across the household could slow everyone's sign-in until the lock expires.
+
+**Risk of the default.** `fdaa::/16` trusts every app in your Fly organisation's 6PN network, not only the web app. Another app in the same org could send the API its own `X-Forwarded-For` and so choose which per-address bucket a request lands in. The per-username throttle still holds. If you run other apps in the org, narrow the range to your org's own /48 prefix: find it in the private address of your app's machines (for example from `fly ips private -a <your-web-app>`), which looks like `fdaa:X:Y:...`, then set `TRUSTED_PROXIES = "fdaa:X:Y::/48"` (the fdaa:X:Y::/48 prefix shown in your app's private address) in `deploy/fly/api.fly.toml` and run `fly deploy -c deploy/fly/api.fly.toml` again. Check the prefix against Fly's private-networking page before relying on it.
+
 ## Settings any other host needs
 - `DATABASE_URL` for the managed database; `MEDIA_DIR=/data/media` on a persistent volume the container user (10001)
   can write; one `api` instance only (photos live on that volume).
 - `COOKIE_SECURE=true` on the `api`; `BIND_ADDR=[::]:8080` where the private network is IPv6 (Fly), else the default.
 - `web`: public HTTPS to port 3000; `API_INTERNAL_URL` = the api's private URL. The `api` has no public address.
+- `TRUST_PROXY_HEADERS` off on `web` unless the host's proxy header is confirmed; `TRUSTED_PROXIES` on `api` = the private network the web app reaches it over (see above).
 - Health checks: `GET /api/health` (api, 8080) and `GET /login` (web, 3000).
 
 | Symptom | Cause and fix |

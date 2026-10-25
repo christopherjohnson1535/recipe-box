@@ -18,6 +18,10 @@ primary_region = "iad"
   # The site is served over HTTPS by Fly, so sign-in cookies carry the Secure flag.
   COOKIE_SECURE = "true"
   SESSION_DAYS = "30"
+  # Fly's private (6PN) network, where the web app's address comes from. Only trusted peers' X-Forwarded-For is read.
+  # This trusts every app in your Fly org (fdaa::/16 is all of 6PN); to narrow it to your org's own /48 prefix, see
+  # "Sign-in throttle settings" in docs/wiki/Deploy-Fly.md.
+  TRUSTED_PROXIES = "fdaa::/16"
   AI_PROVIDER = "none"
   RUST_LOG = "info"
 

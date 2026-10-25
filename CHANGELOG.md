@@ -13,6 +13,7 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 ## [Unreleased]
 
 ### Added
+- Proxy header settings in the HTTPS guides (#17, #33): `TRUST_PROXY_HEADERS` / `TRUSTED_PROXIES` / `WEB_BIND` per access path in `docs/DEPLOY.md` and the Tailscale, VPS and Fly pages; `docker compose --profile https` now stops at once when `PUBLIC_HOSTNAME` is empty.
 - HTTPS deploy guides (#17): Tailscale at home, a VPS with the Caddy profile, and Fly.io (with `deploy/fly/` config), plus a
   `COOKIE_SECURE` table; the Tailscale steps no longer ask for `WEB_BIND=0.0.0.0`.
 - Release process (#18): a `v*` tag publishes amd64 + arm64 images to GHCR only after the full CI suite passes,

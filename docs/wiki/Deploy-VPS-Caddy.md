@@ -22,13 +22,16 @@ POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
 PUBLIC_HOSTNAME=recipes.example.com
 COOKIE_SECURE=true
 WEB_BIND=127.0.0.1
+TRUST_PROXY_HEADERS=true
 IMAGE_TAG=latest
 ```
 Use `openssl rand -hex 24` for the password: it goes into `DATABASE_URL` as-is, so symbols such as `@` or `/` would break it. Postgres fixes the password the first time the `pgdata` volume starts; changing `POSTGRES_PASSWORD` later does not change it.
 
 `IMAGE_TAG=latest` is the newest build of `main` and works today. Once a release exists, pin to a release tag such as `v0.1.0` so updates happen only when you choose (tag table and release steps: [Cutting a release](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/DEPLOY.md#cutting-a-release-owner)).
 
-`PUBLIC_HOSTNAME` is required. Left empty, the Caddy container has no site to serve and restarts in a loop.
+`PUBLIC_HOSTNAME` is required. Left empty, `docker compose --profile https up` stops with "PUBLIC_HOSTNAME is empty".
+`TRUST_PROXY_HEADERS=true` is right here because Caddy's `reverse_proxy` adds the visitor's address to `X-Forwarded-For` and is the only way in (`WEB_BIND=127.0.0.1`); the web container passes on just that last entry, so each visitor is throttled by their own address and a forged `X-Forwarded-For` from a browser is ignored. Leave `TRUSTED_PROXIES` at its default (the private Docker network).
+People behind one home or office NAT share a public IP, so they also share one address bucket.
 `WEB_BIND=127.0.0.1` matters: Docker publishes ports around the host firewall, so a `0.0.0.0` web port would be open
 to the internet without HTTPS.
 
