@@ -574,3 +574,112 @@ async fn bad_input_is_refused() {
     );
     is_not_found(w.services.grocery.clear_item(Uuid::new_v4()).await);
 }
+
+#[tokio::test]
+async fn an_edited_recipe_reaches_the_list_on_the_next_read() {
+    let w = World::new();
+    let id = w.recipe("Soup", None, &["2 onions", "1 cup milk"]).await;
+    let list = w.add(id, None).await;
+    let onions = item(&list, "onions").item.id;
+    w.services
+        .grocery
+        .update_item(
+            onions,
+            ItemPatch {
+                checked: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let before = w.services.grocery.get().await.unwrap();
+
+    // Nothing changed: reading writes nothing, so `updated_at` stays.
+    w.clock.advance(Duration::seconds(1));
+    let again = w.services.grocery.get().await.unwrap();
+    assert_eq!(again, before);
+
+    // Edit the recipe: a new line appears, the milk total changes, the untouched onions keep their tick.
+    w.clock.advance(Duration::seconds(1));
+    let input = RecipeInput {
+        title: "Soup".into(),
+        ingredients: ["2 onions", "2 cups milk", "1 tbsp paprika"]
+            .iter()
+            .map(|t| Ingredient {
+                text: (*t).into(),
+                section: None,
+            })
+            .collect(),
+        ..Default::default()
+    };
+    w.services
+        .recipes
+        .update(id, Uuid::new_v4(), input)
+        .await
+        .unwrap();
+    let after = w.services.grocery.get().await.unwrap();
+    assert_eq!(names(&after), ["onions", "milk", "paprika"]);
+    assert!(after.updated_at > before.updated_at);
+    assert_eq!(
+        item(&after, "milk").item.amounts,
+        vec![amount(2.0, Some("cup"))]
+    );
+    let onions = item(&after, "onions");
+    assert!(onions.item.checked && onions.item.id == before.items[0].item.id);
+
+    // And reading again is quiet again.
+    w.clock.advance(Duration::seconds(1));
+    assert_eq!(w.services.grocery.get().await.unwrap(), after);
+}
+
+#[tokio::test]
+async fn reading_a_fully_cleared_list_writes_nothing() {
+    let w = World::new();
+    let id = w.recipe("Soup", None, &["2 onions"]).await;
+    let list = w.add(id, None).await;
+    w.services
+        .grocery
+        .update_item(
+            list.items[0].item.id,
+            ItemPatch {
+                checked: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let cleared = w.services.grocery.clear_checked().await.unwrap();
+    assert!(cleared.items.is_empty());
+    w.clock.advance(Duration::seconds(1));
+    assert_eq!(w.services.grocery.get().await.unwrap(), cleared);
+}
+
+#[tokio::test]
+async fn nul_characters_are_dropped_from_manual_text() {
+    let w = World::new();
+    is_validation(w.services.grocery.add_item("\0", None).await);
+    is_validation(w.services.grocery.add_item(" \0 \0", None).await);
+    let item = w.services.grocery.add_item("a\0b", None).await.unwrap();
+    assert_eq!(item.item.name, "ab");
+}
+
+#[tokio::test]
+async fn a_patch_with_several_fields_applies_them_together() {
+    let w = World::new();
+    let tea = w.services.grocery.add_item("tea", None).await.unwrap();
+    let patched = w
+        .services
+        .grocery
+        .update_item(
+            tea.item.id,
+            ItemPatch {
+                checked: Some(true),
+                section: Some(Section::Fridge),
+                staple: Some(true),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(patched.item.checked && patched.staple);
+    assert_eq!(patched.item.section, Section::Fridge);
+}

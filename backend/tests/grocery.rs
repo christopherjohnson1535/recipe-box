@@ -428,7 +428,17 @@ async fn bad_requests_to_the_item_routes() {
     .assert_error(StatusCode::BAD_REQUEST, "validation");
 }
 
-/// Two people adding recipes at the same moment both end up on the list, with all their items.
+/// Names of the stored generated items, read straight from the table: `GET /api/grocery` rebuilds the items, so it
+/// would hide a lost update.
+async fn stored_names(ctx: &TestApp) -> Vec<String> {
+    sqlx::query_scalar("select key from grocery_item where not manual order by key")
+        .fetch_all(&ctx.pool)
+        .await
+        .unwrap()
+}
+
+/// Several people adding recipes at the same moment: every recipe ends up on the list with its items, as stored
+/// (before any later read could repair it). Fails without the list lock in `recompute`.
 #[tokio::test]
 async fn concurrent_adds_keep_every_recipe() {
     let ctx = TestApp::spawn_as_admin().await;
@@ -445,15 +455,160 @@ async fn concurrent_adds_keep_every_recipe() {
                 .await,
         );
     }
-    let adds = ids
-        .iter()
-        .map(|id| ctx.post("/api/grocery/recipes", c, json!({ "recipeId": id })));
-    for res in futures_util::future::join_all(adds).await {
-        res.assert_status(StatusCode::OK);
+    for round in 0..10 {
+        ctx.delete("/api/grocery", c)
+            .await
+            .assert_status(StatusCode::NO_CONTENT);
+        let adds = ids
+            .iter()
+            .map(|id| ctx.post("/api/grocery/recipes", c, json!({ "recipeId": id })));
+        for res in futures_util::future::join_all(adds).await {
+            res.assert_status(StatusCode::OK);
+        }
+        assert_eq!(
+            stored_names(&ctx).await,
+            ["apple", "fig", "pear", "plum"],
+            "round {round}"
+        );
     }
     let list = ctx.get("/api/grocery", c).await;
     assert_eq!(list.json["recipes"].as_array().unwrap().len(), 4);
     assert_eq!(names(&list.json), ["apple", "fig", "pear", "plum"]);
+}
+
+/// A tick racing a recompute (the "two people shopping" case) neither deadlocks nor fails.
+#[tokio::test]
+async fn ticking_while_a_recipe_is_added_does_not_deadlock() {
+    let ctx = TestApp::spawn_as_admin().await;
+    let c = ctx.cookie.as_str();
+    let a = ctx
+        .create_recipe_id(c, a_recipe().titled("A").with_ingredients(&["1 onion"]))
+        .await;
+    let b = ctx
+        .create_recipe_id(c, a_recipe().titled("B").with_ingredients(&["1 onion"]))
+        .await;
+    ctx.post("/api/grocery/recipes", c, json!({ "recipeId": a }))
+        .await;
+    for round in 0..10 {
+        let list = ctx.get("/api/grocery", c).await;
+        let onion = list.json["items"][0]["id"].as_str().unwrap().to_string();
+        let path = format!("/api/grocery/items/{onion}");
+        let (add, tick) = futures_util::future::join(
+            async {
+                if round % 2 == 0 {
+                    ctx.post("/api/grocery/recipes", c, json!({ "recipeId": b }))
+                        .await
+                } else {
+                    ctx.delete(&format!("/api/grocery/recipes/{b}"), c).await
+                }
+            },
+            patch(&ctx, &path, c, json!({ "checked": true })),
+        )
+        .await;
+        add.assert_status(StatusCode::OK);
+        tick.assert_status(StatusCode::OK);
+    }
+}
+
+/// "1/0 cup rice" is not a number anybody can shop for: the line stays whole and the list keeps loading.
+#[tokio::test]
+async fn a_line_that_divides_by_zero_does_not_break_the_list() {
+    let ctx = TestApp::spawn_as_admin().await;
+    let c = ctx.cookie.as_str();
+    let id = ctx
+        .create_recipe_id(
+            c,
+            a_recipe().titled("Rice").with_ingredients(&[
+                "1/0 cup rice",
+                "0/0 cup oats",
+                &format!("{} apples", "9".repeat(400)),
+            ]),
+        )
+        .await;
+    ctx.post("/api/grocery/recipes", c, json!({ "recipeId": id }))
+        .await
+        .assert_status(StatusCode::OK);
+    ctx.post("/api/grocery/items", c, json!({ "text": "1/0 cup milk" }))
+        .await
+        .assert_status(StatusCode::CREATED);
+    let list = ctx.get("/api/grocery", c).await;
+    list.assert_status(StatusCode::OK);
+    assert_eq!(
+        list.json["items"].as_array().unwrap().len(),
+        4,
+        "{}",
+        list.json
+    );
+
+    // Whatever a bad amount did get past the parser, a stored row that cannot be read does not fail the list.
+    sqlx::query(
+        "update grocery_item set amounts = '[{\"min\": null, \"max\": null, \"unit\": null}]'",
+    )
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
+    ctx.get("/api/grocery", c)
+        .await
+        .assert_status(StatusCode::OK);
+    ctx.delete(&format!("/api/grocery/recipes/{id}"), c)
+        .await
+        .assert_status(StatusCode::OK);
+}
+
+#[tokio::test]
+async fn manual_text_drops_nul_characters() {
+    let ctx = TestApp::spawn_as_admin().await;
+    let c = ctx.cookie.as_str();
+    for text in ["\0", " \0 "] {
+        ctx.post("/api/grocery/items", c, json!({ "text": text }))
+            .await
+            .assert_error(StatusCode::BAD_REQUEST, "validation");
+    }
+    let res = ctx
+        .post("/api/grocery/items", c, json!({ "text": "a\0b" }))
+        .await;
+    res.assert_status(StatusCode::CREATED);
+    assert_eq!(res.json["name"], "ab");
+}
+
+/// The list is rebuilt from the recipes as they are on every read, so an edit reaches it without a list write; a
+/// read that finds nothing new leaves `updatedAt` alone.
+#[tokio::test]
+async fn an_edited_recipe_reaches_the_list() {
+    let ctx = TestApp::spawn_as_admin().await;
+    let c = ctx.cookie.as_str();
+    let id = ctx
+        .create_recipe_id(
+            c,
+            a_recipe()
+                .titled("Soup")
+                .with_ingredients(&["2 onions", "1 cup milk"]),
+        )
+        .await;
+    ctx.post("/api/grocery/recipes", c, json!({ "recipeId": id }))
+        .await;
+    let before = ctx.get("/api/grocery", c).await;
+    ctx.clock.advance(chrono::Duration::seconds(5));
+    assert_eq!(
+        ctx.get("/api/grocery", c).await.json["updatedAt"],
+        before.json["updatedAt"]
+    );
+
+    let edit =
+        a_recipe()
+            .titled("Soup")
+            .with_ingredients(&["2 onions", "1 cup milk", "1 tbsp paprika"]);
+    ctx.put(&format!("/api/recipes/{id}"), c, edit.json())
+        .await
+        .assert_status(StatusCode::OK);
+    let after = ctx.get("/api/grocery", c).await;
+    assert_eq!(names(&after.json), ["onions", "milk", "paprika"]);
+    assert_ne!(after.json["updatedAt"], before.json["updatedAt"]);
+    ctx.clock.advance(chrono::Duration::seconds(5));
+    assert_eq!(
+        ctx.get("/api/grocery", c).await.json["updatedAt"],
+        after.json["updatedAt"]
+    );
 }
 
 #[tokio::test]
