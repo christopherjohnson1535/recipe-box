@@ -12,9 +12,24 @@ export function upstreamUrl(base: string, incoming: URL): string {
   return base.replace(/\/+$/, "") + incoming.pathname + incoming.search;
 }
 
+// Anything a browser sends about who it is. The API throttles password guesses by client address, so only the
+// value computed in `clientAddress` may reach it.
+const CLIENT_ADDRESS_HEADERS = ["x-forwarded-for", "x-real-ip", "forwarded", "x-client-ip", "cf-connecting-ip"];
+
+/** The right-most `X-Forwarded-For` entry, which the proxy in front of us added; never the client-writable left. */
+export function clientAddress(incoming: Headers, trustProxy = process.env.TRUST_PROXY_HEADERS === "true"): string | null {
+  if (!trustProxy) return null;
+  const last = (incoming.get("x-forwarded-for") ?? "").split(",").pop()?.trim() ?? "";
+  // Looks like an IPv4 or IPv6 address; anything else is dropped rather than passed on.
+  return /^[0-9a-fA-F:.]{2,45}$/.test(last) && (last.includes(".") || last.includes(":")) ? last : null;
+}
+
 export function upstreamRequestHeaders(incoming: Headers, url: URL): Headers {
   const headers = new Headers(incoming);
   for (const name of DROP_REQUEST) headers.delete(name);
+  for (const name of CLIENT_ADDRESS_HEADERS) headers.delete(name);
+  const client = clientAddress(incoming);
+  if (client) headers.set("x-forwarded-for", client);
   headers.set("x-forwarded-host", incoming.get("host") ?? url.host);
   headers.set("x-forwarded-proto", url.protocol.replace(":", ""));
   return headers;

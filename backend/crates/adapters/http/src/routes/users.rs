@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     HttpState,
+    client_ip::ClientIp,
     dto::{User, role_schema},
     error::{AppJson, AppPath, AppResult, ErrorBody},
     extract::{AdminUser, CurrentUser, session_token},
@@ -95,10 +96,13 @@ pub struct SetPasswordBody {
     (status = 401, description = "Not signed in, or wrong `currentPassword` for your own account (`unauthenticated`).", body = ErrorBody),
     (status = 403, description = "A member changing someone else's password (`forbidden`).", body = ErrorBody),
     (status = 404, description = "No such user (`not_found`).", body = ErrorBody),
+    (status = 429, description = "Too many wrong `currentPassword`s for this account or from this address (`rate_limited`). `Retry-After` is in seconds.", body = ErrorBody,
+        headers(("Retry-After" = u64, description = "Seconds to wait."))),
 ))]
 pub async fn set_password(
     State(state): State<HttpState>,
     CurrentUser(caller): CurrentUser,
+    ClientIp(client): ClientIp,
     jar: CookieJar,
     AppPath(id): AppPath<Uuid>,
     AppJson(body): AppJson<SetPasswordBody>,
@@ -112,6 +116,7 @@ pub async fn set_password(
             body.password,
             body.current_password,
             session_token(&jar),
+            client,
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)

@@ -119,6 +119,8 @@ pub struct Res {
     /// The first `Set-Cookie` header, whole.
     pub cookie: Option<String>,
     pub content_type: Option<String>,
+    /// The `Retry-After` header, whole.
+    pub retry_after: Option<String>,
     pub bytes: Vec<u8>,
     /// The body as JSON, `Null` when it isn't.
     pub json: Value,
@@ -291,12 +293,14 @@ impl TestApp {
         };
         let cookie = header_of(header::SET_COOKIE);
         let content_type = header_of(header::CONTENT_TYPE);
+        let retry_after = header_of(header::RETRY_AFTER);
         let bytes = res.into_body().collect().await.unwrap().to_bytes().to_vec();
         let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
         Res {
             status,
             cookie,
             content_type,
+            retry_after,
             bytes,
             json,
         }
@@ -382,6 +386,52 @@ impl TestApp {
             "/api/auth/login",
             None,
             Some(json!({ "username": username, "password": password })),
+        )
+        .await
+    }
+
+    /// A request as if it came over TCP from `peer` (`"203.0.113.9:4000"`), optionally with `X-Forwarded-For`.
+    pub async fn call_from(
+        &self,
+        peer: &str,
+        forwarded_for: Option<&str>,
+        method: Method,
+        path: &str,
+        cookie: Option<&str>,
+        body: Value,
+    ) -> Res {
+        let mut req = Request::builder()
+            .method(method)
+            .uri(path)
+            .header(header::CONTENT_TYPE, "application/json");
+        if let Some(c) = cookie {
+            req = req.header(header::COOKIE, c);
+        }
+        if let Some(f) = forwarded_for {
+            req = req.header("x-forwarded-for", f);
+        }
+        let mut req = req.body(Body::from(body.to_string())).unwrap();
+        let peer: std::net::SocketAddr = peer.parse().unwrap();
+        req.extensions_mut()
+            .insert(axum::extract::ConnectInfo(peer));
+        self.send(req).await
+    }
+
+    /// `login` from a given peer address and `X-Forwarded-For`.
+    pub async fn login_from(
+        &self,
+        peer: &str,
+        forwarded_for: Option<&str>,
+        username: &str,
+        password: &str,
+    ) -> Res {
+        self.call_from(
+            peer,
+            forwarded_for,
+            Method::POST,
+            "/api/auth/login",
+            None,
+            json!({ "username": username, "password": password }),
         )
         .await
     }

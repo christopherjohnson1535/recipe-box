@@ -10,6 +10,7 @@ mod imports;
 mod maintenance;
 mod media;
 mod recipes;
+mod throttle;
 mod users;
 
 use std::sync::Arc;
@@ -27,6 +28,7 @@ pub use imports::{
 pub use maintenance::{BackfillReport, Maintenance, PurgeReport};
 pub use media::{MediaService, Stored};
 pub use recipes::{RecipeService, SettingsService, TagService};
+pub use throttle::{Attempt, Scope, Throttle};
 pub use users::UserService;
 
 /// Every port the services need, plus the one setting that is not stored (`SESSION_DAYS`).
@@ -53,6 +55,8 @@ pub struct Deps {
     pub max_upload_bytes: usize,
     /// How long a new session lasts.
     pub session_days: i64,
+    /// Counts wrong passwords. One per process: build it once and clone the `Arc` into every `Deps`.
+    pub throttle: Arc<Throttle>,
 }
 
 /// Backup export and import (ACC-5): not built yet, both answer `NotImplemented`.

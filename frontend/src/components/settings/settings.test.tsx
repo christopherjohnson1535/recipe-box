@@ -173,6 +173,14 @@ describe("PasswordForm (own password)", () => {
     expect(screen.getByLabelText("Current password").getAttribute("aria-invalid")).toBe("true");
   });
 
+  it("shows how long to wait when the server throttles password changes, without blaming the current password", async () => {
+    setup(vi.fn().mockRejectedValue(new ApiError(429, "rate_limited", "Too many attempts. Try again in 30 seconds.")));
+    fill("old-password", "new-password-1", "new-password-1");
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Too many attempts. Try again in 30 seconds. Nothing was changed."));
+    expect(document.getElementById("own-current-msg")).toBeNull();
+    expect(screen.getByLabelText("Current password").getAttribute("aria-invalid")).toBeNull();
+  });
+
   it("says you were signed out when the 401 is an expired session", async () => {
     setup(
       vi.fn().mockRejectedValue(new ApiError(401, "unauthenticated", "Wrong username or password.")),

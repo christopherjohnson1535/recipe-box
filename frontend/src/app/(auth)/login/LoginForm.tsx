@@ -26,9 +26,12 @@ export function LoginForm({ next }: { next: string }) {
       setError(
         e instanceof ApiError && e.code === "unauthenticated"
           ? "That username and password don’t match. Check them and try again."
-          : e instanceof ApiError
-            ? e.message
-            : "Sign-in failed. Try again.",
+          : e instanceof ApiError && e.code === "rate_limited"
+            ? // The server's message says how long to wait ("Too many attempts. Try again in 5 minutes.").
+              e.message
+            : e instanceof ApiError
+              ? e.message
+              : "Sign-in failed. Try again.",
       );
       setPending(false);
     }

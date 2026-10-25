@@ -10,11 +10,13 @@ use std::sync::Arc;
 
 use app::Services;
 
+pub mod client_ip;
 pub mod dto;
 pub mod error;
 pub mod extract;
 pub mod routes;
 
+pub use client_ip::{ClientIp, TrustedProxies};
 pub use routes::{finish, openapi, routes};
 
 /// What the handlers need beyond the services.
@@ -33,4 +35,6 @@ pub struct HttpConfig {
 pub struct HttpState {
     pub services: Arc<Services>,
     pub config: HttpConfig,
+    /// Proxies whose `X-Forwarded-For` is believed (see [`client_ip`]).
+    pub trusted_proxies: TrustedProxies,
 }

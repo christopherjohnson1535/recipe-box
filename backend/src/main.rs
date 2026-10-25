@@ -35,6 +35,9 @@ async fn run() -> anyhow::Result<()> {
     let allow_host = std::env::var("IMPORT_ALLOW_HOST").unwrap_or_default();
     recipe_box_api::config::check_import_allow_host(&allow_host, config.cookie_secure)?;
     let mut state = AppState::new(pool, config)?;
+    state.trusted_proxies = recipe_box_api::config::trusted_proxies(
+        &std::env::var("TRUSTED_PROXIES").unwrap_or_default(),
+    )?;
     recipe_box_api::spawn_purge_task(state.clone());
     recipe_box_api::spawn_display_backfill(state.clone());
     state.fetch_policy = state
@@ -49,9 +52,12 @@ async fn run() -> anyhow::Result<()> {
         .await
         .map_err(|e| anyhow::anyhow!("can't listen on {bind_addr}: {}", io_reason(&e)))?;
     tracing::info!(%bind_addr, "listening");
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
 

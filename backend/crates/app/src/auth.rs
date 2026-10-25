@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 
 use domain::{
     DomainError, DomainResult, User,
@@ -8,7 +8,7 @@ use domain::{
 };
 use ports::{Clock, PasswordHasher, SessionRepo, SessionTokens, UserRepo};
 
-use crate::Deps;
+use crate::{Deps, Scope, Throttle};
 
 /// The one answer for an unknown user, a wrong password and a password that can never have been set.
 pub(crate) const WRONG_LOGIN: DomainError =
@@ -32,6 +32,7 @@ pub struct AuthService {
     tokens: Arc<dyn SessionTokens>,
     clock: Arc<dyn Clock>,
     session_days: i64,
+    throttle: Arc<Throttle>,
 }
 
 impl AuthService {
@@ -43,16 +44,25 @@ impl AuthService {
             tokens: d.tokens.clone(),
             clock: d.clock.clone(),
             session_days: d.session_days,
+            throttle: d.throttle.clone(),
         }
     }
 
     /// Unknown user and wrong password give the same answer (and the same hashing work). A password over
     /// `MAX_PASSWORD` characters can never have been set, so it is refused before any hashing.
+    ///
+    /// Throttled per submitted username (known or not) and per `client` address: once locked, `RateLimited`
+    /// comes back before anything is looked up or hashed, even for the right password.
     pub async fn login(
         &self,
         username: &str,
         password: String,
+        client: Option<IpAddr>,
     ) -> DomainResult<(User, NewSession)> {
+        let attempt = self
+            .throttle
+            .begin(self.clock.now(), Scope::SignIn, username, client)
+            .map_err(|retry_after_secs| DomainError::RateLimited { retry_after_secs })?;
         if password.chars().count() > validate::MAX_PASSWORD {
             return Err(WRONG_LOGIN);
         }
@@ -64,6 +74,7 @@ impl AuthService {
         let Some(user) = user.filter(|_| ok) else {
             return Err(WRONG_LOGIN);
         };
+        attempt.succeed();
         let session = self.start_session(user.id).await?;
         Ok((user, session))
     }

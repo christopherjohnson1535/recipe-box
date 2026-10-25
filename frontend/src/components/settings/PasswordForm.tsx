@@ -66,7 +66,10 @@ export function PasswordForm({ userId, username, askCurrent, submitLabel, onDone
       onDone?.();
     } catch (e) {
       let failed: Errors;
-      if (e instanceof ApiError && e.status === 401 && askCurrent) {
+      if (e instanceof ApiError && e.code === "rate_limited") {
+        // Too many wrong guesses: the server's message says how long to wait.
+        failed = { form: `${e.message} Nothing was changed.` };
+      } else if (e instanceof ApiError && e.status === 401 && askCurrent) {
         // A 401 means a wrong current password only while the session is still valid.
         const valid = await api.me().then(
           () => true,

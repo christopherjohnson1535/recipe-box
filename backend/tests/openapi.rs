@@ -137,8 +137,14 @@ fn error_code_is_an_extensible_enum() {
         .iter()
         .map(|v| v.as_str().unwrap())
         .collect();
-    for c in ["validation", "ai_disabled", "ai_error", "internal"] {
+    for c in [
+        "validation",
+        "rate_limited",
+        "ai_disabled",
+        "ai_error",
+        "internal",
+    ] {
         assert!(codes.contains(&c), "missing {c}");
     }
-    assert_eq!(codes.len(), 16, "{codes:?}");
+    assert_eq!(codes.len(), 17, "{codes:?}");
 }
