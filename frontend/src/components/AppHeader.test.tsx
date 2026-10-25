@@ -40,7 +40,8 @@ describe("AppHeader", () => {
     nav.path = "/groceries";
     const { container } = render(<AppHeader />);
     expect(screen.getByRole("link", { name: "Recipe Box home" }).textContent).toBe("Recipe Box");
-    expect(container.querySelector("header .rule-double")).toBeTruthy();
+    expect(container.querySelector(".rule-double")).toBeTruthy();
+    expect(container.querySelector("header")).toBeNull(); // the page layout supplies the one banner
     for (const link of screen.getAllByRole("link", { name: /^(Recipes|Groceries|Add|Import|Settings)/ })) {
       expect(link.className).toContain("min-h-control");
     }

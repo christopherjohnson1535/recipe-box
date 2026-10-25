@@ -14,6 +14,7 @@ export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
     if (recipe) showNotice("Saved.");
     else showSaveStamp();
     router.push(`/recipes/${saved.id}`);
+    if (!recipe) router.refresh(); // a new recipe changes the count in the top band
   }
   return (
     <RecipeForm

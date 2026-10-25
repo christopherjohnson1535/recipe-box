@@ -15,7 +15,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   let user: User | null = null;
   let failure: unknown = null;
   // The band's recipe count only decorates: a page of one recipe is the cheapest way to read `total`, and any failure
-  // (API down, offline) just leaves the count out. Asked alongside me() so the layout waits for neither twice.
+  // (API down, offline) just leaves the count out. Asked alongside me() so the two requests overlap, and handed to the
+  // band as a promise: the shell never waits for it.
   let count: Promise<number | undefined> = Promise.resolve(undefined);
   try {
     const api = await serverApi();
@@ -28,9 +29,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
-      {/* The server's day is a first guess; the band switches to the browser's own calendar day once mounted. */}
-      <AppBand serverDay={dayKey(new Date())} count={failure ? undefined : await count} displayName={user?.displayName} />
-      <AppHeader />
+      {/* The page's one banner landmark: the band, then the masthead, in the order they are seen and tabbed. */}
+      <header>
+        {/* The server's day is a first guess; the band switches to the browser's own calendar day once mounted. */}
+        <AppBand serverDay={dayKey(new Date())} count={failure ? undefined : count} displayName={user?.displayName} />
+        <AppHeader />
+      </header>
       <OfflineBanner />
       <main id="main" className="mx-auto w-full max-w-page px-gutter pt-10 pb-20 sm:pt-14">
         {failure ? <ServerError error={failure} /> : children}

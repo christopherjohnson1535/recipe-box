@@ -4,7 +4,8 @@ import { ApiError, type RecipeDraft } from "@/lib/api";
 import { ImportScreen, type ImportApi } from "./ImportScreen";
 
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 
 const draft = (over: Partial<RecipeDraft> = {}): RecipeDraft => ({
   title: "Best pancakes",
@@ -48,6 +49,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   push.mockReset();
+  refresh.mockReset();
   window.history.replaceState(null, "", "/");
 });
 
@@ -81,6 +83,7 @@ describe("ImportScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save recipe" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/recipes/r-1"));
+    expect(refresh).toHaveBeenCalledTimes(1); // the recipe count in the top band is re-read
     expect(api.createRecipe).toHaveBeenCalledWith(expect.objectContaining({ title: "Best pancakes", sourceType: "link" }));
   });
 

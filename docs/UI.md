@@ -65,7 +65,9 @@ Colour (`bg-*`, `text-*`, `border-*` utilities): `--color-paper`, `--color-paper
 | danger / danger-hover / on-danger | `#a33a2b` / `#86301f` / `#f4f4f1` | `#ef9a8a` / `#f5b3a6` / `#121416` | brick red: errors, destructive buttons; never the accent |
 | attention / on-attention | `#6fb5bd` / `#22262b` | same | sea teal "check this" wash, rule or mark; ink on it |
 | stage / on-stage | `#1b1e21` / `#eeede8` | same | cook-mode and import darkroom ground |
-| band / on-band / band-accent | `#22262b` / `#f4f4f1` / `#e9b75a` | `#22262b` / `#eeede8` / `#e0b057` | the charcoal top band and inverse panels (the band since #120) | Layout: `--measure` (38rem, `max-w-measure`), `--measure-form` (44rem, `max-w-form`: the editor, room for a field plus its row buttons), `--measure-wide` (72rem,
+| band / on-band / band-accent | `#22262b` / `#f4f4f1` / `#e9b75a` | `#22262b` / `#eeede8` / `#e0b057` | the charcoal top band and inverse panels (the band since #120) |
+
+Layout: `--measure` (38rem, `max-w-measure`), `--measure-form` (44rem, `max-w-form`: the editor, room for a field plus its row buttons), `--measure-wide` (72rem,
 `max-w-measure-wide`: the recipe page's ingredient column and method), `--page-width` (90rem = 1440px, `max-w-page`; a
 1920 monitor leaves 240px each side), `--gutter` (`px-gutter`), `--control-height`
 (44px, `min-h-control`). Radius: `--radius-control` (2px).
@@ -186,7 +188,7 @@ Controls and states:
   `ui/Pending` (status note with a quiet bar and a way out; token `--progress-fg`). `Heading` takes `ref` and
   `tabIndex` so a page can move focus to a result.
 - `ui/Panel`: tinted (paper-deep) block for an inline form or confirmation. `ui/ConfirmInline`: two-step confirmation in a Panel; focus starts on the safe "Keep" button. `ui/MemberList` + `MemberItem`: people separated by hairlines with name, "You" marker, detail, actions, a note and an opened panel. `ui/DetailList`: label/value pairs as a definition list.
-- Magazine home (#39), all in `ui/`: `CoverStory` (kicker, ~90px headline that is an h2 (the page's h1 is a visually hidden "Recipes"), italic deck, meta, buttons, photo right or above on a phone), `Ticker` (in-season marquee: the looping copy is `aria-hidden`, it pauses under a hovering pointer and on `:focus-within`, a 44px Pause/Play button (or a tap on the text) stops it, reduced motion stops it, hides the button and wraps the list; `components/home/LocalIssue` follows the reader's local clock for the date, season name and ticker after mount), `MagazineCard` + `CardGrid` + `IssueLayout` (4:3 plate or a paper plate with a spot icon, kicker with tags left and time right, display title with a drawn accent underline, two-line deck; the grid sits beside the sidebar from 1024px), `IssueIndex` + `IssueIndexItem` (numbered "Also in this issue") and `FeaturePanel` (the inverse "Haven’t cooked in a while" block; tokens `--feature-*`, same inverse idea as the toast), `SearchField` + `SearchSort` (the display-type search box with a rule beneath and the sort menu set as a quiet label). The empty-box and server-error states omit the issue line by decision ("No. 0" reads oddly).
+- Magazine home (#39), all in `ui/`: `CoverStory` (kicker, ~90px headline that is an h2 (the page's h1 is a visually hidden "Recipes"), italic deck, meta, buttons, photo right or above on a phone), `Ticker` (in-season marquee: the looping copy is `aria-hidden`, it pauses under a hovering pointer and on `:focus-within`, a 44px Pause/Play button (or a tap on the text) stops it, reduced motion stops it, hides the button and wraps the list; `components/home/LocalIssue` exports `LocalTicker`, which follows the reader's local clock for the in-season ticker after mount; the date and season live in the top band), `MagazineCard` + `CardGrid` + `IssueLayout` (4:3 plate or a paper plate with a spot icon, kicker with tags left and time right, display title with a drawn accent underline, two-line deck; the grid sits beside the sidebar from 1024px), `IssueIndex` + `IssueIndexItem` (numbered "Also in this issue") and `FeaturePanel` (the inverse "Haven’t cooked in a while" block; tokens `--feature-*`, same inverse idea as the toast), `SearchField` + `SearchSort` (the display-type search box with a rule beneath and the sort menu set as a quiet label).
 - `ui/Select`: native select set like Input (iPadOS wheel picker); used for the home sort menu. Home search lives in
   `components/search/` (`SearchControls`: debounced 250 ms `router.replace` of `?q=`, uncontrolled input so focus and
   caret survive, Enter/Search/sort push history; `ResultSummary` live count; `NoMatches` with "Clear search").
@@ -215,18 +217,23 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 
 ## Page patterns
-- **App shell** (every signed-in screen, `app/(app)/layout.tsx`): the full-width charcoal **top band** (`ui/TopBand`,
-  `--color-band` / `--color-on-band`, at least 44px tall, `print:hidden`), then the **masthead** (`ui/Masthead`: the
-  Marcellus wordmark, about 44px, on the left; Recipes, Groceries with its saffron count, Add, Import and Settings on
-  the right as uppercase Karla labels, the current one with a 2px accent underline), then the thin double rule
-  (`.rule-double`: 1px ink, 3px gap, 1px ink), then `main`. Band, masthead and `main` share the same edges
-  (`max-w-page px-gutter`, 90rem; gutter 16px phone, 40px from 768px); the band itself bleeds to the window edge and its
-  content respects the iOS safe-area side insets. The band's left side is one label line, `Sunday, October 25 ·
-  Autumn · 24 recipes`: the date and season come from the browser's clock (`lib/local-day.ts`, `useLocalDay`; the
-  server's UTC day only until it mounts) and the count from a `limit=1` recipe request in the layout, left out if that
-  fails. The layout renders once per visit, so the count refreshes on a reload or `router.refresh()`, not on every
-  client navigation. On a phone the season drops and the line may wrap; Sign out (right) stays a 44px target and its
-  focus ring sits inside the band (`--focus-offset`). Sign out ends the session, then `dismissUndo()` and
+- **App shell** (every signed-in screen, `app/(app)/layout.tsx`): one page `<header>` (the only banner landmark)
+  holding, in reading and Tab order, the full-width charcoal **top band** (`ui/TopBand`, `--color-band` /
+  `--color-on-band`, at least 44px tall, `print:hidden`) and the **masthead** (`ui/Masthead`, a plain block inside that
+  header: the Marcellus wordmark, about 44px, on the left; Recipes, Groceries with its saffron count, Add, Import and
+  Settings on the right as uppercase Karla labels, the current one with a 2px accent underline; the nav has no
+  `overflow` so the focus rings are never clipped), then the thin double rule (`.rule-double`: 1px ink, 3px gap, 1px
+  ink), then `main`. Band, masthead and `main` share the same edges (`max-w-page px-gutter`, 90rem; gutter 16px phone,
+  40px from 768px); the band itself bleeds to the window edge and its content respects the iOS safe-area side insets.
+  The band's left side is one label line, `Sunday, October 25 · Autumn · 24 recipes`: the date and season come from the
+  browser's clock (`lib/local-day.ts`, `useLocalDay`; the server's UTC day only until it mounts) and the count from a
+  `limit=1` recipe request in the layout. The layout does not wait for that request: it hands the band a promise, the
+  band reads it with `use()` inside a `Suspense` (fallback: the line without the count), and a failed request leaves
+  the count out. Adding a recipe (editor, import), deleting one and undoing a delete all call `router.refresh()`, which
+  re-renders the layout, so the count follows; other changes show on the next reload. Each dot is glued (`nowrap`) to
+  the item before it. On a phone the season drops and the date and count stack, one per line with no dots (the
+  `.dot-list-stack` rule), so a wrapped line never starts or ends on a dot. Sign out (right) stays a 44px target and
+  its focus ring sits inside the band (`--focus-offset`). Sign out ends the session, then `dismissUndo()` and
   `forgetOffline()`, then goes to `/login`. There is no volume, number or "Issue" wording in the shell.
 - **Home** (a magazine cover): the cover story (the photo recipe edited longest ago; its headline
   is the h1), the in-season ticker, a large search field with the sort menu, the tag index (chips carry spot icons where

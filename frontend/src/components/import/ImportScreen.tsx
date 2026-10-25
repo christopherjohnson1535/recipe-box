@@ -269,6 +269,7 @@ export function ImportScreen({
     const saved = await api.createRecipe(input);
     showSaveStamp();
     router.push(`/recipes/${saved.id}`);
+    router.refresh(); // a new recipe changes the count in the top band
   }
 
   if (review) {
