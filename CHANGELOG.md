@@ -28,6 +28,8 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 - Release process (#18): a `v*` tag publishes amd64 + arm64 images to GHCR only after the full CI suite passes,
   checks both platforms are in the manifest and pull without a login, then creates the GitHub release. Tag table,
   `IMAGE_TAG` pinning, upgrade/rollback and Raspberry Pi notes in `docs/DEPLOY.md`.
+- Offline reading (KIT-5): a service worker keeps recipes you opened, their photos and cooking mode, with an offline
+  banner and Save/Import turned off while offline; signing out clears what was kept (#16).
 - Text import (`POST /api/import/text`) and an AI fallback for link import when a page has no recipe data (#12).
 - Repository quality work (tracked in #52): community docs (`CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS`),
   `docs/TESTING.md`, architecture decision records in `docs/adr/`, a PR-title check and release-note categories.

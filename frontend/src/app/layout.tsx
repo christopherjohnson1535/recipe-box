@@ -7,6 +7,7 @@ import "./globals.css";
 import { EDITION_SCRIPT } from "@/lib/edition";
 import { EditionController } from "@/components/edition/EditionController";
 import { SkipLink } from "@/components/ui/SkipLink";
+import { OfflineSupport } from "@/components/offline/OfflineSupport";
 
 export const metadata: Metadata = {
   title: { default: "Recipe Box", template: "%s · Recipe Box" },
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-dvh">
         <EditionController />
+        <OfflineSupport />
         <SkipLink />
         {children}
       </body>

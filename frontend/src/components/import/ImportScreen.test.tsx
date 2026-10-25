@@ -46,6 +46,7 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   push.mockReset();
   window.history.replaceState(null, "", "/");
 });
@@ -57,6 +58,17 @@ const importLink = (address = "https://example.com/pancakes") => {
 const fail = (status: number, code: string, message = "m", details = {}) => new ApiError(status, code, message, details);
 
 describe("ImportScreen", () => {
+  it("turns Import off while offline, says why, and sends nothing", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const api = mockApi();
+    render(<ImportScreen api={api} />);
+    const button = screen.getByRole("button", { name: "Import recipe" });
+    expect(button).toHaveProperty("disabled", true);
+    expect(document.getElementById(button.getAttribute("aria-describedby")!)?.textContent).toMatch(/You’re offline/);
+    fireEvent.submit(button.closest("form")!);
+    expect(api.importUrl).not.toHaveBeenCalled();
+  });
+
   it("imports a link, focuses the review heading and saves through createRecipe", async () => {
     const api = mockApi();
     render(<ImportScreen api={api} />);

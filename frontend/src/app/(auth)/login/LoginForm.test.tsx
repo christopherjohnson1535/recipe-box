@@ -1,10 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
+import { forgetOffline } from "@/components/offline/forget";
 import { LoginForm } from "./LoginForm";
 
 const login = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
+const replace = vi.fn();
+vi.mock("@/components/offline/forget", () => ({ forgetOffline: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, refresh: vi.fn() }) }));
 vi.mock("@/lib/api", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/api")>()), api: { login: (b: unknown) => login(b) } }));
 
 function signInRefused(error: ApiError) {
@@ -27,5 +30,16 @@ describe("LoginForm errors", () => {
     // Not stuck on "Signing in…": the button is back and enabled.
     expect((screen.getByRole("button", { name: "Sign in" }) as HTMLButtonElement).disabled).toBe(false);
     expect(login).toHaveBeenCalledWith({ username: "chris", password: "not the password" });
+  });
+
+  it("forgets pages kept for the previous person before going on", async () => {
+    login.mockResolvedValue(undefined);
+    render(<LoginForm next="/import" />);
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "chris" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "right" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Sign in" }).closest("form")!);
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/import"));
+    expect(forgetOffline).toHaveBeenCalled();
+    expect(vi.mocked(forgetOffline).mock.invocationCallOrder[0]).toBeLessThan(replace.mock.invocationCallOrder[0]);
   });
 });

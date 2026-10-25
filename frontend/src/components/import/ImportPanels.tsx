@@ -1,4 +1,6 @@
 import type { FormEvent } from "react";
+import { OfflineNote } from "@/components/offline/OfflineNote";
+import { useOnline } from "@/components/offline/use-online";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { Field } from "@/components/ui/Field";
@@ -13,8 +15,23 @@ export type PhotoKind = "recipe" | "dish";
 type Common = { busy: boolean; onSubmit: () => void };
 const submitting = (onSubmit: () => void) => (e: FormEvent) => {
   e.preventDefault();
-  onSubmit();
+  if (navigator.onLine) onSubmit();
 };
+const OFFLINE_ID = "import-offline";
+const OFFLINE_NOTE = "You’re offline. Importing reads the recipe on the server, so it waits until you’re back online.";
+
+/** Every import goes through the server, so the submit button is off while offline, with the reason beside it. */
+function ImportButton({ busy, disabled, children }: { busy: boolean; disabled?: boolean; children: string }) {
+  const online = useOnline();
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <Button type="submit" pending={busy} disabled={disabled || !online} aria-describedby={online ? undefined : OFFLINE_ID}>
+        {children}
+      </Button>
+      <OfflineNote id={OFFLINE_ID}>{OFFLINE_NOTE}</OfflineNote>
+    </div>
+  );
+}
 
 export function LinkPanel({ url, onUrl, error, busy, onSubmit, aiOff }: Common & { url: string; onUrl: (v: string) => void; error?: string; aiOff: boolean }) {
   return (
@@ -40,11 +57,7 @@ export function LinkPanel({ url, onUrl, error, busy, onSubmit, aiOff }: Common &
           onChange={(e) => onUrl(e.target.value)}
         />
       </Field>
-      <div>
-        <Button type="submit" pending={busy}>
-          Import recipe
-        </Button>
-      </div>
+      <ImportButton busy={busy}>Import recipe</ImportButton>
     </form>
   );
 }
@@ -97,9 +110,9 @@ export function TextPanel({
         />
       </Field>
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" pending={busy} disabled={aiOff}>
+        <ImportButton busy={busy} disabled={aiOff}>
           Read the text
-        </Button>
+        </ImportButton>
         {aiOff && (
           <ButtonLink href="/recipes/new" variant="secondary">
             Type it in instead
@@ -150,11 +163,7 @@ export function PhotoPanel({
           ]}
         />
       )}
-      <div>
-        <Button type="submit" pending={busy}>
-          {aiOff ? "Keep photos and type it in" : "Read the photos"}
-        </Button>
-      </div>
+      <ImportButton busy={busy}>{aiOff ? "Keep photos and type it in" : "Read the photos"}</ImportButton>
     </form>
   );
 }

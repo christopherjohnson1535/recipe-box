@@ -20,7 +20,9 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
-      exclude: ["src/**/*.test.*", "src/test/**", "src/**/*.d.ts"],
+      // Only the thin shells of the service worker (src/app/sw.ts wires plugins to routes) and its build-time bundling
+      // route run outside jsdom; e2e/tests/web/offline.spec.ts covers them. Their logic is components/offline/worker-plugins.ts.
+      exclude: ["src/**/*.test.*", "src/test/**", "src/**/*.d.ts", "src/app/sw.ts", "src/app/serwist/**"],
       reporter: ["text", "html", "json-summary"],
     },
   },

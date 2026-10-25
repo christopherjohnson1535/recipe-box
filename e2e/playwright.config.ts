@@ -5,6 +5,10 @@ import { BASE_URL, STACK } from "./support/env.ts";
 // device's viewport, touch support and user agent.
 const onChromium = (d: (typeof devices)[string]) => ({ ...d, defaultBrowserType: "chromium" as const });
 
+// Route the service worker's own fetches through the context, so `context.setOffline` and the outbound block in
+// support/fixtures.ts apply to them too (without it the worker still reaches the network; offline.spec.ts relies on it).
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = "1";
+
 
 export default defineConfig({
   testDir: "tests",
@@ -15,7 +19,8 @@ export default defineConfig({
   workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : process.env.CI ? 4 : 3,
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
+  // `github` turns each failure into a check-run annotation, readable on the PR without downloading logs.
+  reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL: BASE_URL,
     locale: "en-US",

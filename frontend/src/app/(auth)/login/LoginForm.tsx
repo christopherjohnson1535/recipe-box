@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
+import { forgetOffline } from "@/components/offline/forget";
 import { api, ApiError } from "@/lib/api";
 
 export function LoginForm({ next }: { next: string }) {
@@ -20,6 +21,7 @@ export function LoginForm({ next }: { next: string }) {
     setError(null);
     try {
       await api.login({ username: String(form.get("username")), password: String(form.get("password")) });
+      await forgetOffline(); // pages kept by whoever was signed in before must not show for this person
       router.replace(next);
       router.refresh();
     } catch (e) {

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { OfflineNote } from "@/components/offline/OfflineNote";
+import { useOnline } from "@/components/offline/use-online";
 import { showNotice, showUndo } from "@/components/undo/undo-store";
 import { ApiError, api as browserApi } from "@/lib/api";
 
@@ -20,6 +22,7 @@ export function DeleteRecipeButton({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const online = useOnline();
 
   async function remove() {
     setPending(true);
@@ -46,9 +49,10 @@ export function DeleteRecipeButton({
 
   return (
     <>
-      <Button variant="ghost" pending={pending} onClick={remove}>
+      <Button variant="ghost" pending={pending} disabled={!online} aria-describedby={online ? undefined : "delete-offline"} onClick={remove}>
         {pending ? "Deleting…" : "Delete"}
       </Button>
+      <OfflineNote id="delete-offline">You’re offline. Deleting needs the server; try again once you’re back online.</OfflineNote>
       {failed && (
         <div className="w-full max-w-measure text-left">
           <Alert tone="error" title="Not deleted">

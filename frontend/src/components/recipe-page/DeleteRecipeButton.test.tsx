@@ -54,4 +54,14 @@ describe("DeleteRecipeButton", () => {
     expect(screen.getByRole("status").textContent).toContain("That recipe was already deleted.");
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
   });
+
+  it("is off while offline, with the reason beside it and tied to the button", () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    render(<DeleteRecipeButton id="r1" title="Soup" api={asApi(vi.fn())} />);
+    const button = screen.getByRole("button", { name: "Delete" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    const note = document.getElementById(button.getAttribute("aria-describedby")!);
+    expect(note?.textContent).toMatch(/offline/i);
+    vi.restoreAllMocks();
+  });
 });
