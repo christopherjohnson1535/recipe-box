@@ -18,7 +18,7 @@ fn ready<T>(p: Poll<T>) -> Option<T> {
 
 /// Runs two futures to completion side by side on the current task: both are polled until each is done, with no
 /// timing involved, so the result depends only on what the adapter guarantees about overlapping calls.
-async fn join2<A: Future, B: Future>(a: A, b: B) -> (A::Output, B::Output) {
+pub(super) async fn join2<A: Future, B: Future>(a: A, b: B) -> (A::Output, B::Output) {
     let (mut a, mut b) = (Box::pin(a), Box::pin(b));
     let (mut ra, mut rb) = (None, None);
     std::future::poll_fn(|cx| {

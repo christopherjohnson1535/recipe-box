@@ -7,8 +7,8 @@ use std::{
 };
 
 use adapter_postgres::{
-    PgImageRepo, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo,
-    PgUserRepo, migrate,
+    PgGroceryRepo, PgImageRepo, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth,
+    PgTagRepo, PgUserRepo, migrate,
 };
 use domain::uuid::Uuid;
 use ports::{
@@ -87,8 +87,9 @@ impl Schemas {
             images: Arc::new(PgImageRepo::new(pool.clone(), clock.clone())),
             users: Arc::new(PgUserRepo::new(pool.clone(), clock.clone())),
             sessions: Arc::new(PgSessionRepo::new(pool.clone(), clock.clone())),
-            settings: Arc::new(PgSettingsRepo::new(pool.clone(), clock)),
+            settings: Arc::new(PgSettingsRepo::new(pool.clone(), clock.clone())),
             tags: Arc::new(PgTagRepo::new(pool.clone())),
+            grocery: Arc::new(PgGroceryRepo::new(pool.clone(), clock.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
         }
     }
@@ -142,6 +143,12 @@ async fn accounts_meet_the_contract() {
     contract::settings_repo(|c| db.stack(c)).await;
     contract::tag_repo(|c| db.stack(c)).await;
     contract::image_repo(|c| db.stack(c)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn groceries_meet_the_contract() {
+    let Some(db) = Schemas::new() else { return };
+    contract::grocery_repo(|c| db.stack(c)).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

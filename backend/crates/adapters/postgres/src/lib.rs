@@ -6,10 +6,12 @@
 
 mod accounts;
 mod error;
+mod grocery;
 mod images;
 mod recipes;
 
 pub use accounts::{PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo};
+pub use grocery::PgGroceryRepo;
 pub use images::PgImageRepo;
 pub use recipes::PgRecipeRepo;
 pub use sqlx::PgPool;

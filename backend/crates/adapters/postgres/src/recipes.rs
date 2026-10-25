@@ -26,7 +26,7 @@ impl PgRecipeRepo {
 
 /// An ingredient or step as stored in the `jsonb` columns (`{"text", "section"}`).
 #[derive(Serialize, Deserialize)]
-struct Line {
+pub(crate) struct Line {
     text: String,
     #[serde(default)]
     section: Option<String>,
