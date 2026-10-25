@@ -112,7 +112,6 @@ export function ImportScreen({
     };
   }, [api]);
 
-
   // A draft has arrived: move to it. A field error: put the cursor back in the field.
   useEffect(() => {
     const h = heading.current;
@@ -402,7 +401,7 @@ export function ImportScreen({
   const sourceError = here?.field && here.fieldId === "import-source" ? here.message : undefined;
   const inner = (
     <>
-      {sharedRejected &&  (
+      {sharedRejected && (
         <Alert tone="error" title="That link can’t be imported">
           <Text variant="small">The address that was shared isn’t a web page address (it must start with http:// or https://). Paste the recipe link below instead.</Text>
         </Alert>

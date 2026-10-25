@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type Capabilities, type Settings, type User } from "@/lib/api";
+import { redirectToLogin } from "@/lib/login-redirect";
 import { serverApi } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -15,7 +15,7 @@ export default async function SettingsPage() {
     me = await api.me();
     if (me.role === "admin") users = await api.listUsers();
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/login");
+    if (e instanceof ApiError && e.status === 401) await redirectToLogin();
     return <ServerError error={e} />;
   }
   // The status line is a nicety: if it can't load, the rest of the page still works.

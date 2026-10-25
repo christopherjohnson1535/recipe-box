@@ -17,6 +17,13 @@ describe("parseSharedUrl", () => {
     "https://user:pw@example.com/",
     "https://",
     "//example.com/x",
+    "https:example.com/x",
+    "https:/example.com/x",
+    "https:\\\\example.com\\x",
+    "https://example.com\\@evil.example/",
+    "https://exam\tple.com/",
+    "https://example.com/\nx",
+    "https://example.com/\rx",
   ])("refuses %j", (raw) => {
     expect(parseSharedUrl(raw)).toBeNull();
   });

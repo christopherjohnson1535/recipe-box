@@ -9,7 +9,7 @@ afterEach(cleanup);
 describe("bookmarklet", () => {
   it("opens the app with only the page address, encoded, in a tab that cannot reach back", () => {
     const code = bookmarkletFor("https://recipes.example");
-    expect(code.startsWith("javascript:")).toBe(true);
+    expect(new URL(code).protocol).toBe("javascript:");
     expect(code).toContain('"https://recipes.example/import?url="+encodeURIComponent(location.href)');
     expect(code).toContain('"noopener"');
     for (const leak of ["document.", "cookie", "localStorage", "innerHTML", "title"]) expect(code).not.toContain(leak);

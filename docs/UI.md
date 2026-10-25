@@ -163,6 +163,7 @@ Controls and states:
 - `ui/Select`: native select set like Input (iPadOS wheel picker); used for the home sort menu. Home search lives in
   `components/search/` (`SearchControls`: debounced 250 ms `router.replace` of `?q=`, uncontrolled input so focus and
   caret survive, Enter/Search/sort push history; `ResultSummary` live count; `NoMatches` with "Clear search").
+- Share page (#21): `ui/BookmarkTab` (draggable `javascript:` link; the href is set by hand because React refuses it, and a click does nothing), `ui/CodeBlock` (a line to copy exactly, selects whole on tap), `ui/Disclosure` (closed-by-default native `details` note, 44px summary), `ui/Steps` + `Step` (numbered how-to steps with a display numeral).
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
 - `ui/Toast` (`ToastRegion`, `Toast`, `ToastAction`, `ToastDismiss`): inverse message pinned to the bottom, 44px actions, tokens `--toast-*`. The region is a polite live region and stays mounted; hidden in print. Separated by a hairline border, never a shadow. Used by `undo/UndoToast`.

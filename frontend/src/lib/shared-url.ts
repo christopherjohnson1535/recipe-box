@@ -9,6 +9,8 @@ export const MAX_SHARED_URL = 2048;
 export function parseSharedUrl(raw: string | undefined | null): string | null {
   const text = raw?.trim();
   if (!text || text.length > MAX_SHARED_URL) return null;
+  // Browsers quietly rewrite these (`https:example.com`, `https:\\host`, tabs inside a host); refuse instead of guessing.
+  if (!/^https?:\/\//i.test(text) || /[\\\t\n\r]/.test(text)) return null;
   try {
     const u = new URL(text);
     if ((u.protocol !== "http:" && u.protocol !== "https:") || !u.hostname || u.username || u.password) return null;

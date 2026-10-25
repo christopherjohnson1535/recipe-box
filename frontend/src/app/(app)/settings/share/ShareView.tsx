@@ -34,8 +34,11 @@ export function ShareView() {
           On an iPad or iPhone
         </Heading>
         <Text>
-          iPadOS has no way for a web app to appear in the Share menu, so you make a small <Text as="span" variant="strong">Shortcut</Text> once. After that, Share → Save to
-          Recipe Box works from Safari and from most apps.
+          iPadOS has no way for a web app to appear in the Share menu, so you make a small{" "}
+          <Text as="span" variant="strong">
+            Shortcut
+          </Text>{" "}
+          once. After that, Share → Save to Recipe Box works from Safari and from most apps.
         </Text>
         <Steps>
           <Step n={1}>
@@ -45,7 +48,8 @@ export function ShareView() {
           </Step>
           <Step n={2}>
             <p>
-              Tap the <b>i</b> (details) button, turn on <b>Show in Share Sheet</b>, and under Share Sheet Types keep only <b>URLs</b> and <b>Safari web pages</b>.
+              Tap the <b>i</b> (details) button, turn on <b>Show in Share Sheet</b>, and under Share Sheet Types keep only <b>URLs</b> and{" "}
+              <b>Safari web pages</b>.
             </p>
           </Step>
           <Step n={3}>
@@ -55,7 +59,8 @@ export function ShareView() {
           </Step>
           <Step n={4}>
             <p>
-              Add a <b>Text</b> action holding this address, then tap just after the <b>=</b> and insert the <b>URL Encoded Text</b> variable:
+              Add a <b>Text</b> action holding this address, then tap just after the <b>=</b> and insert the <b>URL Encoded Text</b>{" "}
+              variable:
             </p>
             <CodeBlock>{address || "https://your-address/import?url="}</CodeBlock>
             <CopyButton value={address} label="Copy the address" disabled={!address} />
@@ -67,12 +72,14 @@ export function ShareView() {
           </Step>
           <Step n={6}>
             <p>
-              Try it: in Safari on a recipe page tap <b>Share</b> → <b>Save to Recipe Box</b>. Recipe Box opens in Safari and asks you to confirm before it reads the page.
+              Try it: in Safari on a recipe page tap <b>Share</b> → <b>Save to Recipe Box</b>. Recipe Box opens in Safari and asks you to
+              confirm before it reads the page.
             </p>
           </Step>
         </Steps>
         <Text variant="small">
-          The shortcut opens Recipe Box in Safari, not in the Home Screen app, and signs in separately the first time. Full steps and fixes are on the{" "}
+          The shortcut opens Recipe Box in Safari, not in the Home Screen app, and signs in separately the first time. Full steps and fixes
+          are on the{" "}
           <ExternalLink href="https://github.com/christopherjohnson1535/recipe-box/wiki/Save-from-Safari">Save from Safari</ExternalLink>{" "}
           wiki page.
         </Text>
@@ -83,17 +90,24 @@ export function ShareView() {
           On a computer
         </Heading>
         <Text>
-          Drag this tab onto your bookmarks bar (show it with <b>Ctrl</b>+<b>Shift</b>+<b>B</b>, or <b>⌘</b>+<b>Shift</b>+<b>B</b> on a Mac). On a recipe page, click
-          the bookmark. Recipe Box opens in a new tab and asks you to confirm.
+          Drag this tab onto your bookmarks bar (show it with <b>Ctrl</b>+<b>Shift</b>+<b>B</b>, or <b>⌘</b>+<b>Shift</b>+<b>B</b> on a
+          Mac). On a recipe page, click the bookmark. Recipe Box opens in a new tab and asks you to confirm.
         </Text>
-        {bookmarklet ? <BookmarkTab href={bookmarklet}>Save to Recipe Box</BookmarkTab> : <Text variant="note">Getting the bookmark ready…</Text>}
-        <Text variant="small">The bookmark only sends the address of the page you are on. It does not read the page or take anything from it.</Text>
+        {bookmarklet ? (
+          <BookmarkTab href={bookmarklet}>Save to Recipe Box</BookmarkTab>
+        ) : (
+          <Text variant="note">Getting the bookmark ready…</Text>
+        )}
+        <Text variant="small">
+          The bookmark only sends the address of the page you are on. It does not read the page or take anything from it.
+        </Text>
         <Disclosure summary="Can’t drag it?">
-            <p>
-              Copy the bookmark, add any bookmark in your browser, then edit it: name it <b>Save to Recipe Box</b> and paste this into the address (URL) box.
-            </p>
-            <CodeBlock>{bookmarklet || "…"}</CodeBlock>
-            <CopyButton value={bookmarklet} label="Copy the bookmark" disabled={!bookmarklet} />
+          <p>
+            Copy the bookmark, add any bookmark in your browser, then edit it: name it <b>Save to Recipe Box</b> and paste this into the
+            address (URL) box.
+          </p>
+          <CodeBlock>{bookmarklet || "…"}</CodeBlock>
+          <CopyButton value={bookmarklet} label="Copy the bookmark" disabled={!bookmarklet} />
         </Disclosure>
       </section>
 
