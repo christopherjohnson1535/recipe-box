@@ -30,6 +30,9 @@ Every non-2xx response:
 | 422 | `no_recipe_found` | page/photo had no recipe |
 | 422 | `ai_disabled` | AI needed but `AI_PROVIDER=none` |
 | 502 | `ai_error` | the AI provider failed: timeout, rejected key, busy after one retry, or a reply we could not read |
+| 422 | `google_disabled` | Google Tasks needed but not configured (`GOOGLE_CLIENT_ID` etc. unset) |
+| 409 | `google_not_connected` | Google Tasks export without a connected Google account, or the connection was revoked at Google |
+| 502 | `google_error` | Google's API failed: timeout, 5xx, or a reply we could not read |
 | 422 | `blocked_address` | URL resolves to a non-public IP |
 | 502 | `site_blocked` | site returned 401/403/429/503 or a bot check — UI offers paste-text |
 | 502 | `fetch_failed` | DNS, timeout, too large, other HTTP error |
@@ -196,6 +199,33 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
     stays off the list until its amounts change). Unknown item ids are 404.
   - `POST /api/grocery/clear-checked` clears every ticked item the same way and answers `200 GroceryList`.
     `DELETE /api/grocery` empties the list (recipes and items; overrides and staples are kept) and answers `204`.
+- **Google Tasks export (GRO-5).** Optional: on only when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL` and
+  `TOKEN_ENCRYPTION_KEY` are all set (the API refuses to start with only some of them). Each household member connects
+  their own Google account; the connection is per user, any signed-in member may use it.
+  - `GET /api/integrations/google` → `200 {configured, connected, connectedAt}` (`connectedAt` null when not connected).
+  - `GET /api/integrations/google/connect` (a browser navigation, session required) → `302` to Google's consent page
+    (scope `https://www.googleapis.com/auth/tasks`, offline access) with a random `state`, also set in the cookie
+    `rb_google_state` (httpOnly, SameSite=Lax, Secure like `rb_session`, Path `/api/integrations/google`, 10 minutes).
+    `422 google_disabled` when not configured.
+  - `GET /api/integrations/google/callback?code=…&state=…` (Google redirects here; session required) → checks `state`
+    against the cookie (constant time; missing or different → no exchange), exchanges the code, stores the refresh
+    token encrypted (AES-256-GCM or ChaCha20-Poly1305 with `TOKEN_ENCRYPTION_KEY`), clears the cookie and answers
+    `302 /settings?google=connected`; any failure (state mismatch, `error=access_denied`, no refresh token, Google
+    error) answers `302 /settings?google=error` and stores nothing. Connecting again replaces the old token.
+  - `DELETE /api/integrations/google` → revokes the token at Google (best effort: a failed revoke is logged and the
+    local token is deleted anyway) and forgets the stored task list → `204`. Deleting a user deletes their connection.
+  - `POST /api/grocery/export/google-tasks` `{includeStaples?: bool}` (default false) → `200 {taskListTitle, sections,
+    items}` (counts sent). Sends the current list's unticked items (staples only with `includeStaples`) to a Google
+    Tasks list titled `Groceries`: one parent task per non-empty section in store order (`Produce`, `Meat`, `Fridge`,
+    `Freezer`, `Pantry`, `Other`), each item a subtask in list order, titled with its amounts and name as the list
+    shows it (`1 cup + 2 tbsp milk`). Re-sending reuses the same Google list (its id is remembered per user): its
+    existing tasks are deleted first, so it never duplicates; if that list was deleted in Google, a new one is made.
+    An empty list still answers 200 with zero counts and leaves the Google list empty. `422 google_disabled`,
+    `409 google_not_connected` (also when Google answers `invalid_grant`: the stored token is then deleted, so the UI
+    offers to reconnect), `502 google_error`.
+  - The refresh token never leaves the API: no response, log line or error message contains it or an access token.
+- **Share as text** (GRO-5) needs no API: the web app builds the text from `GET /api/grocery` (section headings in
+  store order, unticked items beneath, staples per the page's toggle) and hands it to `navigator.share`, or copies it.
 - **Users (admin)**: changing **your own** password requires `currentPassword` (401 `unauthenticated` if wrong, same
   message as a bad login); an admin resetting **someone else's** doesn't. Password at least 10 characters. Ends that
   user's other sessions (the caller's current session stays when it is their own password). `DELETE` ends the deleted

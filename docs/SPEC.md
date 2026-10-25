@@ -142,6 +142,8 @@ Anything else needs a one-line reason in the agent's report.
   `grocery_item(id uuid pk, list_id fk cascade, key text, name text, amounts jsonb, section text, checked bool,
   cleared bool, manual bool, recipe_ids uuid[])` (`key` is the merge key of a generated item, unique per list among
   generated items), `grocery_section_override(key text pk, section text)`, `grocery_staple(key text pk)`.
+- Google Tasks (`0004_google.sql`, GRO-5): `google_connection(user_id uuid pk fk users on delete cascade,
+  refresh_token bytea (nonce ‖ ciphertext), tasklist_id text null, connected_at timestamptz)`.
 - Soft delete: `DELETE /api/recipes/:id` sets `deleted_at`; `POST /api/recipes/:id/restore` clears it within 10 min
   (REC-2); a periodic task purges rows deleted > 1 day.
 
@@ -165,6 +167,7 @@ Anything else needs a one-line reason in the agent's report.
 | GET `/api/export`, POST `/api/import/export` | admin | ACC-5 | done (#20); archive format in API.md |
 
 | GET `/api/grocery`, POST `/api/grocery/recipes`, DELETE `/api/grocery/recipes/:id`, POST `/api/grocery/items`, PATCH/DELETE `/api/grocery/items/:id`, POST `/api/grocery/clear-checked`, DELETE `/api/grocery` | s | GRO-1–4 | #79 |
+| GET/DELETE `/api/integrations/google`, GET `/api/integrations/google/connect`, GET `/api/integrations/google/callback`, POST `/api/grocery/export/google-tasks` | s | GRO-5 | #81 |
 `RecipeDraft` = recipe fields without id/timestamps + `warnings: string[]` + `duplicateOf: uuid|null` +
 `imageId` (already stored) + `photoImageIds`. Drafts are never saved by the import endpoints — the client POSTs the
 reviewed draft to `/api/recipes`.
@@ -262,6 +265,12 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   frontend scaler test also reads so both sides agree on quantities and units). `ports::GroceryRepo` stores the list;
   `app::GroceryService` does recompute (in one repo call, under a lock on the list row) and the item rules. Behaviour:
   `docs/API.md` → *Grocery list*.
+- **Google Tasks (GRO-5):** ports `GoogleTasks` (consent URL, code exchange, access token from refresh token, revoke,
+  replace a task list's contents) and `TokenCipher` (seal/open), storage port `GoogleConnectionRepo`. Adapter crate
+  `adapters/google` (reqwest, fixed Google hosts; base URLs injectable for tests); the cipher lives in the server crate;
+  `app::GoogleTasksService` reads the grocery list through `GroceryService`. With Google not configured the server wires
+  a disabled `GoogleTasks` that answers `google_disabled`. Tests use a local stub of Google's OAuth and Tasks endpoints
+  (`backend/tests/common/google.rs`). Behaviour: `docs/API.md` → *Google Tasks export*.
 - **Cooking mode (KIT-2/3):** `navigator.wakeLock.request('screen')`, re-acquire on `visibilitychange`.
 
 ## Containers and deploy
