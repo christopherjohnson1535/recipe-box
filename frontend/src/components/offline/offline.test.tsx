@@ -75,3 +75,91 @@ describe("forgetOffline", () => {
     await expect(forgetOffline()).resolves.toBeUndefined();
   });
 });
+
+describe("keptRecipes", () => {
+  it("lists kept recipe pages newest first, skipping cooking mode and untitled pages", async () => {
+    const { keptRecipes } = await import("./SavedRecipes");
+    const id = (n: number) => `0f8e2b4c-1a2b-4c3d-8e9f-01234567890${n}`;
+    const pages: Record<string, string> = {
+      [`http://localhost:3000/recipes/${id(1)}`]: "<title>Soup · Recipe Box</title>",
+      [`http://localhost:3000/recipes/${id(1)}/cook`]: "<title>Cooking Soup · Recipe Box</title>",
+      [`http://localhost:3000/recipes/${id(2)}`]: "<title>Stew · Recipe Box</title>",
+      [`http://localhost:3000/recipes/${id(3)}`]: "<p>no title</p>",
+    };
+    const cache = {
+      keys: async () => Object.keys(pages).map((url) => ({ url })),
+      match: async (req: { url: string }) => ({ text: async () => pages[req.url] }),
+    };
+    vi.stubGlobal("caches", { open: async () => cache });
+    expect(await keptRecipes()).toEqual([
+      { href: `/recipes/${id(2)}`, title: "Stew" },
+      { href: `/recipes/${id(1)}`, title: "Soup" },
+    ]);
+  });
+
+  it("is empty without Cache Storage", async () => {
+    const { keptRecipes } = await import("./SavedRecipes");
+    vi.stubGlobal("caches", undefined);
+    expect(await keptRecipes()).toEqual([]);
+  });
+});
+
+describe("KeepOffline", () => {
+  it("renders the marker the worker looks for", async () => {
+    const { KeepOffline } = await import("./KeepOffline");
+    const { KEEP_MARKER } = await import("./rules");
+    const { container } = render(<KeepOffline />);
+    expect(container.innerHTML.includes(KEEP_MARKER) || document.head.innerHTML.includes(KEEP_MARKER)).toBe(true);
+  });
+});
+
+describe("OfflineSupport", () => {
+  const ID = "0f8e2b4c-1a2b-4c3d-8e9f-0123456789ab";
+  async function mount(pathname: string, controller: object | null = null) {
+    vi.resetModules();
+    vi.doMock("next/navigation", () => ({ usePathname: () => pathname }));
+    const postMessage = vi.fn();
+    const register = vi.fn().mockResolvedValue({});
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: { register, controller, ready: Promise.resolve({ active: { postMessage } }) },
+      configurable: true,
+    });
+    const { OfflineSupport } = await import("./OfflineSupport");
+    render(<OfflineSupport />);
+    await act(async () => {});
+    return { register, postMessage };
+  }
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, "serviceWorker");
+    vi.doUnmock("next/navigation");
+  });
+
+  it("does nothing outside production builds", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const { register, postMessage } = await mount(`/recipes/${ID}`);
+    expect(register).not.toHaveBeenCalled();
+    expect(postMessage).not.toHaveBeenCalled();
+  });
+
+  it("registers the worker and asks it to keep a recipe page after navigation", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    setOnline(true);
+    const { register, postMessage } = await mount(`/recipes/${ID}`);
+    expect(register).toHaveBeenCalledWith("/serwist/sw.js", { scope: "/" });
+    expect(postMessage).toHaveBeenCalledWith({ type: "CACHE_URLS", payload: { urlsToCache: [`/recipes/${ID}`] } });
+  });
+
+  it("does not fetch the page again when the worker already saw it load", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    setOnline(true);
+    const { postMessage } = await mount(`/recipes/${ID}`, {});
+    expect(postMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not ask to keep other pages", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    setOnline(true);
+    const { postMessage } = await mount("/settings");
+    expect(postMessage).not.toHaveBeenCalled();
+  });
+});
