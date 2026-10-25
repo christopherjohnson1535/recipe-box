@@ -13,6 +13,7 @@ Open **Groceries** in the top bar. The number beside it is how many items are le
 
 - Items are grouped **Produce, Meat, Fridge, Freezer, Pantry, Other**. Only sections with something in them show, and the section name stays at the top of the screen while you scroll through it.
 - **Tap an item to cross it off.** A line is drawn through it and it drops to the bottom of its section. Tap again to undo.
+- If a change can't be saved, a message appears at the bottom of the screen and the change is undone.
 - **Recipes on this list** sit at the top: change the servings with the − and + buttons (½×, 1×, 2×) or take a recipe off the list. The amounts update.
 
 ## The item menu (the three dots)

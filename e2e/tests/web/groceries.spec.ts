@@ -1,6 +1,13 @@
+import type { Locator, Page } from "@playwright/test";
 import { expect, hydrated, test, unique } from "../../support/fixtures.ts";
 
 // GRO-1..4: two recipes on one shared list, grouped in store order, shopped from the page, kept across a reload.
+
+/**
+ * A row's tick button by item name. Each row has a second button, "Options for <name>", whose name also contains the
+ * item name and would make a plain `getByRole("button", { name })` match twice (strict mode); the lookahead leaves it out.
+ */
+const tick = (scope: Page | Locator, name: string) => scope.getByRole("button", { name: new RegExp(`^(?!Options for )(?:.* )?${name}$`) });
 
 test("two recipes make one list in store order that can be ticked, moved, added to and cleared", async ({ memberPage: page, member }) => {
   // The household has exactly one list, so one project edits it: the phone and iPad projects run beside this one.
@@ -56,10 +63,10 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   expect(sections.indexOf("Produce")).toBeLessThan(sections.indexOf("Meat"));
   expect(sections.indexOf("Meat")).toBeLessThan(sections.indexOf("Pantry"));
   const produce = page.getByRole("region", { name: "Produce" });
-  // 4 (2 onions at 2×) + 1 = 5; "onion" or "onions" depending on how the API names it.
-  const onions = produce.getByRole("button", { name: /^5 onions?$/ });
+  // 4 (2 onions at 2×) + 1 = 5; the API names it in the singular (docs/API.md, "How items are made").
+  const onions = produce.getByRole("button", { name: /^5 onion$/ });
   await expect(onions).toBeVisible();
-  await expect(page.getByRole("region", { name: "Meat" }).getByRole("button", { name: /ground beef/ })).toBeVisible();
+  await expect(tick(page.getByRole("region", { name: "Meat" }), "ground beef")).toBeVisible();
 
   // Tick, untick, tick.
   await onions.click();
@@ -73,13 +80,13 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   await page.getByRole("button", { name: "Options for ground beef" }).click();
   await page.getByRole("menuitemradio", { name: "Freezer" }).click();
   const freezer = page.getByRole("region", { name: "Freezer" });
-  await expect(freezer.getByRole("button", { name: /ground beef/ })).toBeVisible();
+  await expect(tick(freezer, "ground beef")).toBeVisible();
   await expect(page.getByRole("region", { name: "Meat" })).toHaveCount(0);
 
   // Add a manual item and tick it.
-  await page.getByLabel("Add an item").fill("paper towels");
+  await page.getByLabel("Add an item").fill("dish soap");
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  const towels = page.getByRole("button", { name: "paper towels" });
+  const towels = tick(page, "dish soap");
   await expect(towels).toBeVisible();
   await expect(page.getByLabel("Add an item")).toHaveValue("");
   await towels.click();
@@ -92,10 +99,48 @@ test("two recipes make one list in store order that can be ticked, moved, added 
 
   // Reload: the server has all of it.
   await page.reload();
-  await expect(page.getByRole("region", { name: "Freezer" }).getByRole("button", { name: /ground beef/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /onion/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "paper towels" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /olive oil/ })).toBeVisible();
+  await expect(tick(page.getByRole("region", { name: "Freezer" }), "ground beef")).toBeVisible();
+  await expect(tick(page, "onion")).toHaveCount(0);
+  await expect(tick(page, "dish soap")).toHaveCount(0);
+  await expect(tick(page, "olive oil")).toBeVisible();
   await expect(page.getByRole("link", { name: `Stew ${word}` })).toBeVisible();
   await expect(page.getByRole("link", { name: `Soup ${word}` })).toBeVisible();
+});
+
+// The phone and the iPad are where the list is used (in the shop, on the counter). The test above edits the household's
+// one list, so those projects only look: no horizontal scrolling, and every control big enough to hit (44px).
+test("the list fits a phone or an iPad and its controls are big enough to touch", async ({ memberPage: page, member }) => {
+  // eslint-disable-next-line playwright/no-skipped-test -- the desktop project runs the full test above
+  test.skip(test.info().project.name === "web-desktop", "the phone and iPad projects check the layout; desktop edits the list");
+  const c = member.client;
+  const word = unique("gro");
+  const stew = await c.createRecipe({
+    title: `Stew ${word}`,
+    servings: "4",
+    ingredients: [{ text: "1 lb ground beef", section: null }],
+    steps: [{ text: "Brown the beef.", section: null }],
+  });
+
+  // Another project may empty the shared list between seeding and looking, so seed and look again until one pass holds.
+  await expect(async () => {
+    expect((await c.request.post("/api/grocery/recipes", { data: { recipeId: stew.id, scale: 1 } })).status()).toBe(200);
+    expect((await c.request.post("/api/grocery/items", { data: { text: "dish soap" } })).status()).toBe(201);
+    await page.goto("/groceries");
+    await expect(page.getByRole("link", { name: `Stew ${word}` })).toBeVisible({ timeout: 2_000 });
+    await expect(tick(page, "dish soap").first()).toBeVisible({ timeout: 2_000 });
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const controls: Locator[] = [
+      ...(await page.locator("button[aria-pressed]").all()),
+      ...(await page.getByRole("button", { name: /^Options for / }).all()),
+      ...(await page.getByRole("group", { name: /^Servings of / }).getByRole("button").all()),
+      page.getByRole("button", { name: "Add", exact: true }),
+    ];
+    expect(controls.length).toBeGreaterThan(4);
+    for (const control of controls) {
+      const box = await control.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+    }
+  }).toPass({ timeout: 30_000 });
 });
