@@ -7,6 +7,8 @@
   "scripts": {
     "test": "playwright test",
     "test:compose": "E2E_STACK=compose playwright test",
+    "test:backup": "playwright test -c playwright.backup.config.ts",
+    "test:backup:compose": "E2E_STACK=compose playwright test -c playwright.backup.config.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "report": "playwright show-report"

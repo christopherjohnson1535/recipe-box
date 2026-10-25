@@ -1,0 +1,44 @@
+# Stack for the backup and restore test (e2e/tests/backup). Throwaway, and the only compose file the test uses: just the
+# database and the API, with real named volumes so "wipe the volumes, then restore" is the real thing.
+#   cd e2e && npm run test:backup:compose
+# The API is published on 127.0.0.1 only, so the test can seed and check it without the web container. The values
+# below are test-only; the test looks for them in the backup to prove no secret leaks into it.
+
+name: recipe-box-backup-e2e
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: recipes
+      POSTGRES_PASSWORD: backup-e2e-db-secret-5b1f
+      POSTGRES_DB: recipes
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recipes -d recipes"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgres://recipes:backup-e2e-db-secret-5b1f@db:5432/recipes
+      MEDIA_DIR: /data/media
+      BIND_ADDR: 0.0.0.0:8080
+      COOKIE_SECURE: "false"
+      AI_PROVIDER: none
+      ANTHROPIC_API_KEY: sk-ant-backup-e2e-key-9c2d
+      RUST_LOG: info
+    ports:
+      - "127.0.0.1:${BACKUP_E2E_API_PORT:-8147}:8080"
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  media:

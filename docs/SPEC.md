@@ -238,7 +238,7 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   `media`), `web` (depends on api, port `${WEB_PORT:-3000}:3000`). Optional profile `https` adds `caddy`
   (`deploy/Caddyfile`, ports 80/443, volume for certs).
 - `deploy/compose.prod.yml`: uses `ghcr.io/<owner>/recipe-box-{api,web}:<tag>` images instead of building.
-- `scripts/backup.sh` / `scripts/restore.sh`: `pg_dump` + tar of the media volume.
+- `scripts/backup.sh` / `scripts/restore.sh` (+ `scripts/backup-lib.sh`): `pg_dump` + tar of the media volume, checksummed, retention, safe restore; tested by `e2e/tests/backup` (CI job `backup`, `docker-compose.backup-e2e.yml`). See `docs/DEPLOY.md`.
 - CI (`.github/workflows/ci.yml`): backend fmt/clippy/test with a postgres service; frontend lint/tsc/vitest/
   build; on `main` and tags, buildx multi-arch images pushed to GHCR.
 

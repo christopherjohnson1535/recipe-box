@@ -70,7 +70,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for branches, PR titles and the definitio
 - [Redesign proposals](docs/design/redesign-2026-10/README.md)
 
 ## Backup
-`sh scripts/backup.sh` → `backups/<time>/` · `sh scripts/restore.sh backups/<time>`
+`sh scripts/backup.sh` → `backups/<time>/` · `sh scripts/restore.sh backups/<time>` (asks first, refuses to overwrite existing data without `--force`). Schedule it and copy the folder off the machine: [Backup and restore](docs/wiki/Backup-and-Restore.md).
 
 ## Licence
 MIT — see [LICENSE](LICENSE).

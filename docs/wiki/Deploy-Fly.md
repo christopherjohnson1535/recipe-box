@@ -54,9 +54,39 @@ visitor to a new server becomes admin.
 - Add to Home Screen on the iPad ([[Using on iPad]]). A custom domain: `fly certs add recipes.example.com -a recipe-box-web-<you>`.
 
 ## Upgrade and backups
-Change the tag in both toml files and run both `fly deploy` commands (add `--ha=false` for the api). Take a backup first: the scripts in
-[[Backup and Restore]] expect the Compose stack, so on Fly use the cluster's backups for the database and
-`fly ssh sftp` / `fly ssh console` to copy `/data/media`.
+Change the tag in both toml files and run both `fly deploy` commands (add `--ha=false` for the api). Take a backup first.
+
+The scripts in [[Backup and Restore]] drive Docker Compose, which Fly does not have, so back up the two pieces yourself,
+in the same formats the scripts use:
+
+1. **Database.** Open a private tunnel to the Postgres cluster (Fly's command for this is `fly mpg proxy`; check
+   `fly mpg --help`), then run, with the tunnel's address and the cluster's own credentials:
+   ```sh
+   pg_dump "postgres://USER:PASSWORD@127.0.0.1:PORT/DB" --format=custom --no-owner --no-acl \
+     --exclude-table-data=sessions > db.dump
+   ```
+   Fly's managed Postgres also keeps its own automatic backups; check in `fly mpg status` or the dashboard how long
+   and how often, and do not rely on them alone.
+2. **Photos.** Pack the volume on the machine, then download the file (a plain download avoids the terminal mangling
+   binary output):
+   ```sh
+   fly ssh console -a recipe-box-api-<you> -C "tar -C /data/media -cf /tmp/media.tar ."
+   fly ssh sftp get /tmp/media.tar media.tar -a recipe-box-api-<you>
+   ```
+   (`/tmp` is wiped on restart; the volume itself is only read.)
+3. Copy both files off your computer too, see "Copy backups off the machine" in [[Backup and Restore]].
+
+To restore: stop the api (`fly scale count 0 -a recipe-box-api-<you>`), then rebuild the schema and load the dump
+(`psql "<url>" -c "drop schema public cascade; create schema public"`, then `pg_restore -d "<url>" --no-owner
+--no-acl --single-transaction --exit-on-error db.dump`; dropping the schema first removes tables a newer release
+added, which `--clean` alone would leave behind), upload and unpack `media.tar` into `/data/media`
+as user 10001 (so the `chown` step above does not have to be repeated), then scale the api back to 1. The scripts'
+`BACKUP_MODE=direct` does the database and photo steps for you where you can reach both from one computer
+(`DATABASE_URL`, `MEDIA_DIR`); on Fly the photo folder is only reachable through `fly ssh`, so the manual steps above
+are the practical route.
+
+_These Fly commands were not run against a real Fly account; the database and archive formats are the tested ones
+(see the `backup` job in CI). Please report any step that differs._
 
 ## Sign-in throttle settings
 Leave `TRUST_PROXY_HEADERS` unset (off) on the web app. With it off, the web app sends the API no visitor address, so per-address throttling is effectively off on Fly and only the per-username limit protects sign-in. That is safe, but it is the only protection. Do not turn it on until you have confirmed that Fly's edge sets or overwrites `X-Forwarded-For` (rather than appending to a client-sent value) in front of the web app: Recipe Box reads only that header's right-most entry, and Fly's documentation names `Fly-Client-IP` as the visitor's address, which Recipe Box does not read. Not confirmed when this page was written; check the header against Fly's "request headers" page, for example with a small echo app, before enabling it.
