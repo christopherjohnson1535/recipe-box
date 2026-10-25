@@ -166,7 +166,7 @@ describe("ticking", () => {
     expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("true"); // before the server has answered
     await waitFor(() => expect(calls).toEqual([{ method: "PATCH", path: "/api/grocery/items/i-garlic", body: { checked: true } }]));
     expect(rowsIn("Produce")).toEqual(["3 onion", "2 cloves garlic"]);
-    expect(screen.getByText("3 left to buy · 1 crossed off")).toBeTruthy();
+    expect(screen.getByText("3 left to buy · 1 ticked")).toBeTruthy();
   });
 
   it("unticks", async () => {
@@ -273,7 +273,7 @@ describe("overlapping changes", () => {
     await open();
     fireEvent.click(row("2 cloves garlic"));
     await waitFor(() => expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("true"));
-    await waitFor(() => expect(screen.getByText("3 left to buy · 1 crossed off")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("3 left to buy · 1 ticked")).toBeTruthy());
     let asked = 0;
     server.use(
       http.get("*/api/grocery", () => {
@@ -288,7 +288,7 @@ describe("overlapping changes", () => {
 
     server.use(http.get("*/api/grocery", () => HttpResponse.json({ ...state, updatedAt: "2026-01-01T00:00:05Z" })));
     fireEvent.focus(window); // a newer answer is taken
-    expect(await screen.findByText("3 left to buy · 1 crossed off")).toBeTruthy();
+    expect(await screen.findByText("3 left to buy · 1 ticked")).toBeTruthy();
   });
 });
 
@@ -492,6 +492,25 @@ describe("recipes on the list", () => {
     expect(document.activeElement).toBe(more);
     expect(calls).toHaveLength(1);
     expect(screen.getAllByRole("status").some((s) => s.textContent === "Chili is now 2×. The amounts are updated.")).toBe(true);
+  });
+
+  it("folds the shelf at the start when three or more recipes are on the list, and leaves it alone after", async () => {
+    const three = [recipe(), recipe({ recipeId: "r2", title: "Dal" }), recipe({ recipeId: "r3", title: "Soup" })];
+    const { state } = serve(stock(), three);
+    await open();
+    const shelf = () => screen.getByText(/On this list · 3 recipes/).closest("details")!;
+    expect(shelf().open).toBe(false);
+    shelf().open = true;
+    state.recipes = three.slice(0, 2);
+    fireEvent.focus(window);
+    await waitFor(() => expect(screen.getByText(/On this list · 2 recipes/)).toBeTruthy());
+    expect(screen.getByText(/On this list · 2 recipes/).closest("details")!.open).toBe(true);
+  });
+
+  it("starts the shelf open with one or two recipes", async () => {
+    serve();
+    await open();
+    expect(screen.getByText(/On this list · 1 recipe/).closest("details")!.open).toBe(true);
   });
 
   it("takes a recipe off the list", async () => {

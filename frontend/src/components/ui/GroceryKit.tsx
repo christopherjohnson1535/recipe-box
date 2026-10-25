@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
@@ -29,11 +29,16 @@ export function ListBody({ ref, children }: { ref?: Ref<HTMLDivElement>; childre
   );
 }
 
-/** The recipes on the list, folded away with one tap (open at first). Native `details`. */
-export function RecipeShelf({ summary, children }: { summary: string; children: ReactNode }) {
+/**
+ * The recipes on the list, folded away with one tap. Native `details`. `defaultOpen` is read once, when the shelf first
+ * appears: a recipe added or taken off later never folds or opens it under the reader. It is a quiet head (hairline, muted)
+ * so the heavy rule stays with the store sections the person shops from.
+ */
+export function RecipeShelf({ summary, defaultOpen = true, children }: { summary: string; defaultOpen?: boolean; children: ReactNode }) {
+  const [open] = useState(defaultOpen);
   return (
-    <details open className="group">
-      <summary className="label flex min-h-control cursor-pointer list-none items-center justify-between border-b-2 border-(--rule-double) text-ink [&::-webkit-details-marker]:hidden">
+    <details open={open} className="group">
+      <summary className="label flex min-h-control cursor-pointer list-none items-center justify-between border-b border-(--rule-hair) text-ink-muted [&::-webkit-details-marker]:hidden">
         <span>{summary}</span>
         <span aria-hidden="true" className="px-1 text-body">
           <span className="group-open:hidden">+</span>
@@ -48,15 +53,14 @@ export function RecipeShelf({ summary, children }: { summary: string; children: 
 /** One recipe on the list: its title (a link), servings at the chosen scale, the scale stepper and Remove. */
 export function RecipeRow({ title, meta, stepper, remove }: { title: ReactNode; meta?: string | null; stepper: ReactNode; remove: ReactNode }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-(--rule-hair) py-2">
-      <div className="min-w-0 flex-1 basis-48">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-(--rule-hair) py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+      <div className="col-start-1 row-start-1 min-w-0">
         <p className="text-body leading-snug text-ink [overflow-wrap:anywhere]">{title}</p>
         {meta && <p className="label-quiet text-ink-muted">{meta}</p>}
       </div>
-      <div className="flex items-center gap-1">
-        {stepper}
-        {remove}
-      </div>
+      {/* The same 56px column as every row's options button, so the cross sits on the line of the three dots. */}
+      <div className="col-start-2 row-start-1 flex w-14 justify-center sm:col-start-3">{remove}</div>
+      <div className="col-span-2 row-start-2 justify-self-start sm:col-span-1 sm:col-start-2 sm:row-start-1">{stepper}</div>
     </li>
   );
 }
@@ -87,13 +91,13 @@ export function ScaleStepper({
   const step =
     "inline-flex size-control items-center justify-center text-(--button-ghost-fg) transition-[color] duration-150 ease-out hover:text-(--button-ghost-hover) aria-disabled:cursor-not-allowed aria-disabled:opacity-55 aria-disabled:hover:text-(--button-ghost-fg)";
   return (
-    <div role="group" aria-label={label} className="flex items-center border border-(--input-border) print:hidden">
+    <div role="group" aria-label={label} className="flex items-center rounded-control border border-(--input-border) print:hidden">
       <button type="button" aria-label={downLabel} title={downLabel} onClick={downDisabled ? undefined : onDown} aria-disabled={downDisabled || undefined} className={step}>
         <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M6 12h12" />
         </svg>
       </button>
-      <output aria-live="polite" className={`label min-w-10 text-center text-ink ${tabular}`}>
+      <output aria-live="polite" className={`min-w-12 text-center text-small font-semibold text-ink ${tabular}`}>
         {valueLabel}
       </output>
       <button type="button" aria-label={upLabel} title={upLabel} onClick={upDisabled ? undefined : onUp} aria-disabled={upDisabled || undefined} className={step}>
@@ -155,7 +159,7 @@ export function GroceryRow({
         aria-pressed={checked}
         onClick={onToggle}
         disabled={disabled}
-        className="group flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3.5 py-2 text-left text-body leading-snug disabled:cursor-not-allowed"
+        className="group -ms-2 flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3.5 ps-2 py-2 text-left text-body leading-snug transition-[background-color] duration-150 ease-out enabled:hover:bg-(--panel-bg) enabled:active:bg-(--panel-bg) disabled:cursor-not-allowed"
       >
         <span
           aria-hidden="true"
@@ -189,11 +193,24 @@ export type MenuEntry = { kind: "item"; item: MenuItem } | { kind: "group"; labe
  */
 export function RowMenu({ label, entries, disabled }: { label: string; entries: MenuEntry[]; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
+  /** Opens above the button when the screen has no room below it (the menu is about 370px tall). */
+  const [up, setUp] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menuId = useId();
 
   const choices = () => [...(wrap.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])];
+
+  // Before the first paint: flip above the button if it won't fit below, or, with room nowhere, scroll the menu into view.
+  useLayoutEffect(() => {
+    const menu = wrap.current?.querySelector<HTMLElement>('[role="menu"]');
+    if (!open || !wrap.current || !menu) return;
+    const box = wrap.current.getBoundingClientRect();
+    const need = menu.offsetHeight + 8;
+    const fitsBelow = window.innerHeight - box.bottom >= need;
+    setUp(!fitsBelow && box.top >= need);
+    if (!fitsBelow && box.top < need) menu.scrollIntoView({ block: "nearest" });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -240,7 +257,7 @@ export function RowMenu({ label, entries, disabled }: { label: string; entries: 
         close(true);
         item.onSelect();
       }}
-      className={`group flex min-h-control w-full cursor-pointer items-center gap-3 px-4 text-left text-small hover:bg-(--panel-bg) focus-visible:bg-(--panel-bg) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring) aria-checked:font-semibold ${item.danger ? "text-danger" : "text-ink"}`}
+      className={`group flex min-h-control w-full cursor-pointer items-center gap-3 px-4 text-left text-small hover:bg-(--panel-bg) focus-visible:bg-(--panel-bg) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring) aria-checked:font-semibold ${item.danger ? "text-danger" : "text-ink hover:text-(--button-ghost-hover)"}`}
     >
       {radio && (
         <span aria-hidden="true" className="grid size-4 shrink-0 place-items-center">
@@ -280,7 +297,7 @@ export function RowMenu({ label, entries, disabled }: { label: string; entries: 
         </svg>
       </button>
       {open && (
-        <div id={menuId} role="menu" aria-label={label} className="absolute top-full right-0 z-20 flex min-w-56 max-w-[calc(100vw-2rem)] flex-col border border-(--input-border) bg-paper py-1">
+        <div id={menuId} role="menu" aria-label={label} className={`absolute right-0 z-20 flex min-w-56 max-w-[calc(100vw-2rem)] flex-col border border-(--input-border) bg-paper py-1 ${up ? "bottom-full" : "top-full"}`}>
           {entries.map((entry, i) => {
             if (entry.kind === "separator") return <div key={i} role="separator" className="my-1 border-t border-(--rule-hair)" />;
             if (entry.kind === "item") return choice(entry.item, false);
@@ -372,7 +389,7 @@ export function SelectionBar({ status, action, onAction, actionDisabled, cancel,
           type="button"
           onClick={onAction}
           disabled={actionDisabled}
-          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center rounded-full bg-(--bar-action-bg) px-5 whitespace-nowrap text-(--bar-action-fg) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--bar-focus) disabled:cursor-not-allowed disabled:opacity-55"
+          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center rounded-full bg-(--bar-action-bg) px-5 whitespace-nowrap text-(--bar-action-fg) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--bar-focus) disabled:cursor-not-allowed disabled:bg-transparent disabled:text-(--bar-fg) disabled:opacity-60 disabled:ring-1 disabled:ring-(--bar-fg)/40 disabled:ring-inset"
         >
           {action}
         </button>

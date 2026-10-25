@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { RowMenu, ScaleStepper, SelectCard, SelectionBar } from "./GroceryKit";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { RecipeShelf, RowMenu, ScaleStepper, SelectCard, SelectionBar } from "./GroceryKit";
 
 function menu(onSelect = vi.fn()) {
   render(
@@ -82,6 +82,70 @@ describe("RowMenu", () => {
     expect(onSelect).toHaveBeenCalledOnce();
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+});
+
+describe("RowMenu near the edge of the screen", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  /** jsdom has no layout: say where the button is on a 768px-high screen and how tall the menu is. */
+  function place(top: number, bottom: number) {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(372);
+  }
+
+  it("opens below the button when there is room", () => {
+    place(100, 156);
+    const { trigger } = menu();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu").className).toContain("top-full");
+  });
+
+  it("opens above the button when there is room only there, and goes back below on the next open", () => {
+    place(700, 756);
+    const { trigger } = menu();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu").className).toContain("bottom-full");
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    place(100, 156);
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu").className).toContain("top-full");
+  });
+
+  it("scrolls the menu into view when neither side has room", () => {
+    place(300, 756);
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const { trigger } = menu();
+    fireEvent.click(trigger);
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    expect(screen.getByRole("menu").className).toContain("top-full");
+  });
+});
+
+describe("RecipeShelf", () => {
+  it("starts open, or folded when asked, and keeps what the reader chose when the page re-renders", () => {
+    const { rerender } = render(
+      <RecipeShelf summary="On this list" defaultOpen={false}>
+        <p>rows</p>
+      </RecipeShelf>,
+    );
+    const shelf = () => screen.getByText("On this list").closest("details")!;
+    expect(shelf().open).toBe(false);
+    shelf().open = true;
+    rerender(
+      <RecipeShelf summary="On this list" defaultOpen>
+        <p>rows</p>
+      </RecipeShelf>,
+    );
+    expect(shelf().open).toBe(true);
+    shelf().open = false;
+    rerender(
+      <RecipeShelf summary="On this list" defaultOpen>
+        <p>rows</p>
+      </RecipeShelf>,
+    );
+    expect(shelf().open).toBe(false); // defaultOpen is read once
   });
 });
 

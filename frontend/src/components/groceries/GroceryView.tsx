@@ -117,7 +117,7 @@ export function GroceryView() {
   const description =
     list.items.length === 0
       ? "One list, shared by everyone in the household."
-      : `${left === 0 ? "Nothing left to buy" : `${left} left to buy`}${ticked > 0 ? ` · ${ticked} crossed off` : ""}`;
+      : `${left === 0 ? "Nothing left to buy" : `${left} left to buy`}${ticked > 0 ? ` · ${ticked} ticked` : ""}`;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -210,125 +210,129 @@ export function GroceryView() {
       }}
     >
       <PageHeader kicker="Shopping list" title="Groceries" description={description} liveDescription />
-      <OfflineNote id={OFFLINE}>You’re offline. This is the last copy of the list this device has. Ticking, adding and removing need the server; they work again once you have signal.</OfflineNote>
-      <p role="status" className="sr-only">
-        {g.announcement}
-      </p>
-      <ToastRegion>
-        {g.problem && (
-          <Toast role="alert" actions={<ToastDismiss onClick={g.dismissProblem} />}>
-            That didn’t save. {g.problem}
-          </Toast>
+      {/* The list keeps to the form measure on wide screens, so a row's tick and its options button stay within reach of each other. */}
+      <div className="flex max-w-form flex-col gap-8">
+        <OfflineNote id={OFFLINE}>You’re offline. This is the last copy of the list this device has. Ticking, adding and removing need the server; they work again once you have signal.</OfflineNote>
+        <p role="status" className="sr-only">
+          {g.announcement}
+        </p>
+        <ToastRegion>
+          {g.problem && (
+            <Toast role="alert" actions={<ToastDismiss onClick={g.dismissProblem} />}>
+              That didn’t save. {g.problem}
+            </Toast>
+          )}
+        </ToastRegion>
+
+        {list.recipes.length > 0 && (
+          <RecipeShelf defaultOpen={list.recipes.length <= 2} summary={`On this list · ${list.recipes.length} ${list.recipes.length === 1 ? "recipe" : "recipes"}`}>
+            <ul>{list.recipes.map(recipeRow)}</ul>
+          </RecipeShelf>
         )}
-      </ToastRegion>
 
-      {list.recipes.length > 0 && (
-        <RecipeShelf summary={`On this list · ${list.recipes.length} ${list.recipes.length === 1 ? "recipe" : "recipes"}`}>
-          <ul>{list.recipes.map(recipeRow)}</ul>
-        </RecipeShelf>
-      )}
+        <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-2 print:hidden">
+          <Field label="Add an item" htmlFor="grocery-add" error={typoed ? "Type what to add, like “2 lb potatoes”." : undefined}>
+            <div className="flex gap-3">
+              <Input
+                ref={addField}
+                id="grocery-add"
+                name="item"
+                autoComplete="off"
+                enterKeyHint="done"
+                maxLength={200}
+                placeholder="Paper towels, 2 lb potatoes…"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                disabled={!online}
+                readOnly={adding}
+                aria-invalid={typoed || undefined}
+                aria-describedby={typoed ? "grocery-add-msg" : online ? undefined : OFFLINE}
+              />
+              <Button type="submit" variant="secondary" pending={adding} disabled={!online} {...offlineAttrs}>
+                Add
+              </Button>
+            </div>
+          </Field>
+        </form>
 
-      <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-2 print:hidden">
-        <Field label="Add an item" htmlFor="grocery-add" error={typoed ? "Type what to add, like “2 lb potatoes”." : undefined}>
-          <div className="flex gap-3">
-            <Input
-              ref={addField}
-              id="grocery-add"
-              name="item"
-              autoComplete="off"
-              enterKeyHint="done"
-              maxLength={200}
-              placeholder="Paper towels, 2 lb potatoes…"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={!online}
-              readOnly={adding}
-              aria-invalid={typoed || undefined}
-              aria-describedby={typoed ? "grocery-add-msg" : online ? undefined : OFFLINE}
-            />
-            <Button type="submit" variant="secondary" pending={adding} disabled={!online} {...offlineAttrs}>
-              Add
+        <ListBody ref={listTop}>
+          {list.items.length === 0 && list.recipes.length === 0 && (
+            <EmptyState title="Nothing on the list yet" actions={<ButtonLink href="/">Choose recipes</ButtonLink>}>
+              <p>Open a recipe and choose Add to groceries, or pick several on the home page. What you type above lands here too.</p>
+            </EmptyState>
+          )}
+
+          {list.items.length === 0 && list.recipes.length > 0 && <Text variant="note">Nothing left to buy.</Text>}
+
+          {groups.length === 0 && list.items.length > 0 && <Text variant="note">Everything left is a staple you always have. Show staples to see them.</Text>}
+
+          {groups.length > 0 && (
+            <div className="flex flex-col gap-8">
+              {groups.map((group) => (
+                <GrocerySection key={group.section} title={group.label} count={group.left === 0 ? "All ticked" : `${group.left} left`}>
+                  {group.items.map((item) => (
+                    <GroceryRow
+                      key={item.id}
+                      itemId={item.id}
+                      amounts={amountsText(item.amounts)}
+                      name={item.name}
+                      note={item.staple ? "Staple" : undefined}
+                      checked={item.checked}
+                      onToggle={() => {
+                        keepFocus.current = item.id; // the row moves when it sinks; a keyboard user stays on it
+                        void g.toggle(item);
+                      }}
+                      disabled={!online}
+                      menu={<RowMenu label={`Options for ${item.name}`} entries={menuFor(item)} disabled={!online} />}
+                    />
+                  ))}
+                </GrocerySection>
+              ))}
+            </div>
+          )}
+        </ListBody>
+
+        {(list.items.length > 0 || list.recipes.length > 0) && (
+          <div className="grid grid-cols-2 items-center gap-x-6 gap-y-2 border-t border-(--rule-hair) pt-4 sm:flex sm:flex-wrap sm:justify-end">
+            {staples > 0 && (
+              <Button variant="ghost" className="justify-self-start sm:mr-auto" onClick={() => setShowStaples((s) => !s)}>
+                {showStaples ? `Hide staples (${staples})` : `Show staples (${staples})`}
+              </Button>
+            )}
+            {list.items.length > 0 && (
+              <Button
+                variant="secondary"
+                className="max-sm:order-first max-sm:col-span-2 max-sm:w-full"
+                disabled={ticked === 0 || !online}
+                {...offlineAttrs}
+                onClick={() => {
+                  listTop.current?.focus({ preventScroll: true }); // this button is about to disable itself
+                  void g.clearChecked(ticked);
+                }}
+              >
+                Clear ticked{ticked > 0 ? ` (${ticked})` : ""}
+              </Button>
+            )}
+            <Button variant="ghost" className="col-start-2 justify-self-end sm:col-start-auto" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
+              Empty list
             </Button>
           </div>
-        </Field>
-      </form>
-
-      <ListBody ref={listTop}>
-        {list.items.length === 0 && list.recipes.length === 0 && (
-          <EmptyState title="Nothing on the list yet" actions={<ButtonLink href="/">Choose recipes</ButtonLink>}>
-            <p>Open a recipe and choose Add to groceries, or pick several on the home page. What you type above lands here too.</p>
-          </EmptyState>
         )}
-
-        {list.items.length === 0 && list.recipes.length > 0 && <Text variant="note">Nothing left to buy.</Text>}
-
-        {groups.length === 0 && list.items.length > 0 && <Text variant="note">Everything left is a staple you always have. Show staples to see them.</Text>}
-
-        {groups.length > 0 && (
-          <div className="flex flex-col gap-8">
-            {groups.map((group) => (
-              <GrocerySection key={group.section} title={group.label} count={group.left === 0 ? "All crossed off" : `${group.left} left`}>
-                {group.items.map((item) => (
-                  <GroceryRow
-                    key={item.id}
-                    itemId={item.id}
-                    amounts={amountsText(item.amounts)}
-                    name={item.name}
-                    note={item.staple ? "Staple" : undefined}
-                    checked={item.checked}
-                    onToggle={() => {
-                      keepFocus.current = item.id; // the row moves when it sinks; a keyboard user stays on it
-                      void g.toggle(item);
-                    }}
-                    disabled={!online}
-                    menu={<RowMenu label={`Options for ${item.name}`} entries={menuFor(item)} disabled={!online} />}
-                  />
-                ))}
-              </GrocerySection>
-            ))}
-          </div>
+        {confirmEmpty && (
+          <ConfirmInline
+            confirmLabel="Empty list"
+            cancelLabel="Keep list"
+            pending={g.busy}
+            onCancel={() => setConfirmEmpty(false)}
+            onConfirm={async () => {
+              await g.empty();
+              setConfirmEmpty(false);
+            }}
+          >
+            Empty the whole list? Every recipe and every item comes off it, for everyone in the household. Staples and your section choices are kept.
+          </ConfirmInline>
         )}
-      </ListBody>
-
-      {(list.items.length > 0 || list.recipes.length > 0) && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          {staples > 0 && (
-            <Button variant="ghost" onClick={() => setShowStaples((s) => !s)}>
-              {showStaples ? `Hide staples (${staples})` : `Show staples (${staples})`}
-            </Button>
-          )}
-          {list.items.length > 0 && (
-            <Button
-              variant="secondary"
-              disabled={ticked === 0 || !online}
-              {...offlineAttrs}
-              onClick={() => {
-                listTop.current?.focus({ preventScroll: true }); // this button is about to disable itself
-                void g.clearChecked(ticked);
-              }}
-            >
-              Clear ticked{ticked > 0 ? ` (${ticked})` : ""}
-            </Button>
-          )}
-          <Button variant="ghost" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
-            Empty list
-          </Button>
-        </div>
-      )}
-      {confirmEmpty && (
-        <ConfirmInline
-          confirmLabel="Empty list"
-          cancelLabel="Keep list"
-          pending={g.busy}
-          onCancel={() => setConfirmEmpty(false)}
-          onConfirm={async () => {
-            await g.empty();
-            setConfirmEmpty(false);
-          }}
-        >
-          Empty the whole list? Every recipe and every item comes off it, for everyone in the household. Staples and your section choices are kept.
-        </ConfirmInline>
-      )}
+      </div>
     </div>
   );
 }
