@@ -1,6 +1,6 @@
 # 0006. Editorial design system with three token layers
 
-Status: Accepted · Date: 2026-10-22 (recorded after the fact; the decision predates this record)
+Status: Accepted; palette and font parts superseded by [0009](0009-riviera-charcoal-saffron.md) · Date: 2026-10-22 (recorded after the fact; the decision predates this record)
 
 ## Context
 The app is used in the kitchen on an iPad at arm's length. It should feel like a printed cookbook, stay legible and accessible, and let the look change in one place instead of page by page.

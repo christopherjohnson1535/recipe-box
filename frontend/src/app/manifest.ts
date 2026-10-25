@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 // Matches --color-paper in src/styles/themes/day.css (manifest.test.ts checks it).
-const PAPER = "#fbf8f1";
+const PAPER = "#f4f4f1";
 
 const icon = (src: string, size: number, purpose: "any" | "maskable" = "any") => ({
   src,

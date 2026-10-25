@@ -7,15 +7,16 @@ How the colours are wired, how to change them, and how to add a theme. The look 
 
 ```
 primitives            semantic (per theme)          component                    used by
---cream-50   ─────►   --color-paper        ─────►   --button-primary-fg   ─────► components/ui/Button.tsx
---stone-950  ─────►   --color-ink          ─────►   --button-primary-bg
---claret-700 ─────►   --color-accent       ─────►   --kicker-fg, --link-fg ...
+--chalk-50    ─────►   --color-paper        ─────►   --button-primary-fg   ─────► components/ui/Button.tsx
+--slate-900   ─────►   --color-ink          ─────►   --button-primary-bg
+--saffron-700 ─────►   --color-accent       ─────►   --kicker-fg, --link-fg ...
+--brick-700   ─────►   --color-danger       ─────►   --button-danger-bg, --input-border-invalid ...
 ```
 
 | Layer | File | What it holds | Who may read it |
 |---|---|---|---|
-| 1. Primitives | `frontend/src/styles/primitives.css` | Raw hex values named by what they look like (`--cream-50`, `--umber-900`, `--claret-700`, print inks `--mustard-500`, `--fern-700`, `--tomato-600`) | Theme files only |
-| 2. Semantic | `frontend/src/styles/themes/day.css`, `evening.css` | What a colour means: `--color-paper`, `--color-ink`, `--color-ink-muted`, `--color-rule`, `--color-rule-strong`, `--color-accent`, `--color-accent-hover`, `--color-on-accent`, `--color-danger`, `--color-focus`, `--color-attention`, `--color-on-attention`, `--color-stage`, `--color-on-stage` | ui components (as `bg-paper`, `text-ink`...), component tokens, `globals.css` base styles |
+| 1. Primitives | `frontend/src/styles/primitives.css` | Raw hex values named by what they look like (`--chalk-50`, `--slate-900`, `--saffron-700`, `--brick-700`, `--sea-400`, print inks `--mustard-500`, `--fern-700`, `--tomato-600`) | Theme files only |
+| 2. Semantic | `frontend/src/styles/themes/day.css`, `evening.css` | What a colour means: `--color-paper`, `--color-ink`, `--color-ink-muted`, `--color-rule`, `--color-rule-strong`, `--color-accent`, `--color-accent-hover`, `--color-on-accent`, `--color-danger`, `--color-danger-hover`, `--color-on-danger`, `--color-focus`, `--color-attention`, `--color-on-attention`, `--color-stage`, `--color-on-stage`, `--color-band`, `--color-on-band`, `--color-band-accent` | ui components (as `bg-paper`, `text-ink`...), component tokens, `globals.css` base styles |
 | 3. Component | `frontend/src/styles/components.css` | One decision inside one component: `--button-primary-bg`, `--input-border`, `--chip-underline-selected`, `--panel-bg`, `--numeral-fg`, `--focus-ring`... | `frontend/src/components/ui/*` only, written as Tailwind arbitrary values: `bg-(--button-primary-bg)` |
 
 Pages and app components (`src/app/**`, `src/components/*.tsx`) never touch colour, type or borders. They compose
@@ -24,6 +25,23 @@ ui components and use layout utilities (flex, grid, gap, padding, widths such as
 `day.css` is written as Tailwind `@theme static`, which is what creates the `bg-paper`/`text-ink`/`border-rule`
 utilities. Tailwind's own colour palette is switched off (`--color-*: initial`), so a class like `text-red-600`
 produces nothing. Type scale, fonts, radius and easing don't change between themes and live in `globals.css`.
+
+## The Riviera palette (October 2026, ADR 0009)
+Charcoal & Saffron replaced the cream, umber and claret palette. Values and contrast figures are in `docs/UI.md`
+("Tokens") and `docs/design/restyle-2026-10-riviera/README.md`; the guard tests below hold every pairing. Three
+decisions worth knowing before you change a colour:
+
+- **Danger is no longer the accent.** The claret accent used to double as the danger colour. Saffron reads as warmth,
+  not as an error, so `--color-danger` is its own brick red (`--brick-700` by day, `--brick-300` by evening) with
+  `--color-danger-hover` and `--color-on-danger` for the danger button. `tokens.test.ts` fails if danger or attention
+  comes within 25 degrees of hue of the accent.
+- **Attention moved from mustard to sea teal.** Mustard (`#d9a21b`, hue 43) sat next to saffron (hue 38) and a
+  flagged import row read as "accent", not "check this". `--color-attention` is now `--sea-400` (`#6fb5bd`) in both
+  editions: still a wash, rule or mark only, charcoal ink on it (6.5:1), 7.2:1 against the darkroom stage, and the
+  20% wash keeps ink and accent text above 4.5:1. Mustard stays a primitive print ink with no meaning attached.
+- **The band.** `--color-band`, `--color-on-band` and `--color-band-accent` are the charcoal top band and inverse
+  panels. They are dark in both editions (evening only softens the text a touch) and are paired in the contract now,
+  before the shell issue (#120) uses them.
 
 ## Editions: how day and evening are chosen
 Day is the default token set (`:root`, from `day.css`). Evening is the same names redefined in `evening.css` (and the
@@ -90,6 +108,7 @@ primitive, under a selector. Example, a high-contrast "large print" theme:
   - `PAPER` in `lib/edition.ts` equals each theme's `--color-paper`;
   - print inks: each ink's contrast on day and evening paper is recorded (text-safe, graphic or decorative only);
   - decorative component tokens (`--skeleton-bg`, `--skeleton-shine`) are listed with a reason instead of a pairing;
+  - danger and attention stay at least 25 degrees of hue away from the accent in every theme;
   - every `(--x)` / `var(--x)` read by `components/ui` and `globals.css` is defined, and every component token is read;
   - every `-fg` / `-bg` component token has a contrast pairing below;
   - `themeColor` in `app/layout.tsx` and the manifest colours equal the resolved `--color-paper` of day and evening;

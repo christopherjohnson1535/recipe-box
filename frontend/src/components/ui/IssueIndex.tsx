@@ -14,7 +14,7 @@ export function IssueIndex({ title, children }: { title: string; children: React
   );
 }
 
-/** One line of the index: claret display numeral, title, total time. The whole line is the link. */
+/** One line of the index: accent display numeral, title, total time. The whole line is the link. */
 export function IssueIndexItem({ n, href, title, time }: { n: number; href: string; title: string; time?: ReactNode }) {
   return (
     <li className="border-b border-(--rule-hair)">

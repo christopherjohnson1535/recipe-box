@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import "@fontsource/libre-caslon-display/latin-400.css";
-import "@fontsource-variable/newsreader/opsz.css";
-import "@fontsource-variable/newsreader/opsz-italic.css";
+import "@fontsource/marcellus/latin-400.css";
+import "@fontsource-variable/karla/wght.css";
+import "@fontsource-variable/crimson-pro/wght.css";
+import "@fontsource-variable/crimson-pro/wght-italic.css";
 import "./globals.css";
 import { EDITION_SCRIPT } from "@/lib/edition";
 import { EditionController } from "@/components/edition/EditionController";
@@ -29,8 +30,8 @@ export const viewport: Viewport = {
   viewportFit: "cover", // lets env(safe-area-inset-*) report the iOS home indicator; see the safe-area block in globals.css
   // Matches --color-paper in src/styles/themes/day.css and evening.css; EditionController rewrites it for a chosen edition.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbf8f1" },
-    { media: "(prefers-color-scheme: dark)", color: "#16130f" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f4f1" },
+    { media: "(prefers-color-scheme: dark)", color: "#121416" },
   ],
 };
 

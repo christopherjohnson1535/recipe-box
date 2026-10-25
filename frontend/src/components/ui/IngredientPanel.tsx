@@ -38,7 +38,7 @@ export function IngredientGroup({ title, children }: { title: string | null; chi
 type IngredientRowProps = {
   /** Position in the whole list: the step links point at `#ingredient-<index>`. */
   index: number;
-  /** The amount and unit, claret in its own column; null leaves the column empty. */
+  /** The amount and unit, accent in its own column; null leaves the column empty. */
   quantity: string | null;
   checked: boolean;
   onToggle: () => void;
@@ -47,7 +47,7 @@ type IngredientRowProps = {
   children: ReactNode;
 };
 
-/** One ingredient: a button the cook taps to tick off. Ticked rows get a checked box and a drawn claret line. */
+/** One ingredient: a button the cook taps to tick off. Ticked rows get a checked box and a drawn accent line. */
 export function IngredientRow({ index, quantity, checked, onToggle, fade, children }: IngredientRowProps) {
   return (
     <li id={`ingredient-${index}`} className="scroll-mt-24 border-b border-(--rule-hair) md:scroll-mt-4 print:break-inside-avoid">

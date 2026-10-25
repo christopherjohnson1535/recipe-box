@@ -7,41 +7,51 @@
 :root[data-theme="evening"] {
   color-scheme: dark;
 
-  --color-paper: var(--umber-950);
-  --color-paper-deep: var(--umber-900);
-  --color-ink: var(--umber-50);
-  --color-ink-muted: var(--umber-300);
-  --color-rule: var(--umber-700);
-  --color-rule-strong: var(--umber-500);
-  --color-accent: var(--claret-300);
-  --color-accent-hover: var(--claret-200);
-  --color-on-accent: var(--umber-950);
-  --color-danger: var(--claret-200);
-  --color-focus: var(--claret-200);
-  --color-attention: var(--mustard-500);
-  --color-on-attention: var(--stone-950);
-  --color-stage: var(--umber-900);
-  --color-on-stage: var(--umber-50);
+  --color-paper: var(--slate-950);
+  --color-paper-deep: var(--slate-925);
+  --color-ink: var(--chalk-75);
+  --color-ink-muted: var(--slate-300);
+  --color-rule: var(--slate-800);
+  --color-rule-strong: var(--slate-500);
+  --color-accent: var(--saffron-300);
+  --color-accent-hover: var(--saffron-200);
+  --color-on-accent: var(--slate-950);
+  --color-danger: var(--brick-300);
+  --color-danger-hover: var(--brick-200);
+  --color-on-danger: var(--slate-950);
+  --color-focus: var(--saffron-300);
+  --color-attention: var(--sea-400);
+  --color-on-attention: var(--slate-900);
+  --color-stage: var(--slate-925);
+  --color-on-stage: var(--chalk-75);
+  --color-band: var(--slate-900);
+  --color-on-band: var(--chalk-75);
+  --color-band-accent: var(--saffron-300);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --color-paper: var(--umber-950);
-    --color-paper-deep: var(--umber-900);
-    --color-ink: var(--umber-50);
-    --color-ink-muted: var(--umber-300);
-    --color-rule: var(--umber-700);
-    --color-rule-strong: var(--umber-500);
-    --color-accent: var(--claret-300);
-    --color-accent-hover: var(--claret-200);
-    --color-on-accent: var(--umber-950);
-    --color-danger: var(--claret-200);
-    --color-focus: var(--claret-200);
-    --color-attention: var(--mustard-500);
-    --color-on-attention: var(--stone-950);
-    --color-stage: var(--umber-900);
-    --color-on-stage: var(--umber-50);
+    --color-paper: var(--slate-950);
+    --color-paper-deep: var(--slate-925);
+    --color-ink: var(--chalk-75);
+    --color-ink-muted: var(--slate-300);
+    --color-rule: var(--slate-800);
+    --color-rule-strong: var(--slate-500);
+    --color-accent: var(--saffron-300);
+    --color-accent-hover: var(--saffron-200);
+    --color-on-accent: var(--slate-950);
+    --color-danger: var(--brick-300);
+    --color-danger-hover: var(--brick-200);
+    --color-on-danger: var(--slate-950);
+    --color-focus: var(--saffron-300);
+    --color-attention: var(--sea-400);
+    --color-on-attention: var(--slate-900);
+    --color-stage: var(--slate-925);
+    --color-on-stage: var(--chalk-75);
+    --color-band: var(--slate-900);
+    --color-on-band: var(--chalk-75);
+    --color-band-accent: var(--saffron-300);
   }
 }

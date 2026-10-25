@@ -83,7 +83,7 @@
 
 /*
  * Magazine card (ui/MagazineCard): on hover and on keyboard focus the plate scales and turns a touch and the title
- * draws its claret underline. Only scale, rotate and background-size move; colour changes are in the component.
+ * draws its accent underline. Only scale, rotate and background-size move; colour changes are in the component.
  */
 .mag-card .plate-img {
   transition:
@@ -128,7 +128,7 @@
 
 /*
  * Recipe spread (#40). The opener photo turns slowly as it scrolls through view (CSS scroll-driven animation, no
- * script; browsers without it keep the photo still). A ticked ingredient gets a claret line drawn through it
+ * script; browsers without it keep the photo still). A ticked ingredient gets an accent line drawn through it
  * (background-size, so it follows wrapped lines); a rescaled quantity fades to its new value; the floating bar
  * slides up once the opener's buttons scroll away.
  */
@@ -164,7 +164,7 @@
   visibility: hidden;
   transition-delay: 0s, 0s, var(--duration-slow);
 }
-/* The ingredient row a step link jumped to: a claret bar and a tint, fading out after a moment (kept still when motion is reduced). */
+/* The ingredient row a step link jumped to: an accent bar and a tint, fading out after a moment (kept still when motion is reduced). */
 li:target > button {
   background-color: var(--target-bg);
   box-shadow: inset 3px 0 0 var(--qty-fg);

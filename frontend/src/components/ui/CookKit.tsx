@@ -77,7 +77,7 @@ export function CookVoiceToggle({ listening, ...rest }: { listening: boolean } &
   );
 }
 
-/** One segment per step: ticked steps in ink, steps passed but not ticked in muted ink, the current one in claret, the rest as a hairline. Decorative. */
+/** One segment per step: ticked steps in ink, steps passed but not ticked in muted ink, the current one in the accent, the rest as a hairline. Decorative. */
 export function CookProgress({ count, current, done }: { count: number; current: number; done: ReadonlySet<number> }) {
   return (
     <div aria-hidden="true" className="mt-3 flex gap-2">
@@ -231,7 +231,7 @@ export function CookRail({ children, hiddenCount, anyLit }: { children: ReactNod
   );
 }
 
-/** One ingredient: a button the cook taps to tick off (claret line through it, muted, as on the recipe page). */
+/** One ingredient: a button the cook taps to tick off (accent line through it, muted, as on the recipe page). */
 export function CookRailRow({ quantity, name, lit, ticked, onToggle }: { quantity: string; name: string; lit: boolean; ticked: boolean; onToggle: () => void }) {
   return (
     <li data-lit={lit} className={cx("shrink-0 text-small min-[700px]:text-deck", lit ? "text-ink" : "text-ink-muted max-lg:group-data-[all=false]/rail:hidden")}>
@@ -274,7 +274,7 @@ export function CookStepList({ children }: { children: ReactNode }) {
 }
 
 /**
- * One step in the list, 24px text (28px from 700px) with its numeral and a tick on the right. The current step has a claret
+ * One step in the list, 24px text (28px from 700px) with its numeral and a tick on the right. The current step has an accent
  * bar on its left and scrolls into view when it becomes current; a done step is muted.
  */
 export function CookStepItem({ number, current, done, tick, children }: { number: number; current: boolean; done: boolean; tick: ReactNode; children: ReactNode }) {
@@ -306,7 +306,7 @@ export function CookStepItem({ number, current, done, tick, children }: { number
   );
 }
 
-/** An ingredient named in the step: claret with a solid underline. */
+/** An ingredient named in the step: accent with a solid underline. */
 export function CookMention({ children }: { children: ReactNode }) {
   return <span className="text-accent underline decoration-1 underline-offset-[0.2em]">{children}</span>;
 }
@@ -350,7 +350,7 @@ const R = 90;
 const C = 2 * Math.PI * R;
 
 /**
- * A timer. `large` is a ring with big tabular digits; otherwise a compact row. A finished timer flashes claret: colour
+ * A timer. `large` is a ring with big tabular digits; otherwise a compact row. A finished timer flashes the accent colour: colour
  * only (`flash` flips about once a second), so reduced motion keeps it. `digits` is "8:38".
  */
 export function CookTimer({

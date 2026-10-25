@@ -10,7 +10,7 @@ export const EDITION_EVENT = "rb-edition-change";
 export const EVENING_STARTS_AT = 19; // local hour: evening runs 19:00 to 06:59
 export const DAY_STARTS_AT = 7;
 /** The paper colour of each edition, for <meta name="theme-color">. A guard test ties these to the tokens. */
-export const PAPER: Record<Edition, string> = { day: "#fbf8f1", evening: "#16130f" };
+export const PAPER: Record<Edition, string> = { day: "#f4f4f1", evening: "#121416" };
 
 const PREFERENCES: readonly EditionPreference[] = ["clock", "day", "evening", "device"];
 

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { splitIngredient } from "@/lib/scale";
 import { cx } from "./cx";
 
-// Import as a darkroom (#42). Mustard is the semantic token `attention`: only ever a wash, a rule or a mark (2.17:1 on
+// Import as a darkroom (#42). The semantic token `attention` (sea teal) is only ever a wash, a rule or a mark (2.1:1 on
 // day paper); any glyph on it is `on-attention` ink. The dark ground is `stage`. tokens.test.ts checks the contrast.
 // Movement lives in these keyframes and is switched off for reduced motion.
 const css = `
@@ -23,7 +23,7 @@ const Styles = () => (
 
 export type StageRegion = { x: number; y: number; w: number; h: number; label?: string };
 
-/** A photo tilted on a dark ground. `scanning` loops a mustard line over it; regions are boxes the provider found. */
+/** A photo tilted on a dark ground. `scanning` loops an attention-coloured line over it; regions are boxes the provider found. */
 export function ScanStage({ src, alt, caption, scanning, regions = [] }: { src: string; alt: string; caption: string; scanning: boolean; regions?: StageRegion[] }) {
   return (
     <figure className="flex flex-col gap-3 bg-stage p-6 text-on-stage">
@@ -82,7 +82,7 @@ export function ScanHeading() {
   );
 }
 
-/** "Draft · not saved yet": the claret kicker over the title. */
+/** "Draft · not saved yet": the accent kicker over the title. */
 export function DraftKicker({ children }: { children: ReactNode }) {
   return <p className="label text-(--kicker-fg)">{children}</p>;
 }
@@ -101,8 +101,8 @@ export function DraftTitle({ title, typed }: { title: string; typed: string }) {
 }
 
 /**
- * One row: a mark at the left (check, or a `?` ink-on-mustard badge when flagged), the quantity in claret tabular
- * figures, then the rest of the line. Flagged rows get the mustard wash; `delay` staggers the slide in.
+ * One row: a mark at the left (check, or a `?` ink-on-attention badge when flagged), the quantity in accent tabular
+ * figures, then the rest of the line. Flagged rows get the attention wash; `delay` staggers the slide in.
  */
 export function DraftRow({ delay, flagged, text }: { delay: number; flagged: boolean; text: string }) {
   const { quantity, rest } = splitIngredient(text);
@@ -127,7 +127,7 @@ export function DraftRow({ delay, flagged, text }: { delay: number; flagged: boo
   );
 }
 
-/** The mustard-ruled note for warnings. */
+/** The attention-ruled note for warnings. */
 export function DraftNote({ children }: { children: ReactNode }) {
   return (
     <div role="status" className="border-l-[3px] border-attention bg-(--alert-bg) px-5 py-4 text-small text-(--alert-fg)">

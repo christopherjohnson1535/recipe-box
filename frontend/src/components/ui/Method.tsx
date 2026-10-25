@@ -15,7 +15,7 @@ export function MethodHeader({ steps }: { steps: number }) {
   );
 }
 
-/** One step: a large claret numeral hanging in the margin, the text beside it. */
+/** One step: a large accent numeral hanging in the margin, the text beside it. */
 export function MethodStep({ number, children }: { number: number; children: ReactNode }) {
   return (
     <li className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-4">
@@ -28,7 +28,7 @@ export function MethodStep({ number, children }: { number: number; children: Rea
 }
 
 /**
- * An ingredient named in a step: a dotted claret underline linking to its row in the ingredient list. Activating it
+ * An ingredient named in a step: a dotted accent underline linking to its row in the ingredient list. Activating it
  * jumps to the row (the browser's own jump, so nothing animates) and moves focus to the row's button; the row is
  * highlighted while it is the link target. On touch screens the hit area grows to 44px without moving the text.
  */

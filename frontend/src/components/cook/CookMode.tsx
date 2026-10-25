@@ -103,7 +103,7 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
     return () => clearInterval(tick);
   }, [running]);
 
-  // A finished timer flashes for ten seconds, then stays claret; the re-render stops with the flashing.
+  // A finished timer flashes for ten seconds, then stays accent; the re-render stops with the flashing.
   const flashing = timers.timers.some((t) => t.done && now - t.endsAt < FLASH_MS);
   useEffect(() => {
     if (!flashing) return;

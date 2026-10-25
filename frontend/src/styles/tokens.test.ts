@@ -123,6 +123,11 @@ const TEXT: [string, string][] = [
   ["--color-ink", "--target-bg"],
   ["--color-on-attention", "--color-attention"], // the ? mark
   ["--color-on-stage", "--color-stage"], // darkroom caption and domain card
+  ["--color-danger-hover", "--color-paper"],
+  ["--color-on-danger", "--color-danger"], // the danger button
+  ["--color-on-danger", "--color-danger-hover"],
+  ["--color-on-band", "--color-band"], // the charcoal top band and inverse panels (#120)
+  ["--color-band-accent", "--color-band"], // saffron on the band: active link, counts
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
 const UI: [string, string][] = [
@@ -151,6 +156,8 @@ const UI: [string, string][] = [
   ["--mention-line", "--color-paper"], // dotted underline on an ingredient named in a step
   ["--bar-focus", "--bar-bg"],
   ["--color-attention", "--color-stage"], // scan line and region boxes on the dark ground
+  ["--color-band-accent", "--color-band"], // active underline and focus ring on the band
+  ["--color-on-band", "--color-band"],
 ];
 
 describe("design tokens", () => {
@@ -253,7 +260,7 @@ describe("design tokens", () => {
 
   it("print inks: where each is safe on day and evening paper", () => {
     // Recorded, not aspirational. text = 4.5:1 (may carry words); graphic = 3:1 (icons, strokes, large marks);
-    // decorative = below 3:1, flat colour with no meaning of its own. Mustard is named by --color-attention (a wash, rule or mark only, ink on top).
+    // decorative = below 3:1, flat colour with no meaning of its own. No semantic token names these inks yet.
     const use = (c: number) => (c >= 4.5 ? "text" : c >= 3 ? "graphic" : "decorative");
     const inks = { "--mustard-500": "#d9a21b", "--fern-700": "#3f6b45", "--tomato-600": "#d2492a" };
     for (const [name, value] of Object.entries(inks)) expect(primitives[name], name).toBe(value);
@@ -264,9 +271,9 @@ describe("design tokens", () => {
       ]),
     );
     expect(result).toEqual({
-      "--mustard-500": { day: "decorative", evening: "text" }, // 2.17:1 on day paper, 8.05:1 on evening paper
-      "--fern-700": { day: "text", evening: "decorative" }, // 5.82:1 on day paper; 2.998:1 on evening paper, a hair under 3
-      "--tomato-600": { day: "graphic", evening: "graphic" }, // 4.19:1 and 4.17:1: icons yes, body text no
+      "--mustard-500": { day: "decorative", evening: "text" }, // 2.09:1 on day paper, 8.03:1 on evening paper
+      "--fern-700": { day: "text", evening: "decorative" }, // 5.60:1 on day paper; 2.99:1 on evening paper, a hair under 3
+      "--tomato-600": { day: "graphic", evening: "graphic" }, // 4.03:1 and 4.16:1: icons yes, body text no
     });
   });
 
@@ -275,6 +282,25 @@ describe("design tokens", () => {
       "#" + [1, 3, 5].map((i) => Math.round(k * parseInt(a.slice(i, i + 2), 16) + (1 - k) * parseInt(b.slice(i, i + 2), 16)).toString(16).padStart(2, "0")).join("");
     const wash = mix(hex(t, "--color-attention"), hex(t, "--color-paper"), 0.2);
     for (const fg of ["--color-ink", "--color-accent"]) expect(contrast(hex(t, fg), wash), `${t} ${fg}`).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(themeFiles.map((f) => f.replace(".css", "")))("%s: danger and attention read apart from the accent", (t) => {
+    // Hue in degrees, 0-360. Saffron sits near 38 degrees; an error or a "check this" mark must not look like it.
+    const hue = (h: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+      const max = Math.max(r, g, b);
+      const d = max - Math.min(r, g, b);
+      if (d === 0) return 0;
+      const raw = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (raw * 60 + 360) % 360;
+    };
+    const apart = (a: string, b: string) => {
+      const diff = Math.abs(hue(hex(t, a)) - hue(hex(t, b)));
+      return Math.min(diff, 360 - diff);
+    };
+    expect(hex(t, "--color-danger")).not.toBe(hex(t, "--color-accent"));
+    expect(apart("--color-danger", "--color-accent"), `${t} danger vs accent`).toBeGreaterThanOrEqual(25);
+    expect(apart("--color-attention", "--color-accent"), `${t} attention vs accent`).toBeGreaterThanOrEqual(25);
   });
 
   it("the contrast helper matches WCAG", () => {
