@@ -88,3 +88,57 @@ impl<T: RecipeExtractor + ?Sized> AiProvider for T {
         Ok(self.extract_text(text).await?.into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use domain::Secret;
+
+    use super::*;
+
+    fn config(provider: &str, key: Option<&str>) -> Config {
+        Config {
+            database_url: String::new(),
+            media_dir: "media".into(),
+            bind_addr: "127.0.0.1:0".into(),
+            cookie_secure: false,
+            session_days: 30,
+            ai_provider: provider.into(),
+            anthropic_api_key: key.map(Secret::new),
+            ai_model: "test-model".into(),
+            max_upload_mb: 1,
+        }
+    }
+
+    #[test]
+    fn anthropic_with_a_key_builds_the_provider_without_any_network() {
+        let ai = Ai::from_config(&config("anthropic", Some("sk-test")))
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert!(matches!(ai, Ai::Anthropic(_)));
+        assert_eq!(ai.provider(), Provider::Anthropic);
+    }
+
+    #[test]
+    fn anthropic_without_a_key_is_refused() {
+        let e = Ai::from_config(&config("anthropic", None))
+            .err()
+            .expect("refused");
+        assert_eq!(
+            e.to_string(),
+            "AI_PROVIDER=anthropic needs ANTHROPIC_API_KEY"
+        );
+    }
+
+    #[tokio::test]
+    async fn none_is_disabled_and_every_call_says_so() {
+        let ai = Ai::from_config(&config("none", None)).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(ai.provider(), Provider::None);
+        assert!(matches!(
+            ai.extract_text("soup").await,
+            Err(domain::DomainError::AiDisabled)
+        ));
+        assert!(matches!(
+            ai.extract_images(&[], PhotoMode::Dish).await,
+            Err(domain::DomainError::AiDisabled)
+        ));
+    }
+}

@@ -222,3 +222,235 @@ async fn read_capped(
     }
     Ok(Some(out))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
+
+    use adapter_memory::{
+        FakeImageCodec, FakePasswordHasher, FakeSessionTokens, MemoryMedia, MemoryStore,
+    };
+    use app::{Deps, Services};
+    use async_trait::async_trait;
+    use axum::{body::Body, extract::FromRequest, http::Request};
+    use domain::{
+        DomainError, DomainResult, RecipeDraft as Draft, User, chrono::Utc, url::Url, uuid::Uuid,
+    };
+    use ports::{
+        FetchedPage, PageContent, PageFetcher, PageReader, RecipeExtractor, SpawnedTask,
+        TaskSpawner, contract::ManualClock,
+    };
+
+    use super::*;
+    use crate::HttpConfig;
+
+    struct Extractor(domain::AiProvider);
+
+    #[async_trait]
+    impl RecipeExtractor for Extractor {
+        fn provider(&self) -> domain::AiProvider {
+            self.0
+        }
+
+        async fn extract_images(&self, _: &[Vec<u8>], _: Mode) -> DomainResult<Draft> {
+            Err(DomainError::AiDisabled)
+        }
+
+        async fn extract_text(&self, _: &str) -> DomainResult<Draft> {
+            Err(DomainError::AiDisabled)
+        }
+    }
+
+    struct NoFetch;
+
+    #[async_trait]
+    impl PageFetcher for NoFetch {
+        async fn fetch(&self, _: &Url, _: usize) -> DomainResult<FetchedPage> {
+            Err(DomainError::FetchFailed("no network in tests".into()))
+        }
+
+        fn budget(&self) -> Duration {
+            Duration::from_secs(1)
+        }
+    }
+
+    struct NoRead;
+
+    #[async_trait]
+    impl PageReader for NoRead {
+        async fn read(&self, _: FetchedPage, _: bool, _: Duration) -> DomainResult<PageContent> {
+            Ok(PageContent::Nothing)
+        }
+    }
+
+    struct NoSpawn;
+
+    impl TaskSpawner for NoSpawn {
+        fn spawn(&self, _: &'static str, _: SpawnedTask) {}
+    }
+
+    fn state(provider: domain::AiProvider) -> HttpState {
+        let clock = Arc::new(ManualClock::new());
+        let store = Arc::new(MemoryStore::new(clock.clone()));
+        let services = Services::new(Deps {
+            recipes: store.clone(),
+            images: store.clone(),
+            users: store.clone(),
+            sessions: store.clone(),
+            settings: store.clone(),
+            tags: store.clone(),
+            health: store.clone(),
+            media: Arc::new(MemoryMedia::default()),
+            hasher: Arc::new(FakePasswordHasher::default()),
+            tokens: Arc::new(FakeSessionTokens::default()),
+            codec: Arc::new(FakeImageCodec::default()),
+            clock,
+            extractor: Arc::new(Extractor(provider)),
+            fetcher: Arc::new(NoFetch),
+            reader: Arc::new(NoRead),
+            spawner: Arc::new(NoSpawn),
+            max_upload_bytes: 1 << 20,
+            session_days: 30,
+        });
+        HttpState {
+            services: Arc::new(services),
+            config: HttpConfig {
+                cookie_secure: false,
+                max_upload_bytes: 1 << 20,
+                version: "test",
+            },
+        }
+    }
+
+    fn user() -> User {
+        User {
+            id: Uuid::new_v4(),
+            username: "cook".into(),
+            display_name: "Cook".into(),
+            role: "member".into(),
+            created_at: Utc::now(),
+        }
+    }
+
+    async fn multipart(parts: &[(&str, &str)]) -> Multipart {
+        let mut body = String::new();
+        for (name, value) in parts {
+            body += &format!(
+                "--B\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+            );
+        }
+        body += "--B--\r\n";
+        let request = Request::builder()
+            .header("content-type", "multipart/form-data; boundary=B")
+            .body(Body::from(body))
+            .unwrap();
+        Multipart::from_request(request, &()).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn capabilities_name_the_configured_provider() {
+        for (provider, ai, name) in [
+            (domain::AiProvider::Anthropic, true, "anthropic"),
+            (domain::AiProvider::None, false, "none"),
+        ] {
+            let Json(c) = capabilities(State(state(provider)), CurrentUser(user())).await;
+            assert_eq!(c.ai, ai);
+            assert_eq!(serde_json::to_value(&c.provider).unwrap(), name);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_photo_form_with_an_unknown_field_still_imports_and_keeps_the_photo() {
+        let form = multipart(&[
+            ("note", "ignored"),
+            ("files", "jpeg-bytes"),
+            ("mode", "dish"),
+        ])
+        .await;
+        let r = from_photo(
+            State(state(domain::AiProvider::None)),
+            CurrentUser(user()),
+            form,
+        )
+        .await;
+        // The extractor refuses (AI off), and the stored photo is reported so the form can show it.
+        assert!(
+            matches!(&r, Err(AppError::WithPhotos { photo_image_ids, .. }) if photo_image_ids.len() == 1),
+            "unexpected result: {}",
+            r.err().map_or("ok".into(), |e| e.to_string())
+        );
+    }
+
+    /// A writer the subscriber logs into and the test reads back.
+    #[derive(Clone, Default)]
+    struct Captured(Arc<Mutex<Vec<u8>>>);
+
+    impl io::Write for Captured {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Captured {
+        /// What was logged so far (flushing first, as a buffered sink would need).
+        fn text(&self) -> String {
+            io::Write::flush(&mut self.clone()).unwrap();
+            String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+        }
+    }
+
+    #[test]
+    fn what_the_service_reports_is_logged() {
+        let captured = Captured::default();
+        let writer = captured.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .with_ansi(false)
+            .finish();
+        let id = Uuid::new_v4();
+        tracing::subscriber::with_default(subscriber, || {
+            log(&ImportNotes {
+                rendition_errors: vec![(id, DomainError::Internal("disk full".into()))],
+                skipped_image: Some((
+                    "https://example.com/p.jpg".into(),
+                    DomainError::BlockedAddress,
+                )),
+                cleanup_failed: true,
+            });
+        });
+        let out = captured.text();
+        assert!(
+            out.contains("could not write the display rendition") && out.contains("disk full"),
+            "{out}"
+        );
+        assert!(
+            out.contains("import image skipped") && out.contains("https://example.com/p.jpg"),
+            "{out}"
+        );
+        assert!(
+            out.contains("could not delete images of a failed request"),
+            "{out}"
+        );
+        assert!(out.contains(&id.to_string()), "{out}");
+    }
+
+    #[test]
+    fn a_clean_import_logs_nothing() {
+        let captured = Captured::default();
+        let writer = captured.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .finish();
+        tracing::subscriber::with_default(subscriber, || log(&ImportNotes::default()));
+        assert!(captured.text().is_empty());
+    }
+}

@@ -48,3 +48,38 @@ impl PageReader for HtmlPageReader {
             .map_err(DomainError::internal)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn page(body: String) -> FetchedPage {
+        FetchedPage {
+            final_url: "https://example.com/soup".parse().unwrap(),
+            content_type: Some("text/html".into()),
+            body: body.into_bytes(),
+        }
+    }
+
+    // A page near the tag cap takes the parser far longer than the 1 ms budget (the timeout under test, not a sleep).
+    #[tokio::test]
+    async fn a_parse_that_outlasts_the_budget_is_a_fetch_failure() {
+        let html = format!("<body>{}</body>", "<p>Boil the water.</p>".repeat(50_000));
+        let r = HtmlPageReader
+            .read(page(html), true, Duration::from_millis(1))
+            .await;
+        assert!(
+            matches!(&r, Err(DomainError::FetchFailed(m)) if m == "That page took too long to read."),
+            "{:?}",
+            r.err()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_page_without_recipe_data_is_nothing_when_text_is_not_wanted() {
+        let r = HtmlPageReader
+            .read(page("<p>Hello</p>".into()), false, Duration::from_secs(5))
+            .await;
+        assert!(matches!(r, Ok(PageContent::Nothing)));
+    }
+}

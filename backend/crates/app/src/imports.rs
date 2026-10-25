@@ -392,6 +392,40 @@ impl RecipeExtractor for NoneExtractor {
 mod tests {
     use super::*;
 
+    fn stored(rendition_error: Option<DomainError>) -> Stored {
+        Stored {
+            image: Image {
+                id: Uuid::new_v4(),
+                file_name: "a.jpg".into(),
+                display_file_name: None,
+                width: 1,
+                height: 1,
+                bytes: 1,
+                created_by: None,
+            },
+            jpeg: vec![1],
+            rendition_error,
+        }
+    }
+
+    #[test]
+    fn a_rendition_error_moves_into_the_notes_with_the_image_id() {
+        let mut notes = ImportNotes::default();
+        let mut s = stored(Some(DomainError::Internal("disk full".into())));
+        notes.rendition(&mut s);
+        assert!(
+            s.rendition_error.is_none(),
+            "the error is taken, not copied"
+        );
+        assert!(matches!(
+            notes.rendition_errors.as_slice(),
+            [(id, DomainError::Internal(m))] if *id == s.image.id && m == "disk full"
+        ));
+        // Nothing to report: nothing is added.
+        notes.rendition(&mut stored(None));
+        assert_eq!(notes.rendition_errors.len(), 1);
+    }
+
     #[tokio::test]
     async fn every_call_is_ai_disabled() {
         let x = NoneExtractor;

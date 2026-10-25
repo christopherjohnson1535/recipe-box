@@ -24,3 +24,11 @@ tower-http = { version = "0.7", features = ["trace"] }
 tracing = "0.1"
 utoipa = { version = "6", features = ["chrono", "uuid"] }
 uuid = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+async-trait = "0.1"
+recipe-box-adapter-memory = { path = "../memory" }
+# `contract` is only for its `ManualClock`.
+recipe-box-ports = { path = "../../ports", features = ["contract"] }
+tokio = { version = "1", features = ["macros", "rt"] }
+tracing-subscriber = "0.3"

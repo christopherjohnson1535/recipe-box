@@ -153,6 +153,12 @@ mod tests {
     }
 
     #[test]
+    fn comments_are_not_text() {
+        let r = read("<body><p>Boil<!-- hidden note --> water.</p></body>");
+        assert_eq!(r.text, "Boil water.");
+    }
+
+    #[test]
     fn title_is_prefixed_when_missing_from_the_start() {
         let r = read("<title>Nice Soup</title><body><p>Boil water.</p></body>");
         assert_eq!(r.text, "Nice Soup\nBoil water.");

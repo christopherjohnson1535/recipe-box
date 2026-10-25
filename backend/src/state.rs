@@ -113,3 +113,90 @@ impl AppState {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io,
+        sync::{Arc, Mutex},
+    };
+
+    use domain::DomainError;
+
+    use super::*;
+
+    /// A writer the subscriber logs into and the test reads back.
+    #[derive(Clone, Default)]
+    struct Captured(Arc<Mutex<Vec<u8>>>);
+
+    impl io::Write for Captured {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Captured {
+        /// What was logged so far (flushing first, as a buffered sink would need).
+        fn text(&self) -> String {
+            io::Write::flush(&mut self.clone()).unwrap();
+            String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+        }
+    }
+
+    // The runtime of `#[tokio::test]` is single-threaded, so the spawned task logs on this thread, where the
+    // subscriber is set, and has done so by the time the receiver wakes.
+    #[tokio::test]
+    async fn a_failed_task_is_logged_and_does_not_panic() {
+        let log = Captured::default();
+        let writer = log.clone();
+        let _guard = tracing::subscriber::set_default(
+            tracing_subscriber::fmt()
+                .with_writer(move || writer.clone())
+                .with_ansi(false)
+                .finish(),
+        );
+        let (ran, done) = tokio::sync::oneshot::channel();
+        TokioSpawner.spawn(
+            "could not delete images of a failed request",
+            Box::pin(async move {
+                let _ = ran.send(());
+                Err(DomainError::Internal("rows stuck".into()))
+            }),
+        );
+        done.await.expect("the task ran");
+        let out = log.text();
+        assert!(out.contains("WARN"), "{out}");
+        assert!(
+            out.contains("could not delete images of a failed request"),
+            "{out}"
+        );
+        assert!(out.contains("rows stuck"), "{out}");
+    }
+
+    #[tokio::test]
+    async fn a_successful_task_runs_and_logs_nothing() {
+        let log = Captured::default();
+        let writer = log.clone();
+        let _guard = tracing::subscriber::set_default(
+            tracing_subscriber::fmt()
+                .with_writer(move || writer.clone())
+                .finish(),
+        );
+        let (ran, done) = tokio::sync::oneshot::channel();
+        TokioSpawner.spawn(
+            "never logged",
+            Box::pin(async move {
+                let _ = ran.send(());
+                Ok(())
+            }),
+        );
+        done.await.expect("the task ran");
+        tokio::task::yield_now().await;
+        assert!(log.text().is_empty());
+    }
+}

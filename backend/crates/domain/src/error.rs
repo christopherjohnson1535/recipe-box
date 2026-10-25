@@ -66,6 +66,42 @@ mod tests {
         assert_eq!(e.to_string(), "Wrong username or password.");
     }
 
+    #[derive(Debug, thiserror::Error)]
+    #[error("{label}")]
+    struct Layer {
+        label: &'static str,
+        #[source]
+        inner: Option<Box<Layer>>,
+    }
+
+    #[test]
+    fn internal_keeps_the_whole_source_chain() {
+        let chain = Layer {
+            label: "save failed",
+            inner: Some(Box::new(Layer {
+                label: "query failed",
+                inner: Some(Box::new(Layer {
+                    label: "connection reset",
+                    inner: None,
+                })),
+            })),
+        };
+        let e = DomainError::internal(chain);
+        assert!(
+            matches!(&e, DomainError::Internal(m) if m == "save failed: query failed: connection reset"),
+            "{e:?}"
+        );
+    }
+
+    #[test]
+    fn internal_without_a_source_is_just_the_message() {
+        let e = DomainError::internal(Layer {
+            label: "disk full",
+            inner: None,
+        });
+        assert!(matches!(e, DomainError::Internal(m) if m == "disk full"));
+    }
+
     #[test]
     fn validation_message_is_displayed() {
         let e = DomainError::validation("title: required");

@@ -2429,17 +2429,22 @@ name = "recipe-box-adapter-http"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "axum-extra",
  "chrono",
  "cookie",
+ "recipe-box-adapter-memory",
  "recipe-box-app",
  "recipe-box-domain",
+ "recipe-box-ports",
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
  "tower-http 0.7.1",
  "tracing",
+ "tracing-subscriber",
  "utoipa",
  "uuid",
 ]
