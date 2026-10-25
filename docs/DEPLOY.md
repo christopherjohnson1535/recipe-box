@@ -2,17 +2,20 @@
 
 The same containers run everywhere. Pick a target; all of them use `docker-compose.yml` and a `.env` file.
 
-| Target | Good for | HTTPS (needed for iPad install/offline/camera/wake lock) |
-|---|---|---|
-| A. Your PC / home server | Free; recipes stay at home | Tailscale (no domain) or Caddy + a domain + port forwarding |
-| B. Small VPS (Hetzner, DigitalOcean, Lightsail…) | Reachable anywhere; ~$5/month | Caddy profile, automatic Let's Encrypt |
-| C. Managed container host (Fly.io, Railway, Render, Azure Container Apps) | No server to patch | Provided by the host |
+| Target | Good for | HTTPS (needed for iPad install/offline/camera/wake lock) | Step-by-step |
+|---|---|---|---|
+| A. Your PC / home server | Free; recipes stay at home | Tailscale (no domain, private to your devices) or Caddy + a domain + port forwarding | [Tailscale](wiki/Deploy-Tailscale.md) |
+| B. Small VPS (Hetzner, DigitalOcean, Lightsail…) | Reachable anywhere; ~$5/month | Caddy profile, automatic Let's Encrypt | [VPS + Caddy](wiki/Deploy-VPS-Caddy.md) |
+| C. Managed container host (Fly.io; Azure Container Apps, Railway, Render work the same way) | No server to patch | Provided by the host | [Fly.io](wiki/Deploy-Fly.md) |
+
+The three walkthroughs below are short versions of the wiki pages. Read [HTTPS and `COOKIE_SECURE`](#https-and-cookie_secure)
+first: the setting must match how you reach the site.
 
 ## Common steps
 ```sh
 git clone https://github.com/christopherjohnson1535/recipe-box.git && cd recipe-box
 cp .env.example .env
-# edit .env: POSTGRES_PASSWORD (long random), and the target-specific values below
+# edit .env: POSTGRES_PASSWORD (`openssl rand -hex 24`: letters and digits only), and the target-specific values below
 ```
 Build on the host (`docker compose up -d --build`) or use the images CI publishes to GHCR:
 ```sh
@@ -23,12 +26,12 @@ packages are public, so `docker pull` needs no login.
 
 | Tag | Points at | Use it for |
 |---|---|---|
-| `v0.1.0` (also `0.1.0`) | that release, never moves | a deployment you update on purpose (recommended) |
+| `v0.1.0` (also `0.1.0`), once a release exists | that release, never moves | a deployment you update on purpose (recommended once a release exists) |
 | `0.1` | the newest `0.1.x` release | patch updates on `pull` |
 | `latest` | the newest build of `main` | trying the newest work |
 | `sha-<short>` | one `main` commit | rolling back to a specific build |
 
-Choose the tag with `IMAGE_TAG` in `.env` (read by `deploy/compose.prod.yml`; default `latest`):
+Choose the tag with `IMAGE_TAG` in `.env` (read by `deploy/compose.prod.yml`; default `latest`, which works before any release exists). Once a release is published, pin to it:
 ```sh
 IMAGE_TAG=v0.1.0
 ```
@@ -39,28 +42,81 @@ the same two commands; a release whose migrations changed the schema needs a res
 Raspberry Pi: use a 64-bit OS (Raspberry Pi OS 64-bit or Ubuntu arm64) on a Pi 4 or 5; Docker pulls the arm64 image
 on its own. A 32-bit OS (armv7) has no image: build on the Pi with `docker compose up -d --build` instead.
 
+## HTTPS and `COOKIE_SECURE`
+`COOKIE_SECURE` (default `false`) decides whether the `rb_session` sign-in cookie carries the `Secure` flag. The API
+reads only this setting; it does not look at `X-Forwarded-Proto` or the address you typed. So set it to match how
+people reach the site:
+
+| How you open Recipe Box | `COOKIE_SECURE` | `WEB_BIND` |
+|---|---|---|
+| `http://localhost:3000` on the same machine, or `http://<pc-ip>:3000` on your Wi-Fi (no install, no offline) | `false` | `127.0.0.1` / `0.0.0.0` |
+| `https://<pc>.<tailnet>.ts.net` (Tailscale serve) | `true` | `127.0.0.1` |
+| `https://recipes.example.com` (Caddy profile) | `true` | `127.0.0.1` |
+| Managed host (HTTPS from the host) | `true`, on the `api` service | not used |
+
+- `true` and then opening the plain `http://` address: the browser refuses to keep a `Secure` cookie from an
+  insecure page, so sign-in appears to succeed and the next page asks you to sign in again. Use the HTTPS address, or
+  set `false` for a LAN-only setup.
+- `false` behind HTTPS: everything works, but the cookie can also travel over plain HTTP. Do not leave it that way on
+  a public site.
+- Check what your server sends (use your own address and a real account):
+  `curl -si -X POST https://<your-address>/api/auth/login -H 'content-type: application/json' -d '{"username":"you","password":"…"}' | grep -i '^set-cookie'`
+  The line looks like `rb_session=...; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=...`. It must contain `; Secure` when
+  `COOKIE_SECURE=true`, and not when it is `false`.
+- The API refuses to start if `COOKIE_SECURE=true` is combined with `IMPORT_ALLOW_HOST` (a test-only setting). After
+  a change to `.env`, run `docker compose up -d` again so the `api` container is recreated.
+- Behind a proxy the API sees the web container as the client, not the visitor. Caddy and the web container pass
+  `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` along, but the API does not read them yet. Anything
+  that needs the visitor's address (sign-in throttling, tracked in #33) will have to say which proxy header to trust.
+
+**Claim the admin account first.** The first visit to a new server creates the admin account, for whoever gets
+there first. On a public address (B, C) open it and finish setup yourself before you share the address or leave it
+unattended.
+
 ## A. Home PC / server
 1. Docker Desktop (Windows/macOS) or Docker Engine (Linux).
-2. `.env`: `WEB_BIND=0.0.0.0` so the iPad can reach `http://<pc-ip>:3000`.
-3. HTTPS without a domain — **Tailscale**: install Tailscale on the PC and the iPad, then on the PC run
-   `tailscale serve --bg 3000`. Open the `https://<pc-name>.<tailnet>.ts.net` address on the iPad; set
-   `COOKIE_SECURE=true`. Only your devices can reach it.
-4. HTTPS with a domain: point a DNS name at your home IP, forward ports 80/443 to the PC, set `PUBLIC_HOSTNAME` and
-   `COOKIE_SECURE=true`, then `docker compose --profile https up -d`.
+2. `.env`: `POSTGRES_PASSWORD` from `openssl rand -hex 24` (it goes into `DATABASE_URL` unescaped; Postgres fixes it on the first start of the `pgdata` volume), then `docker compose up -d` (or the prod file above).
+   Browsing `http://localhost:3000` on the PC needs nothing else.
+3. HTTPS without a domain, **Tailscale** (full page: [Deploy-Tailscale](wiki/Deploy-Tailscale.md)):
+   - Install Tailscale on the PC and on the iPad and sign in to the same account.
+   - Admin console → DNS: turn on **MagicDNS**, then under **HTTPS Certificates** choose **Enable HTTPS**. The names of
+     your machines then appear in public certificate logs, so give the PC a name you do not mind being public.
+   - `.env`: `COOKIE_SECURE=true`. Leave `WEB_BIND=127.0.0.1` (`tailscale serve` proxies to `127.0.0.1` only).
+     `docker compose up -d`.
+   - On the PC: `tailscale serve --bg 3000`. It prints the `https://<pc-name>.<tailnet>.ts.net` address; open it on
+     the iPad (Tailscale must be on there). `tailscale serve status` shows it; `tailscale serve reset` removes it.
+   - Only devices in your tailnet can reach it. Do not use `tailscale funnel` unless you want the site public.
+4. HTTPS with a domain from home: point a DNS name at your home IP, forward ports 80 and 443 to the PC, set
+   `PUBLIC_HOSTNAME`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`, then `docker compose --profile https up -d`.
+   This fails if your ISP blocks 80/443 or shares one address between customers; use Tailscale then.
 5. Windows: the PC must stay on; set Docker Desktop to start on login.
 
 ## B. VPS
+Full page: [Deploy-VPS-Caddy](wiki/Deploy-VPS-Caddy.md).
 1. Create a small Linux VM (1 vCPU / 1–2 GB RAM is enough), install Docker Engine.
-2. Point a DNS name (e.g. `recipes.example.com`) at the VM's IP. Open ports 80 and 443 only.
-3. `.env`: `PUBLIC_HOSTNAME=recipes.example.com`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`.
+2. Point a DNS name (e.g. `recipes.example.com`) at the VM's IP (an `A` record, plus `AAAA` for IPv6). Open ports 80
+   and 443 only, plus 22 for SSH.
+3. `.env`: `PUBLIC_HOSTNAME=recipes.example.com`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`, and optionally `IMAGE_TAG=<release tag>` (default `latest`).
 4. `docker compose -f docker-compose.yml -f deploy/compose.prod.yml --profile https up -d`.
-5. Updates: set `IMAGE_TAG` to the new release, then `docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull && … up -d`.
+5. `PUBLIC_HOSTNAME` must be set: Caddy has nothing to serve without it and the `caddy` container restarts in a loop.
+   The certificate is issued on the first request, a few seconds after the DNS name resolves to the VM
+   (`docker compose logs caddy`). Keep the `caddy_data` volume: it holds the certificate and account.
+6. Open the address and create the admin account at once (see above).
+7. Updates: set `IMAGE_TAG` to the new release (or just pull `latest`), then `docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull && … up -d`.
+
+Docker publishes a container port straight past `ufw`/`iptables` rules of the host firewall. That is why `WEB_BIND`
+stays `127.0.0.1` here and the `db` and `api` services publish nothing: only Caddy listens on the internet.
 
 ## C. Managed container hosts
-Run three services from the same images: Postgres (use the host's managed Postgres if offered), `api` (env from
-`.env.example`, a persistent volume at `/data/media`, internal only) and `web` (`API_INTERNAL_URL` = the api's
-internal URL, public HTTPS port 3000). Set `COOKIE_SECURE=true`. Host-specific walkthroughs live in the wiki once
-tested (issue: deploy guides).
+Run three things from the same images: Postgres (the host's managed Postgres), `api` (a persistent volume at
+`/data/media`, private) and `web` (public HTTPS, `API_INTERNAL_URL` pointing at the api's private address). The API
+has no public port. Set `COOKIE_SECURE=true` on the `api`. Walkthrough with ready-made config for **Fly.io**:
+[Deploy-Fly](wiki/Deploy-Fly.md) and `deploy/fly/`. Other hosts need the same four settings:
+- `DATABASE_URL` for the managed database, `MEDIA_DIR=/data/media` on a volume that user `10001` can write (the image
+  runs as that user; a fresh volume is owned by root, so `chown 10001:10001 /data/media` once).
+- `BIND_ADDR`: `0.0.0.0:8080` by default. Hosts whose private network is IPv6 (Fly) need `[::]:8080`.
+- One `api` instance: photos live on that volume, which cannot be shared between instances.
+- Health checks: `GET /api/health` on the api (port 8080) and `GET /login` on the web (port 3000).
 
 ## Cutting a release (owner)
 Releases are tags `vMAJOR.MINOR.PATCH` on `main`. Pushing one runs CI, which publishes the images and the GitHub release.
