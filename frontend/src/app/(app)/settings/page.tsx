@@ -22,9 +22,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // The status line is a nicety: if it can't load, the rest of the page still works.
   const capabilities: Capabilities | null = await api.importCapabilities().catch(() => null);
 
-  const settings: Settings | null = me.role === "admin" ? await api.getSettings().catch(() => null) : null;
-
-  const google: GoogleStatus | null = await api.googleStatus().catch(() => null);
+  const [settings, google]: [Settings | null, GoogleStatus | null] = await Promise.all([
+    me.role === "admin" ? api.getSettings().catch(() => null) : null,
+    api.googleStatus().catch(() => null),
+  ]);
 
   return <SettingsView me={me} users={users} capabilities={capabilities} settings={settings} google={google} googleResult={googleResult} />;
 }

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HardLink, RecipeShelf, RowMenu, ScaleStepper, SelectCard, SelectionBar, SendArea } from "./GroceryKit";
+import { RecipeShelf, RowMenu, ScaleStepper, SelectCard, SelectionBar, SendArea } from "./GroceryKit";
 
 function menu(onSelect = vi.fn()) {
   render(
@@ -192,7 +192,7 @@ describe("SelectCard and SelectionBar", () => {
   });
 });
 
-describe("SendArea and HardLink", () => {
+describe("SendArea", () => {
   it("labels the group, and sets its message under the buttons", () => {
     render(
       <SendArea label="Send to…" actions={<button type="button">Copy list</button>}>
@@ -201,20 +201,5 @@ describe("SendArea and HardLink", () => {
     );
     const group = screen.getByRole("group", { name: "Send to…" });
     expect(group.textContent).toBe("Send to…Copy list" + "Copied.");
-  });
-
-  it("is a plain anchor (a full page load), as a button or as an inline link", () => {
-    render(
-      <>
-        <HardLink href="/api/x" variant="secondary">
-          Go
-        </HardLink>
-        <HardLink href="/api/y">Again</HardLink>
-      </>,
-    );
-    const go = screen.getByRole("link", { name: "Go" });
-    expect(go.getAttribute("href")).toBe("/api/x");
-    expect(go.className).toContain("min-h-control");
-    expect(screen.getByRole("link", { name: "Again" }).className).toBe("link");
   });
 });

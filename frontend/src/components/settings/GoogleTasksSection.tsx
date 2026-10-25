@@ -1,16 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { LocalDate } from "@/components/recipe-page/LocalDate";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
+import { Button, HardLink } from "@/components/ui/Button";
 import { ConfirmInline } from "@/components/ui/ConfirmInline";
 import { ExternalLink } from "@/components/ui/ExternalLink";
-import { HardLink } from "@/components/ui/GroceryKit";
 import { Heading } from "@/components/ui/Heading";
 import { Text } from "@/components/ui/Text";
 import { api as browserApi, ApiError, GOOGLE_CONNECT_URL, type Api, type GoogleStatus } from "@/lib/api";
+import { CONNECT_IN_BROWSER, useInstalledApp } from "@/lib/installed-app";
 
 const DEPLOY = "https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/DEPLOY.md#google-tasks-optional";
 
@@ -36,15 +35,17 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
-  const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
+  const disconnectButton = useRef<HTMLButtonElement>(null);
+  const hint = useId();
+  const installed = useInstalledApp();
 
   useEffect(() => {
-    const found = result ? RESULTS[result] : undefined;
-    if (!found) return;
-    queueMicrotask(() => setNotice(found)); // after the live region is on the page, so it is read out
-    router.replace("/settings"); // a reload must not announce it again
-  }, [result, router]);
+    if (!result) return;
+    const found = RESULTS[result];
+    if (found) queueMicrotask(() => setNotice(found));
+    window.history.replaceState(null, "", "/settings"); // a reload must not announce it again; Next keeps its router in step
+  }, [result]);
 
   async function disconnect() {
     setPending(true);
@@ -61,13 +62,19 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
     }
   }
 
+  function cancel() {
+    setConfirming(false);
+    requestAnimationFrame(() => disconnectButton.current?.focus()); // the panel that had focus is gone, and Disconnect is enabled again
+  }
+
   return (
     <section aria-labelledby="google-heading" className="flex flex-col gap-4">
       <Heading level={2} id="google-heading" ruled ref={heading} tabIndex={-1}>
         Google Tasks
       </Heading>
       <Text>Send your grocery list to a list called Groceries in your own Google Tasks, to shop from Google’s apps. Each person connects their own Google account.</Text>
-      {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+      <div role="status">{notice?.tone === "info" && <Alert tone="info">{notice.text}</Alert>}</div>
+      {notice?.tone === "error" && <Alert tone="error">{notice.text}</Alert>}
       {status === null ? (
         <Text variant="note">Couldn’t check Google Tasks. Reload the page to try again.</Text>
       ) : !status.configured ? (
@@ -83,25 +90,27 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
               </Text>
               {status.connectedAt && <LocalDate iso={status.connectedAt} />}
             </Text>
-            <Button variant="ghost" aria-expanded={confirming} disabled={confirming} onClick={() => setConfirming(true)}>
+            <Button ref={disconnectButton} variant="ghost" aria-expanded={confirming} disabled={confirming} onClick={() => setConfirming(true)}>
               Disconnect
             </Button>
           </div>
           {confirming && (
-            <ConfirmInline confirmLabel="Disconnect" cancelLabel="Stay connected" pending={pending} onConfirm={() => void disconnect()} onCancel={() => setConfirming(false)}>
+            <ConfirmInline confirmLabel="Disconnect" cancelLabel="Stay connected" pending={pending} onConfirm={() => void disconnect()} onCancel={cancel}>
               Disconnect Google Tasks? Recipe Box forgets your connection and asks Google to end its access. Tasks already in your Google list stay where they are.
             </ConfirmInline>
           )}
-          <Text variant="small">While the household’s Google app is in Testing mode, Google ends the connection after 7 days. Connect again when the grocery list asks you to.</Text>
+          <Text variant="small">If Google ends the connection, connect again when the grocery list asks you to.</Text>
         </>
       ) : (
         <>
           <div className="flex">
-            <HardLink href={GOOGLE_CONNECT_URL} variant="secondary">
+            <HardLink href={GOOGLE_CONNECT_URL} variant="secondary" aria-describedby={hint}>
               Connect Google Tasks
             </HardLink>
           </div>
-          <Text variant="small">This takes you to Google’s consent page, then back here.</Text>
+          <Text variant="small" id={hint}>
+            {installed ? CONNECT_IN_BROWSER : "This takes you to Google’s consent page, then back here."}
+          </Text>
         </>
       )}
     </section>

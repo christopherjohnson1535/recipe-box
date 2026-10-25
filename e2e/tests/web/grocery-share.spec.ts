@@ -10,12 +10,14 @@ const withoutShareSheet = (page: Page) => page.addInitScript(() => Object.define
 test("Copy puts the unticked items on the clipboard, and there is no Google Tasks button", async ({ memberPage: page, member }) => {
   const c = member.client;
   const word = unique("gro");
+  let status = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/integrations/google");
   await withoutShareSheet(page);
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   // The household has one list and other specs empty it, so seed again and look again until one pass holds.
   await expect(async () => {
     const res = await c.request.post("/api/grocery/items", { data: { text: `2 lb ${word}` } });
     expect(res.status()).toBe(201);
+    status = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/integrations/google");
     await page.goto("/groceries");
     const copy = page.getByRole("button", { name: "Copy list" });
     await expect(copy).toBeVisible({ timeout: 2_000 });
@@ -28,6 +30,9 @@ test("Copy puts the unticked items on the clipboard, and there is no Google Task
     expect(text).toContain(`- 2 lb ${word}`);
   }).toPass({ timeout: 30_000 });
 
+  // Absence only means something once the status answer is in and the page has drawn from it.
+  expect(await (await status).json()).toMatchObject({ configured: false });
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await expect(page.getByRole("button", { name: /Google Tasks/ })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Google Tasks/ })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

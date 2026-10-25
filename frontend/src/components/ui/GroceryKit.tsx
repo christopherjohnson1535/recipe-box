@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
-import { buttonClass } from "./Button";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
@@ -58,18 +57,6 @@ export function SendArea({ label, actions, children }: { label: string; actions:
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center max-sm:[&>*]:w-full">{actions}</div>
       {children}
     </div>
-  );
-}
-
-/**
- * A link that leaves the app for a full page load (the API's connect address, which answers with a redirect to Google), so
- * not next/link, which would prefetch it. With a `variant` it is set as that button; without, as an inline link.
- */
-export function HardLink({ href, variant, children }: { href: string; variant?: "primary" | "secondary" | "ghost"; children: ReactNode }) {
-  return (
-    <a href={href} className={variant ? buttonClass(variant) : "link"}>
-      {children}
-    </a>
   );
 }
 

@@ -39,11 +39,16 @@ const sendFails = (status: number, code: string, message: string) =>
   server.use(http.post("*/api/grocery/export/google-tasks", () => HttpResponse.json({ error: { code, message } }, { status })));
 
 const setNavigator = (key: "share" | "clipboard", value: unknown) => Object.defineProperty(navigator, key, { value, configurable: true });
+const setExec = (fn: unknown) => Object.defineProperty(document, "execCommand", { value: fn, configurable: true });
 afterEach(() => {
   vi.restoreAllMocks(); // the offline tests spy on navigator.onLine
+  vi.unstubAllGlobals();
   delete (navigator as unknown as Record<string, unknown>).share;
   delete (navigator as unknown as Record<string, unknown>).clipboard;
+  delete (navigator as unknown as Record<string, unknown>).standalone;
+  delete (document as unknown as Record<string, unknown>).execCommand;
 });
+const sendArea = () => within(screen.getByRole("group", { name: "Send to…" }));
 
 describe("Share or Copy", () => {
   it("offers Copy where the browser has no share sheet, and copies the unticked items", async () => {
@@ -68,12 +73,54 @@ describe("Share or Copy", () => {
     expect(writeText).toHaveBeenCalledWith(`${MILK_LIST}\n\nPantry\n- salt`);
   });
 
-  it("says so when the clipboard refuses", async () => {
-    setNavigator("clipboard", { writeText: vi.fn().mockRejectedValue(new Error("denied")) });
+  it("copies by selection when the page has no clipboard API (plain http on the LAN)", async () => {
+    let copied = "";
+    setExec(
+      vi.fn(() => {
+        const box = document.activeElement as HTMLTextAreaElement;
+        copied = box.value.slice(box.selectionStart, box.selectionEnd);
+        return true;
+      }),
+    );
     serve();
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Copy list" }));
-    expect((await screen.findByRole("alert")).textContent).toContain("Couldn’t copy");
+    expect(await sendArea().findByText("Copied.")).toBeTruthy();
+    expect(copied).toBe(MILK_LIST);
+    expect(sendArea().queryByRole("textbox")).toBeNull();
+  });
+
+  it("shows the list, selected, when nothing on the device will copy it", async () => {
+    setNavigator("clipboard", { writeText: vi.fn().mockRejectedValue(new Error("denied")) });
+    setExec(vi.fn(() => false));
+    serve();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Copy list" }));
+    expect(await sendArea().findByText("Select and copy the list below.")).toBeTruthy();
+    const box = sendArea().getByRole("textbox", { name: "The list, to copy" }) as HTMLTextAreaElement;
+    expect(box.readOnly).toBe(true);
+    expect(box.value).toBe(MILK_LIST);
+    expect(document.activeElement).toBe(box);
+    expect(box.value.slice(box.selectionStart, box.selectionEnd)).toBe(MILK_LIST);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("forgets a message once the list changes underneath it", async () => {
+    setNavigator("clipboard", { writeText: vi.fn().mockResolvedValue(undefined) });
+    serve();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Copy list" }));
+    await sendArea().findByText("Copied.");
+    fireEvent.click(screen.getByRole("button", { name: /Show staples/ }));
+    expect(sendArea().queryByText("Copied.")).toBeNull();
+  });
+
+  it("says the staples are left out until they are shown", async () => {
+    serve();
+    await open();
+    expect(sendArea().getByText(/Staples are left out/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Show staples/ }));
+    expect(sendArea().queryByText(/Staples are left out/)).toBeNull();
   });
 
   it("offers Share instead of Copy when the browser has a share sheet", async () => {
@@ -98,12 +145,36 @@ describe("Share or Copy", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("reports a share that fails for another reason", async () => {
+  it("copies the list instead when the share sheet fails for another reason", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    setNavigator("clipboard", { writeText });
     setNavigator("share", vi.fn().mockRejectedValue(new DOMException("No", "NotAllowedError")));
     serve();
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Share list" }));
-    expect((await screen.findByRole("alert")).textContent).toContain("Couldn’t open the share sheet");
+    expect(await sendArea().findByText("Couldn’t open the share sheet, so the list was copied.")).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith(MILK_LIST);
+  });
+
+  it("shows the list to select when the share sheet fails and nothing copies", async () => {
+    setNavigator("share", vi.fn().mockRejectedValue(new DOMException("No", "NotAllowedError")));
+    setExec(vi.fn(() => false));
+    serve();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Share list" }));
+    expect(await sendArea().findByRole("textbox", { name: "The list, to copy" })).toBeTruthy();
+  });
+
+  it("is quiet when a second tap lands while the share sheet is open", async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException("Busy", "InvalidStateError"));
+    setNavigator("share", share);
+    serve();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Share list" }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(sendArea().queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("is not shown when there is nothing on the list at all", async () => {
@@ -144,11 +215,22 @@ describe("Send to Google Tasks", () => {
     await open();
     const link = await screen.findByRole("link", { name: "Connect Google Tasks" });
     expect(link.getAttribute("href")).toBe("/api/integrations/google/connect");
-    expect(screen.getByText(/Google’s consent page, then back to Settings/)).toBeTruthy();
+    const hint = screen.getByText(/Google’s consent page, then back to Settings/);
+    expect(link.getAttribute("aria-describedby")).toBe(hint.id);
     expect(tasksButton()).toBeNull();
   });
 
-  it("sends with the staples setting, disables itself while sending, and reports the counts", async () => {
+  it("tells a Home Screen app to connect from the browser, with Connect still there", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(display-mode: standalone)" }));
+    serve(stock(), configured(false));
+    await open();
+    const link = await screen.findByRole("link", { name: "Connect Google Tasks" });
+    const hint = screen.getByText(/Connect once from Safari \(or your browser\), not the Home Screen app: open Settings there\. After that, sending works here too\./);
+    expect(link.getAttribute("aria-describedby")).toBe(hint.id);
+    expect(screen.queryByText(/consent page/)).toBeNull();
+  });
+
+  it("sends with the staples setting, keeps focus while sending, says so, and reports the counts", async () => {
     serve(stock(), configured(true));
     let release: () => void = () => undefined;
     const gate = new Promise<void>((r) => (release = r));
@@ -164,12 +246,15 @@ describe("Send to Google Tasks", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Show staples/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Send to Google Tasks" }));
     await waitFor(() => expect(tasksButton()?.textContent).toBe("Sending…"));
-    expect(tasksButton()?.disabled).toBe(true);
-    fireEvent.click(tasksButton()!);
+    expect(tasksButton()?.getAttribute("aria-disabled")).toBe("true");
+    expect(tasksButton()?.disabled).toBe(false); // so keyboard focus stays on it
+    expect(sendArea().getByRole("status").textContent).toBe("Sending to Google Tasks…");
+    fireEvent.click(tasksButton()!); // a second tap does nothing
     release();
     await waitFor(() => expect(screen.getByRole("button", { name: "Send to Google Tasks" })).toBeTruthy());
     expect(screen.getByText("Sent 3 items to Google Tasks › Groceries.")).toBeTruthy();
     expect(bodies).toEqual([{ includeStaples: true }]);
+    expect(sendArea().getByRole("status").textContent).not.toContain("Sending");
   });
 
   it("sends without staples by default and speaks of one item in the singular", async () => {
@@ -203,6 +288,7 @@ describe("Send to Google Tasks", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("isn’t connected");
     expect(alert.querySelector("a")?.getAttribute("href")).toBe("/api/integrations/google/connect");
+    expect(document.activeElement).toBe(alert.querySelector("a")); // the Send button that had focus is gone
     // the button now reads as the connect link too
     expect(screen.getByRole("link", { name: "Connect Google Tasks" })).toBeTruthy();
     expect(tasksButton()).toBeNull();
@@ -263,6 +349,7 @@ describe("Send to Google Tasks", () => {
     });
     const button = screen.getByRole("button", { name: "Connect Google Tasks" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-    expect(button.getAttribute("aria-describedby")).toBe("groceries-offline");
+    expect(button.getAttribute("aria-describedby")).toContain("groceries-offline");
+    expect(button.getAttribute("aria-describedby")).toContain(screen.getByText(/consent page/).id);
   });
 });
