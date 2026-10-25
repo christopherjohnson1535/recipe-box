@@ -105,8 +105,14 @@ a restart clears them.
   `X-Forwarded-For` entry, which is the one your proxy added. Set it to `true` for the `https` profile (Caddy
   overwrites the header with the real client) or any proxy that does the same; keep it `false` when port 3000 is
   reached directly. Never turn it on if clients can bypass the proxy.
-- With it `false`, all visitors share one address (the web container) and the per-address limit of 20 applies to
-  everyone together; the per-username limit still protects each account.
+- With it `false` the API cannot tell visitors apart (they all arrive from the web container, a trusted proxy), so it
+  applies no per-address limit at all and relies on the per-username limit, which protects each account. Nobody can
+  lock everyone else out by guessing. The same holds for LAN clients behind a proxy that sends no usable
+  `X-Forwarded-For`. If the peer is not in `TRUSTED_PROXIES`, it is the client and is limited as one address.
+- **Warning:** with `TRUST_PROXY_HEADERS=true`, the web container believes the right-most `X-Forwarded-For` entry,
+  so anyone who can reach port 3000 directly can pick their own address and so dodge, or aim, the per-address limit.
+  With the `https` profile keep `WEB_BIND=127.0.0.1` (Caddy reaches the web container over the Docker network) and
+  do not publish port 3000 elsewhere. The software cannot check this for you.
 
 ## Backups
 `sh scripts/backup.sh` writes `backups/<time>/db.dump` + `media.tar`; copy that folder off the machine.

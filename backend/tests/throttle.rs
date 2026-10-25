@@ -274,6 +274,39 @@ async fn one_address_spraying_many_usernames_is_locked_out_and_a_spoofed_header_
 }
 
 #[tokio::test]
+async fn behind_a_trusted_proxy_that_does_not_say_who_the_client_is_nobody_locks_the_others_out() {
+    // The compose default without TRUST_PROXY_HEADERS: every request comes from the web container (trusted) and
+    // carries no client address. Twenty-five wrong guesses must not lock the shared proxy address.
+    let ctx = TestApp::spawn_with(|s| {
+        s.trusted_proxies = adapter_http::TrustedProxies::parse("10.0.0.0/8").unwrap();
+    })
+    .await;
+    ctx.setup_admin().await;
+    let proxy = "10.0.0.2:4444";
+    for (i, xff) in [None, Some("unknown"), Some("10.0.0.9")]
+        .into_iter()
+        .cycle()
+        .take(25)
+        .enumerate()
+    {
+        ctx.login_from(proxy, xff, &format!("user{i}"), WRONG)
+            .await
+            .assert_error(StatusCode::UNAUTHORIZED, "unauthenticated");
+    }
+    // Somebody else on the LAN signs in fine, with no address to be blamed for the guesses ...
+    ctx.login_from(proxy, None, "admin", ADMIN_PASSWORD)
+        .await
+        .assert_status(StatusCode::OK);
+    // ... while the username limit still protects each account.
+    for _ in 0..5 {
+        ctx.login_from(proxy, None, "sam", WRONG).await;
+    }
+    ctx.login_from(proxy, None, "sam", WRONG)
+        .await
+        .assert_error(StatusCode::TOO_MANY_REQUESTS, "rate_limited");
+}
+
+#[tokio::test]
 async fn behind_a_trusted_proxy_each_forwarded_client_has_its_own_count() {
     let ctx = TestApp::spawn_with(|s| {
         s.trusted_proxies = adapter_http::TrustedProxies::parse("10.0.0.0/8").unwrap();
@@ -296,6 +329,28 @@ async fn behind_a_trusted_proxy_each_forwarded_client_has_its_own_count() {
     ctx.login_from(proxy, Some("198.51.100.77"), "admin", ADMIN_PASSWORD)
         .await
         .assert_status(StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn parallel_wrong_guesses_are_counted_before_any_is_checked() {
+    // Count-before-verify: with 40 guesses in flight at once, exactly 5 may reach the password check (401); the
+    // other 35 are refused up front (429). No sleeps: the counting happens under one lock before any hashing.
+    let ctx = TestApp::spawn().await;
+    ctx.setup_admin().await;
+    let results = futures_util::future::join_all((0..40).map(|_| ctx.login("admin", WRONG))).await;
+    let wrong = results
+        .iter()
+        .filter(|r| r.status == StatusCode::UNAUTHORIZED)
+        .count();
+    let limited = results
+        .iter()
+        .filter(|r| r.status == StatusCode::TOO_MANY_REQUESTS)
+        .count();
+    assert_eq!((wrong, limited), (5, 35));
+    // Even the right password is refused now.
+    ctx.login("admin", ADMIN_PASSWORD)
+        .await
+        .assert_error(StatusCode::TOO_MANY_REQUESTS, "rate_limited");
 }
 
 #[tokio::test]

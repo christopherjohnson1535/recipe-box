@@ -62,6 +62,9 @@ even with no or an expired session.
 - Counts are kept in the API's memory: a restart clears them.
 - The client address is the TCP peer, or, when the peer is in `TRUSTED_PROXIES`, the right-most `X-Forwarded-For`
   entry that is not itself a trusted proxy. Otherwise the header is ignored (docs/DEPLOY.md).
+- When the peer is a trusted proxy but the real client cannot be told (no usable `X-Forwarded-For`), there is no
+  client address: that request is counted per username only, so people behind one proxy cannot lock each other out
+  with the address limit.
 
 ## Clients outside the browser
 

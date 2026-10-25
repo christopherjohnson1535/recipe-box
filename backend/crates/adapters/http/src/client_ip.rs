@@ -4,6 +4,10 @@
 //! proxies (`TRUSTED_PROXIES`, default none); otherwise the header is ignored, because any client can send it.
 //! Behind a trusted proxy the header is read from the right, skipping trusted proxies: the first address that is
 //! not one is the client. Entries to the left of it are whatever the client claimed and are never used.
+//!
+//! When the request came through a trusted proxy but no real client can be told (no header, a garbled one, or
+//! only trusted hops), there is no address: `None`. The proxy's own address would be shared by everybody behind
+//! it, and a per-address lock on it would let one person lock everyone out. Only the username is throttled then.
 
 use std::{
     net::{IpAddr, SocketAddr},
@@ -56,7 +60,8 @@ impl TrustedProxies {
             .any(|(net, bits)| same_prefix(*net, ip, *bits))
     }
 
-    /// The client address for a request from `peer` carrying these `X-Forwarded-For` header values.
+    /// The client address for a request from `peer` carrying these `X-Forwarded-For` header values. `None` when
+    /// the real client cannot be told: no peer, or a trusted proxy that did not say who it is serving.
     pub fn client<'a>(
         &self,
         peer: Option<IpAddr>,
@@ -67,20 +72,20 @@ impl TrustedProxies {
             return Some(peer);
         }
         // Rightmost first, across all header lines. An entry that is not an address ends the walk: from there
-        // on nothing can be told, so the proxy itself is the best answer.
+        // on nothing can be told, so there is no client address (the proxy's would be everybody's).
         for entry in forwarded_for
             .rev()
             .flat_map(|v| v.rsplit(','))
             .map(str::trim)
         {
             let Ok(ip) = entry.parse::<IpAddr>() else {
-                return Some(peer);
+                return None;
             };
             if !self.contains(ip) {
                 return Some(ip.to_canonical());
             }
         }
-        Some(peer)
+        None
     }
 }
 
@@ -178,23 +183,14 @@ mod tests {
     }
 
     #[test]
-    fn missing_or_garbled_headers_fall_back_to_the_peer() {
-        assert_eq!(
-            client("172.18.0.0/16", "172.18.0.5", &[]),
-            Some(ip("172.18.0.5"))
-        );
-        assert_eq!(
-            client("172.18.0.0/16", "172.18.0.5", &["unknown"]),
-            Some(ip("172.18.0.5"))
-        );
+    fn a_trusted_peer_with_no_usable_header_has_no_client_address() {
+        assert_eq!(client("172.18.0.0/16", "172.18.0.5", &[]), None);
+        assert_eq!(client("172.18.0.0/16", "172.18.0.5", &["unknown"]), None);
         assert_eq!(
             client("172.18.0.0/16", "172.18.0.5", &["6.6.6.6, not-an-ip"]),
-            Some(ip("172.18.0.5"))
+            None
         );
-        assert_eq!(
-            client("172.18.0.0/16", "172.18.0.5", &["172.18.0.9"]),
-            Some(ip("172.18.0.5"))
-        );
+        assert_eq!(client("172.18.0.0/16", "172.18.0.5", &["172.18.0.9"]), None);
     }
 
     #[test]
@@ -217,10 +213,7 @@ mod tests {
         for bad in ["nope", "10.0.0.0/33", "10.0.0.0/x", "::1/129"] {
             assert!(TrustedProxies::parse(bad).is_err(), "{bad}");
         }
-        // Trusting everything leaves no client to find: the peer it is.
-        assert_eq!(
-            client("0.0.0.0/0", "9.9.9.9", &["1.1.1.1"]),
-            Some(ip("9.9.9.9"))
-        );
+        // Trusting everything leaves no client to find.
+        assert_eq!(client("0.0.0.0/0", "9.9.9.9", &["1.1.1.1"]), None);
     }
 }

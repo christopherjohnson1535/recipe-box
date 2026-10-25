@@ -24,7 +24,8 @@ use domain::chrono::{DateTime, Duration, Utc};
 /// Wrong attempts per username (or per user id) before the first lock.
 pub const FREE_PER_NAME: u32 = 5;
 /// Wrong attempts per client address before the first lock. Higher than the name limit because one address can
-/// be a whole household (or, behind a proxy that hides clients, everybody) and a lock here blocks them all.
+/// be a whole household and a lock here blocks them all. (Behind a proxy that hides its clients there is no
+/// address at all: the HTTP adapter passes `None` and only the name is counted.)
 pub const FREE_PER_ADDRESS: u32 = 20;
 /// The first lock lasts this long; each further wrong attempt doubles it.
 pub const BASE_SECS: i64 = 30;
@@ -174,6 +175,11 @@ fn lock_secs(over: u32) -> i64 {
 }
 
 /// The same name spelled differently (case, surrounding spaces) is one key, as the user lookup is.
+///
+/// shortcut: the lookup is `citext` (Postgres `lower()` on both sides), this is Rust's Unicode `to_lowercase`. They
+/// agree for ASCII and the common scripts; an exotic letter whose two lowercasings differ (or a name with inner
+/// spaces) can give one account two keys, so the per-name limit is a bit looser for such a name. The per-address
+/// limit still applies. Usernames are ASCII-ish in practice (`validate::username`).
 fn normalize(name: &str) -> String {
     name.trim()
         .chars()
