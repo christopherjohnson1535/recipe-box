@@ -173,9 +173,12 @@ test("a second member signing in on the same browser sees none of the first one'
   await expect(page).not.toHaveURL(/\/login/);
   // Recipes are shared by the household, so the second member's own home page may keep photos; the first one's pages must be gone.
   await expectWiped(page, "rb-pages");
-  // The second member's own masthead reads the shared grocery list, which the worker keeps (docs/API.md); the first
-  // member's recipe must not be among what is kept.
-  await expect.poll(() => keptUrls(page, "rb-api"), { message: "the worker still keeps the first member's recipe" }).not.toContain(`/api/recipes/${recipe.id}`);
+  // The second member's own masthead reads the shared grocery list, which the worker keeps (docs/API.md). That is the only
+  // API response that survives the wipe: nothing else, the first member's recipe included, may be left in `rb-api`.
+  const keptBesidesList = async () => (await keptUrls(page, "rb-api")).filter((url) => url !== "/api/grocery");
+  await expect.poll(keptBesidesList, { message: "the worker still keeps something of the first member's besides the shared list" }).toEqual([]);
+  await page.evaluate(() => fetch("/api/health", { cache: "no-store" }).then((r) => r.status)); // a late write has had its turn
+  expect(await keptBesidesList()).toEqual([]);
 
   await goOffline(context, page);
   await page.goto(`/recipes/${recipe.id}`);

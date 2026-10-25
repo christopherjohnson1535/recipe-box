@@ -130,6 +130,9 @@ test("the list fits a phone or an iPad and its controls are big enough to touch"
     await expect(tick(page, "dish soap").first()).toBeVisible({ timeout: 2_000 });
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    // The recipe shelf starts folded once three or more recipes are on the (shared) list; open it to reach the steppers.
+    const folded = page.locator("details:not([open]) > summary");
+    if (await folded.count()) await folded.click();
     const controls: Locator[] = [
       ...(await page.locator("button[aria-pressed]").all()),
       ...(await page.getByRole("button", { name: /^Options for / }).all()),
