@@ -137,6 +137,7 @@ async fn recipes_on_the_list() {
     );
     assert_eq!(item(&list.json, "salt to taste")["amounts"], json!([]));
 
+    ctx.clock.advance(chrono::Duration::seconds(1)); // recipes are listed in the order they were added
     // A second recipe merges onions; a rescale changes the amounts and the servings.
     let list = ctx
         .post("/api/grocery/recipes", c, json!({ "recipeId": stew }))

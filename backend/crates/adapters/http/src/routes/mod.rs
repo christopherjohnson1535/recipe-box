@@ -62,7 +62,7 @@ where
         .route("/api/grocery", get(grocery::get).delete(grocery::clear))
         .route("/api/grocery/recipes", post(grocery::add_recipe))
         .route(
-            "/api/grocery/recipes/{recipe_id}",
+            "/api/grocery/recipes/{recipeId}",
             delete(grocery::remove_recipe),
         )
         .route("/api/grocery/items", post(grocery::add_item))
