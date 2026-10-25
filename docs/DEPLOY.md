@@ -184,6 +184,58 @@ a restart clears them.
   With the `https` profile keep `WEB_BIND=127.0.0.1` (Caddy reaches the web container over the Docker network) and
   do not publish port 3000 elsewhere. The software cannot check this for you.
 
+## Google Tasks (optional)
+Lets each member send the grocery list to their own Google Tasks (GRO-5). Without these settings the app runs as
+usual and only that button is off. Everything below is free; no Google verification is needed for a household.
+
+1. In the [Google Cloud console](https://console.cloud.google.com/) create a project (any name).
+2. **APIs & Services > Library**: enable the **Google Tasks API**.
+3. **OAuth consent screen** (shown as **Google Auth platform > Branding / Audience** in newer consoles): user type
+   **External**, publishing status **Testing**. Fill in the app name and your email. Under **Audience > Test users** add
+   the Google account of every household member who will use the export (up to 100). Only listed accounts can
+   connect. Under **Data Access** adding the scope `https://www.googleapis.com/auth/tasks` is optional; the app asks for it.
+4. **Credentials > Create credentials > OAuth client ID**, type **Web application**. Under **Authorised redirect URIs**
+   add `<PUBLIC_URL>/api/integrations/google/callback`, for example
+   `https://recipes.example.com/api/integrations/google/callback`. Google accepts `http://` only for `localhost`, so a
+   real deployment needs HTTPS (it needs it for the iPad anyway, see above). Copy the client ID and secret.
+5. Set four variables in `.env` (all four or none; the API refuses to start with only some of them and says which are
+   missing) and restart the API:
+   ```sh
+   GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=...
+   PUBLIC_URL=https://recipes.example.com   # how people reach the site; no trailing slash
+   TOKEN_ENCRYPTION_KEY=...   # the output of `openssl rand -base64 32` (exactly 32 bytes)
+   ```
+   `PUBLIC_URL` must match the redirect URI character for character (scheme, host and port). Keep
+   `TOKEN_ENCRYPTION_KEY` safe like the database password: it seals each member's Google refresh token in the
+   database, so a database backup alone does not hold usable tokens. Restoring onto a server with a different key (or
+   changing the key) does not break anything else; it only means members connect Google again.
+6. Each member opens the Google section of **Settings** and connects. Google warns that the app is unverified (it is
+   in Testing); that is expected for a test user: **Continue**, then allow access to Google Tasks.
+
+**Refresh tokens expire after 7 days in Testing.** Google's rule: a project with an External consent screen and
+publishing status *Testing* is issued a refresh token that expires in 7 days
+([Using OAuth 2.0 to Access Google APIs, "Refresh token expiration"](https://developers.google.com/identity/protocols/oauth2);
+[Manage App Audience](https://support.google.com/cloud/answer/15549945): "Authorizations by a test user will expire
+seven days from the time of consent"). So about a week after connecting, sending the list fails with *not connected*:
+the API treats Google's `invalid_grant` answer as a lost connection, forgets the dead token and the app offers
+to connect again; one click and a tap on Google's consent page fix it. Two ways to live with it:
+- **Reconnect when asked** (about weekly). Nothing else is needed, and nothing is lost: the Groceries list in
+  Google Tasks stays and is refilled on the next send.
+- **Publish the app** (consent screen > **Publish app**, status *In production*). Tokens then stop expiring after 7 days.
+  Because Google treats the Tasks scope as a sensitive scope (the consent screen's Data Access page labels it) and the app is not verified, Google keeps showing the "unverified app" warning
+  at connect time and caps the number of accounts that may ever connect at 100 for the life of the project
+  ([Manage App Audience](https://support.google.com/cloud/answer/15549945)); that is plenty for a household. Both
+  routes follow Google's documentation; the automated tests use a local stand-in for Google, so neither has been
+  tried against live Google.
+
+**Disconnecting.** A member disconnects in the same Settings section: the API revokes the token at Google
+and deletes it (and the remembered task list) from the database, even if Google could not be reached to revoke it. The
+`Groceries` list in Google Tasks is left as it is; delete it in the Tasks app if you want it gone. A member can also
+remove Recipe Box under *Google Account > Security > Third-party access*. Deleting a member in Recipe Box deletes
+their connection too. To switch the feature off for everyone, empty the four variables and restart: stored tokens are
+then unreadable and ignored.
+
 ## Backups
 `sh scripts/backup.sh` and `sh scripts/restore.sh backups/<time>` (OPS-6). User-facing guide, with scheduling and
 off-site copies: wiki page `docs/wiki/Backup-and-Restore.md`. Reference:
