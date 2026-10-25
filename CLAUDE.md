@@ -70,16 +70,17 @@ adapters → `app` → `ports` → `domain`; the server crate (`backend/src`) wi
 
 | You are adding… | It goes in |
 |---|---|
-| A data shape, a business rule, input validation, an error variant | `backend/crates/domain` |
-| A new outbound need (storage, clock, network, AI, files) | A trait in `backend/crates/ports`, an adapter implementing it, and the wiring. For storage, add cases to `ports::contract` (feature `contract`) so every adapter is held to them |
+| A data shape, a business rule, input validation, an error variant | `backend/crates/domain`; a new `DomainError` variant also needs its HTTP status in `backend/crates/adapters/http/src/error.rs` (`From<DomainError> for AppError`) |
+| A new outbound need (storage, clock, network, AI, files) | A trait in `backend/crates/ports`, an adapter implementing it, and the wiring. For storage, add cases to `ports::contract` (feature `contract`) so every adapter is held to them. A new crate also needs a `COPY` line in `backend/Dockerfile`'s dependency layer |
 | A use case or workflow | A method on a service in `backend/crates/app/src`, with a unit test on `adapter-memory` in `app/tests/` |
 | SQL, a table, a migration | `backend/crates/adapters/postgres` (`src`, `migrations/`); never in `app` or the HTTP adapter |
 | An endpoint | `backend/crates/adapters/http/src/routes/*` + DTO in `dto.rs` + a service method; handlers parse, call one service, map. Then `just openapi` to regenerate `docs/openapi.json` |
+| A config setting or env var | `backend/src/config.rs`, plus `.env.example` and `docs/DEPLOY.md` |
 | Wiring, config, process start, adapters with no crate of their own (argon2, image codec, HEIC) | `backend/src` (`state.rs` builds `Deps`) |
 
 Never let `sqlx`, `axum`, `reqwest` (or `utoipa`, `tokio`, `hyper`) into `domain`, `ports` or `app`. CI checks it with
 `cargo tree` in the backend job of `.github/workflows/ci.yml`; it also keeps `reqwest` to the `http-fetch` and
-`anthropic` adapters and the HTTP adapter off `sqlx`, `image` and `argon2`. Guides: `docs/STORAGE-ADAPTERS.md`
+`anthropic` adapters and the HTTP adapter off `sqlx`, `image` and `argon2`. Tests: levels and commands in `docs/TESTING.md` (B1 app, B2 contract, B3 HTTP). Guides: `docs/STORAGE-ADAPTERS.md`
 (adding a storage adapter), `docs/SDK.md` (adding a client SDK).
 
 ## Rules that never bend

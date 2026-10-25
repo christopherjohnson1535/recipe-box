@@ -20,12 +20,12 @@ ports use the domain. The compiler and a CI check enforce it.
 |---|---|---|
 | Domain | `domain` | Recipes, users, validation, time rules, `DomainError` |
 | Ports | `ports` | Traits for what the app needs: storage, media, clock, AI, page fetching |
-| App | `app` | The use cases (recipes, imports, media, sign-in, export) |
+| App | `app` | The use cases (recipes, imports, media, sign-in; export is a stub) |
 | Adapters | `adapters/*` | `http` (routes), `postgres`, `memory`, `fs-media`, `anthropic`, `http-fetch`, `html` |
 | Server | `recipe-box-api` | Config, wiring and start-up |
 
 So a new database, photo storage or SDK is a new adapter, not a rewrite. Guides:
-[Extending the backend](Extending-the-Backend) and, in the repo,
+[[Extending the Backend]] and, in the repo,
 [Adding a storage adapter](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/STORAGE-ADAPTERS.md),
 [Client SDKs](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/SDK.md) and
 [ADR 0008](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/adr/0008-hexagonal-backend.md).

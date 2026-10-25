@@ -2,7 +2,7 @@
 
 A storage adapter is a crate that implements the storage ports in `backend/crates/ports`. The services in
 `backend/crates/app` only see those traits, so a new database does not touch routes or use cases. The rules behind
-this are in [ADR 0008](adr/0008-hexagonal-backend.md). For client libraries see "Adding an SDK" in
+this are in [ADR 0008](adr/0008-hexagonal-backend.md). For client libraries see "Adding a language" in
 [docs/SDK.md](SDK.md#adding-a-language).
 
 Two existing adapters are your models:
@@ -35,7 +35,9 @@ Photo files are not part of this. They go through `MediaStore` (see "Media" belo
    `recipe-box-domain` and `recipe-box-ports` (path dependencies) and `async-trait`. Add your driver crate
    (for example `sqlx`). Do not depend on `recipe-box-app`, `recipe-box-api` or another adapter.
 2. **Add it to the workspace**: put `"crates/adapters/<name>"` in both `members` and `default-members` in
-   `backend/Cargo.toml`.
+   `backend/Cargo.toml`. Also add `COPY crates/adapters/<name>/Cargo.toml crates/adapters/<name>/Cargo.toml` (and the
+   matching `src` entries in its `mkdir`, `touch` and `rm` lines) to the dependency layer of `backend/Dockerfile`, or
+   the image build fails.
 3. **Implement the traits.** One struct per port, as in `adapter_postgres` (`PgRecipeRepo`, `PgUserRepo`, ...), or one
    struct for all of them, as in `adapter_memory::MemoryStore`. Repositories take a `ports::Clock` when built
    (`PgRecipeRepo::new(pool, clock)`) and stamp rows with it. Never call the wall clock yourself.
@@ -81,8 +83,9 @@ tokio = { version = "1", features = ["macros", "rt"] }
 
 Then add `tests/contract.rs`. The suite takes a function that builds a `contract::Stack` (all seven repositories over
 one backing store) from a clock. Every case calls it again, so each case starts with an empty store. The clock is a
-`ManualClock`: time moves only when the case moves it, so there is no sleeping. This is
-`backend/crates/adapters/memory/tests/contract.rs`:
+`ManualClock`: time moves only when the case moves it, so there is no sleeping. This is a trimmed
+`backend/crates/adapters/memory/tests/contract.rs` (the real file also has the capability-decline, media, hasher and
+clock cases):
 
 ```rust
 use std::sync::Arc;
@@ -139,7 +142,7 @@ prefix per case, cleaned up even when a case panics.
 `Capabilities` has two flags: `phrase_search` and `boolean_operators`. `Capabilities::ALL` is what Postgres must
 offer. If your search engine cannot do `"two words"` phrases, or `-word` and `a or b`, pass a `Capabilities` with that
 flag `false`. The suite then skips only those cases and prints `contract: SKIPPED <case>: adapter does not declare
-<flag>` on stderr. Declare a flag `false` only for a real limit of the engine, and say so in your crate docs. Do not
+`<flag>` on stderr. Declare a flag `false` only for a real limit of the engine, and say so in your crate docs. Do not
 use it to get a failing case through.
 
 ## Search
@@ -210,6 +213,7 @@ cargo tree -p recipe-box-app -e normal --prefix none
 ## Checklist
 
 - [ ] Crate at `backend/crates/adapters/<name>/`, added to `members` and `default-members`
+- [ ] Crate added to the dependency layer of `backend/Dockerfile` (`COPY` line plus the `mkdir`/`touch`/`rm` entries)
 - [ ] Depends on `domain` and `ports` only (plus its driver); no `app`, `recipe-box-api` or other adapter
 - [ ] All seven storage traits implemented; each method atomic; errors mapped to `DomainError`
 - [ ] `set_password_hash` compares and sets; `create_first_admin` and `remove` safe under concurrency

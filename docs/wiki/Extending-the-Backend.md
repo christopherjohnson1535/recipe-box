@@ -1,6 +1,6 @@
 # Extending the backend
 
-Recipe Box's backend is layered (see [Architecture](Architecture)), so the common extensions have a set path.
+Recipe Box's backend is layered (see [[Architecture]]), so the common extensions have a set path.
 Each guide below lives in the repo.
 
 | I want to... | Read |

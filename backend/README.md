@@ -47,7 +47,11 @@ TEST_DATABASE_URL=postgres://recipes:recipes@127.0.0.1:5432/recipes_test cargo t
 
 Integration tests (`tests/*.rs`) give each test its own schema in `TEST_DATABASE_URL` and drop it afterwards; the
 role needs `create` on that database (and the `citext` extension, created in `public` on first run). Without
-`TEST_DATABASE_URL` they print a note and pass, so `cargo test` alone runs only the unit tests.
+`TEST_DATABASE_URL` the harness starts a throwaway Postgres 16 with testcontainers (needs Docker); if that fails the
+test panics, nothing is skipped. Only the Postgres contract tests (`crates/adapters/postgres/tests/contract.rs`)
+return early with a `SKIPPED:` message. Postgres-free levels (for example
+`cargo test -p recipe-box-app -p recipe-box-adapter-memory`), and all levels with their commands, are in
+[`docs/TESTING.md`](../docs/TESTING.md).
 
 ## Layout
 

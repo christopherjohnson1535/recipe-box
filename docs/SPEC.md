@@ -87,13 +87,13 @@ Backend, per crate (the `Cargo.toml` files and the CI `cargo tree` guard are the
 | `ports` | async-trait, `domain` | |
 | `app` | async-trait, `domain`, `ports` | `adapter-memory`, `ports` (feature `contract`), tokio |
 | `adapter-http` | axum (macros, multipart), axum-extra (cookie), cookie, tower-http (trace), utoipa, serde, serde_json, chrono, uuid, thiserror, anyhow, tracing, `app`, `domain` | `adapter-memory`, `ports` (feature `contract`), tokio, tracing-subscriber, async-trait |
-| `adapter-postgres` | sqlx (postgres, uuid, chrono, json, migrate, runtime-tokio, tls-rustls), serde, async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
+| `adapter-postgres` | sqlx (the workspace feature set, see `[workspace.dependencies]`), serde, async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
 | `adapter-memory` | async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
 | `adapter-fs-media` | tokio (fs), async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
 | `adapter-http-fetch` | reqwest (rustls, stream, json), tokio (net, time), url, async-trait, `domain`, `ports` | tokio |
 | `adapter-html` | scraper, serde_json, url, tokio, async-trait, `domain`, `ports` | tokio |
 | `adapter-anthropic` | reqwest (rustls, stream, json), image, base64, serde_json, tokio, tracing, anyhow, async-trait, `domain`, `ports` | tokio |
-| `recipe-box-api` (server) | all of the above crates, axum, sqlx, tokio, argon2, rand, sha2, base64, image, chrono, uuid, anyhow, async-trait, tracing, tracing-subscriber | serde_json, url, futures-util, http-body-util, tower (util), testcontainers-modules (postgres) |
+| `recipe-box-api` (server) | all of the above crates except `adapter-memory`, axum, sqlx, tokio, argon2, rand, sha2, base64, image, chrono, uuid, anyhow, async-trait, tracing, tracing-subscriber | serde_json, url, futures-util, http-body-util, tower (util), testcontainers-modules (postgres) |
 
 Shared versions (`sqlx`, `chrono`, `serde`, `thiserror`, `url`, `uuid`) are pinned once in `[workspace.dependencies]`.
 `domain` re-exports `chrono`, `url` and `uuid`, so ports and adapters name them through it. `async-trait` is there
@@ -191,7 +191,7 @@ backend/Cargo.toml                         // server package recipe-box-api + th
 backend/src/main.rs                        // config, tracing, pool, migrations, router, purge task, graceful shutdown
 backend/src/lib.rs                         // module tree, hourly purge, display-rendition backfill
 backend/src/config.rs                      // Config::from_env()
-backend/src/state.rs                       // AppState: builds the Pg*/fs/AI adapters, deps() -> app::Deps, services()
+backend/src/state.rs                       // AppState (also TokioSpawner, the TaskSpawner impl): builds the Pg*/fs/AI adapters, deps() -> app::Deps, services()
 backend/src/routes/{mod,openapi}.rs        // router(): adapter_http routes + HttpState; OpenAPI json
 backend/src/auth/{password,session}.rs     // Argon2Hasher (PasswordHasher), RandomTokens (SessionTokens)
 backend/src/media.rs                       // ImageCrateCodec (ImageCodec)

@@ -21,7 +21,7 @@ Every issue goes through the whole loop, with the stages done by subagents on a 
 session orchestrating. Skills: `.claude/skills/factory*`; overview: `docs/FACTORY.md`.
 
 ## Extending the backend
-New storage, photo storage or client library? See [Extending the backend](Extending-the-Backend).
+New storage, photo storage or client library? See [[Extending the Backend]].
 
 ## UI work
 Read `docs/UI.md` (the editorial look and the ui components) and `docs/THEMING.md` (the three token layers, how to
