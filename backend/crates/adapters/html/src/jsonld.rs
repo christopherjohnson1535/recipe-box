@@ -1,15 +1,12 @@
 //! Recipe extraction from HTML (LNK-1/2): schema.org `Recipe` as JSON-LD (arrays, `@graph`, `@id` references,
 //! HowToSection/HowToStep, ISO 8601 durations), falling back to microdata (`itemtype=".../Recipe"`).
-//! Text fields have entities decoded and tags stripped. `None` means no recipe: the route answers 422.
+//! Text fields have entities decoded and tags stripped. `None` means no recipe.
 
 use scraper::{ElementRef, Html, Node, Selector};
 use serde_json::Value;
 use url::Url;
 
-use crate::{
-    models::{Ingredient, RecipeDraft, SourceType},
-    validate,
-};
+use domain::{Ingredient, RecipeDraft, SourceType, source::shown_url, validate};
 
 const MAX_TAGS: usize = 15;
 const MAX_TAG_CHARS: usize = 40;
@@ -82,25 +79,12 @@ pub fn extract(html: &str, page_url: &Url) -> Option<RecipeDraft> {
 }
 
 /// `og:site_name`, else the host without `www.`.
-pub(crate) fn site_name(html: &str, page_url: &Url) -> Option<String> {
+pub fn site_name(html: &str, page_url: &Url) -> Option<String> {
     meta(html, "og:site_name").or_else(|| {
         page_url
             .host_str()
             .map(|h| h.trim_start_matches("www.").to_string())
     })
-}
-
-/// `url` without credentials or fragment, as stored in `source_url`.
-pub(crate) fn cleaned(url: &Url) -> Url {
-    let mut shown = url.clone();
-    let _ = shown.set_username("");
-    let _ = shown.set_password(None);
-    shown.set_fragment(None);
-    shown
-}
-
-pub(crate) fn shown_url(url: &Url) -> String {
-    cleaned(url).to_string()
 }
 
 // ---------- cheap scans (no DOM) ----------
@@ -670,7 +654,7 @@ mod tests {
     #[test]
     fn wprm_yoast_graph() {
         let d = draft(
-            include_str!("../../tests/fixtures/wprm-graph.html"),
+            include_str!("../../../../tests/fixtures/wprm-graph.html"),
             "https://saltandthyme.example/brown-butter-pasta/",
         );
         assert_eq!(d.title, "Brown Butter Pasta with Sage");
@@ -713,7 +697,7 @@ mod tests {
     #[test]
     fn tasty_recipes_single_object() {
         let d = draft(
-            include_str!("../../tests/fixtures/tasty.html"),
+            include_str!("../../../../tests/fixtures/tasty.html"),
             "https://weeknightwins.example/fajitas/",
         );
         assert_eq!(d.title, "Sheet Pan Chicken Fajitas");
@@ -753,7 +737,7 @@ mod tests {
     #[test]
     fn publisher_type_array_and_string_instructions() {
         let d = draft(
-            include_str!("../../tests/fixtures/publisher.html"),
+            include_str!("../../../../tests/fixtures/publisher.html"),
             "https://dailytable.example/recipes/tomato-soup",
         );
         assert_eq!(d.title, "Slow-Roasted Tomato Soup");
@@ -779,7 +763,7 @@ mod tests {
     #[test]
     fn howto_sections_become_step_sections() {
         let d = draft(
-            include_str!("../../tests/fixtures/howto-sections.html"),
+            include_str!("../../../../tests/fixtures/howto-sections.html"),
             "https://flourandfork.example/cinnamon-rolls",
         );
         assert_eq!(d.title, "Weekend Cinnamon Rolls");
@@ -812,7 +796,7 @@ mod tests {
     #[test]
     fn microdata_only_page() {
         let d = draft(
-            include_str!("../../tests/fixtures/microdata.html"),
+            include_str!("../../../../tests/fixtures/microdata.html"),
             "https://oldpantry.example/lentil-stew/",
         );
         assert_eq!(d.title, "Grandma\u{2019}s Lentil Stew");
@@ -842,7 +826,13 @@ mod tests {
     #[test]
     fn page_without_recipe_is_none() {
         let url = Url::parse("https://example.com/post").unwrap();
-        assert!(extract(include_str!("../../tests/fixtures/no-recipe.html"), &url).is_none());
+        assert!(
+            extract(
+                include_str!("../../../../tests/fixtures/no-recipe.html"),
+                &url
+            )
+            .is_none()
+        );
         assert!(extract("", &url).is_none());
     }
 
@@ -941,7 +931,7 @@ mod tests {
     #[test]
     fn extract_skips_the_microdata_fallback_for_too_deep_pages() {
         let url = Url::parse("https://oldpantry.example/lentil-stew/").unwrap();
-        let fixture = include_str!("../../tests/fixtures/microdata.html");
+        let fixture = include_str!("../../../../tests/fixtures/microdata.html");
         // Shallow: the microdata fallback finds the recipe.
         assert!(extract(fixture, &url).is_some());
         // Same content, wrapped deeper than the cap: extract must refuse to build the DOM.

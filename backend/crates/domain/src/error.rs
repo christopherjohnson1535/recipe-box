@@ -39,6 +39,19 @@ impl DomainError {
     pub fn validation(msg: impl Into<String>) -> Self {
         Self::Validation(msg.into())
     }
+
+    /// `Internal` carrying the whole chain of `e` and its sources ("outer: inner: root"), so the log keeps what
+    /// an `anyhow` error would have shown.
+    pub fn internal(e: impl std::error::Error) -> Self {
+        let mut message = e.to_string();
+        let mut source = e.source();
+        while let Some(s) = source {
+            message.push_str(": ");
+            message.push_str(&s.to_string());
+            source = s.source();
+        }
+        Self::Internal(message)
+    }
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;
@@ -51,6 +64,42 @@ mod tests {
     fn unauthenticated_message_is_displayed() {
         let e = DomainError::Unauthenticated("Wrong username or password.");
         assert_eq!(e.to_string(), "Wrong username or password.");
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("{label}")]
+    struct Layer {
+        label: &'static str,
+        #[source]
+        inner: Option<Box<Layer>>,
+    }
+
+    #[test]
+    fn internal_keeps_the_whole_source_chain() {
+        let chain = Layer {
+            label: "save failed",
+            inner: Some(Box::new(Layer {
+                label: "query failed",
+                inner: Some(Box::new(Layer {
+                    label: "connection reset",
+                    inner: None,
+                })),
+            })),
+        };
+        let e = DomainError::internal(chain);
+        assert!(
+            matches!(&e, DomainError::Internal(m) if m == "save failed: query failed: connection reset"),
+            "{e:?}"
+        );
+    }
+
+    #[test]
+    fn internal_without_a_source_is_just_the_message() {
+        let e = DomainError::internal(Layer {
+            label: "disk full",
+            inner: None,
+        });
+        assert!(matches!(e, DomainError::Internal(m) if m == "disk full"));
     }
 
     #[test]

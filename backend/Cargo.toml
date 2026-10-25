@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [workspace]
-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
-default-members = [".", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
+members = [".", "crates/adapters/anthropic", "crates/adapters/http-fetch", "crates/adapters/html", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
+default-members = [".", "crates/adapters/anthropic", "crates/adapters/http-fetch", "crates/adapters/html", "crates/domain", "crates/ports", "crates/adapters/memory", "crates/adapters/fs-media", "crates/adapters/postgres", "crates/app", "crates/adapters/http"]
 
 [workspace.dependencies]
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "uuid", "chrono", "json", "migrate", "macros", "runtime-tokio", "tls-rustls"] }
@@ -21,6 +21,9 @@ recipe-box-app = { path = "crates/app" }
 recipe-box-domain = { path = "crates/domain" }
 recipe-box-adapter-http = { path = "crates/adapters/http" }
 recipe-box-adapter-postgres = { path = "crates/adapters/postgres" }
+recipe-box-adapter-anthropic = { path = "crates/adapters/anthropic" }
+recipe-box-adapter-http-fetch = { path = "crates/adapters/http-fetch" }
+recipe-box-adapter-html = { path = "crates/adapters/html" }
 recipe-box-adapter-fs-media = { path = "crates/adapters/fs-media" }
 recipe-box-ports = { path = "crates/ports" }
 anyhow = "1"
@@ -31,20 +34,16 @@ base64 = "0.23"
 chrono = { workspace = true, features = ["serde"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 rand = "0.10"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json"] }
-serde.workspace = true
-serde_json = "1"
 sha2 = "0.11"
 sqlx.workspace = true
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "fs", "process"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-url.workspace = true
 uuid = { workspace = true, features = ["serde"] }
-scraper = "0.29.0"
-utoipa = { version = "6", features = ["chrono", "uuid"] }
 
 [dev-dependencies]
+serde_json = "1"
+url.workspace = true
 futures-util = "0.3"
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }

@@ -6,7 +6,7 @@ Status: Accepted · Date: 2026-10-22 (recorded after the fact; the decision pred
 Link import makes the server fetch a URL chosen by a user. Left unchecked this is server-side request forgery: a request to a private, loopback or link-local address could reach the home network or cloud metadata.
 
 ## Decision
-Every outbound fetch of a user-supplied address goes through `backend/src/import/safe_fetch.rs`. It resolves the host and allows only public IP addresses, re-checks them on every redirect, and enforces a 15 s timeout and a 5 MB cap. No other code calls the HTTP client with a user-supplied URL. This is one of the rules in CLAUDE.md that never bend, and changes to it get an independent security review.
+Every outbound fetch of a user-supplied address goes through `backend/crates/adapters/http-fetch/src/safe_fetch.rs`. It resolves the host and allows only public IP addresses, re-checks them on every redirect, and enforces a 15 s timeout and a 5 MB cap. No other code calls the HTTP client with a user-supplied URL. This is one of the rules in CLAUDE.md that never bend, and changes to it get an independent security review.
 
 ## Consequences
 - One small module carries the SSRF defence, so it can be reviewed and tested thoroughly (including with local fixture servers, never the real network).

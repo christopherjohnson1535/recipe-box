@@ -77,6 +77,29 @@ jobs:
             echo "::error::recipe-box-adapter-http depends on a storage, image, crypto or server crate"
             exit 1
           fi
+      - name: Outbound network stays in two adapters, and the import adapters stay leaf crates
+        run: |
+          set -euo pipefail
+          # Only the SSRF-guarded fetcher, the Anthropic client and the server crate (which wires them) may have
+          # reqwest in their normal dependency tree; the server crate must not list it as a direct dependency.
+          cargo tree -i reqwest -e normal --prefix none > "$RUNNER_TEMP/tree.txt"
+          if grep -vE '^(reqwest|recipe-box-adapter-(anthropic|http-fetch)|recipe-box-api)( |$)' "$RUNNER_TEMP/tree.txt"; then
+            echo "::error::a crate other than the http-fetch and anthropic adapters depends on reqwest"
+            exit 1
+          fi
+          cargo tree -p recipe-box-api -e normal --depth 1 --prefix none > "$RUNNER_TEMP/tree.txt"
+          if grep -E '^reqwest( |$)' "$RUNNER_TEMP/tree.txt"; then
+            echo "::error::recipe-box-api depends on reqwest directly"
+            exit 1
+          fi
+          # The three import adapters reach the rest of the application only through domain and ports.
+          for crate in recipe-box-adapter-anthropic recipe-box-adapter-http-fetch recipe-box-adapter-html; do
+            cargo tree -p "$crate" -e normal --prefix none > "$RUNNER_TEMP/tree.txt"
+            if grep -vE "^$crate " "$RUNNER_TEMP/tree.txt" | grep -E '^(recipe-box-app|recipe-box-api|recipe-box-adapter-[a-z-]+|axum|sqlx)( |$)'; then
+              echo "::error::$crate depends on the app, the server, another adapter or a storage/web crate"
+              exit 1
+            fi
+          done
       - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2
         with:
           tool: cargo-nextest

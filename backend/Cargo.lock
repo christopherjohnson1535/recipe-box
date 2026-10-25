@@ -2386,6 +2386,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "recipe-box-adapter-anthropic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.23.1",
+ "image",
+ "recipe-box-domain",
+ "recipe-box-ports",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "recipe-box-adapter-fs-media"
 version = "0.1.0"
 dependencies = [
@@ -2396,23 +2412,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "recipe-box-adapter-html"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "recipe-box-domain",
+ "recipe-box-ports",
+ "scraper",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "recipe-box-adapter-http"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "axum-extra",
  "chrono",
  "cookie",
+ "recipe-box-adapter-memory",
  "recipe-box-app",
  "recipe-box-domain",
+ "recipe-box-ports",
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
  "tower-http 0.7.1",
  "tracing",
+ "tracing-subscriber",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "recipe-box-adapter-http-fetch"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "recipe-box-domain",
+ "recipe-box-ports",
+ "reqwest",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2451,15 +2497,15 @@ dependencies = [
  "http-body-util",
  "image",
  "rand 0.10.3",
+ "recipe-box-adapter-anthropic",
  "recipe-box-adapter-fs-media",
+ "recipe-box-adapter-html",
  "recipe-box-adapter-http",
+ "recipe-box-adapter-http-fetch",
  "recipe-box-adapter-postgres",
  "recipe-box-app",
  "recipe-box-domain",
  "recipe-box-ports",
- "reqwest",
- "scraper",
- "serde",
  "serde_json",
  "sha2 0.11.1",
  "sqlx",
@@ -2469,7 +2515,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "utoipa",
  "uuid",
 ]
 

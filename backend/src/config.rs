@@ -2,6 +2,8 @@ use std::{env, path::PathBuf};
 
 use anyhow::{Context, bail};
 
+pub use domain::Secret;
+
 /// `IMPORT_ALLOW_HOST` is for throwaway test stacks. `COOKIE_SECURE=true` is a production-looking config, so the two
 /// together are refused at startup.
 pub fn check_import_allow_host(allow_host: &str, cookie_secure: bool) -> anyhow::Result<()> {
@@ -11,32 +13,6 @@ pub fn check_import_allow_host(allow_host: &str, cookie_secure: bool) -> anyhow:
         );
     }
     Ok(())
-}
-
-/// A credential that never prints: `Debug` and `Display` show `[redacted]`. Read it with [`Secret::expose`].
-#[derive(Clone)]
-pub struct Secret(String);
-
-impl Secret {
-    pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
-
-    pub fn expose(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Debug for Secret {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("[redacted]")
-    }
-}
-
-impl std::fmt::Display for Secret {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("[redacted]")
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -87,10 +63,6 @@ impl Config {
         })
     }
 
-    pub fn ai_enabled(&self) -> bool {
-        self.ai_provider != "none"
-    }
-
     pub fn max_upload_bytes(&self) -> usize {
         self.max_upload_mb * 1024 * 1024
     }
@@ -113,14 +85,7 @@ fn var(name: &str, default: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Secret, parse_session_days};
-
-    #[test]
-    fn secret_never_prints() {
-        let s = Secret::new("sk-ant-hunter2");
-        assert_eq!(format!("{s:?} {s}"), "[redacted] [redacted]");
-        assert_eq!(s.expose(), "sk-ant-hunter2");
-    }
+    use super::parse_session_days;
 
     #[test]
     fn session_days_must_be_between_1_and_3650() {

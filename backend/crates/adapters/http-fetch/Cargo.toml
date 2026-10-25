@@ -1,0 +1,20 @@
+[package]
+name = "recipe-box-adapter-http-fetch"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "adapter_http_fetch"
+
+# Outbound network adapter (docs/adr/0008): fetches user-supplied addresses behind the SSRF guard.
+[dependencies]
+async-trait = "0.1"
+recipe-box-domain = { path = "../../domain" }
+recipe-box-ports = { path = "../../ports" }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json"] }
+tokio = { version = "1", features = ["net", "time"] }
+url.workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

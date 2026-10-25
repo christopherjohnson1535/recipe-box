@@ -6,6 +6,7 @@
 //! Build the lot with [`Services::new`] from a [`Deps`].
 
 mod auth;
+mod imports;
 mod maintenance;
 mod media;
 mod recipes;
@@ -14,11 +15,15 @@ mod users;
 use std::sync::Arc;
 
 use ports::{
-    Clock, ImageCodec, ImageRepo, MediaStore, PasswordHasher, RecipeRepo, SessionRepo,
-    SessionTokens, SettingsRepo, StorageHealth, TagRepo, UserRepo,
+    Clock, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader, PasswordHasher,
+    RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo,
+    TaskSpawner, UserRepo,
 };
 
 pub use auth::{AuthService, NewSession};
+pub use imports::{
+    Capabilities, ImportNotes, ImportService, Imported, NoneExtractor, PhotoFailure,
+};
 pub use maintenance::{BackfillReport, Maintenance, PurgeReport};
 pub use media::{MediaService, Stored};
 pub use recipes::{RecipeService, SettingsService, TagService};
@@ -39,6 +44,13 @@ pub struct Deps {
     pub tokens: Arc<dyn SessionTokens>,
     pub codec: Arc<dyn ImageCodec>,
     pub clock: Arc<dyn Clock>,
+    pub extractor: Arc<dyn RecipeExtractor>,
+    pub fetcher: Arc<dyn PageFetcher>,
+    pub reader: Arc<dyn PageReader>,
+    /// Runs cleanup that must outlive a dropped request.
+    pub spawner: Arc<dyn TaskSpawner>,
+    /// Largest accepted upload (`MAX_UPLOAD_MB`); also caps a page photo downloaded by link import.
+    pub max_upload_bytes: usize,
     /// How long a new session lasts.
     pub session_days: i64,
 }
@@ -70,6 +82,7 @@ pub struct Services {
     pub settings: SettingsService,
     pub tags: TagService,
     pub media: MediaService,
+    pub imports: ImportService,
     pub export: ExportService,
     pub maintenance: Maintenance,
 }
@@ -84,6 +97,7 @@ impl Services {
             settings: SettingsService::new(&d),
             tags: TagService::new(&d),
             media: MediaService::new(&d),
+            imports: ImportService::new(&d),
             export: ExportService,
             maintenance: Maintenance::new(&d),
         }

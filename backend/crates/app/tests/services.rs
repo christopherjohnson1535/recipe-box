@@ -1,11 +1,14 @@
 //! One test per rule the services own, over the in-memory adapters and a manual clock.
 
+#[allow(dead_code)] // shared with tests/imports.rs
+mod common;
+
 use std::sync::Arc;
 
 use adapter_memory::{
     FakeImageCodec, FakePasswordHasher, FakeSessionTokens, MemoryMedia, MemoryStore,
 };
-use app::{Deps, Services};
+use app::{Deps, NoneExtractor, Services};
 use async_trait::async_trait;
 use domain::Image;
 use domain::{
@@ -39,6 +42,11 @@ impl World {
             tokens: Arc::new(FakeSessionTokens::default()),
             codec: Arc::new(FakeImageCodec::default()),
             clock: clock.clone(),
+            extractor: Arc::new(NoneExtractor),
+            fetcher: Arc::new(common::FakeFetcher::default()),
+            reader: Arc::new(common::FakeReader::default()),
+            spawner: Arc::new(common::CollectingSpawner::default()),
+            max_upload_bytes: 1 << 20,
             session_days: 30,
         };
         Self {

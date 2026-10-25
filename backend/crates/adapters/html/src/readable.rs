@@ -6,14 +6,13 @@
 
 use scraper::{ElementRef, Html, Node, Selector};
 
+use domain::MIN_PAGE_CHARS;
+
 use super::jsonld;
 use url::Url;
 
 /// Most characters of page text sent to the AI.
 pub const MAX_READABLE_CHARS: usize = 20_000;
-/// Fewest non-space characters of page text worth sending to the AI; a `<main>`/`<article>` with less falls back
-/// to the next candidate root.
-pub const MIN_PAGE_CHARS: usize = 200;
 /// Deepest element the text walk descends into (`too_complex` refuses deeper pages first; this keeps the stack safe anyway).
 const MAX_WALK_DEPTH: usize = 400;
 
@@ -151,6 +150,12 @@ mod tests {
             r.text,
             "Soup\nA warm soup.\nFor the broth\n1 onion\n2 carrots"
         );
+    }
+
+    #[test]
+    fn comments_are_not_text() {
+        let r = read("<body><p>Boil<!-- hidden note --> water.</p></body>");
+        assert_eq!(r.text, "Boil water.");
     }
 
     #[test]

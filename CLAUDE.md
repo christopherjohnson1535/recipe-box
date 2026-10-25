@@ -65,7 +65,7 @@ For an issue:
 7. Open a PR that says `Closes #<n>`, ticks the issue's acceptance checklist, and lists checks run.
 
 ## Rules that never bend
-- Link import only fetches public addresses through `backend/src/import/safe_fetch.rs` (re-checked per redirect).
+- Link import only fetches public addresses through `backend/crates/adapters/http-fetch/src/safe_fetch.rs` (re-checked per redirect).
 - Uploaded images are decoded and re-encoded; never served as uploaded.
 - Every API route except health/setup/login requires a session; admin routes check the role.
 - Secrets live in env vars only (`.env` is gitignored; document new vars in `.env.example`).

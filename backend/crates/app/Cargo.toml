@@ -9,11 +9,11 @@ name = "app"
 
 # Pure on purpose (docs/adr/0008): only the domain and the port traits. No web, database, image or crypto crates.
 [dependencies]
+async-trait = "0.1"
 recipe-box-domain = { path = "../domain" }
 recipe-box-ports = { path = "../ports" }
 
 [dev-dependencies]
-async-trait = "0.1"
 recipe-box-adapter-memory = { path = "../adapters/memory" }
 # `contract` is only for its `ManualClock`.
 recipe-box-ports = { path = "../ports", features = ["contract"] }

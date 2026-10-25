@@ -33,18 +33,21 @@ COPY crates/adapters/memory/Cargo.toml crates/adapters/memory/Cargo.toml
 COPY crates/adapters/fs-media/Cargo.toml crates/adapters/fs-media/Cargo.toml
 COPY crates/adapters/postgres/Cargo.toml crates/adapters/postgres/Cargo.toml
 COPY crates/adapters/http/Cargo.toml crates/adapters/http/Cargo.toml
+COPY crates/adapters/anthropic/Cargo.toml crates/adapters/anthropic/Cargo.toml
+COPY crates/adapters/http-fetch/Cargo.toml crates/adapters/http-fetch/Cargo.toml
+COPY crates/adapters/html/Cargo.toml crates/adapters/html/Cargo.toml
 COPY crates/app/Cargo.toml crates/app/Cargo.toml
 RUN . /env.sh \
-    && mkdir src benches crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/fs-media/src crates/adapters/postgres/src crates/adapters/http/src crates/app/src && echo 'fn main() {}' > src/main.rs \
-    && touch src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/fs-media/src/lib.rs crates/adapters/postgres/src/lib.rs crates/adapters/http/src/lib.rs crates/app/src/lib.rs \
+    && mkdir src benches crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/fs-media/src crates/adapters/postgres/src crates/adapters/http/src crates/adapters/anthropic/src crates/adapters/http-fetch/src crates/adapters/html/src crates/app/src && echo 'fn main() {}' > src/main.rs \
+    && touch src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/fs-media/src/lib.rs crates/adapters/postgres/src/lib.rs crates/adapters/http/src/lib.rs crates/adapters/anthropic/src/lib.rs crates/adapters/http-fetch/src/lib.rs crates/adapters/html/src/lib.rs crates/app/src/lib.rs \
     && echo 'fn main() {}' > benches/search.rs \
     && cargo build --release --locked \
-    && rm -rf src crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/fs-media/src crates/adapters/postgres/src crates/adapters/http/src crates/app/src
+    && rm -rf src crates/domain/src crates/ports/src crates/adapters/memory/src crates/adapters/fs-media/src crates/adapters/postgres/src crates/adapters/http/src crates/adapters/anthropic/src crates/adapters/http-fetch/src crates/adapters/html/src crates/app/src
 COPY src src
 COPY crates crates
 # COPY keeps the context's mtimes, which can be older than the dummy build; touch so cargo rebuilds our crates.
 RUN . /env.sh \
-    && touch src/main.rs src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/fs-media/src/lib.rs crates/adapters/postgres/src/lib.rs crates/adapters/http/src/lib.rs crates/app/src/lib.rs \
+    && touch src/main.rs src/lib.rs crates/domain/src/lib.rs crates/ports/src/lib.rs crates/adapters/memory/src/lib.rs crates/adapters/fs-media/src/lib.rs crates/adapters/postgres/src/lib.rs crates/adapters/http/src/lib.rs crates/adapters/anthropic/src/lib.rs crates/adapters/http-fetch/src/lib.rs crates/adapters/html/src/lib.rs crates/app/src/lib.rs \
     && cargo build --release --locked \
     && cp "target/$CARGO_BUILD_TARGET/release/recipe-box-api" /recipe-box-api
 

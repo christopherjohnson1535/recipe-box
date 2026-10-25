@@ -10,6 +10,7 @@ use crate::{HttpConfig, HttpState, error::AppError};
 pub mod auth;
 pub mod export;
 pub mod health;
+pub mod imports;
 pub mod media;
 pub mod openapi;
 pub mod recipes;
@@ -33,6 +34,12 @@ where
         .route("/api/media", post(media::upload))
         .route("/api/import/export", post(export::import_zip))
         .layer(DefaultBodyLimit::max(config.max_upload_bytes));
+    // Photo import takes up to MAX_PHOTOS files (each still checked against the 1x limit) plus multipart framing.
+    let photos = Router::new()
+        .route("/api/import/photo", post(imports::from_photo))
+        .layer(DefaultBodyLimit::max(
+            domain::MAX_PHOTOS * config.max_upload_bytes + (64 << 10),
+        ));
     Router::new()
         .route("/api/health", get(health::health))
         .route("/api/setup", get(setup::status).post(setup::create_admin))
@@ -51,11 +58,15 @@ where
         .route("/api/tags", get(tags::list))
         .route("/media/{file_name}", get(media::serve))
         .route("/api/export", get(export::export_zip))
+        .route("/api/import/capabilities", get(imports::capabilities))
+        .route("/api/import/url", post(imports::from_url))
+        .route("/api/import/text", post(imports::from_text))
         .route("/api/users", get(users::list).post(users::create))
         .route("/api/users/{id}", delete(users::remove))
         .route("/api/users/{id}/password", put(users::set_password))
         .layer(DefaultBodyLimit::max(JSON_BODY_LIMIT))
         .merge(uploads)
+        .merge(photos)
 }
 
 /// The fallbacks and request tracing for the whole router, then its state.

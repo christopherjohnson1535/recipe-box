@@ -1,0 +1,24 @@
+[package]
+name = "recipe-box-adapter-anthropic"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "adapter_anthropic"
+
+# Outbound AI adapter (docs/adr/0008): the Anthropic Messages API behind `ports::RecipeExtractor`.
+[dependencies]
+async-trait = "0.1"
+base64 = "0.23"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
+recipe-box-domain = { path = "../../domain" }
+recipe-box-ports = { path = "../../ports" }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "time"] }
+tracing = "0.1"
+anyhow = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

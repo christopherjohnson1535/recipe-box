@@ -12,7 +12,7 @@ use utoipa::{
     },
 };
 
-use super::{auth, export, health, media, recipes, settings, setup, tags, users};
+use super::{auth, export, health, imports, media, recipes, settings, setup, tags, users};
 use crate::extract::COOKIE_NAME;
 
 #[derive(OpenApi)]
@@ -45,6 +45,10 @@ use crate::extract::COOKIE_NAME;
         users::set_password,
         export::export_zip,
         export::import_zip,
+        imports::capabilities,
+        imports::from_url,
+        imports::from_text,
+        imports::from_photo,
     ),
     components(schemas(recipes::RecipeSort)), // only named in a query parameter's `value_type`
 )]
@@ -137,11 +141,9 @@ fn add_error(op: &mut Operation, status: &str, description: &str) {
         .or_insert_with(|| response.into());
 }
 
-/// The spec: this crate's paths plus `extra` (the server's own routes), then the modifiers, which therefore apply
-/// to all of them. `version` is the server's.
-pub fn spec(extra: Spec, version: &str) -> Spec {
+/// The spec: this crate's paths, then the modifiers. `version` is the server's.
+pub fn spec(version: &str) -> Spec {
     let mut spec = ApiDoc::openapi();
-    spec.merge(extra);
     let modifiers: [&dyn Modify; 3] = [&Session, &CommonErrors, &ExtensibleErrorCode];
     for m in modifiers {
         m.modify(&mut spec);
@@ -152,8 +154,8 @@ pub fn spec(extra: Spec, version: &str) -> Spec {
 
 /// The spec as pretty JSON with a trailing newline. Keys are sorted (serde_json without `preserve_order`), so
 /// the output is byte-for-byte stable.
-pub fn json(extra: Spec, version: &str) -> String {
-    let mut out = serde_json::to_string_pretty(&spec(extra, version)).expect("spec serializes");
+pub fn json(version: &str) -> String {
+    let mut out = serde_json::to_string_pretty(&spec(version)).expect("spec serializes");
     out.push('\n');
     out
 }

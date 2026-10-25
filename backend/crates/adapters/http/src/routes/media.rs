@@ -1,4 +1,4 @@
-use app::{MediaService, Stored};
+use app::Stored;
 use axum::{
     Json,
     extract::{Multipart, State},
@@ -19,15 +19,13 @@ use crate::{
 /// `MediaService::upload` calls this.
 pub fn log_rendition_error(stored: &Stored) {
     if let Some(e) = &stored.rendition_error {
-        tracing::warn!(id = %stored.image.id, error = %e, "could not write the display rendition");
+        log_rendition(stored.image.id, e);
     }
 }
 
-/// `MediaService::delete_images`, logging when the rows could not be deleted.
-pub async fn delete_images(media: &MediaService, ids: &[Uuid]) {
-    if !media.delete_images(ids).await {
-        tracing::warn!("could not delete images of a failed request");
-    }
+/// Logs why image `id` has no display rendition.
+pub fn log_rendition(id: Uuid, error: &domain::DomainError) {
+    tracing::warn!(%id, %error, "could not write the display rendition");
 }
 
 /// Multipart body of `POST /api/media`.
