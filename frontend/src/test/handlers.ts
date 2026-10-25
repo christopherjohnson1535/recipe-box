@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import type { GroceryItem, GroceryList } from "@/components/groceries/types";
 import type { Capabilities, Health, Image, Recipe, RecipeDraft, RecipeSummary, Tag, User } from "@/lib/api";
 
 // Typed against the types api.ts re-exports from the generated OpenAPI types (src/lib/api-types.ts).
@@ -18,6 +19,9 @@ export const draft: RecipeDraft = {
   tags: [], imageUrl: null, warnings: [], duplicateOf: null,
 };
 export const image: Image = { id: "i1", url: "/media/i1.jpg", width: 1, height: 1, displayUrl: null };
+
+export const groceryList: GroceryList = { id: "g1", updatedAt: "2026-01-01T00:00:00Z", recipes: [], items: [] };
+export const groceryItem: GroceryItem = { id: "i1", name: "paper towels", amounts: [], section: "other", checked: false, manual: true, staple: false, recipeIds: [] };
 
 export const handlers = [
   http.get("*/api/health", () => HttpResponse.json<Health>({ status: "ok", db: "ok", version: "test" })),
@@ -42,6 +46,14 @@ export const handlers = [
   http.post("*/api/users", () => HttpResponse.json(user, { status: 201 })),
   http.delete("*/api/users/:id", () => new HttpResponse(null, { status: 204 })),
   http.put("*/api/users/:id/password", () => new HttpResponse(null, { status: 204 })),
+  http.get("*/api/grocery", () => HttpResponse.json(groceryList)),
+  http.delete("*/api/grocery", () => new HttpResponse(null, { status: 204 })),
+  http.post("*/api/grocery/recipes", () => HttpResponse.json(groceryList)),
+  http.delete("*/api/grocery/recipes/:id", () => HttpResponse.json(groceryList)),
+  http.post("*/api/grocery/items", () => HttpResponse.json(groceryItem, { status: 201 })),
+  http.patch("*/api/grocery/items/:id", () => HttpResponse.json(groceryItem)),
+  http.delete("*/api/grocery/items/:id", () => new HttpResponse(null, { status: 204 })),
+  http.post("*/api/grocery/clear-checked", () => HttpResponse.json(groceryList)),
   http.get("*/api/export", () => new HttpResponse("{}", { headers: { "content-type": "application/zip" } })),
   http.post("*/api/import/export", () => HttpResponse.json({ imported: 0, skipped: 0 })),
 ];

@@ -1,0 +1,370 @@
+"use client";
+
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { SpotIcon } from "./SpotIcon";
+import type { SpotName } from "./spot-icons";
+
+/* The grocery list's pieces (#80, GRO). Set like department signage in a shop: ruled, letter-spaced section heads, hairlines between
+   rows, no boxes. Rows reuse the recipe page's tick (aria-pressed + the drawn `.strike`). Tokens only; no new ones. */
+
+const tabular = "[font-variant-numeric:lining-nums_tabular-nums]";
+
+function Check({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 12 12" className={className} fill="none" stroke="var(--button-primary-fg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
+    </svg>
+  );
+}
+
+/** The recipes on the list, folded away with one tap (open at first). Native `details`. */
+export function RecipeShelf({ summary, children }: { summary: string; children: ReactNode }) {
+  return (
+    <details open className="group">
+      <summary className="label flex min-h-control cursor-pointer list-none items-center justify-between border-b-2 border-(--rule-double) text-ink [&::-webkit-details-marker]:hidden">
+        <span>{summary}</span>
+        <span aria-hidden="true" className="px-1 text-body">
+          <span className="group-open:hidden">+</span>
+          <span className="hidden group-open:inline">−</span>
+        </span>
+      </summary>
+      {children}
+    </details>
+  );
+}
+
+/** One recipe on the list: its title (a link), servings at the chosen scale, the scale stepper and Remove. */
+export function RecipeRow({ title, meta, stepper, remove }: { title: ReactNode; meta?: string | null; stepper: ReactNode; remove: ReactNode }) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-(--rule-hair) py-2">
+      <div className="min-w-0 flex-1 basis-48">
+        <p className="text-body leading-snug text-ink [overflow-wrap:anywhere]">{title}</p>
+        {meta && <p className="label-quiet text-ink-muted">{meta}</p>}
+      </div>
+      <div className="flex items-center gap-1">
+        {stepper}
+        {remove}
+      </div>
+    </li>
+  );
+}
+
+/** − 1× + : steps a recipe's scale. The value is a polite live region so a change is heard. */
+export function ScaleStepper({
+  label,
+  valueLabel,
+  downLabel,
+  upLabel,
+  onDown,
+  onUp,
+  downDisabled,
+  upDisabled,
+}: {
+  label: string;
+  valueLabel: string;
+  downLabel: string;
+  upLabel: string;
+  onDown: () => void;
+  onUp: () => void;
+  downDisabled?: boolean;
+  upDisabled?: boolean;
+}) {
+  const step =
+    "inline-flex size-control items-center justify-center text-(--button-ghost-fg) transition-[color] duration-150 ease-out hover:text-(--button-ghost-hover) disabled:cursor-not-allowed disabled:opacity-55";
+  return (
+    <div role="group" aria-label={label} className="flex items-center border border-(--input-border)">
+      <button type="button" aria-label={downLabel} title={downLabel} onClick={onDown} disabled={downDisabled} className={step}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 12h12" />
+        </svg>
+      </button>
+      <output aria-live="polite" className={`label min-w-10 text-center text-ink ${tabular}`}>
+        {valueLabel}
+      </output>
+      <button type="button" aria-label={upLabel} title={upLabel} onClick={onUp} disabled={upDisabled} className={step}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 12h12M12 6v12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+/** A store section: a ruled, letter-spaced head that stays at the top of the screen while its items scroll under it. */
+export function GrocerySection({ title, count, children }: { title: string; count?: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id}>
+      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b-2 border-(--rule-double) bg-paper pt-3 pb-1.5">
+        <h2 id={id} className="label text-ink">
+          {title}
+        </h2>
+        {count && <p className="label-quiet text-ink-muted">{count}</p>}
+      </div>
+      <ul>{children}</ul>
+    </section>
+  );
+}
+
+/**
+ * One item: the whole row is the tick (a button with `aria-pressed`, 56px tall), then the menu. Amounts come first in claret
+ * ("1 cup + 2 tbsp"), then the name. Ticked: a claret line is drawn through it and it turns muted. `disabled` keeps the
+ * text at full strength (the list must stay readable offline).
+ */
+export function GroceryRow({
+  amounts,
+  name,
+  note,
+  checked,
+  onToggle,
+  disabled,
+  menu,
+}: {
+  amounts: string;
+  name: string;
+  /** A small tag after the name, e.g. "Staple". */
+  note?: string;
+  checked: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  menu: ReactNode;
+}) {
+  return (
+    <li className="flex items-stretch border-b border-(--rule-hair) print:break-inside-avoid">
+      <button
+        type="button"
+        aria-pressed={checked}
+        onClick={onToggle}
+        disabled={disabled}
+        className="group flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3.5 py-2 text-left text-body leading-snug disabled:cursor-not-allowed"
+      >
+        <span
+          aria-hidden="true"
+          className="grid size-6 shrink-0 place-items-center rounded-[2px] border-[1.5px] border-ink-muted group-aria-pressed:border-(--button-primary-bg) group-aria-pressed:bg-(--button-primary-bg) print:hidden"
+        >
+          <Check className="hidden size-3.5 group-aria-pressed:block" />
+        </span>
+        <span className="min-w-0 text-ink [overflow-wrap:anywhere] group-aria-pressed:text-ink-muted">
+          <span className="strike">
+            {amounts && (
+              <>
+                <span className={`font-semibold text-(--qty-fg) group-aria-pressed:text-ink-muted ${tabular}`}>{amounts}</span>{" "}
+              </>
+            )}
+            {name}
+          </span>
+          {note && <span className="label-quiet ms-2.5 whitespace-nowrap text-ink-muted">{note}</span>}
+        </span>
+      </button>
+      {menu}
+    </li>
+  );
+}
+
+export type MenuItem = { label: string; onSelect: () => void; /** Set for a choice among several: marks the current one. */ checked?: boolean; danger?: boolean };
+export type MenuEntry = { kind: "item"; item: MenuItem } | { kind: "group"; label: string; items: MenuItem[] } | { kind: "separator" };
+
+/**
+ * A small "options" button that opens a menu (`role="menu"`): Arrow keys, Home and End move between entries, Escape closes and
+ * returns focus to the button, Tab or a tap elsewhere closes. A group with `checked` entries is a set of radios.
+ */
+export function RowMenu({ label, entries, disabled }: { label: string; entries: MenuEntry[]; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  const choices = () => [...(wrap.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])];
+
+  useEffect(() => {
+    if (!open) return;
+    const all = choices();
+    (all.find((el) => el.getAttribute("aria-checked") === "true") ?? all[0])?.focus();
+    const away = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+
+  function close(refocus: boolean) {
+    setOpen(false);
+    if (refocus) trigger.current?.focus();
+  }
+
+  function onKeyDown(e: KeyboardEvent) {
+    const all = choices();
+    const at = all.indexOf(document.activeElement as HTMLElement);
+    const go = (i: number) => {
+      e.preventDefault();
+      all[(i + all.length) % all.length]?.focus();
+    };
+    if (e.key === "ArrowDown") go(at + 1);
+    else if (e.key === "ArrowUp") go(at <= 0 ? all.length - 1 : at - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(all.length - 1);
+    else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+    } else if (e.key === "Tab") setOpen(false);
+  }
+
+  const choice = (item: MenuItem, radio: boolean) => (
+    <button
+      key={item.label}
+      type="button"
+      role={radio ? "menuitemradio" : "menuitem"}
+      aria-checked={radio ? Boolean(item.checked) : undefined}
+      tabIndex={-1}
+      onClick={() => {
+        close(true);
+        item.onSelect();
+      }}
+      className={`group flex min-h-control w-full cursor-pointer items-center gap-3 px-4 text-left text-small hover:bg-(--panel-bg) focus-visible:bg-(--panel-bg) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring) aria-checked:font-semibold ${item.danger ? "text-danger" : "text-ink"}`}
+    >
+      {radio && (
+        <span aria-hidden="true" className="grid size-4 shrink-0 place-items-center">
+          <svg viewBox="0 0 12 12" className="hidden size-3.5 group-aria-checked:block" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
+          </svg>
+        </span>
+      )}
+      {item.label}
+    </button>
+  );
+
+  return (
+    <div ref={wrap} className="relative flex" onKeyDown={open ? onKeyDown : undefined}>
+      <button
+        ref={trigger}
+        type="button"
+        aria-label={label}
+        title={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" && !open) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className="inline-flex size-14 shrink-0 cursor-pointer items-center justify-center text-(--button-ghost-fg) transition-[color] duration-150 ease-out hover:text-(--button-ghost-hover) disabled:cursor-not-allowed disabled:opacity-55"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="currentColor">
+          <circle cx="5" cy="12" r="1.75" />
+          <circle cx="12" cy="12" r="1.75" />
+          <circle cx="19" cy="12" r="1.75" />
+        </svg>
+      </button>
+      {open && (
+        <div id={menuId} role="menu" aria-label={label} className="absolute top-full right-0 z-20 flex min-w-56 max-w-[calc(100vw-2rem)] flex-col border border-(--input-border) bg-paper py-1">
+          {entries.map((entry, i) => {
+            if (entry.kind === "separator") return <div key={i} role="separator" className="my-1 border-t border-(--rule-hair)" />;
+            if (entry.kind === "item") return choice(entry.item, false);
+            return (
+              <div key={entry.label} role="group" aria-label={entry.label} className="flex flex-col">
+                <p aria-hidden="true" className="label px-4 pt-2 pb-1 text-ink-muted">
+                  {entry.label}
+                </p>
+                {entry.items.map((item) => choice(item, true))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The count after "Groceries" in the masthead: a claret numeral, spoken as "(n to buy)". */
+export function NavCount({ n }: { n: number }) {
+  return (
+    <>
+      <span aria-hidden="true" className={`ms-1.5 font-semibold text-(--qty-fg) ${tabular}`}>
+        {n}
+      </span>
+      <span className="sr-only"> ({n} to buy)</span>
+    </>
+  );
+}
+
+/** A recipe in the home grid while choosing: the same plate and title as a card, but tapping ticks it instead of opening it. */
+export function SelectCard({
+  title,
+  kicker,
+  time,
+  imageSrc,
+  fallbackIcon,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  kicker?: string;
+  time?: string | null;
+  imageSrc?: string | null;
+  fallbackIcon: SpotName;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={onToggle}
+        className="group flex w-full cursor-pointer flex-col gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--focus-ring)"
+      >
+        <span className="relative block aspect-[4/3] overflow-hidden border border-(--rule-hair) bg-(--panel-bg) group-aria-pressed:border-(--button-primary-bg) group-aria-pressed:outline-2 group-aria-pressed:-outline-offset-2 group-aria-pressed:outline-(--button-primary-bg)">
+          {imageSrc ? (
+            <img src={imageSrc} alt="" width={640} height={480} loading="lazy" className="size-full object-cover [filter:var(--photo-filter)]" />
+          ) : (
+            <span className="flex size-full items-center justify-center">
+              <SpotIcon name={fallbackIcon} size={56} />
+            </span>
+          )}
+          <span
+            aria-hidden="true"
+            className="absolute top-3 left-3 grid size-7 place-items-center border-[1.5px] border-ink bg-paper group-aria-pressed:border-(--button-primary-bg) group-aria-pressed:bg-(--button-primary-bg)"
+          >
+            <Check className="hidden size-4 group-aria-pressed:block" />
+          </span>
+        </span>
+        <span className="flex items-baseline justify-between gap-4">
+          <span className="label min-w-0 text-(--entry-kicker-fg)">{kicker}</span>
+          {time && <span className="label shrink-0 text-ink-muted">{time}</span>}
+        </span>
+        <span className="font-display text-[1.875rem] leading-[1.1] text-ink [overflow-wrap:anywhere]">{title}</span>
+      </button>
+    </li>
+  );
+}
+
+/** The bar pinned to the bottom while choosing recipes: a count (from 640px), the add action and a way out. Same inverse pill as the recipe page's floating bar. */
+export function SelectionBar({ status, action, onAction, actionDisabled, cancel, onCancel }: { status: string; action: string; onAction: () => void; actionDisabled?: boolean; cancel: string; onCancel: () => void }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
+      <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) sm:gap-3 sm:pl-6">
+        <p className="label hidden whitespace-nowrap sm:block">{status}</p>
+        <button
+          type="button"
+          onClick={onAction}
+          disabled={actionDisabled}
+          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center rounded-full bg-(--bar-action-bg) px-5 whitespace-nowrap text-(--bar-action-fg) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--bar-focus) disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {action}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center px-3 whitespace-nowrap text-(--bar-fg) underline decoration-1 underline-offset-[0.3em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--bar-focus)"
+        >
+          {cancel}
+        </button>
+      </div>
+    </div>
+  );
+}
