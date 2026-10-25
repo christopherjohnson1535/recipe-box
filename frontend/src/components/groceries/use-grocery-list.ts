@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError } from "@/lib/api";
-import { groceryApi } from "./client";
+import { api, ApiError } from "@/lib/api";
 import { sectionLabel, withItem, withoutItem } from "./list-model";
+import { scaleLabel } from "./scale-steps";
 import type { GroceryItem, GroceryList, GrocerySection, ItemPatch } from "./types";
 
 /** How often a visible list asks the server again, so two people in one shop see each other's ticks. */
 export const POLL_MS = 20_000;
-/** How long a just-ticked item stays in place while the line is drawn through it, before it sinks (motion.css: --duration-morph). */
-export const PENCIL_MS = 600;
+/** How long a just-ticked item stays in place while the line is drawn through it, before it sinks (motion.css: --duration-morph, 450ms). */
+export const PENCIL_MS = 450;
 
 const reducedMotion = () => typeof matchMedia !== "function" || matchMedia("(prefers-reduced-motion: reduce)").matches;
 const messageOf = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
@@ -17,7 +17,9 @@ const messageOf = (e: unknown) => (e instanceof ApiError ? e.message : "Somethin
 /**
  * The household's grocery list: loads it, keeps it fresh (window focus, tab visible, every 20 s while visible) and offers
  * the writes. Ticks, moves, staples and removals show at once and roll back with a message if the server refuses.
- * A refresh that started before a write finished is dropped, so it can't undo what you just did.
+ * A refresh that started before a write finished is dropped, so it can't undo what you just did; so is an answer older
+ * than the list on screen (the service worker serves its kept copy when the network is slow, and that copy looks like a
+ * live one). Each request only touches the fields it sent, and only while it is the newest to do so for that item.
  */
 export function useGroceryList() {
   const [list, setList] = useState<GroceryList | null>(null);
@@ -32,21 +34,36 @@ export function useGroceryList() {
   const writes = useRef(0);
   const epoch = useRef(0);
   const loaded = useRef(false);
+  /** `updatedAt` of the last whole list we took from the server, and whether we have written since (so the server's is newer). */
+  const appliedAt = useRef(Number.NaN);
+  const dirty = useRef(false);
+  /** Per item and field, the number of the newest request that sends it. */
+  const newest = useRef(new Map<string, number>());
+  const requests = useRef(0);
+  const scaling = useRef(new Set<string>());
+
+  const adopt = useCallback((next: GroceryList) => {
+    appliedAt.current = Date.parse(next.updatedAt);
+    dirty.current = false;
+    setList(next);
+  }, []);
 
   const refresh = useCallback(() => {
     const started = epoch.current;
-    return groceryApi.get().then(
+    return api.getGrocery().then(
       (next) => {
         if (epoch.current !== started || writes.current > 0) return;
         loaded.current = true;
-        setList(next);
         setLoadError(null);
+        const at = Date.parse(next.updatedAt);
+        if (at < appliedAt.current || (dirty.current && at === appliedAt.current)) return; // an older copy than ours
+        adopt(next);
       },
       (e: unknown) => {
         if (!loaded.current) setLoadError(e); // a failed background refresh leaves the list as it was
       },
     );
-  }, []);
+  }, [adopt]);
 
   useEffect(() => {
     void refresh();
@@ -69,7 +86,9 @@ export function useGroceryList() {
     epoch.current++;
     setBusy(true);
     try {
-      return await op();
+      const result = await op();
+      dirty.current = true; // the server's list is newer than the one we hold
+      return result;
     } finally {
       writes.current--;
       epoch.current++;
@@ -77,10 +96,17 @@ export function useGroceryList() {
     }
   }, []);
 
+  /**
+   * A write the server refused: undo what was shown, say so, and look again (two overlapping writes can leave the screen
+   * unsure). Not found means someone else got there first: no undo and no message, the fresh list drops it.
+   */
   const fail = useCallback(
-    (e: unknown) => {
-      setProblem(messageOf(e));
-      if (e instanceof ApiError && e.status === 404) void refresh(); // someone else already removed it
+    (e: unknown, undo?: () => void) => {
+      if (!(e instanceof ApiError && e.status === 404)) {
+        undo?.();
+        setProblem(messageOf(e));
+      }
+      void refresh();
     },
     [refresh],
   );
@@ -88,15 +114,23 @@ export function useGroceryList() {
   const patchItem = useCallback(
     async (item: GroceryItem, patch: ItemPatch, announce?: string) => {
       setProblem(null);
-      const apply = (fields: Partial<GroceryItem>) => setList((l) => (l ? withItem(l, { ...item, ...fields }) : l));
+      const n = ++requests.current;
+      const keys = Object.keys(patch) as (keyof ItemPatch)[];
+      for (const k of keys) newest.current.set(`${item.id}/${k}`, n);
+      /** Sets these fields on the item as it is now, but only those no later request has taken over. */
+      const apply = (from: Partial<GroceryItem>) =>
+        setList((l) => {
+          const now = l?.items.find((i) => i.id === item.id);
+          if (!l || !now) return l;
+          const own = keys.filter((k) => newest.current.get(`${item.id}/${k}`) === n);
+          return withItem(l, { ...now, ...Object.fromEntries(own.map((k) => [k, from[k]])) });
+        });
       apply(patch);
       try {
-        const saved = await track(() => groceryApi.patchItem(item.id, patch));
-        setList((l) => (l ? withItem(l, saved) : l));
+        apply(await track(() => api.patchGroceryItem(item.id, patch)));
         if (announce) setAnnouncement(announce);
       } catch (e) {
-        apply({ checked: item.checked, section: item.section, staple: item.staple });
-        fail(e);
+        fail(e, () => apply(item));
       }
     },
     [track, fail],
@@ -121,7 +155,7 @@ export function useGroceryList() {
 
   const setStaple = useCallback(
     (item: GroceryItem, staple: boolean) =>
-      patchItem(item, { staple }, staple ? `${item.name} is now a staple and hidden.` : `${item.name} is no longer a staple.`),
+      patchItem(item, { staple }, staple ? `${item.name} is now a staple.` : `${item.name} is no longer a staple.`),
     [patchItem],
   );
 
@@ -130,11 +164,10 @@ export function useGroceryList() {
       setProblem(null);
       setList((l) => (l ? withoutItem(l, item.id) : l));
       try {
-        await track(() => groceryApi.removeItem(item.id));
+        await track(() => api.removeGroceryItem(item.id));
         setAnnouncement(`Removed ${item.name}.`);
       } catch (e) {
-        setList((l) => (l ? withItem(l, item) : l));
-        fail(e);
+        fail(e, () => setList((l) => (l ? withItem(l, item) : l)));
       }
     },
     [track, fail],
@@ -145,7 +178,7 @@ export function useGroceryList() {
     async (text: string) => {
       setProblem(null);
       try {
-        const item = await track(() => groceryApi.addItem(text));
+        const item = await track(() => api.addGroceryItem(text));
         setList((l) => (l ? withItem(l, item) : l));
         setAnnouncement(`Added ${text}.`);
         return true;
@@ -162,32 +195,39 @@ export function useGroceryList() {
       setProblem(null);
       try {
         const next = await track(op);
-        setList(next);
+        adopt(next);
         setAnnouncement(announce(next));
       } catch (e) {
         fail(e);
       }
     },
-    [track, fail],
+    [track, fail, adopt],
   );
 
+  /** One change at a time per recipe: a second tap while the first is still on its way is ignored (the stepper keeps focus). */
   const setScale = useCallback(
-    (recipeId: string, scale: number) => replaceList(() => groceryApi.addRecipe(recipeId, scale), () => "Servings changed. The amounts are updated."),
+    async (recipeId: string, scale: number) => {
+      if (scaling.current.has(recipeId)) return;
+      scaling.current.add(recipeId);
+      const title = (next: GroceryList) => next.recipes.find((r) => r.recipeId === recipeId)?.title ?? "Recipe";
+      await replaceList(() => api.addGroceryRecipe(recipeId, scale), (next) => `${title(next)} is now ${scaleLabel(scale)}. The amounts are updated.`);
+      scaling.current.delete(recipeId);
+    },
     [replaceList],
   );
   const removeRecipe = useCallback(
-    (recipeId: string, title: string) => replaceList(() => groceryApi.removeRecipe(recipeId), () => `Took ${title} off the list.`),
+    (recipeId: string, title: string) => replaceList(() => api.removeGroceryRecipe(recipeId), () => `Took ${title} off the list.`),
     [replaceList],
   );
   const clearChecked = useCallback(
-    (count: number) => replaceList(() => groceryApi.clearChecked(), () => `Cleared ${count} ticked ${count === 1 ? "item" : "items"}.`),
+    (count: number) => replaceList(() => api.clearGroceryChecked(), () => `Cleared ${count} ticked ${count === 1 ? "item" : "items"}.`),
     [replaceList],
   );
 
   const empty = useCallback(async () => {
     setProblem(null);
     try {
-      await track(() => groceryApi.empty());
+      await track(() => api.emptyGrocery());
       setList((l) => (l ? { ...l, recipes: [], items: [] } : l));
       setAnnouncement("The list is empty.");
     } catch (e) {
@@ -195,5 +235,7 @@ export function useGroceryList() {
     }
   }, [track, fail]);
 
-  return { list, loadError, problem, announcement, holding, busy, refresh, toggle, move, setStaple, removeItem, addItem, setScale, removeRecipe, clearChecked, empty };
+  const dismissProblem = useCallback(() => setProblem(null), []);
+
+  return { list, loadError, problem, dismissProblem, announcement, holding, busy, refresh, toggle, move, setStaple, removeItem, addItem, setScale, removeRecipe, clearChecked, empty };
 }

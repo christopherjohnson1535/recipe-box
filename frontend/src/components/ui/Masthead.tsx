@@ -11,7 +11,7 @@ export function Masthead({ children }: { children: ReactNode }) {
         <Link href="/" className="inline-flex min-h-control items-center" aria-label="Recipe Box home">
           <Logo />
         </Link>
-        <nav aria-label="Main" className="flex max-w-full items-center overflow-x-auto">
+        <nav aria-label="Main" className="flex max-w-full flex-wrap items-center sm:flex-nowrap sm:overflow-x-auto">
           {children}
         </nav>
       </div>

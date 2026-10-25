@@ -1,18 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OfflineNote } from "@/components/offline/OfflineNote";
 import { useOnline } from "@/components/offline/use-online";
 import { RecipeCard, cardIcon } from "@/components/RecipeCard";
-import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { SelectCard, SelectionBar } from "@/components/ui/GroceryKit";
 import { CardGrid } from "@/components/ui/MagazineCard";
 import { Text } from "@/components/ui/Text";
-import { TextLink } from "@/components/ui/TextLink";
+import { Toast, ToastDismiss, ToastLink, ToastRegion } from "@/components/ui/Toast";
 import { formatMinutes, plateSrc } from "@/lib/recipe";
-import type { RecipeSummary } from "@/lib/api";
-import { groceryApi } from "./client";
+import { api, type RecipeSummary } from "@/lib/api";
 
 /**
  * The home grid, with a "Select recipes" mode: tap cards to choose them, then "Add N to groceries" puts each on the list
@@ -24,6 +22,20 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [result, setResult] = useState<{ added: number; failed: string[] } | null>(null);
+  const grid = useRef<HTMLDivElement>(null);
+  const selectButton = useRef<HTMLButtonElement>(null);
+  const wasSelecting = useRef(false);
+
+  // The button that starts choosing (and, on leaving, the bar's buttons) disappear: put focus on the first card going in
+  // and back on "Select recipes" coming out.
+  useEffect(() => {
+    if (selecting) grid.current?.querySelector<HTMLElement>("button[aria-pressed]")?.focus({ preventScroll: true });
+    else if (wasSelecting.current) selectButton.current?.focus();
+    wasSelecting.current = selecting;
+  }, [selecting]);
+
+  // Only recipes still on screen count: a search or tag filter can drop chosen ones from the grid.
+  const picked = recipes.filter((r) => chosen.has(r.id));
 
   const stop = () => {
     setSelecting(false);
@@ -41,9 +53,9 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
     setResult(null);
     const failed: string[] = [];
     let added = 0;
-    for (const r of recipes.filter((r) => chosen.has(r.id))) {
+    for (const r of picked) {
       try {
-        await groceryApi.addRecipe(r.id, 1);
+        await api.addGroceryRecipe(r.id, 1);
         added++;
       } catch {
         failed.push(r.id);
@@ -52,32 +64,21 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
     setAdding(false);
     setResult({ added, failed: failed.map((id) => recipes.find((r) => r.id === id)?.title ?? "a recipe") });
     if (failed.length === 0) stop();
-    else setChosen(new Set(recipes.filter((r) => failed.includes(r.id)).map((r) => r.id)));
+    else setChosen(new Set(failed));
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div ref={grid} className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
         {selecting ? (
           <Text variant="note">Tap the recipes you want to shop for.</Text>
         ) : (
-          <Button variant="ghost" disabled={!online} aria-describedby={online ? undefined : "select-offline"} onClick={() => setSelecting(true)}>
+          <Button ref={selectButton} variant="ghost" disabled={!online} aria-describedby={online ? undefined : "select-offline"} onClick={() => setSelecting(true)}>
             Select recipes
           </Button>
         )}
         <OfflineNote id="select-offline">You’re offline. Adding to the grocery list needs the server.</OfflineNote>
       </div>
-
-      {result && (
-        <Alert tone={result.failed.length > 0 ? "error" : "info"} title={result.failed.length > 0 ? "Some didn’t go on the list" : undefined}>
-          {result.added > 0 && (
-            <>
-              Added {result.added} {result.added === 1 ? "recipe" : "recipes"} to your groceries. <TextLink href="/groceries">Open the list</TextLink>
-            </>
-          )}
-          {result.failed.length > 0 && <p>Couldn’t add {result.failed.join(", ")}. They’re still chosen: try again.</p>}
-        </Alert>
-      )}
 
       <CardGrid>
         {recipes.map((r, i) =>
@@ -98,13 +99,30 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
         )}
       </CardGrid>
 
+      <ToastRegion lifted={selecting}>
+        {result && (
+          <Toast
+            role={result.failed.length > 0 ? "alert" : undefined}
+            actions={
+              <>
+                {result.added > 0 && <ToastLink href="/groceries">Open the list</ToastLink>}
+                <ToastDismiss onClick={() => setResult(null)} />
+              </>
+            }
+          >
+            {result.added > 0 && `Added ${result.added} ${result.added === 1 ? "recipe" : "recipes"} to your groceries. `}
+            {result.failed.length > 0 && `Couldn’t add ${result.failed.join(", ")}. They’re still chosen: try again.`}
+          </Toast>
+        )}
+      </ToastRegion>
+
       {selecting && <div className="h-16" aria-hidden="true" />}
       {selecting && (
         <SelectionBar
-          status={chosen.size === 0 ? "None chosen" : `${chosen.size} chosen`}
-          action={adding ? "Adding…" : chosen.size === 0 ? "Add to groceries" : `Add ${chosen.size} to groceries`}
+          status={picked.length === 0 ? "None chosen" : `${picked.length} chosen`}
+          action={adding ? "Adding…" : picked.length === 0 ? "Add to groceries" : `Add ${picked.length} to groceries`}
           onAction={() => void addAll()}
-          actionDisabled={chosen.size === 0 || adding || !online}
+          actionDisabled={picked.length === 0 || adding || !online}
           cancel="Cancel"
           onCancel={stop}
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
@@ -14,6 +14,18 @@ function Check({ className }: { className?: string }) {
     <svg viewBox="0 0 12 12" className={className} fill="none" stroke="var(--button-primary-fg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
     </svg>
+  );
+}
+
+/**
+ * The part of the page that holds the items (or the note that there are none). It can take focus from script, so that when
+ * a button disappears (Clear ticked, Empty list) the person lands here rather than at the top of the page.
+ */
+export function ListBody({ ref, children }: { ref?: Ref<HTMLDivElement>; children: ReactNode }) {
+  return (
+    <div ref={ref} tabIndex={-1} className="flex flex-col gap-8 outline-none">
+      {children}
+    </div>
   );
 }
 
@@ -49,7 +61,10 @@ export function RecipeRow({ title, meta, stepper, remove }: { title: ReactNode; 
   );
 }
 
-/** − 1× + : steps a recipe's scale. The value is a polite live region so a change is heard. */
+/**
+ * − 1× + : steps a recipe's scale. The value is a polite live region so a change is heard. A button that can't be used now
+ * is `aria-disabled`, not `disabled`: it keeps keyboard focus (the person stays where they were) and the click does nothing.
+ */
 export function ScaleStepper({
   label,
   valueLabel,
@@ -70,10 +85,10 @@ export function ScaleStepper({
   upDisabled?: boolean;
 }) {
   const step =
-    "inline-flex size-control items-center justify-center text-(--button-ghost-fg) transition-[color] duration-150 ease-out hover:text-(--button-ghost-hover) disabled:cursor-not-allowed disabled:opacity-55";
+    "inline-flex size-control items-center justify-center text-(--button-ghost-fg) transition-[color] duration-150 ease-out hover:text-(--button-ghost-hover) aria-disabled:cursor-not-allowed aria-disabled:opacity-55 aria-disabled:hover:text-(--button-ghost-fg)";
   return (
-    <div role="group" aria-label={label} className="flex items-center border border-(--input-border)">
-      <button type="button" aria-label={downLabel} title={downLabel} onClick={onDown} disabled={downDisabled} className={step}>
+    <div role="group" aria-label={label} className="flex items-center border border-(--input-border) print:hidden">
+      <button type="button" aria-label={downLabel} title={downLabel} onClick={downDisabled ? undefined : onDown} aria-disabled={downDisabled || undefined} className={step}>
         <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M6 12h12" />
         </svg>
@@ -81,7 +96,7 @@ export function ScaleStepper({
       <output aria-live="polite" className={`label min-w-10 text-center text-ink ${tabular}`}>
         {valueLabel}
       </output>
-      <button type="button" aria-label={upLabel} title={upLabel} onClick={onUp} disabled={upDisabled} className={step}>
+      <button type="button" aria-label={upLabel} title={upLabel} onClick={upDisabled ? undefined : onUp} aria-disabled={upDisabled || undefined} className={step}>
         <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M6 12h12M12 6v12" />
         </svg>
@@ -112,6 +127,7 @@ export function GrocerySection({ title, count, children }: { title: string; coun
  * text at full strength (the list must stay readable offline).
  */
 export function GroceryRow({
+  itemId,
   amounts,
   name,
   note,
@@ -120,6 +136,8 @@ export function GroceryRow({
   disabled,
   menu,
 }: {
+  /** Lets the page find this row's tick to put focus back on it. */
+  itemId: string;
   amounts: string;
   name: string;
   /** A small tag after the name, e.g. "Staple". */
@@ -130,9 +148,10 @@ export function GroceryRow({
   menu: ReactNode;
 }) {
   return (
-    <li className="flex items-stretch border-b border-(--rule-hair) print:break-inside-avoid">
+    <li className="flex scroll-mt-14 items-stretch border-b border-(--rule-hair) print:break-inside-avoid">
       <button
         type="button"
+        data-item-id={itemId}
         aria-pressed={checked}
         onClick={onToggle}
         disabled={disabled}
@@ -166,7 +185,7 @@ export type MenuEntry = { kind: "item"; item: MenuItem } | { kind: "group"; labe
 
 /**
  * A small "options" button that opens a menu (`role="menu"`): Arrow keys, Home and End move between entries, Escape closes and
- * returns focus to the button, Tab or a tap elsewhere closes. A group with `checked` entries is a set of radios.
+ * returns focus to the button, Tab (focus goes back to the button first, so Tab carries on from there) or a tap elsewhere closes. A group with `checked` entries is a set of radios.
  */
 export function RowMenu({ label, entries, disabled }: { label: string; entries: MenuEntry[]; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -207,7 +226,7 @@ export function RowMenu({ label, entries, disabled }: { label: string; entries: 
       e.preventDefault();
       e.stopPropagation();
       close(true);
-    } else if (e.key === "Tab") setOpen(false);
+    } else if (e.key === "Tab") close(true);
   }
 
   const choice = (item: MenuItem, radio: boolean) => (
@@ -235,7 +254,7 @@ export function RowMenu({ label, entries, disabled }: { label: string; entries: 
   );
 
   return (
-    <div ref={wrap} className="relative flex" onKeyDown={open ? onKeyDown : undefined}>
+    <div ref={wrap} className="relative flex print:hidden" onKeyDown={open ? onKeyDown : undefined}>
       <button
         ref={trigger}
         type="button"
@@ -346,7 +365,7 @@ export function SelectCard({
 /** The bar pinned to the bottom while choosing recipes: a count (from 640px), the add action and a way out. Same inverse pill as the recipe page's floating bar. */
 export function SelectionBar({ status, action, onAction, actionDisabled, cancel, onCancel }: { status: string; action: string; onAction: () => void; actionDisabled?: boolean; cancel: string; onCancel: () => void }) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
+    <div className="selection-bar pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
       <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) sm:gap-3 sm:pl-6">
         <p className="label hidden whitespace-nowrap sm:block">{status}</p>
         <button

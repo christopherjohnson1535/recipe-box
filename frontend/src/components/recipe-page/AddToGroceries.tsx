@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { groceryApi } from "@/components/groceries/client";
 import { scaleLabel } from "@/components/groceries/scale-steps";
 import { OfflineNote } from "@/components/offline/OfflineNote";
 import { useOnline } from "@/components/offline/use-online";
@@ -9,7 +8,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { TextLink } from "@/components/ui/TextLink";
-import { ApiError } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { useRecipeState } from "./RecipeState";
 
 /** Puts this recipe on the household's grocery list at the scale the ingredients are showing (½× / 1× / 2×). Adding it again sets the scale. */
@@ -24,7 +23,7 @@ export function AddToGroceries({ recipeId }: { recipeId: string }) {
     setPending(true);
     setFailure(null);
     try {
-      await groceryApi.addRecipe(recipeId, scale);
+      await api.addGroceryRecipe(recipeId, scale);
       setAdded(scale);
     } catch (e) {
       setAdded(null);

@@ -86,7 +86,7 @@ describe("home page, magazine layout", () => {
     expect(screen.queryByRole("region", { name: "In season" })).toBeNull();
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(screen.getByRole("region", { name: "1 matching recipes" })).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toBe("1 recipe matches “soup”");
+    expect(screen.getByText("1 recipe matches “soup”").closest('[role="status"]')).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "Recipes" })).toBeTruthy();
   });
 

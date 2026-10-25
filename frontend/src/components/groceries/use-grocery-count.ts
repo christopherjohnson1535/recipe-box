@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GROCERY_CHANGED, groceryApi } from "./client";
+import { api, GROCERY_CHANGED } from "@/lib/api";
 import { toBuy } from "./list-model";
 
 /**
@@ -16,7 +16,7 @@ export function useGroceryCount(): number {
     let latest = 0;
     const load = () => {
       const mine = ++latest;
-      groceryApi.get().then(
+      api.getGrocery().then(
         (list) => live && mine === latest && setCount(toBuy(list)),
         () => undefined,
       );

@@ -69,6 +69,7 @@ describe("RowMenu", () => {
     fireEvent.click(trigger);
     fireEvent.keyDown(document.activeElement!, { key: "Tab" });
     expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(trigger); // so the Tab carries on from the button, not from the top of the page
     fireEvent.click(trigger);
     fireEvent.pointerDown(screen.getByRole("button", { name: "after" }));
     expect(screen.queryByRole("menu")).toBeNull();
@@ -85,12 +86,24 @@ describe("RowMenu", () => {
 });
 
 describe("ScaleStepper", () => {
-  it("names both buttons, shows the value and disables the ends", () => {
-    const onUp = vi.fn();
-    render(<ScaleStepper label="Servings of Chili" valueLabel="2×" downLabel="Fewer" upLabel="More" onDown={vi.fn()} onUp={onUp} upDisabled />);
+  it("names both buttons and shows the value", () => {
+    render(<ScaleStepper label="Servings of Chili" valueLabel="2×" downLabel="Fewer" upLabel="More" onDown={vi.fn()} onUp={vi.fn()} />);
     expect(screen.getByRole("group", { name: "Servings of Chili" }).textContent).toBe("2×");
-    expect((screen.getByRole("button", { name: "More" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Fewer" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("marks an end aria-disabled, ignores its click and keeps keyboard focus on it", () => {
+    const onUp = vi.fn();
+    const onDown = vi.fn();
+    render(<ScaleStepper label="Servings of Chili" valueLabel="2×" downLabel="Fewer" upLabel="More" onDown={onDown} onUp={onUp} upDisabled />);
+    const more = screen.getByRole("button", { name: "More" }) as HTMLButtonElement;
+    more.focus();
+    fireEvent.click(more);
+    expect(onUp).not.toHaveBeenCalled();
+    expect(more.getAttribute("aria-disabled")).toBe("true");
+    expect(more.disabled).toBe(false); // a disabled button would drop focus
+    expect(document.activeElement).toBe(more);
+    fireEvent.click(screen.getByRole("button", { name: "Fewer" }));
+    expect(onDown).toHaveBeenCalledOnce();
   });
 });
 

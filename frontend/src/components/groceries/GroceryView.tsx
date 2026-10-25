@@ -8,12 +8,13 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmInline } from "@/components/ui/ConfirmInline";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
-import { GroceryRow, GrocerySection, RecipeRow, RecipeShelf, RowMenu, ScaleStepper, type MenuEntry } from "@/components/ui/GroceryKit";
+import { GroceryRow, GrocerySection, ListBody, RecipeRow, RecipeShelf, RowMenu, ScaleStepper, type MenuEntry } from "@/components/ui/GroceryKit";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
+import { Toast, ToastDismiss, ToastRegion } from "@/components/ui/Toast";
 import { TextLink } from "@/components/ui/TextLink";
 import { splitIngredient } from "@/lib/scale";
 import { amountsText, groupItems, SECTIONS, toBuy } from "./list-model";
@@ -53,13 +54,38 @@ export function GroceryView() {
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [text, setText] = useState("");
   const [typoed, setTypoed] = useState(false);
+  const [adding, setAdding] = useState(false);
   const emptyButton = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
+  const root = useRef<HTMLDivElement>(null);
+  /** Where focus rests when a change takes the control it was on away (the items, or the page's own start of the list). */
+  const listTop = useRef<HTMLDivElement>(null);
+  const addField = useRef<HTMLInputElement>(null);
+  /** The item whose tick should get focus back if a re-render (it moved to another place in the list) drops it. */
+  const keepFocus = useRef<string | null>(null);
+
+  const ticks = () => [...(root.current?.querySelectorAll<HTMLElement>("[data-item-id]") ?? [])];
+  /** Focus goes to the tick next to this one (or the start of the list when it was the last): call before taking the row away. */
+  const focusBeside = (selector: string, id: string, attr: string) => {
+    const all = [...(root.current?.querySelectorAll<HTMLElement>(selector) ?? [])];
+    const at = all.findIndex((el) => el.dataset[attr] === id);
+    (all[at + 1] ?? all[at - 1] ?? listTop.current)?.focus({ preventScroll: true });
+  };
 
   useEffect(() => {
-    if (wasConfirming.current && !confirmEmpty) emptyButton.current?.focus();
+    if (wasConfirming.current && !confirmEmpty) (emptyButton.current ?? listTop.current)?.focus({ preventScroll: true }); // the button is gone once the list is empty
     wasConfirming.current = confirmEmpty;
   }, [confirmEmpty]);
+
+  useEffect(() => {
+    const id = keepFocus.current;
+    if (!id || (document.activeElement && document.activeElement !== document.body)) return;
+    const tick = ticks().find((el) => el.dataset.itemId === id);
+    if (tick) {
+      tick.focus();
+      keepFocus.current = null;
+    }
+  });
 
   const { list } = g;
   const offlineAttrs = online ? {} : { "aria-describedby": OFFLINE };
@@ -95,17 +121,46 @@ export function GroceryView() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (adding) return; // a second tap or Enter while the first is on its way would add it twice
     const value = text.trim();
-    if (!value) return setTypoed(true);
+    if (!value) {
+      setTypoed(true);
+      return addField.current?.focus();
+    }
     setTypoed(false);
-    if (await g.addItem(value)) setText("");
+    setAdding(true);
+    const added = await g.addItem(value);
+    setAdding(false);
+    if (added) setText("");
+    if (document.activeElement === document.body) addField.current?.focus(); // the Add button was disabled under focus
   }
 
   const menuFor = (item: GroceryItem): MenuEntry[] => [
-    { kind: "group", label: "Move to", items: SECTIONS.map((s) => ({ label: s.label, checked: s.id === item.section, onSelect: () => void g.move(item, s.id) })) },
+    {
+      kind: "group",
+      label: "Move to",
+      items: SECTIONS.map((s) => ({
+        label: s.label,
+        checked: s.id === item.section,
+        onSelect: () => {
+          if (s.id !== item.section) keepFocus.current = item.id; // the row reappears under another heading: follow it
+          void g.move(item, s.id);
+        },
+      })),
+    },
     { kind: "separator" },
     { kind: "item", item: { label: item.staple ? "Not a staple" : "Mark as staple", onSelect: () => void g.setStaple(item, !item.staple) } },
-    { kind: "item", item: { label: "Remove", danger: true, onSelect: () => void g.removeItem(item) } },
+    {
+      kind: "item",
+      item: {
+        label: "Remove",
+        danger: true,
+        onSelect: () => {
+          focusBeside("[data-item-id]", item.id, "itemId");
+          void g.removeItem(item);
+        },
+      },
+    },
   ];
 
   const recipeRow = (r: GroceryRecipe) => {
@@ -122,29 +177,50 @@ export function GroceryView() {
             valueLabel={scaleLabel(r.scale)}
             downLabel={`Fewer servings of ${r.title}`}
             upLabel={`More servings of ${r.title}`}
-            downDisabled={down === null || !online || g.busy}
-            upDisabled={up === null || !online || g.busy}
+            downDisabled={down === null || !online}
+            upDisabled={up === null || !online}
             onDown={() => down !== null && void g.setScale(r.recipeId, down)}
             onUp={() => up !== null && void g.setScale(r.recipeId, up)}
           />
         }
-        remove={<IconButton icon="remove" quiet label={`Take ${r.title} off the list`} disabled={!online} onClick={() => void g.removeRecipe(r.recipeId, r.title)} />}
+        remove={
+          <IconButton
+            icon="remove"
+            quiet
+            label={`Take ${r.title} off the list`}
+            disabled={!online}
+            data-recipe-id={r.recipeId}
+            onClick={() => {
+              focusBeside("[data-recipe-id]", r.recipeId, "recipeId");
+              void g.removeRecipe(r.recipeId, r.title);
+            }}
+          />
+        }
       />
     );
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div
+      ref={root}
+      className="flex flex-col gap-8"
+      onPointerDown={() => (keepFocus.current = null)}
+      onFocus={(e) => {
+        if (e.target.dataset.itemId !== keepFocus.current) keepFocus.current = null;
+      }}
+    >
       <PageHeader kicker="Shopping list" title="Groceries" description={description} liveDescription />
       <OfflineNote id={OFFLINE}>You’re offline. This is the last copy of the list this device has. Ticking, adding and removing need the server; they work again once you have signal.</OfflineNote>
       <p role="status" className="sr-only">
         {g.announcement}
       </p>
-      {g.problem && (
-        <Alert tone="error" title="That didn’t save">
-          {g.problem}
-        </Alert>
-      )}
+      <ToastRegion>
+        {g.problem && (
+          <Toast role="alert" actions={<ToastDismiss onClick={g.dismissProblem} />}>
+            That didn’t save. {g.problem}
+          </Toast>
+        )}
+      </ToastRegion>
 
       {list.recipes.length > 0 && (
         <RecipeShelf summary={`On this list · ${list.recipes.length} ${list.recipes.length === 1 ? "recipe" : "recipes"}`}>
@@ -152,10 +228,11 @@ export function GroceryView() {
         </RecipeShelf>
       )}
 
-      <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-2">
+      <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-2 print:hidden">
         <Field label="Add an item" htmlFor="grocery-add" error={typoed ? "Type what to add, like “2 lb potatoes”." : undefined}>
           <div className="flex gap-3">
             <Input
+              ref={addField}
               id="grocery-add"
               name="item"
               autoComplete="off"
@@ -165,47 +242,53 @@ export function GroceryView() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               disabled={!online}
+              readOnly={adding}
               aria-invalid={typoed || undefined}
               aria-describedby={typoed ? "grocery-add-msg" : online ? undefined : OFFLINE}
             />
-            <Button type="submit" variant="secondary" disabled={!online} {...offlineAttrs}>
+            <Button type="submit" variant="secondary" pending={adding} disabled={!online} {...offlineAttrs}>
               Add
             </Button>
           </div>
         </Field>
       </form>
 
-      {list.items.length === 0 && list.recipes.length === 0 && (
-        <EmptyState
-          title="Nothing on the list yet"
-          actions={<ButtonLink href="/">Choose recipes</ButtonLink>}
-        >
-          <p>Open a recipe and choose Add to groceries, or pick several on the home page. What you type above lands here too.</p>
-        </EmptyState>
-      )}
+      <ListBody ref={listTop}>
+        {list.items.length === 0 && list.recipes.length === 0 && (
+          <EmptyState title="Nothing on the list yet" actions={<ButtonLink href="/">Choose recipes</ButtonLink>}>
+            <p>Open a recipe and choose Add to groceries, or pick several on the home page. What you type above lands here too.</p>
+          </EmptyState>
+        )}
 
-      {groups.length === 0 && list.items.length > 0 && <Text variant="note">Everything left is a staple you always have. Show staples to see them.</Text>}
+        {list.items.length === 0 && list.recipes.length > 0 && <Text variant="note">Nothing left to buy.</Text>}
 
-      {groups.length > 0 && (
-        <div className="flex flex-col gap-8">
-          {groups.map((group) => (
-            <GrocerySection key={group.section} title={group.label} count={group.left === 0 ? "All crossed off" : `${group.left} left`}>
-              {group.items.map((item) => (
-                <GroceryRow
-                  key={item.id}
-                  amounts={amountsText(item.amounts)}
-                  name={item.name}
-                  note={item.staple ? "Staple" : undefined}
-                  checked={item.checked}
-                  onToggle={() => void g.toggle(item)}
-                  disabled={!online}
-                  menu={<RowMenu label={`Options for ${item.name}`} entries={menuFor(item)} disabled={!online} />}
-                />
-              ))}
-            </GrocerySection>
-          ))}
-        </div>
-      )}
+        {groups.length === 0 && list.items.length > 0 && <Text variant="note">Everything left is a staple you always have. Show staples to see them.</Text>}
+
+        {groups.length > 0 && (
+          <div className="flex flex-col gap-8">
+            {groups.map((group) => (
+              <GrocerySection key={group.section} title={group.label} count={group.left === 0 ? "All crossed off" : `${group.left} left`}>
+                {group.items.map((item) => (
+                  <GroceryRow
+                    key={item.id}
+                    itemId={item.id}
+                    amounts={amountsText(item.amounts)}
+                    name={item.name}
+                    note={item.staple ? "Staple" : undefined}
+                    checked={item.checked}
+                    onToggle={() => {
+                      keepFocus.current = item.id; // the row moves when it sinks; a keyboard user stays on it
+                      void g.toggle(item);
+                    }}
+                    disabled={!online}
+                    menu={<RowMenu label={`Options for ${item.name}`} entries={menuFor(item)} disabled={!online} />}
+                  />
+                ))}
+              </GrocerySection>
+            ))}
+          </div>
+        )}
+      </ListBody>
 
       {(list.items.length > 0 || list.recipes.length > 0) && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -215,7 +298,15 @@ export function GroceryView() {
             </Button>
           )}
           {list.items.length > 0 && (
-            <Button variant="secondary" disabled={ticked === 0 || !online} {...offlineAttrs} onClick={() => void g.clearChecked(ticked)}>
+            <Button
+              variant="secondary"
+              disabled={ticked === 0 || !online}
+              {...offlineAttrs}
+              onClick={() => {
+                listTop.current?.focus({ preventScroll: true }); // this button is about to disable itself
+                void g.clearChecked(ticked);
+              }}
+            >
               Clear ticked{ticked > 0 ? ` (${ticked})` : ""}
             </Button>
           )}

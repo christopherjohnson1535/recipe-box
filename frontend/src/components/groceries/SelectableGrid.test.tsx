@@ -59,6 +59,40 @@ describe("SelectableGrid", () => {
     expect(screen.getByRole("button", { name: /Beef stew/ }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("counts and adds only the chosen recipes still on screen", async () => {
+    const posted = record();
+    const { rerender } = render(<SelectableGrid recipes={recipes} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    fireEvent.click(screen.getByRole("button", { name: /Apple pie/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Beef stew/ }));
+    rerender(<SelectableGrid recipes={[recipes[0], recipes[2]]} />); // a search took Beef stew off the grid
+    fireEvent.click(screen.getByRole("button", { name: "Add 1 to groceries" }));
+    await screen.findByText(/Added 1 recipe to your groceries/);
+    expect(posted.map((p) => p.recipeId)).toEqual(["a"]);
+  });
+
+  it("puts focus on the first card going in, and back on Select recipes coming out", () => {
+    render(<SelectableGrid recipes={recipes} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /Apple pie/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Select recipes" }));
+  });
+
+  it("shows the result in the toast region at the bottom, above the bar while choosing goes on", async () => {
+    record("b");
+    render(<SelectableGrid recipes={recipes} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    fireEvent.click(screen.getByRole("button", { name: /Beef stew/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add 1 to groceries" }));
+    const alert = await screen.findByRole("alert");
+    const region = alert.closest('[role="status"]')!;
+    expect(region.className).toContain("fixed");
+    expect(region.className).toContain("5.5rem"); // lifted clear of the bar
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("cancels without sending anything", () => {
     const posted = record();
     render(<SelectableGrid recipes={recipes} />);

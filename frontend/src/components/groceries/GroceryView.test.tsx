@@ -83,6 +83,11 @@ const sectionNames = () => screen.getAllByRole("heading", { level: 2 }).map((h) 
 const rowsIn = (section: string) =>
   [...screen.getByRole("region", { name: section }).querySelectorAll("button[aria-pressed]")].map((b) => b.textContent);
 
+/** The area that holds the items; it takes focus when the control a person was on goes away. */
+const listBody = () => document.querySelector<HTMLElement>('[tabindex="-1"]');
+const garlicWith = (over: Partial<GroceryItem>) => ({ ...stock()[0], ...over });
+const failure = (message = "The server hiccuped.") => HttpResponse.json({ error: { code: "internal", message } }, { status: 500 });
+
 /** Captures timers with this delay instead of running them, so a test decides when they fire. Other timers run as usual. */
 function captureTimer(kind: "setTimeout" | "setInterval", delay: number) {
   const fired: (() => void)[] = [];
@@ -178,8 +183,12 @@ describe("ticking", () => {
     await open();
     fireEvent.click(row("2 clove garlic"));
     expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true");
-    expect((await screen.findByRole("alert")).textContent).toContain("The server hiccuped.");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("The server hiccuped.");
+    expect(alert.closest('[role="status"]')?.className).toContain("fixed"); // pinned to the screen's bottom, not up the page
     expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("keeps a just-ticked item in place while the line is drawn, then lets it sink", async () => {
@@ -192,6 +201,141 @@ describe("ticking", () => {
     expect(rowsIn("Produce")).toEqual(["2 clove garlic", "3 onion"]);
     act(() => release.forEach((fn) => fn()));
     expect(rowsIn("Produce")).toEqual(["3 onion", "2 clove garlic"]);
+  });
+});
+
+describe("overlapping changes", () => {
+  it("keeps the newest tap when two are on their way and the answers arrive out of order", async () => {
+    serve();
+    const gates: (() => void)[] = [];
+    server.use(
+      http.patch("*/api/grocery/items/:id", async ({ request }) => {
+        const patch = (await request.json()) as ItemPatch;
+        await new Promise<void>((r) => gates.push(r));
+        return HttpResponse.json(garlicWith(patch));
+      }),
+    );
+    await open();
+    fireEvent.click(row("2 clove garlic")); // tick
+    fireEvent.click(row("2 clove garlic")); // and untick, before the first answer
+    await waitFor(() => expect(gates).toHaveLength(2));
+    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("false");
+    gates[1](); // the second answer first
+    await new Promise((r) => setTimeout(r, 30));
+    gates[0](); // then the first, which says "ticked"
+    await new Promise((r) => setTimeout(r, 30));
+    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("does not undo a move that worked when an earlier tick on the same item fails late", async () => {
+    const { state } = serve();
+    let failTick!: () => void;
+    server.use(
+      http.patch("*/api/grocery/items/:id", async ({ request }) => {
+        const patch = (await request.json()) as ItemPatch;
+        if (patch.checked !== undefined) {
+          await new Promise<void>((r) => (failTick = r));
+          return failure();
+        }
+        Object.assign(state.items.find((i) => i.id === "i-garlic")!, patch);
+        return HttpResponse.json(garlicWith(patch));
+      }),
+    );
+    await open();
+    fireEvent.click(row("2 clove garlic"));
+    await waitFor(() => expect(failTick).toBeTypeOf("function"));
+    fireEvent.click(screen.getByRole("button", { name: "Options for garlic" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Freezer" }));
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Freezer" })).getByRole("button", { name: "2 clove garlic" })).toBeTruthy());
+    failTick();
+    expect((await screen.findByRole("alert")).textContent).toContain("The server hiccuped.");
+    const garlic = within(screen.getByRole("region", { name: "Freezer" })).getByRole("button", { name: "2 clove garlic" });
+    expect(garlic.getAttribute("aria-pressed")).toBe("false"); // the tick is undone, the move is not
+  });
+
+  it("says nothing and just refreshes when someone else already took the item off", async () => {
+    const { state } = serve();
+    server.use(
+      http.patch("*/api/grocery/items/:id", () => {
+        state.items = state.items.filter((i) => i.id !== "i-garlic");
+        return HttpResponse.json({ error: { code: "not_found", message: "Not found." } }, { status: 404 });
+      }),
+    );
+    await open();
+    fireEvent.click(row("2 clove garlic"));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "2 clove garlic" })).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("ignores a kept copy of the list that is older than the one it already shows", async () => {
+    const { state } = serve();
+    const older = JSON.parse(JSON.stringify(state)) as GroceryList; // what the service worker would answer with
+    await open();
+    fireEvent.click(row("2 clove garlic"));
+    await waitFor(() => expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => expect(screen.getByText("3 left to buy · 1 crossed off")).toBeTruthy());
+    let asked = 0;
+    server.use(
+      http.get("*/api/grocery", () => {
+        asked++;
+        return HttpResponse.json(older);
+      }),
+    );
+    fireEvent.focus(window);
+    await waitFor(() => expect(asked).toBe(1));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true"); // not un-ticked by the old copy
+
+    server.use(http.get("*/api/grocery", () => HttpResponse.json({ ...state, updatedAt: "2026-01-01T00:00:05Z" })));
+    fireEvent.focus(window); // a newer answer is taken
+    expect(await screen.findByText("3 left to buy · 1 crossed off")).toBeTruthy();
+  });
+});
+
+describe("focus", () => {
+  it("stays on the item after a keyboard tick even though the row moves", async () => {
+    serve();
+    await open();
+    const tick = row("2 clove garlic");
+    tick.focus();
+    fireEvent.click(tick, { detail: 0 });
+    tick.blur(); // what a browser does when the row is moved in the page
+    await waitFor(() => expect(document.activeElement).toBe(row("2 clove garlic")));
+  });
+
+  it("follows an item that is moved to another section", async () => {
+    serve();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Options for milk" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Freezer" }));
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Freezer" })).getByRole("button", { name: "1 cup + 2 tbsp milk" })).toBeTruthy());
+    expect(document.activeElement).toBe(row("1 cup + 2 tbsp milk"));
+  });
+
+  it("goes to the next item when one is removed", async () => {
+    serve();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Options for garlic" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "2 clove garlic" })).toBeNull());
+    expect(document.activeElement).toBe(row("3 onion"));
+  });
+
+  it("rests on the list area after Clear ticked, whose button then switches itself off", async () => {
+    serve([item({ id: "a", name: "apple", section: "produce", checked: true })], []);
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Clear ticked (1)" }));
+    expect(document.activeElement).toBe(listBody());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "apple" })).toBeNull());
+    expect(document.activeElement).toBe(listBody());
+  });
+
+  it("goes to the field and says what is missing when Add is pressed empty", async () => {
+    serve();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(document.activeElement).toBe(screen.getByLabelText("Add an item"));
+    expect(screen.getByLabelText("Add an item").getAttribute("aria-describedby")).toBe("grocery-add-msg");
   });
 });
 
@@ -256,6 +400,28 @@ describe("adding, clearing, emptying", () => {
     expect(field.value).toBe("");
   });
 
+  it("adds once when Add is pressed twice before the server answers", async () => {
+    const { calls } = serve();
+    let answer!: () => void;
+    server.use(
+      http.post("*/api/grocery/items", async ({ request }) => {
+        calls.push({ method: "POST", path: "/api/grocery/items", body: await request.json() });
+        await new Promise<void>((r) => (answer = r));
+        return HttpResponse.json(item({ id: "n1", name: "paper towels", manual: true }), { status: 201 });
+      }),
+    );
+    await open();
+    fireEvent.change(screen.getByLabelText("Add an item"), { target: { value: "paper towels" } });
+    const form = screen.getByLabelText("Add an item").closest("form")!;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => expect(answer).toBeTypeOf("function"));
+    expect(screen.getByRole("button", { name: "Add" }).getAttribute("aria-busy")).toBe("true");
+    answer();
+    expect(await screen.findByRole("button", { name: "paper towels" })).toBeTruthy();
+    expect(calls).toHaveLength(1);
+  });
+
   it("asks for text instead of sending nothing", async () => {
     const { calls } = serve();
     await open();
@@ -286,6 +452,7 @@ describe("adding, clearing, emptying", () => {
     fireEvent.click(within(screen.getByRole("group", { name: "Confirm" })).getByRole("button", { name: "Empty list" }));
     await waitFor(() => expect(calls).toEqual([{ method: "DELETE", path: "/api/grocery", body: undefined }]));
     expect(await screen.findByRole("heading", { name: "Nothing on the list yet" })).toBeTruthy();
+    expect(document.activeElement).toBe(listBody()); // the Empty button is gone: focus rests on the list area, not the page
   });
 });
 
@@ -297,9 +464,34 @@ describe("recipes on the list", () => {
     fireEvent.click(screen.getByRole("button", { name: "More servings of Chili" }));
     await waitFor(() => expect(calls).toEqual([{ method: "POST", path: "/api/grocery/recipes", body: { recipeId: "r1", scale: 2 } }]));
     await waitFor(() => expect(screen.getByRole("group", { name: "Servings of Chili" }).textContent).toContain("2×"));
-    await waitFor(() => expect((screen.getByRole("button", { name: "More servings of Chili" }) as HTMLButtonElement).disabled).toBe(true));
+    await waitFor(() => expect(screen.getByRole("button", { name: "More servings of Chili" }).getAttribute("aria-disabled")).toBe("true"));
     fireEvent.click(screen.getByRole("button", { name: "Fewer servings of Chili" }));
     await waitFor(() => expect(calls[1].body).toEqual({ recipeId: "r1", scale: 1 }));
+  });
+
+  it("keeps focus on a stepper end, and ignores a second tap while the first is on its way", async () => {
+    const { calls } = serve();
+    let answer!: () => void;
+    server.use(
+      http.post("*/api/grocery/recipes", async ({ request }) => {
+        calls.push({ method: "POST", path: "/api/grocery/recipes", body: await request.json() });
+        await new Promise<void>((r) => (answer = r));
+        return HttpResponse.json({ id: "g1", updatedAt: "2026-01-01T00:00:01Z", recipes: [recipe({ scale: 2 })], items: stock() });
+      }),
+    );
+    await open();
+    const more = screen.getByRole("button", { name: "More servings of Chili" });
+    more.focus();
+    fireEvent.click(more);
+    fireEvent.click(more);
+    await waitFor(() => expect(answer).toBeTypeOf("function"));
+    expect(document.activeElement).toBe(more); // not disabled under the person's finger
+    expect(more.getAttribute("aria-disabled")).toBeNull();
+    answer();
+    await waitFor(() => expect(more.getAttribute("aria-disabled")).toBe("true")); // top of the range
+    expect(document.activeElement).toBe(more);
+    expect(calls).toHaveLength(1);
+    expect(screen.getAllByRole("status").some((s) => s.textContent === "Chili is now 2×. The amounts are updated.")).toBe(true);
   });
 
   it("takes a recipe off the list", async () => {
@@ -308,6 +500,7 @@ describe("recipes on the list", () => {
     fireEvent.click(screen.getByRole("button", { name: "Take Chili off the list" }));
     await waitFor(() => expect(calls).toEqual([{ method: "DELETE", path: "/api/grocery/recipes/r1", body: undefined }]));
     await waitFor(() => expect(screen.queryByText(/On this list/)).toBeNull());
+    expect(document.activeElement).toBe(listBody()); // the last recipe's button is gone
   });
 });
 
