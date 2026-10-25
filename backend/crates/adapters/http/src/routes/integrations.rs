@@ -43,7 +43,7 @@ pub(crate) fn flow_cookie(
 
 /// The cookie that clears `name` at `path`.
 pub(crate) fn clear_flow_cookie(name: &'static str, path: &'static str) -> Cookie<'static> {
-    let mut gone = Cookie::build(name).path(path).build();
+    let mut gone = Cookie::build(name).path(path).secure(true).build();
     gone.make_removal();
     gone
 }
