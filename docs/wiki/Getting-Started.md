@@ -15,7 +15,7 @@ by the admin in **Settings → Household**.
 ## Reaching it from an iPad on the same Wi‑Fi
 Set `WEB_BIND=0.0.0.0` in `.env`, run `docker compose up -d`, and open `http://<your-computer's-IP>:3000`.
 Recipes work, but installing to the Home Screen, offline use, the camera and keep-screen-awake need HTTPS —
-see [[Deploying]] (Tailscale is the easiest way at home).
+see [[Deploying]] (Tailscale is the easiest way at home: [[Deploy-Tailscale]]). Keep `COOKIE_SECURE=false` while you use this plain `http://` address.
 
 ## Stopping and updating
 - Stop: `docker compose down` (your recipes stay in Docker volumes)

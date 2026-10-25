@@ -1,0 +1,41 @@
+# Recipe Box API on Fly.io. Private: no public ports, reached by the web app at <app>.internal:8080.
+#   fly deploy -c deploy/fly/api.fly.toml
+# Replace recipe-box-api-CHANGEME with your own app name everywhere (names are global on Fly).
+# DATABASE_URL (and ANTHROPIC_API_KEY, if you use photo import) are secrets, not set here; see docs/wiki/Deploy-Fly.md.
+
+app = "recipe-box-api-CHANGEME"
+primary_region = "iad"
+
+[build]
+  # Pin a release (docs/DEPLOY.md, "Tag"); change the tag to upgrade.
+  image = "ghcr.io/christopherjohnson1535/recipe-box-api:v0.1.0"
+
+[env]
+  # Fly's private network is IPv6, so listen on both IPv4 and IPv6.
+  BIND_ADDR = "[::]:8080"
+  MEDIA_DIR = "/data/media"
+  # The site is served over HTTPS by Fly, so sign-in cookies carry the Secure flag.
+  COOKIE_SECURE = "true"
+  SESSION_DAYS = "30"
+  AI_PROVIDER = "none"
+  RUST_LOG = "info"
+
+# Photos. One volume, so run exactly one machine for this app.
+[mounts]
+  source = "media"
+  destination = "/data/media"
+
+# The Dockerfile HEALTHCHECK is not used by Fly; this is its equivalent.
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8080
+    method = "GET"
+    path = "/api/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "20s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

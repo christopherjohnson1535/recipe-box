@@ -13,6 +13,8 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 ## [Unreleased]
 
 ### Added
+- HTTPS deploy guides (#17): Tailscale at home, a VPS with the Caddy profile, and Fly.io (with `deploy/fly/` config), plus a
+  `COOKIE_SECURE` table; the Tailscale steps no longer ask for `WEB_BIND=0.0.0.0`.
 - Release process (#18): a `v*` tag publishes amd64 + arm64 images to GHCR only after the full CI suite passes,
   checks both platforms are in the manifest and pull without a login, then creates the GitHub release. Tag table,
   `IMAGE_TAG` pinning, upgrade/rollback and Raspberry Pi notes in `docs/DEPLOY.md`.

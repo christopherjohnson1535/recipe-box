@@ -11,7 +11,7 @@ A household recipe website: save recipes from links and photos, find them fast, 
 - [[Backup and Restore]]
 
 **Running it**
-- [[Deploying]] — home PC, VPS, managed hosts, HTTPS
+- [[Deploying]] — home PC with Tailscale, VPS with Caddy, Fly.io, HTTPS
 
 **Building it**
 - [[Architecture]] — containers, data flow, data model
