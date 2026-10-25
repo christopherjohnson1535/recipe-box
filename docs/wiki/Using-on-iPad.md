@@ -29,9 +29,9 @@ While cooking mode is open the screen won't lock; the top of the screen says **S
 
 ## Offline
 Recipes you've opened on the iPad stay readable without internet, photos and cooking mode included. Open the ones
-you'll cook from while you're online (opening the recipe once is enough; cooking mode is kept when you open it too).
-- With no connection a banner says **You're offline**. Saving, importing, search and settings need the connection:
-  **Save** and the import buttons are turned off and say why. What you typed in a recipe stays on the page until
+you'll cook from while you're online: opening a recipe once keeps it, its photo and its cooking mode.
+- With no connection a banner says **You're offline**. Saving, deleting, importing, search and settings need the
+  connection: **Save**, **Delete** and the import buttons are turned off, and Save and Import say why beside them. What you typed in a recipe stays on the page until
   you're back online.
 - A page that wasn't kept shows **You're offline** with the list of recipes this iPad can still open.
 - Online, you always see the server's latest copy; the kept copy is only used when the server can't be reached.

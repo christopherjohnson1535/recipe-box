@@ -5,7 +5,7 @@
 // and /media/* only, network first so online always shows the server's copy. Everything else goes to the network.
 import type { PrecacheEntry, RouteHandler, SerwistGlobalConfig, SerwistPlugin } from "serwist";
 import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
-import { CACHE_PREFIX, CACHES, keepablePage, LIMITS, MEDIA, mediaIn, OFFLINE_URL, pageKey, RECIPE_API, RECIPE_PAGE, signedOut } from "../components/offline/rules";
+import { CACHE_PREFIX, CACHES, keepablePage, LIMITS, MEDIA, mediaIn, OFFLINE_URL, pageKey, RECIPE_API, RECIPE_PAGE, RECIPE_READ_PAGE, signedOut } from "../components/offline/rules";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -14,7 +14,11 @@ declare global {
 }
 declare const self: ServiceWorkerGlobalScope;
 
+// Bumped by every wipe: a fetch that started before a wipe (signed in then) must not be stored after it.
+let generation = 0;
+
 async function forgetAll() {
+  generation++;
   for (const name of await caches.keys()) if (name.startsWith(CACHE_PREFIX)) await caches.delete(name);
 }
 
@@ -24,6 +28,14 @@ const watchSession: SerwistPlugin = {
     if (signedOut(response)) await forgetAll();
     return response;
   },
+};
+
+/** First in every caching strategy: drops the response if a wipe happened while it was in flight. */
+const sameSession: SerwistPlugin = {
+  handlerWillStart: async ({ state }) => {
+    if (state) state.generation = generation;
+  },
+  cacheWillUpdate: async ({ response, state }) => (state?.generation === generation ? response : null),
 };
 
 const expire = (maxEntries: number) =>
@@ -38,7 +50,7 @@ const okOnly = (cacheName: string): SerwistPlugin => ({
 });
 
 // Media names are content ids (`Cache-Control: immutable`), so a kept copy is always right.
-const media = new CacheFirst({ cacheName: CACHES.media, plugins: [watchSession, okOnly(CACHES.media), expire(LIMITS.media)] });
+const media = new CacheFirst({ cacheName: CACHES.media, plugins: [watchSession, sameSession, okOnly(CACHES.media), expire(LIMITS.media)] });
 
 const pages = new NetworkFirst({
   cacheName: CACHES.pages,
@@ -46,6 +58,7 @@ const pages = new NetworkFirst({
   matchOptions: { ignoreVary: true },
   plugins: [
     watchSession,
+    sameSession,
     { cacheKeyWillBeUsed: async ({ request }) => pageKey(request.url) },
     {
       cacheWillUpdate: async ({ request, response }) => {
@@ -53,9 +66,15 @@ const pages = new NetworkFirst({
         return keepablePage(response, await response.clone().text()) ? response : null;
       },
       // Keep the page's photos too: a page kept in the background (CACHE_URLS, update refresh) never loads them.
-      cacheDidUpdate: async ({ newResponse, event }) => {
+      // And its cooking mode, the page most used in the kitchen, unless that is kept already.
+      cacheDidUpdate: async ({ request, newResponse, event }) => {
         const urls = mediaIn(await newResponse.clone().text());
-        await Promise.allSettled(urls.map((url) => media.handle({ request: new Request(url), event })));
+        const jobs = urls.map((url) => media.handle({ request: new Request(url), event }));
+        const cook = pageKey(request.url) + "/cook";
+        if (RECIPE_READ_PAGE.test(new URL(request.url).pathname) && !(await (await caches.open(CACHES.pages)).match(cook, { ignoreVary: true }))) {
+          jobs.push(pages.handle({ request: new Request(cook), event }));
+        }
+        await Promise.allSettled(jobs);
       },
     },
     expire(LIMITS.pages),
@@ -77,7 +96,7 @@ const serwist = new Serwist({
       handler: new NetworkFirst({
         cacheName: CACHES.api,
         networkTimeoutSeconds: LIMITS.networkTimeoutSeconds,
-        plugins: [watchSession, okOnly(CACHES.api), expire(LIMITS.api)],
+        plugins: [watchSession, sameSession, okOnly(CACHES.api), expire(LIMITS.api)],
       }),
     },
     { matcher: ({ sameOrigin, url }) => sameOrigin && MEDIA.test(url.pathname), handler: media },

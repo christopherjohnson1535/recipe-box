@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { useOnline } from "@/components/offline/use-online";
 import { showNotice, showUndo } from "@/components/undo/undo-store";
 import { ApiError, api as browserApi } from "@/lib/api";
 
@@ -20,6 +21,7 @@ export function DeleteRecipeButton({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const online = useOnline(); // the offline banner says why
 
   async function remove() {
     setPending(true);
@@ -46,7 +48,7 @@ export function DeleteRecipeButton({
 
   return (
     <>
-      <Button variant="ghost" pending={pending} onClick={remove}>
+      <Button variant="ghost" pending={pending} disabled={!online} onClick={remove}>
         {pending ? "Deleting…" : "Delete"}
       </Button>
       {failed && (

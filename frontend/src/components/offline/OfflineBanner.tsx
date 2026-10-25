@@ -10,7 +10,7 @@ export function OfflineBanner() {
   return (
     <div className="mx-auto w-full max-w-page px-gutter pt-4">
       <Alert title="You’re offline">
-        Recipes you’ve opened on this device still open. Saving, importing and search come back when you’re online.
+        Recipes you’ve opened on this device still open. Saving, deleting, importing and search wait until you’re back online.
       </Alert>
     </div>
   );

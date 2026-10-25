@@ -13,7 +13,7 @@ async function recipeWithPhoto(member: Member) {
   });
 }
 
-/** Opens the recipe and waits until the service worker has kept the page and its photo. */
+/** Opens the recipe and waits until the service worker has kept the page, its cooking mode and its photo. */
 async function openAndKeep(page: Page, id: string) {
   await page.goto(`/recipes/${id}`);
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -22,7 +22,8 @@ async function openAndKeep(page: Page, id: string) {
       page.evaluate(async (id) => {
         const pages = await (await caches.open("rb-pages")).keys();
         const media = await (await caches.open("rb-media")).keys();
-        return pages.some((r) => r.url.endsWith(`/recipes/${id}`)) && media.length > 0;
+        const urls = pages.map((r) => r.url);
+        return urls.some((u) => u.endsWith(`/recipes/${id}`)) && urls.some((u) => u.endsWith(`/recipes/${id}/cook`)) && media.length > 0;
       }, id),
     )
     .toBe(true);
