@@ -8,12 +8,14 @@ You need: Docker on the PC ([[Getting Started]]), a free Tailscale account, and 
 ## 1. Start Recipe Box
 In the repo folder, edit `.env`:
 ```sh
-POSTGRES_PASSWORD=<a long random string>
+POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
 COOKIE_SECURE=true
 WEB_BIND=127.0.0.1
 ```
 Then `docker compose up -d` (add `-f docker-compose.yml -f deploy/compose.prod.yml` to use the published images, and
-`IMAGE_TAG=v0.1.0` in `.env` to pin a release). Check `docker compose ps`: `db`, `api`, `web` healthy.
+`IMAGE_TAG=<release tag>` in `.env` to pin a release once one exists; the default `latest` is the newest build of `main`, see [Cutting a release](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/DEPLOY.md#cutting-a-release-owner)). Check `docker compose ps`: `db`, `api`, `web` healthy.
+
+Use `openssl rand -hex 24` for the password: it goes into `DATABASE_URL` as-is, so symbols such as `@` or `/` would break it. Postgres fixes the password the first time the `pgdata` volume starts; changing it later in `.env` does not change it.
 
 `WEB_BIND` stays `127.0.0.1` on purpose: Tailscale talks to the app from the same PC, and nothing else on your Wi-Fi
 can then reach it without HTTPS.
@@ -40,7 +42,7 @@ Share → **Add to Home Screen** ([[Using on iPad]]).
 
 ## Check it
 - `https://<pc-name>.<tailnet-name>.ts.net/api/health` shows `"db":"ok"`.
-- The sign-in cookie is `Secure`: `curl -si -X POST https://<address>/api/auth/login -H 'content-type: application/json' -d '{"username":"you","password":"..."}' | grep -i set-cookie` ends `Secure` on the `rb_session` line.
+- The sign-in cookie is `Secure`: `curl -si -X POST https://<address>/api/auth/login -H 'content-type: application/json' -d '{"username":"you","password":"..."}' | grep -i set-cookie` prints an `rb_session` line like `HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=...`. It must contain `; Secure`.
 
 ## If something is off
 | Symptom | Cause and fix |

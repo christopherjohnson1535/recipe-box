@@ -15,7 +15,7 @@ first: the setting must match how you reach the site.
 ```sh
 git clone https://github.com/christopherjohnson1535/recipe-box.git && cd recipe-box
 cp .env.example .env
-# edit .env: POSTGRES_PASSWORD (long random), and the target-specific values below
+# edit .env: POSTGRES_PASSWORD (`openssl rand -hex 24`: letters and digits only), and the target-specific values below
 ```
 Build on the host (`docker compose up -d --build`) or use the images CI publishes to GHCR:
 ```sh
@@ -26,12 +26,12 @@ packages are public, so `docker pull` needs no login.
 
 | Tag | Points at | Use it for |
 |---|---|---|
-| `v0.1.0` (also `0.1.0`) | that release, never moves | a deployment you update on purpose (recommended) |
+| `v0.1.0` (also `0.1.0`), once a release exists | that release, never moves | a deployment you update on purpose (recommended once a release exists) |
 | `0.1` | the newest `0.1.x` release | patch updates on `pull` |
 | `latest` | the newest build of `main` | trying the newest work |
 | `sha-<short>` | one `main` commit | rolling back to a specific build |
 
-Choose the tag with `IMAGE_TAG` in `.env` (read by `deploy/compose.prod.yml`; default `latest`):
+Choose the tag with `IMAGE_TAG` in `.env` (read by `deploy/compose.prod.yml`; default `latest`, which works before any release exists). Once a release is published, pin to it:
 ```sh
 IMAGE_TAG=v0.1.0
 ```
@@ -61,7 +61,8 @@ people reach the site:
   a public site.
 - Check what your server sends (use your own address and a real account):
   `curl -si -X POST https://<your-address>/api/auth/login -H 'content-type: application/json' -d '{"username":"you","password":"…"}' | grep -i '^set-cookie'`
-  The line must contain `HttpOnly; SameSite=Lax; Path=/` and, with `COOKIE_SECURE=true`, `Secure`.
+  The line looks like `rb_session=...; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=...`. It must contain `; Secure` when
+  `COOKIE_SECURE=true`, and not when it is `false`.
 - The API refuses to start if `COOKIE_SECURE=true` is combined with `IMPORT_ALLOW_HOST` (a test-only setting). After
   a change to `.env`, run `docker compose up -d` again so the `api` container is recreated.
 - Behind a proxy the API sees the web container as the client, not the visitor. Caddy and the web container pass
@@ -74,7 +75,7 @@ unattended.
 
 ## A. Home PC / server
 1. Docker Desktop (Windows/macOS) or Docker Engine (Linux).
-2. `.env`: a long random `POSTGRES_PASSWORD`, then `docker compose up -d` (or the prod file above).
+2. `.env`: `POSTGRES_PASSWORD` from `openssl rand -hex 24` (it goes into `DATABASE_URL` unescaped; Postgres fixes it on the first start of the `pgdata` volume), then `docker compose up -d` (or the prod file above).
    Browsing `http://localhost:3000` on the PC needs nothing else.
 3. HTTPS without a domain, **Tailscale** (full page: [Deploy-Tailscale](wiki/Deploy-Tailscale.md)):
    - Install Tailscale on the PC and on the iPad and sign in to the same account.
@@ -95,13 +96,13 @@ Full page: [Deploy-VPS-Caddy](wiki/Deploy-VPS-Caddy.md).
 1. Create a small Linux VM (1 vCPU / 1–2 GB RAM is enough), install Docker Engine.
 2. Point a DNS name (e.g. `recipes.example.com`) at the VM's IP (an `A` record, plus `AAAA` for IPv6). Open ports 80
    and 443 only, plus 22 for SSH.
-3. `.env`: `PUBLIC_HOSTNAME=recipes.example.com`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`, `IMAGE_TAG=v0.1.0`.
+3. `.env`: `PUBLIC_HOSTNAME=recipes.example.com`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`, and optionally `IMAGE_TAG=<release tag>` (default `latest`).
 4. `docker compose -f docker-compose.yml -f deploy/compose.prod.yml --profile https up -d`.
 5. `PUBLIC_HOSTNAME` must be set: Caddy has nothing to serve without it and the `caddy` container restarts in a loop.
    The certificate is issued on the first request, a few seconds after the DNS name resolves to the VM
    (`docker compose logs caddy`). Keep the `caddy_data` volume: it holds the certificate and account.
 6. Open the address and create the admin account at once (see above).
-7. Updates: set `IMAGE_TAG` to the new release, then `docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull && … up -d`.
+7. Updates: set `IMAGE_TAG` to the new release (or just pull `latest`), then `docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull && … up -d`.
 
 Docker publishes a container port straight past `ufw`/`iptables` rules of the host firewall. That is why `WEB_BIND`
 stays `127.0.0.1` here and the `db` and `api` services publish nothing: only Caddy listens on the internet.

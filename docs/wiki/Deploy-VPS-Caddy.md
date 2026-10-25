@@ -18,12 +18,16 @@ cp .env.example .env
 ```
 Edit `.env`:
 ```sh
-POSTGRES_PASSWORD=<a long random string>
+POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
 PUBLIC_HOSTNAME=recipes.example.com
 COOKIE_SECURE=true
 WEB_BIND=127.0.0.1
-IMAGE_TAG=v0.1.0
+IMAGE_TAG=latest
 ```
+Use `openssl rand -hex 24` for the password: it goes into `DATABASE_URL` as-is, so symbols such as `@` or `/` would break it. Postgres fixes the password the first time the `pgdata` volume starts; changing `POSTGRES_PASSWORD` later does not change it.
+
+`IMAGE_TAG=latest` is the newest build of `main` and works today. Once a release exists, pin to a release tag such as `v0.1.0` so updates happen only when you choose (tag table and release steps: [Cutting a release](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/DEPLOY.md#cutting-a-release-owner)).
+
 `PUBLIC_HOSTNAME` is required. Left empty, the Caddy container has no site to serve and restarts in a loop.
 `WEB_BIND=127.0.0.1` matters: Docker publishes ports around the host firewall, so a `0.0.0.0` web port would be open
 to the internet without HTTPS.
@@ -47,7 +51,7 @@ Then on the iPad: Safari → the address → Share → **Add to Home Screen** ([
 - `curl -sI https://recipes.example.com | head -1` is `HTTP/2 200` (or a redirect to `/login`);
   `curl -sI http://recipes.example.com` redirects to `https://`.
 - `https://recipes.example.com/api/health` shows `"db":"ok"`; the response has `strict-transport-security`.
-- The `rb_session` cookie carries `Secure` (see the `curl ... | grep -i set-cookie` check in [[Deploy-Tailscale]]).
+- The `rb_session` `Set-Cookie` line contains `; Secure` (see the `curl ... | grep -i set-cookie` check in [[Deploy-Tailscale]]).
 
 ## Keep it healthy
 - Update: set a newer `IMAGE_TAG`, then the same `pull` and `up -d` commands (take a backup first, [[Backup and Restore]]).

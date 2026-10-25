@@ -6,7 +6,9 @@ app = "recipe-box-web-CHANGEME"
 primary_region = "iad"
 
 [build]
-  image = "ghcr.io/christopherjohnson1535/recipe-box-web:v0.1.0"
+  # `latest` is the newest build of main. Once a release exists, pin to a release tag such as v0.1.0
+  # (docs/DEPLOY.md, "Common steps" tag table), and use the same tag as the api app.
+  image = "ghcr.io/christopherjohnson1535/recipe-box-web:latest"
 
 [env]
   API_INTERNAL_URL = "http://recipe-box-api-CHANGEME.internal:8080"

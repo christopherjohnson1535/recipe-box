@@ -7,8 +7,9 @@ app = "recipe-box-api-CHANGEME"
 primary_region = "iad"
 
 [build]
-  # Pin a release (docs/DEPLOY.md, "Tag"); change the tag to upgrade.
-  image = "ghcr.io/christopherjohnson1535/recipe-box-api:v0.1.0"
+  # `latest` is the newest build of main. Once a release exists, pin to a release tag such as v0.1.0
+  # (docs/DEPLOY.md, "Common steps" tag table) and change the tag to upgrade.
+  image = "ghcr.io/christopherjohnson1535/recipe-box-api:latest"
 
 [env]
   # Fly's private network is IPv6, so listen on both IPv4 and IPv6.

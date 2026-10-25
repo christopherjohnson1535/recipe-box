@@ -15,7 +15,7 @@ yourself before anyone else finds it.
 
 Prebuilt images: `ghcr.io/christopherjohnson1535/recipe-box-api` and `recipe-box-web` (amd64 + arm64, public, no
 login). Use them with `docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d`. Pin a release with
-`IMAGE_TAG=v0.1.0` in `.env` (default `latest` = newest `main` build); a Raspberry Pi needs a 64-bit OS. Tags and the
+`IMAGE_TAG=<release tag>` in `.env` once one exists (default `latest` = newest `main` build); a Raspberry Pi needs a 64-bit OS. Tags and the
 release steps: `docs/DEPLOY.md`.
 
 Why HTTPS matters: iPad Home Screen install, offline, the camera and keep-screen-awake only work on secure origins.
