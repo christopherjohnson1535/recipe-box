@@ -5,6 +5,7 @@ use utoipa::ToSchema;
 
 use crate::{
     HttpState,
+    client_ip::ClientIp,
     dto::User,
     error::{AppJson, AppResult, ErrorBody},
     extract::{CurrentUser, removal_cookie, session_cookie, session_token},
@@ -23,16 +24,19 @@ pub struct LoginBody {
         headers(("Set-Cookie" = String, description = "The `rb_session` cookie."))),
     (status = 400, description = "Malformed body (`validation`).", body = ErrorBody),
     (status = 401, description = "Wrong username or password; the same answer for both (`unauthenticated`).", body = ErrorBody),
+    (status = 429, description = "Too many wrong passwords for this username or from this address (`rate_limited`). `Retry-After` is in seconds.", body = ErrorBody,
+        headers(("Retry-After" = u64, description = "Seconds to wait."))),
 ))]
 pub async fn login(
     State(state): State<HttpState>,
+    ClientIp(client): ClientIp,
     jar: CookieJar,
     AppJson(body): AppJson<LoginBody>,
 ) -> AppResult<(CookieJar, Json<User>)> {
     let (user, session) = state
         .services
         .auth
-        .login(&body.username, body.password)
+        .login(&body.username, body.password, client)
         .await?;
     let jar = jar.add(session_cookie(&state.config, session));
     Ok((jar, Json(user.into())))

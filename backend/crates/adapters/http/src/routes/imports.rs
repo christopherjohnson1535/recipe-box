@@ -317,9 +317,11 @@ mod tests {
             spawner: Arc::new(NoSpawn),
             max_upload_bytes: 1 << 20,
             session_days: 30,
+            throttle: app::Throttle::new(),
         });
         HttpState {
             services: Arc::new(services),
+            trusted_proxies: Default::default(),
             config: HttpConfig {
                 cookie_secure: false,
                 max_upload_bytes: 1 << 20,

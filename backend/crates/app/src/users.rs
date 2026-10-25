@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 
 use domain::{DomainError, DomainResult, NewUser, ROLE_ADMIN, User, uuid::Uuid, validate};
-use ports::{PasswordHasher, UserRepo};
+use ports::{Clock, PasswordHasher, UserRepo};
 
 use crate::{
-    Deps,
+    Deps, Scope, Throttle,
     auth::{AuthService, NewSession, WRONG_LOGIN},
 };
 
@@ -14,6 +14,8 @@ pub struct UserService {
     users: Arc<dyn UserRepo>,
     hasher: Arc<dyn PasswordHasher>,
     auth: AuthService,
+    clock: Arc<dyn Clock>,
+    throttle: Arc<Throttle>,
 }
 
 impl UserService {
@@ -22,6 +24,8 @@ impl UserService {
             users: d.users.clone(),
             hasher: d.hasher.clone(),
             auth,
+            clock: d.clock.clone(),
+            throttle: d.throttle.clone(),
         }
     }
 
@@ -99,6 +103,9 @@ impl UserService {
     /// existing (`NotFound`), and for an own change the current password (`Unauthenticated`, an over-long one
     /// without hashing). An admin resetting another user's needs no current password. If the stored hash changed
     /// after it was verified, an own change is `Unauthenticated` too: to the caller it is a wrong current password.
+    ///
+    /// An own change is throttled like sign-in (per user id and per `client` address): when locked it is
+    /// `RateLimited`, before the password is hashed. An admin reset checks no password and is not throttled.
     pub async fn set_password(
         &self,
         caller: &User,
@@ -106,6 +113,7 @@ impl UserService {
         new: String,
         current: Option<String>,
         caller_token: Option<&str>,
+        client: Option<IpAddr>,
     ) -> DomainResult<()> {
         let own = id == caller.id;
         if !own && !caller.is_admin() {
@@ -116,12 +124,22 @@ impl UserService {
             return Err(DomainError::NotFound("No such user.".into()));
         };
         if own {
+            let attempt = self
+                .throttle
+                .begin(
+                    self.clock.now(),
+                    Scope::PasswordChange,
+                    &id.to_string(),
+                    client,
+                )
+                .map_err(|retry_after_secs| DomainError::RateLimited { retry_after_secs })?;
             let given = current.unwrap_or_default();
             if given.chars().count() > validate::MAX_PASSWORD
                 || !self.hasher.verify(given, Some(stored.clone())).await?
             {
                 return Err(WRONG_LOGIN);
             }
+            attempt.succeed();
         }
         let hash = self.hasher.hash(new).await?;
         let keep = own

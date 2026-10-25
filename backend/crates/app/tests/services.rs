@@ -48,6 +48,7 @@ impl World {
             spawner: Arc::new(common::CollectingSpawner::default()),
             max_upload_bytes: 1 << 20,
             session_days: 30,
+            throttle: app::Throttle::new(),
         };
         Self {
             clock,
@@ -228,7 +229,7 @@ async fn long_password_is_refused_before_any_hashing() {
     let s = w.services();
     user(&s, "ann", "admin").await;
     let long = "x".repeat(1025);
-    assert!(is_wrong_login(s.auth.login("ann", long).await));
+    assert!(is_wrong_login(s.auth.login("ann", long, None).await));
     assert_eq!(w.hasher.verify_count(), 0);
 }
 
@@ -238,14 +239,16 @@ async fn unknown_user_and_wrong_password_look_the_same() {
     let s = w.services();
     user(&s, "ann", "admin").await;
     assert!(is_wrong_login(
-        s.auth.login("ann", "nope nope nope".into()).await
+        s.auth.login("ann", "nope nope nope".into(), None).await
     ));
-    assert!(is_wrong_login(s.auth.login("bob", PASSWORD.into()).await));
+    assert!(is_wrong_login(
+        s.auth.login("bob", PASSWORD.into(), None).await
+    ));
     assert_eq!(w.hasher.verify_count(), 2);
     // Only "bob" is unknown: his login still verifies, against no hash (the dummy-work path).
     assert_eq!(w.hasher.verify_without_hash_count(), 1);
     // Case and padding in the username do not matter; the session lasts `session_days`.
-    let (u, session) = s.auth.login("  ANN ", PASSWORD.into()).await.unwrap();
+    let (u, session) = s.auth.login("  ANN ", PASSWORD.into(), None).await.unwrap();
     assert_eq!(session.expires_at, w.clock.now() + Duration::days(30));
     let found = s.auth.current_user(&session.token).await.unwrap().unwrap();
     assert_eq!(found.id, u.id);
@@ -255,8 +258,8 @@ async fn unknown_user_and_wrong_password_look_the_same() {
 async fn logout_ends_only_that_session() {
     let s = World::new().services();
     user(&s, "ann", "admin").await;
-    let (_, a) = s.auth.login("ann", PASSWORD.into()).await.unwrap();
-    let (_, b) = s.auth.login("ann", PASSWORD.into()).await.unwrap();
+    let (_, a) = s.auth.login("ann", PASSWORD.into(), None).await.unwrap();
+    let (_, b) = s.auth.login("ann", PASSWORD.into(), None).await.unwrap();
     s.auth.logout(None).await.unwrap();
     s.auth.logout(Some(&a.token)).await.unwrap();
     assert!(s.auth.current_user(&a.token).await.unwrap().is_none());
@@ -268,7 +271,7 @@ async fn a_session_is_gone_once_its_lifetime_has_passed() {
     let w = World::new();
     let s = w.services();
     user(&s, "ann", "admin").await;
-    let (_, session) = s.auth.login("ann", PASSWORD.into()).await.unwrap();
+    let (_, session) = s.auth.login("ann", PASSWORD.into(), None).await.unwrap();
     assert_eq!(session.lifetime, Duration::days(30));
     w.clock.advance(Duration::days(30) - Duration::seconds(1));
     assert!(s.auth.current_user(&session.token).await.unwrap().is_some());
@@ -351,8 +354,8 @@ async fn own_password_change_checks_current_and_keeps_only_this_session() {
     let w = World::new();
     let s = w.services();
     let ann = user(&s, "ann", "member").await;
-    let (_, here) = s.auth.login("ann", PASSWORD.into()).await.unwrap();
-    let (_, other) = s.auth.login("ann", PASSWORD.into()).await.unwrap();
+    let (_, here) = s.auth.login("ann", PASSWORD.into(), None).await.unwrap();
+    let (_, other) = s.auth.login("ann", PASSWORD.into(), None).await.unwrap();
     let change = |current: Option<&str>| {
         s.users.set_password(
             &ann,
@@ -360,6 +363,7 @@ async fn own_password_change_checks_current_and_keeps_only_this_session() {
             "a brand new one".into(),
             current.map(Into::into),
             Some(&here.token),
+            None,
         )
     };
     assert!(is_wrong_login(change(None).await));
@@ -370,14 +374,19 @@ async fn own_password_change_checks_current_and_keeps_only_this_session() {
     change(Some(PASSWORD)).await.unwrap();
     assert!(s.auth.current_user(&here.token).await.unwrap().is_some());
     assert!(s.auth.current_user(&other.token).await.unwrap().is_none());
-    assert!(s.auth.login("ann", "a brand new one".into()).await.is_ok());
+    assert!(
+        s.auth
+            .login("ann", "a brand new one".into(), None)
+            .await
+            .is_ok()
+    );
 }
 
 #[tokio::test]
 async fn password_rules_come_before_the_user_lookup() {
     async fn set(s: &Services, caller: &User, id: Uuid, pw: &str) -> DomainResult<()> {
         s.users
-            .set_password(caller, id, pw.into(), None, None)
+            .set_password(caller, id, pw.into(), None, None, None)
             .await
     }
     let s = World::new().services();
@@ -400,8 +409,8 @@ async fn admin_reset_needs_no_current_password_and_ends_all_their_sessions() {
     let s = World::new().services();
     let ann = user(&s, "ann", "member").await;
     let admin = user(&s, "root", "admin").await;
-    let (_, theirs) = s.auth.login("ann", PASSWORD.into()).await.unwrap();
-    let (_, mine) = s.auth.login("root", PASSWORD.into()).await.unwrap();
+    let (_, theirs) = s.auth.login("ann", PASSWORD.into(), None).await.unwrap();
+    let (_, mine) = s.auth.login("root", PASSWORD.into(), None).await.unwrap();
     s.users
         .set_password(
             &admin,
@@ -409,6 +418,7 @@ async fn admin_reset_needs_no_current_password_and_ends_all_their_sessions() {
             "a brand new one".into(),
             None,
             Some(&mine.token),
+            None,
         )
         .await
         .unwrap();
@@ -455,6 +465,7 @@ async fn a_lost_race_on_an_own_password_change_is_a_wrong_password() {
             ann.id,
             "a brand new one".into(),
             Some(PASSWORD.into()),
+            None,
             None,
         )
         .await;
@@ -705,4 +716,75 @@ async fn delete_images_says_when_the_rows_could_not_be_deleted() {
     assert!(!w.services().media.delete_images(&[id]).await);
     assert_eq!(media.names().len(), 2, "files are kept when the rows stay");
     assert!(World::new().services().media.delete_images(&[id]).await);
+}
+
+fn rate_limited<T>(r: &DomainResult<T>) -> Option<u64> {
+    match r {
+        Err(DomainError::RateLimited { retry_after_secs }) => Some(*retry_after_secs),
+        _ => None,
+    }
+}
+
+#[tokio::test]
+async fn a_locked_login_does_no_hashing_and_clears_after_the_wait() {
+    let w = World::new();
+    let s = w.services();
+    user(&s, "ann", "admin").await;
+    for _ in 0..5 {
+        assert!(is_wrong_login(
+            s.auth.login("ann", "nope nope nope".into(), None).await
+        ));
+    }
+    let verifies = w.hasher.verify_count();
+    let locked = s.auth.login("ann", PASSWORD.into(), None).await;
+    assert_eq!(rate_limited(&locked), Some(30));
+    assert_eq!(w.hasher.verify_count(), verifies);
+    w.clock.advance(Duration::seconds(30));
+    assert!(s.auth.login("ann", PASSWORD.into(), None).await.is_ok());
+}
+
+#[tokio::test]
+async fn an_over_long_password_counts_as_a_guess() {
+    let s = World::new().services();
+    user(&s, "ann", "admin").await;
+    for _ in 0..5 {
+        assert!(is_wrong_login(
+            s.auth.login("ann", "x".repeat(1025), None).await
+        ));
+    }
+    assert!(rate_limited(&s.auth.login("ann", PASSWORD.into(), None).await).is_some());
+}
+
+#[tokio::test]
+async fn own_password_change_locks_per_user_and_leaves_admin_resets_alone() {
+    let w = World::new();
+    let s = w.services();
+    let ann = user(&s, "ann", "member").await;
+    let admin = user(&s, "root", "admin").await;
+    let change = |current: &str| {
+        s.users.set_password(
+            &ann,
+            ann.id,
+            "a brand new one".into(),
+            Some(current.into()),
+            None,
+            None,
+        )
+    };
+    for _ in 0..5 {
+        assert!(is_wrong_login(change("not it at all").await));
+    }
+    let verifies = w.hasher.verify_count();
+    assert_eq!(rate_limited(&change(PASSWORD).await), Some(30));
+    assert_eq!(w.hasher.verify_count(), verifies);
+    // The admin's reset checks no password, so it is never throttled.
+    for _ in 0..8 {
+        s.users
+            .set_password(&admin, ann.id, "reset by admin ok".into(), None, None, None)
+            .await
+            .unwrap();
+    }
+    w.clock.advance(Duration::seconds(30));
+    // The reset changed the password, so the old "right" one is just wrong now (and the count carries on).
+    assert!(is_wrong_login(change(PASSWORD).await));
 }

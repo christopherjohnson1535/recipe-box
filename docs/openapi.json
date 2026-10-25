@@ -82,6 +82,26 @@
               }
             }
           },
+          "429": {
+            "description": "Too many wrong passwords for this username or from this address (`rate_limited`). `Retry-After` is in seconds.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "description": "Seconds to wait."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Something went wrong on the server (`internal`).",
             "content": {
@@ -1940,6 +1960,26 @@
               }
             }
           },
+          "429": {
+            "description": "Too many wrong `currentPassword`s for this account or from this address (`rate_limited`). `Retry-After` is in seconds.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "description": "Seconds to wait."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Something went wrong on the server (`internal`).",
             "content": {
@@ -2119,6 +2159,7 @@
           "not_found",
           "method_not_allowed",
           "conflict",
+          "rate_limited",
           "too_large",
           "unsupported_media",
           "no_recipe_found",

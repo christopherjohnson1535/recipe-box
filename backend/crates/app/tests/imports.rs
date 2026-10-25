@@ -73,6 +73,7 @@ impl World {
             spawner: spawner.clone(),
             max_upload_bytes: UPLOAD_CAP,
             session_days: 30,
+            throttle: app::Throttle::new(),
         });
         Self {
             services,

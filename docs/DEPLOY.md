@@ -91,6 +91,23 @@ not on `main`. If the problem is in the code, do not move the tag once its image
 "never moves" promise in the tag table above for anyone who pulled it. Tag `v0.1.1` instead. Moving a tag
 (`git tag -f ... && git push -f origin <tag>`) is only acceptable when no image was published for it.
 
+## Sign-in throttling and proxies
+Wrong passwords are slowed down on sign-in and on "change my password": 5 wrong attempts per username (a name that
+does not exist counts too) or 20 per client address lock that name or address for 30 seconds, doubling with each
+further wrong attempt up to 15 minutes; a correct password starts the name over. Counts live in the API's memory, so
+a restart clears them.
+
+"Client address" needs care behind proxies, because a browser can send any `X-Forwarded-For` it likes:
+- The API believes `X-Forwarded-For` only from peers in `TRUSTED_PROXIES` (default in compose: the private Docker
+  networks, where only the web container can connect; empty when you run the API yourself). It takes the right-most
+  address that is not itself a trusted proxy.
+- The web container passes on a client address only when `TRUST_PROXY_HEADERS=true`, and then takes the right-most
+  `X-Forwarded-For` entry, which is the one your proxy added. Set it to `true` for the `https` profile (Caddy
+  overwrites the header with the real client) or any proxy that does the same; keep it `false` when port 3000 is
+  reached directly. Never turn it on if clients can bypass the proxy.
+- With it `false`, all visitors share one address (the web container) and the per-address limit of 20 applies to
+  everyone together; the per-username limit still protects each account.
+
 ## Backups
 `sh scripts/backup.sh` writes `backups/<time>/db.dump` + `media.tar`; copy that folder off the machine.
 `sh scripts/restore.sh backups/<time>` restores (asks for confirmation). Test a restore after setting up.

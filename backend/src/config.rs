@@ -68,6 +68,14 @@ impl Config {
     }
 }
 
+/// `TRUSTED_PROXIES`: the proxies whose `X-Forwarded-For` the sign-in rate limiter believes. Empty (the default)
+/// trusts none, so the limiter sees the peer address. See docs/DEPLOY.md.
+pub fn trusted_proxies(raw: &str) -> anyhow::Result<adapter_http::TrustedProxies> {
+    adapter_http::TrustedProxies::parse(raw).map_err(|e| {
+        anyhow::anyhow!("TRUSTED_PROXIES: {e} (use addresses or CIDR networks, comma-separated)")
+    })
+}
+
 /// Whole days a session lasts. Capped so date arithmetic on it can never overflow.
 fn parse_session_days(raw: &str) -> anyhow::Result<i64> {
     raw.parse()

@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { server } from "@/test/server";
-import { downstreamResponseHeaders, forwardToApi, upstreamRequestHeaders, upstreamUrl } from "./forward";
+import { clientAddress, downstreamResponseHeaders, forwardToApi, upstreamRequestHeaders, upstreamUrl } from "./forward";
 import { safeNext } from "./nav";
 
 describe("upstreamUrl", () => {
@@ -54,6 +54,41 @@ describe("header mapping", () => {
     expect(h.getSetCookie()).toEqual(["rb_session=abc; HttpOnly; Path=/", "other=1; Path=/"]);
     expect(h.has("content-encoding")).toBe(false);
     expect(h.get("cache-control")).toContain("immutable");
+  });
+});
+
+describe("client address for the sign-in throttle", () => {
+  const url = new URL("https://recipes.example.com/api/auth/login");
+  const spoofed = {
+    "x-forwarded-for": "6.6.6.6, 198.51.100.4",
+    "x-real-ip": "6.6.6.6",
+    forwarded: "for=6.6.6.6",
+    "x-client-ip": "6.6.6.6",
+    "cf-connecting-ip": "6.6.6.6",
+  };
+
+  it("passes on no client-sent address headers unless the proxy is trusted", () => {
+    vi.stubEnv("TRUST_PROXY_HEADERS", "");
+    const h = upstreamRequestHeaders(new Headers(spoofed), url);
+    for (const name of Object.keys(spoofed)) expect(h.has(name), name).toBe(false);
+    vi.stubEnv("TRUST_PROXY_HEADERS", "false");
+    expect(upstreamRequestHeaders(new Headers(spoofed), url).has("x-forwarded-for")).toBe(false);
+  });
+
+  it("when trusted, sends only the right-most X-Forwarded-For entry, the one our proxy added", () => {
+    vi.stubEnv("TRUST_PROXY_HEADERS", "true");
+    const h = upstreamRequestHeaders(new Headers(spoofed), url);
+    expect(h.get("x-forwarded-for")).toBe("198.51.100.4");
+    for (const name of ["x-real-ip", "forwarded", "x-client-ip", "cf-connecting-ip"]) expect(h.has(name), name).toBe(false);
+  });
+
+  it("drops anything that is not an address", () => {
+    expect(clientAddress(new Headers({ "x-forwarded-for": "1.2.3.4, evil<script>" }), true)).toBeNull();
+    expect(clientAddress(new Headers({ "x-forwarded-for": "unknown" }), true)).toBeNull();
+    expect(clientAddress(new Headers({ "x-forwarded-for": "" }), true)).toBeNull();
+    expect(clientAddress(new Headers(), true)).toBeNull();
+    expect(clientAddress(new Headers({ "x-forwarded-for": "2001:db8::7" }), true)).toBe("2001:db8::7");
+    expect(clientAddress(new Headers({ "x-forwarded-for": "198.51.100.4" }), false)).toBeNull();
   });
 });
 

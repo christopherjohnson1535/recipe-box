@@ -778,6 +778,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Too many wrong passwords for this username or from this address (`rate_limited`). `Retry-After` is in seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
             /** @description Something went wrong on the server (`internal`). */
             500: {
                 headers: {
@@ -2241,6 +2252,17 @@ export interface operations {
             /** @description Body over the size limit (`too_large`). */
             413: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many wrong `currentPassword`s for this account or from this address (`rate_limited`). `Retry-After` is in seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait. */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {

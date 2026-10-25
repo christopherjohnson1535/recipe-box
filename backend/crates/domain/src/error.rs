@@ -12,6 +12,10 @@ pub enum DomainError {
     /// Not signed in, or the credentials given are wrong. The message is a fixed sentence shown to the client.
     #[error("{0}")]
     Unauthenticated(&'static str),
+    /// Too many wrong passwords. Refused before any password is checked, so the answer says nothing about the
+    /// account; `retry_after_secs` is how long to wait.
+    #[error("Too many attempts. Try again in {}.", wait_phrase(*retry_after_secs))]
+    RateLimited { retry_after_secs: u64 },
     #[error("This needs an AI provider, and none is configured.")]
     AiDisabled,
     #[error("{0}")]
@@ -52,6 +56,16 @@ impl DomainError {
         }
         Self::Internal(message)
     }
+}
+
+/// "1 second", "45 seconds", "1 minute", "5 minutes": whole minutes rounded up from a minute on.
+pub fn wait_phrase(secs: u64) -> String {
+    let (n, unit) = if secs < 60 {
+        (secs.max(1), "second")
+    } else {
+        (secs.div_ceil(60), "minute")
+    };
+    format!("{n} {unit}{}", if n == 1 { "" } else { "s" })
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;
@@ -100,6 +114,27 @@ mod tests {
             inner: None,
         });
         assert!(matches!(e, DomainError::Internal(m) if m == "disk full"));
+    }
+
+    #[test]
+    fn rate_limited_says_how_long_to_wait() {
+        for (secs, text) in [
+            (0, "1 second"),
+            (1, "1 second"),
+            (45, "45 seconds"),
+            (60, "1 minute"),
+            (61, "2 minutes"),
+            (300, "5 minutes"),
+            (900, "15 minutes"),
+        ] {
+            let e = DomainError::RateLimited {
+                retry_after_secs: secs,
+            };
+            assert_eq!(
+                e.to_string(),
+                format!("Too many attempts. Try again in {text}.")
+            );
+        }
     }
 
     #[test]

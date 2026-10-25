@@ -23,6 +23,7 @@ pub enum ErrorCode {
     NotFound,
     MethodNotAllowed,
     Conflict,
+    RateLimited,
     TooLarge,
     UnsupportedMedia,
     NoRecipeFound,
@@ -65,6 +66,8 @@ pub enum AppError {
     MethodNotAllowed,
     #[error("{0}")]
     Conflict(String),
+    #[error("Too many attempts. Try again in {}.", domain::error::wait_phrase(*retry_after_secs))]
+    RateLimited { retry_after_secs: u64 },
     #[error("Upload is too large.")]
     TooLarge,
     #[error("{0}")]
@@ -108,6 +111,7 @@ impl AppError {
             Self::NotFound(_) => (StatusCode::NOT_FOUND, ErrorCode::NotFound),
             Self::MethodNotAllowed => (StatusCode::METHOD_NOT_ALLOWED, ErrorCode::MethodNotAllowed),
             Self::Conflict(_) => (StatusCode::CONFLICT, ErrorCode::Conflict),
+            Self::RateLimited { .. } => (StatusCode::TOO_MANY_REQUESTS, ErrorCode::RateLimited),
             Self::TooLarge => (StatusCode::PAYLOAD_TOO_LARGE, ErrorCode::TooLarge),
             Self::UnsupportedMedia(_) => (
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
@@ -142,7 +146,11 @@ impl IntoResponse for AppError {
             } => Some(photo_image_ids.clone()),
             _ => None,
         };
-        (
+        let retry_after = match &self {
+            Self::RateLimited { retry_after_secs } => Some(retry_after_secs.to_string()),
+            _ => None,
+        };
+        let mut res = (
             status,
             Json(ErrorBody {
                 error: ErrorDetail {
@@ -152,7 +160,12 @@ impl IntoResponse for AppError {
                 },
             }),
         )
-            .into_response()
+            .into_response();
+        if let Some(secs) = retry_after.and_then(|s| s.parse().ok()) {
+            res.headers_mut()
+                .insert(axum::http::header::RETRY_AFTER, secs);
+        }
+        res
     }
 }
 
@@ -165,6 +178,7 @@ impl From<domain::DomainError> for AppError {
             D::Conflict(m) => Self::Conflict(m),
             D::Forbidden(m) => Self::Forbidden(m),
             D::Unauthenticated(m) => Self::Unauthenticated(m),
+            D::RateLimited { retry_after_secs } => Self::RateLimited { retry_after_secs },
             D::AiDisabled => Self::AiDisabled,
             D::Ai(m) => Self::AiError(m),
             D::NoRecipeFound(m) => Self::NoRecipeFound(m),
@@ -263,6 +277,13 @@ mod tests {
             (D::Validation(m()), 400, "validation"),
             (D::NotFound(m()), 404, "not_found"),
             (D::Conflict(m()), 409, "conflict"),
+            (
+                D::RateLimited {
+                    retry_after_secs: 5,
+                },
+                429,
+                "rate_limited",
+            ),
             (D::Forbidden(m()), 403, "forbidden"),
             (
                 D::Unauthenticated("Wrong username or password."),

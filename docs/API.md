@@ -24,6 +24,7 @@ Every non-2xx response:
 | 404 | `not_found` | |
 | 409 | `conflict` | username taken; restore window passed |
 | 405 | `method_not_allowed` | known path, wrong method |
+| 429 | `rate_limited` | too many wrong passwords on `POST /api/auth/login` or on `PUT /api/users/:id/password` with a `currentPassword`; see "Password throttling". Has a `Retry-After` header (seconds) and a message that says how long to wait |
 | 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`, `/api/import/export`), or any other request body over 1 MB |
 | 415 | `unsupported_media` | not an image we can decode, or over 10,000 px a side / 40 megapixels |
 | 422 | `no_recipe_found` | page/photo had no recipe |
@@ -44,6 +45,23 @@ refused with the usual 401 "Wrong username or password."; elsewhere 400); recipe
 characters, `notes` 20,000, each ingredient/step line 2,000, at most 500 ingredients, 500 steps and 50 tags
 (400 `validation`, message starts with the field name). `POST /api/auth/logout` always returns 204 and clears the cookie,
 even with no or an expired session.
+
+## Password throttling
+
+`POST /api/auth/login` and an own-password `PUT /api/users/:id/password` slow down password guessing:
+- Counted per username as submitted (trimmed, case-insensitive; a name that does not exist counts exactly like one that
+  does, so the answers are no way to find out who has an account) and per client address (IPv6 by its /64). The two
+  scopes are separate: wrong guesses at sign-in do not lock password changes, and the other way round. A change is
+  counted per user id.
+- After 5 wrong passwords for one name, or 20 from one address, that name or address is locked for 30 seconds; each
+  further wrong password doubles the lock, up to 15 minutes. The 6th wrong attempt in a row is therefore
+  `429 rate_limited` with `Retry-After: 30`.
+- While locked every attempt gets 429, the right password included, and nothing is checked. Refused attempts do not
+  extend the lock. A correct password resets the name's count; a count is also forgotten after 15 quiet minutes.
+- An admin resetting someone else's password checks no password and is not throttled.
+- Counts are kept in the API's memory: a restart clears them.
+- The client address is the TCP peer, or, when the peer is in `TRUSTED_PROXIES`, the right-most `X-Forwarded-For`
+  entry that is not itself a trusted proxy. Otherwise the header is ignored (docs/DEPLOY.md).
 
 ## Clients outside the browser
 

@@ -52,6 +52,10 @@ pub struct AppState {
     pub clock: Clock,
     /// Photo/text recipe extraction. `Ai::None` when `AI_PROVIDER=none`; tests swap in a mock-backed one.
     pub ai: Arc<dyn RecipeExtractor>,
+    /// Proxies whose `X-Forwarded-For` the rate limiter believes (`TRUSTED_PROXIES`). None by default.
+    pub trusted_proxies: adapter_http::TrustedProxies,
+    /// Wrong-password counts, shared by every `deps()` call.
+    pub throttle: Arc<app::Throttle>,
 }
 
 impl AppState {
@@ -77,6 +81,7 @@ impl AppState {
             spawner: Arc::new(TokioSpawner),
             max_upload_bytes: self.config.max_upload_bytes(),
             session_days: self.config.session_days,
+            throttle: self.throttle.clone(),
         }
     }
 
@@ -110,6 +115,8 @@ impl AppState {
             fetch_policy: FetchPolicy::default(),
             clock,
             ai,
+            trusted_proxies: Default::default(),
+            throttle: app::Throttle::new(),
         })
     }
 }

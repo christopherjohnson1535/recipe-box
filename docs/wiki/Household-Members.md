@@ -12,6 +12,7 @@ Everyone in the household signs in with their own username and password and shar
 - Passwords are at least 10 characters.
 - You can't remove yourself, and you can't remove the last admin, so the box always has someone who can manage it.
 - Removing a member signs them out everywhere. Their recipes stay in the box; they just no longer show who added them.
+- Too many wrong passwords in a row (5 for one username, 20 from one device or network) pauses sign-in and password changes for a while, 30 seconds at first and up to 15 minutes if guessing continues. The message says how long to wait; the right password is not accepted until then.
 - Anyone can change their own password; they must enter the current one. This signs out every other device but keeps the one in use.
 
 ## On screen: Settings
