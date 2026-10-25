@@ -13,7 +13,7 @@ use domain::constant_time_eq;
 use serde::Deserialize;
 
 use crate::{
-    HttpConfig, HttpState,
+    HttpState,
     dto::GoogleStatus,
     error::{AppError, AppQuery, AppResult, ErrorBody},
     extract::CurrentUser,
@@ -24,9 +24,9 @@ const STATE_PATH: &str = "/api/integrations/google";
 const STATE_MINUTES: i64 = 10;
 
 /// A short-lived cookie for an OAuth round trip (`name` at `path`): httpOnly, SameSite=Lax so it comes back with
-/// Google's redirect, Secure as configured, gone after `minutes`.
+/// Google's redirect, always Secure (browsers keep Secure cookies on `http://localhost` too; Google only redirects
+/// to HTTPS or localhost), gone after `minutes`.
 pub(crate) fn flow_cookie(
-    config: &HttpConfig,
     name: &'static str,
     path: &'static str,
     value: String,
@@ -48,8 +48,8 @@ pub(crate) fn clear_flow_cookie(name: &'static str, path: &'static str) -> Cooki
     gone
 }
 
-fn state_cookie(config: &HttpConfig, state: String) -> Cookie<'static> {
-    flow_cookie(config, STATE_COOKIE, STATE_PATH, state, STATE_MINUTES)
+fn state_cookie(state: String) -> Cookie<'static> {
+    flow_cookie(STATE_COOKIE, STATE_PATH, state, STATE_MINUTES)
 }
 
 fn clear_state_cookie() -> Cookie<'static> {
@@ -101,10 +101,7 @@ pub async fn connect(
         return Ok((jar, found("/login?next=/settings")));
     }
     let (url, random) = state.services.google.consent()?;
-    Ok((
-        jar.add(state_cookie(&state.config, random)),
-        found(url.as_str()),
-    ))
+    Ok((jar.add(state_cookie(random)), found(url.as_str())))
 }
 
 #[derive(Debug, Deserialize)]
@@ -182,14 +179,8 @@ mod tests {
 
     #[test]
     fn the_state_cookie_has_the_agreed_attributes() {
-        let config = HttpConfig {
-            cookie_secure: true,
-            max_upload_bytes: 1,
-            max_backup_bytes: 1,
-            version: "test",
-        };
         assert_eq!(
-            state_cookie(&config, "s".into()).to_string(),
+            state_cookie("s".into()).to_string(),
             "rb_google_state=s; HttpOnly; SameSite=Lax; Secure; Path=/api/integrations/google; Max-Age=600"
         );
     }

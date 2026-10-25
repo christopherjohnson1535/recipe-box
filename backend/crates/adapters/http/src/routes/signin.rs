@@ -72,13 +72,7 @@ pub async fn start(
         None
     };
     let started = signin.start(q.next.as_deref(), link_user)?;
-    let cookie = flow_cookie(
-        &state.config,
-        FLOW_COOKIE,
-        FLOW_PATH,
-        started.flow,
-        FLOW_MINUTES,
-    );
+    let cookie = flow_cookie(FLOW_COOKIE, FLOW_PATH, started.flow, FLOW_MINUTES);
     Ok((jar.add(cookie), found(started.url.as_str())))
 }
 

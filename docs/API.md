@@ -205,7 +205,7 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   - `GET /api/integrations/google` → `200 {configured, connected, connectedAt}` (`connectedAt` null when not connected).
   - `GET /api/integrations/google/connect` (a browser navigation) → `302` to Google's consent page
     (scope `https://www.googleapis.com/auth/tasks`, offline access) with a random `state`, also set in the cookie
-    `rb_google_state` (httpOnly, SameSite=Lax, Secure like `rb_session`, Path `/api/integrations/google`, 10 minutes).
+    `rb_google_state` (httpOnly, SameSite=Lax, always Secure, Path `/api/integrations/google`, 10 minutes).
     `422 google_disabled` when not configured. Without a session it answers `302 /login?next=/settings` (and sets no
     cookie) instead of 401, because it is a page navigation.
   - `GET /api/integrations/google/callback?code=…&state=…` (Google redirects here) → checks `state`
@@ -273,7 +273,7 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   - `GET /api/auth/providers` (public) → `200 {"google": bool}`.
   - `GET /api/auth/google/start?next=/path` (public; a browser navigation, not `fetch`) → `302` to Google (scopes
     `openid email profile`, PKCE S256, `state`, `nonce`, `prompt=select_account`, redirect address from `PUBLIC_URL`)
-    and sets `rb_oauth` (httpOnly, SameSite=Lax, Secure like `rb_session`, Path `/api/auth/google`, 10 minutes): the
+    and sets `rb_oauth` (httpOnly, SameSite=Lax, always Secure, Path `/api/auth/google`, 10 minutes): the
     flow record (`state`, `nonce`, PKCE verifier, `next`, who is linking, issue time) sealed with
     `TOKEN_ENCRYPTION_KEY` (ChaCha20-Poly1305, its own context, so it cannot be opened as a stored refresh token).
     `next` must be a path on this site: anything else (another address, `//host`, `\`, a scheme, spaces, control or
