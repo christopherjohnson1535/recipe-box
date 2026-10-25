@@ -16,6 +16,278 @@
     }
   ],
   "paths": {
+    "/api/auth/google/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Where Google sends the browser back. Always clears `rb_oauth` and ends on a page, never on JSON.",
+        "description": "Signing in: a member gets the session cookie (as the password login does) and lands on `next`; a Google account\nthat is no member lands on `/login?error=google_not_member` and nothing is created; any other failure (a wrong\nor old `state`, a refusal from Google, an unverified email, a bad ID token) on `/login?error=google_failed`.\nLinking from Settings (needs the session of the member who started it): `/settings?signin=linked`,\n`/settings?signin=taken` (that Google account belongs to another member) or `/settings?signin=error`.",
+        "operationId": "googleSignInCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "description": "Google's authorisation code.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "Must equal the `state` sealed in the `rb_oauth` cookie.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "description": "Set by Google when the person declined.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "To `next` (a member signed in; sets `rb_session`), `/login?error=google_not_member`, `/login?error=google_failed`, or, when linking, `/settings?signin=linked`, `/settings?signin=taken` or `/settings?signin=error`. Clears `rb_oauth`.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the browser lands."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Clears `rb_oauth`; on sign-in also sets `rb_session`."
+              }
+            }
+          },
+          "404": {
+            "description": "Google sign-in is not set up on this server (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/api/auth/google/start": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Starts signing in with Google. Open it as a page (a browser navigation), not with `fetch`. With `link=1` and a\nsession it links a Google account to that member instead; they need not share an email.",
+        "operationId": "startGoogleSignIn",
+        "parameters": [
+          {
+            "name": "next",
+            "in": "query",
+            "description": "A path on this site to land on after signing in (anything else becomes `/`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "link",
+            "in": "query",
+            "description": "`1` links a Google account to the signed-in member instead of signing in.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "To Google (scopes `openid email profile`, PKCE S256, `state`, `nonce`, `prompt=select_account`), setting the `rb_oauth` cookie (httpOnly, SameSite=Lax, 10 minutes, path `/api/auth/google`). With `link=1` and no session: to `/login?next=/settings`, no cookie.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Google's sign-in page, or `/login?next=/settings`."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`rb_oauth`, the sealed record of this sign-in."
+              }
+            }
+          },
+          "404": {
+            "description": "Google sign-in is not set up on this server (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/api/auth/identities": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "The Google accounts linked to the signed-in member, oldest first.",
+        "operationId": "listIdentities",
+        "responses": {
+          "200": {
+            "description": "Your linked accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Identity"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/auth/identities/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Unlinks one of your Google accounts. The password keeps working.",
+        "operationId": "deleteIdentity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Linked account id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unlinked."
+          },
+          "400": {
+            "description": "Malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such linked account, or it is someone else's (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -196,6 +468,40 @@
           {
             "session": []
           }
+        ]
+      }
+    },
+    "/api/auth/providers": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Which sign-in methods besides the password this server offers. The login page shows its Google button from this.",
+        "operationId": "getAuthProviders",
+        "responses": {
+          "200": {
+            "description": "The providers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthProviders"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
         ]
       }
     },
@@ -2599,7 +2905,7 @@
             }
           },
           "409": {
-            "description": "Username taken (`conflict`).",
+            "description": "Username or email taken (`conflict`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2692,6 +2998,122 @@
           },
           "404": {
             "description": "No such user (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Sets or clears a member's email, the address a Google account must have verified to sign in as them. Admin only.",
+        "operationId": "updateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The member now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed email or id, or no `email` key (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an admin (`forbidden`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such user (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member has that email (`conflict`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over the size limit (`too_large`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2974,6 +3396,19 @@
           "anthropic"
         ]
       },
+      "AuthProviders": {
+        "type": "object",
+        "description": "Which ways to sign in this server offers besides the password.",
+        "required": [
+          "google"
+        ],
+        "properties": {
+          "google": {
+            "type": "boolean",
+            "description": "Sign in with Google is set up (the Google OAuth client is configured)."
+          }
+        }
+      },
       "BinaryFile": {
         "type": "string",
         "format": "binary",
@@ -3006,6 +3441,13 @@
           "displayName": {
             "type": "string"
           },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Google address that may sign in as this member (optional; trimmed and lower-cased, blank means none)."
+          },
           "password": {
             "type": "string"
           },
@@ -3022,6 +3464,7 @@
         },
         "example": {
           "displayName": "Alex",
+          "email": "alex@example.com",
           "password": "correct horse battery",
           "role": "member",
           "username": "alex"
@@ -3325,6 +3768,36 @@
           },
           "version": {
             "type": "string"
+          }
+        }
+      },
+      "Identity": {
+        "type": "object",
+        "description": "A Google account linked to the signed-in member.",
+        "required": [
+          "id",
+          "provider",
+          "email",
+          "createdAt"
+        ],
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string",
+            "description": "The account's address when it was linked."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
           }
         }
       },
@@ -4139,6 +4612,24 @@
         },
         "additionalProperties": false
       },
+      "UpdateUserBody": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Google address that may sign in as this member; `null` or blank clears it."
+          }
+        },
+        "example": {
+          "email": "alex@example.com"
+        }
+      },
       "UploadForm": {
         "type": "object",
         "description": "Multipart body of `POST /api/media`.",
@@ -4159,6 +4650,7 @@
           "id",
           "username",
           "displayName",
+          "email",
           "role",
           "createdAt"
         ],
@@ -4169,6 +4661,13 @@
           },
           "displayName": {
             "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Google address that may sign in as this member; null when none is set."
           },
           "id": {
             "type": "string",
@@ -4215,7 +4714,7 @@
   "tags": [
     {
       "name": "auth",
-      "description": "Sign in, sign out and the current user."
+      "description": "Sign in (password or Google), sign out, the current user and linked Google accounts."
     },
     {
       "name": "export",
