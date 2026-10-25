@@ -69,6 +69,6 @@ test("Share hands the same text to the device's share sheet", async ({ memberPag
 test("Settings says the household admin can turn Google Tasks on", async ({ memberPage: page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { level: 2, name: "Google Tasks" })).toBeVisible();
-  await expect(page.getByText(/household admin can turn it on/)).toBeVisible();
+  await expect(page.getByText(/Google Tasks is off for this household\. The household admin can turn it on/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Connect Google Tasks" })).toHaveCount(0);
 });
