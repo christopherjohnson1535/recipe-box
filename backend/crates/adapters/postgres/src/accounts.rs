@@ -14,13 +14,15 @@ use sqlx::{PgPool, error::ErrorKind};
 use crate::error::{db, violation};
 
 /// Select list for [`UserRow`]; `username` is citext, so it is cast for decoding.
-const USER_COLUMNS: &str = "id, username::text as username, display_name, role, created_at";
+const USER_COLUMNS: &str =
+    "id, username::text as username, display_name, email::text as email, role, created_at";
 
 #[derive(sqlx::FromRow)]
 struct UserRow {
     id: Uuid,
     username: String,
     display_name: String,
+    email: Option<String>,
     role: String,
     created_at: DateTime<Utc>,
 }
@@ -31,6 +33,7 @@ impl From<UserRow> for User {
             id: r.id,
             username: r.username,
             display_name: r.display_name,
+            email: r.email,
             role: r.role,
             created_at: r.created_at,
         }
@@ -50,6 +53,18 @@ fn no_such_user() -> DomainError {
 
 fn username_taken() -> DomainError {
     DomainError::Conflict("That username is already taken.".into())
+}
+
+fn email_taken() -> DomainError {
+    DomainError::Conflict("That email is already used by another member.".into())
+}
+
+/// Which unique constraint a violation broke. Postgres names the `email` one `users_email_key`.
+fn taken(e: &sqlx::Error) -> DomainError {
+    match e {
+        sqlx::Error::Database(d) if d.constraint() == Some("users_email_key") => email_taken(),
+        _ => username_taken(),
+    }
 }
 
 pub struct PgUserRepo {
@@ -74,19 +89,20 @@ impl UserRepo for PgUserRepo {
 
     async fn create(&self, new: NewUser) -> DomainResult<User> {
         let sql = format!(
-            "insert into users (username, display_name, password_hash, role, created_at)
-             values ($1, $2, $3, $4, $5) returning {USER_COLUMNS}"
+            "insert into users (username, display_name, password_hash, role, email, created_at)
+             values ($1, $2, $3, $4, $5, $6) returning {USER_COLUMNS}"
         );
         let row = sqlx::query_as::<_, UserRow>(sqlx::AssertSqlSafe(sql))
             .bind(&new.username)
             .bind(&new.display_name)
             .bind(&new.password_hash)
             .bind(&new.role)
+            .bind(&new.email)
             .bind(self.clock.now())
             .fetch_one(&self.pool)
             .await
             .map_err(|e| match violation(&e) {
-                Some(ErrorKind::UniqueViolation) => username_taken(),
+                Some(ErrorKind::UniqueViolation) => taken(&e),
                 _ => db(e),
             })?;
         Ok(row.into())
@@ -107,13 +123,14 @@ impl UserRepo for PgUserRepo {
             return Err(DomainError::Forbidden("Setup is already done.".into()));
         }
         let sql = format!(
-            "insert into users (username, display_name, password_hash, role, created_at)
-             values ($1, $2, $3, 'admin', $4) returning {USER_COLUMNS}"
+            "insert into users (username, display_name, password_hash, role, email, created_at)
+             values ($1, $2, $3, 'admin', $4, $5) returning {USER_COLUMNS}"
         );
         let row = sqlx::query_as::<_, UserRow>(sqlx::AssertSqlSafe(sql))
             .bind(&new.username)
             .bind(&new.display_name)
             .bind(&new.password_hash)
+            .bind(&new.email)
             .bind(self.clock.now())
             .fetch_one(&mut *tx)
             .await
@@ -130,6 +147,57 @@ impl UserRepo for PgUserRepo {
             .await
             .map_err(db)?;
         Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn find(&self, id: Uuid) -> DomainResult<Option<User>> {
+        let sql = format!("select {USER_COLUMNS} from users where id = $1");
+        let row = sqlx::query_as::<_, UserRow>(sqlx::AssertSqlSafe(sql))
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(db)?;
+        Ok(row.map(Into::into))
+    }
+
+    async fn find_by_email(&self, email: &str) -> DomainResult<Option<User>> {
+        let sql = format!("select {USER_COLUMNS} from users where email = $1::citext");
+        let row = sqlx::query_as::<_, UserRow>(sqlx::AssertSqlSafe(sql))
+            .bind(email)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(db)?;
+        Ok(row.map(Into::into))
+    }
+
+    // One transaction: a changed or cleared email takes the member's linked accounts with it.
+    async fn set_email(&self, id: Uuid, email: Option<&str>) -> DomainResult<User> {
+        let mut tx = self.pool.begin().await.map_err(db)?;
+        let old: Option<Option<String>> =
+            sqlx::query_scalar("select email::text from users where id = $1 for update")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(db)?;
+        let old = old.ok_or_else(no_such_user)?;
+        let sql = format!("update users set email = $2 where id = $1 returning {USER_COLUMNS}");
+        let row = sqlx::query_as::<_, UserRow>(sqlx::AssertSqlSafe(sql))
+            .bind(id)
+            .bind(email)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| match violation(&e) {
+                Some(ErrorKind::UniqueViolation) => email_taken(),
+                _ => db(e),
+            })?;
+        if old.is_some_and(|old| email.is_none_or(|new| !old.eq_ignore_ascii_case(new))) {
+            sqlx::query("delete from user_identities where user_id = $1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await
+                .map_err(db)?;
+        }
+        tx.commit().await.map_err(db)?;
+        Ok(row.into())
     }
 
     // The caller trims the username, as the route did.

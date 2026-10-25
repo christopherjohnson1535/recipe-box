@@ -42,7 +42,7 @@ impl UserService {
         password: String,
     ) -> DomainResult<(User, NewSession)> {
         let new = self
-            .new_user(username, display_name, password, ROLE_ADMIN)
+            .new_user(username, display_name, password, ROLE_ADMIN, None)
             .await?;
         let user = self.users.create_first_admin(new).await?;
         let session = self.auth.start_session(user.id).await?;
@@ -53,27 +53,38 @@ impl UserService {
         self.users.list().await
     }
 
-    /// `role` is `admin` or `member`. The caller's admin check is the HTTP layer's (an extractor).
+    /// `role` is `admin` or `member`; `email` (optional) is the Google address that may sign in as this member. The
+    /// caller's admin check is the HTTP layer's (an extractor).
     pub async fn create(
         &self,
         username: &str,
         display_name: &str,
         password: String,
         role: &str,
+        email: Option<&str>,
     ) -> DomainResult<User> {
         let new = self
-            .new_user(username, display_name, password, role)
+            .new_user(username, display_name, password, role, email)
             .await?;
         self.users.create(new).await
     }
 
-    /// Validates in the order username, display name, password, role; then hashes.
+    /// Sets or (blank or `None`) clears a member's email (admin only, checked by the caller). `Validation` for a
+    /// malformed address, `Conflict` when another member has it, `NotFound` for an unknown member.
+    pub async fn set_email(&self, id: Uuid, email: Option<&str>) -> DomainResult<User> {
+        self.users
+            .set_email(id, validate::email(email)?.as_deref())
+            .await
+    }
+
+    /// Validates in the order username, display name, password, role, email; then hashes.
     async fn new_user(
         &self,
         username: &str,
         display_name: &str,
         password: String,
         role: &str,
+        email: Option<&str>,
     ) -> DomainResult<NewUser> {
         let username = validate::username(username)?;
         let display_name = validate::display_name(display_name)?;
@@ -81,11 +92,13 @@ impl UserService {
         if !matches!(role, "admin" | "member") {
             return Err(DomainError::validation("role: `admin` or `member`."));
         }
+        let email = validate::email(email)?;
         Ok(NewUser {
             username,
             display_name,
             password_hash: self.hasher.hash(password).await?,
             role: role.into(),
+            email,
         })
     }
 

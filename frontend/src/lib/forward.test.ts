@@ -116,6 +116,29 @@ describe("forwardToApi", () => {
     expect(res.headers.getSetCookie()).toEqual(["rb_session=new; Path=/"]);
   });
 
+  it("hands a redirect back as is: status, Location and both Set-Cookie lines (Google sign-in callback)", async () => {
+    vi.stubEnv("API_INTERNAL_URL", "http://backend.internal:9000");
+    const clear = "rb_oauth=; Path=/api/auth/google; Max-Age=0; HttpOnly; SameSite=Lax";
+    const session = "rb_session=tok123; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax";
+    let seenCookie: string | null = null;
+    server.use(
+      http.get("http://backend.internal:9000/api/auth/google/callback", ({ request }) => {
+        seenCookie = request.headers.get("cookie");
+        const headers = new Headers({ location: "/recipes/abc?x=1" });
+        headers.append("set-cookie", clear);
+        headers.append("set-cookie", session);
+        return new HttpResponse(null, { status: 302, headers });
+      }),
+    );
+
+    const res = await forwardToApi(new Request("http://localhost:3000/api/auth/google/callback?code=c&state=s", { headers: { cookie: "rb_oauth=sealed" } }));
+
+    expect(res.status).toBe(302); // not followed: the browser takes the redirect
+    expect(res.headers.get("location")).toBe("/recipes/abc?x=1");
+    expect(res.headers.getSetCookie()).toEqual([clear, session]);
+    expect(seenCookie).toBe("rb_oauth=sealed");
+  });
+
   it("answers 502 api_unreachable when the API is down", async () => {
     vi.stubEnv("API_INTERNAL_URL", "http://backend.internal:9000");
     server.use(http.get("http://backend.internal:9000/api/setup", () => HttpResponse.error()));

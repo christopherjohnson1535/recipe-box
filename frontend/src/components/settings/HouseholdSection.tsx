@@ -10,15 +10,16 @@ import { MemberItem, MemberList } from "@/components/ui/MemberList";
 import { Panel } from "@/components/ui/Panel";
 import { api as browserApi, ApiError, type Api, type User } from "@/lib/api";
 import { AddMemberForm } from "./AddMemberForm";
+import { EmailForm } from "./EmailForm";
 import { PasswordForm } from "./PasswordForm";
 
 type Props = {
   currentUserId: string;
   initialUsers: User[];
-  api?: Pick<Api, "createUser" | "deleteUser" | "setPassword" | "me">;
+  api?: Pick<Api, "createUser" | "deleteUser" | "setPassword" | "me" | "updateUserEmail">;
 };
 
-type Open = { id: string; kind: "reset" | "remove" } | null;
+type Open = { id: string; kind: "reset" | "remove" | "email" } | null;
 
 /** Admin only: the household list, add, reset password and remove. */
 export function HouseholdSection({ currentUserId, initialUsers, api = browserApi }: Props) {
@@ -29,6 +30,7 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
   const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
   const resetButtons = useRef(new Map<string, HTMLButtonElement>());
+  const emailButtons = useRef(new Map<string, HTMLButtonElement>());
 
   const adminCount = users.filter((u) => u.role === "admin").length;
 
@@ -60,6 +62,20 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
     requestAnimationFrame(() => resetButtons.current.get(user.id)?.focus());
   }
 
+  function closeEmail(user: User, saved: User | null) {
+    setOpen(null);
+    setNotice(null);
+    if (saved) {
+      setUsers((list) => list.map((u) => (u.id === saved.id ? saved : u)));
+      const dropped = user.email !== null && user.email !== saved.email ? " Their connected Google accounts were disconnected." : ""; // API: replacing or clearing deletes the links
+      setNotice({
+        tone: "info",
+        text: (saved.email ? `${saved.displayName} can now sign in with Google as ${saved.email}.` : `${saved.displayName}’s Google email was removed.`) + dropped,
+      });
+    }
+    requestAnimationFrame(() => emailButtons.current.get(user.id)?.focus());
+  }
+
   return (
     <section aria-labelledby="household-heading" className="flex flex-col gap-6">
       <Heading level={2} id="household-heading" ruled ref={heading} tabIndex={-1}>
@@ -77,9 +93,24 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
               key={u.id}
               name={u.displayName}
               marker={isYou ? "You" : undefined}
-              detail={`${u.username} · ${u.role === "admin" ? "Admin" : "Member"}`}
+              detail={`${u.username} · ${u.role === "admin" ? "Admin" : "Member"}${u.email ? ` · ${u.email}` : ""}`}
               actions={
                 <>
+                  <Button
+                    variant="secondary"
+                    ref={(el) => {
+                      if (el) emailButtons.current.set(u.id, el);
+                      else emailButtons.current.delete(u.id);
+                    }}
+                    aria-label={`${u.email ? "Change" : "Add"} Google email for ${u.displayName}`}
+                    aria-expanded={mine === "email"}
+                    onClick={() => {
+                      setNotice(null);
+                      setOpen(mine === "email" ? null : { id: u.id, kind: "email" });
+                    }}
+                  >
+                    {u.email ? "Change Google email" : "Add Google email"}
+                  </Button>
                   {!isYou && (
                     <Button
                       variant="secondary"
@@ -114,7 +145,11 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
               note={blocked}
               noteId={`remove-note-${u.id}`}
               panel={
-                mine === "reset" ? (
+                mine === "email" ? (
+                  <Panel label={`Google email for ${u.displayName}`}>
+                    <EmailForm user={u} api={api} onDone={(saved) => closeEmail(u, saved)} onCancel={() => closeEmail(u, null)} />
+                  </Panel>
+                ) : mine === "reset" ? (
                   <Panel label={`Reset password for ${u.displayName}`}>
                     <PasswordForm
                       userId={u.id}

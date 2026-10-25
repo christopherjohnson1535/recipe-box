@@ -45,6 +45,8 @@ pub enum Scope {
     SignIn,
     /// `PUT /api/users/:id/password` with a `currentPassword`, keyed by the user id.
     PasswordChange,
+    /// `GET /api/auth/google/callback`, keyed by the client address: each callback costs a call to Google.
+    GoogleCallback,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

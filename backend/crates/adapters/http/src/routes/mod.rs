@@ -18,6 +18,7 @@ pub mod openapi;
 pub mod recipes;
 pub mod settings;
 pub mod setup;
+pub mod signin;
 pub mod tags;
 pub mod users;
 
@@ -51,6 +52,11 @@ where
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/logout", post(auth::logout))
         .route("/api/auth/me", get(auth::me))
+        .route("/api/auth/providers", get(signin::providers))
+        .route("/api/auth/google/start", get(signin::start))
+        .route("/api/auth/google/callback", get(signin::callback))
+        .route("/api/auth/identities", get(signin::identities))
+        .route("/api/auth/identities/{id}", delete(signin::unlink))
         .route("/api/recipes", get(recipes::list).post(recipes::create))
         .route(
             "/api/recipes/{id}",
@@ -95,7 +101,10 @@ where
         .route("/api/import/url", post(imports::from_url))
         .route("/api/import/text", post(imports::from_text))
         .route("/api/users", get(users::list).post(users::create))
-        .route("/api/users/{id}", delete(users::remove))
+        .route(
+            "/api/users/{id}",
+            delete(users::remove).patch(users::update),
+        )
         .route("/api/users/{id}/password", put(users::set_password))
         .layer(DefaultBodyLimit::max(JSON_BODY_LIMIT))
         .merge(uploads)

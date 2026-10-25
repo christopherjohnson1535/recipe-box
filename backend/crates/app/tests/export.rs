@@ -89,6 +89,9 @@ impl World {
             tags: store.clone(),
             grocery: store.clone(),
             google_connections: store.clone(),
+            identities: store.clone(),
+            google_signin: Arc::new(app::DisabledGoogleSignIn),
+            flows: Arc::new(app::DisabledGoogleSignIn),
             health: store.clone(),
             media: media.clone(),
             backup: format(backup.clone()),
@@ -120,7 +123,7 @@ impl World {
         let u = self
             .services
             .users
-            .create("cook", "Cook", "correct horse".into(), "admin")
+            .create("cook", "Cook", "correct horse".into(), "admin", None)
             .await
             .unwrap();
         self.user = u.id;

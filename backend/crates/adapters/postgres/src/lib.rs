@@ -8,12 +8,14 @@ mod accounts;
 mod error;
 mod google;
 mod grocery;
+mod identities;
 mod images;
 mod recipes;
 
 pub use accounts::{PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo};
 pub use google::PgGoogleConnectionRepo;
 pub use grocery::PgGroceryRepo;
+pub use identities::PgIdentityRepo;
 pub use images::PgImageRepo;
 pub use recipes::PgRecipeRepo;
 pub use sqlx::PgPool;

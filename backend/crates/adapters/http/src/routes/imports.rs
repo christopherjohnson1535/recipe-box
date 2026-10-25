@@ -307,6 +307,9 @@ mod tests {
             tags: store.clone(),
             grocery: store.clone(),
             google_connections: store.clone(),
+            identities: store.clone(),
+            google_signin: Arc::new(app::DisabledGoogleSignIn),
+            flows: Arc::new(app::DisabledGoogleSignIn),
             health: store.clone(),
             media: Arc::new(MemoryMedia::default()),
             backup: Arc::new(adapter_memory::MemoryBackup::default()),
@@ -341,6 +344,7 @@ mod tests {
             id: Uuid::new_v4(),
             username: "cook".into(),
             display_name: "Cook".into(),
+            email: None,
             role: "member".into(),
             created_at: Utc::now(),
         }

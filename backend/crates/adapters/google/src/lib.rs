@@ -8,6 +8,8 @@
 //! POST that Google did process would add the task twice). A send that still fails leaves the list partly filled and
 //! the next send starts by emptying it. Google's own error text is logged, trimmed, without any request data.
 
+mod signin;
+
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -25,6 +27,18 @@ const SCOPE: &str = "https://www.googleapis.com/auth/tasks";
 /// Where Google sends the browser back, below `PUBLIC_URL`.
 pub const CALLBACK_PATH: &str = "/api/integrations/google/callback";
 const CALL_TIMEOUT: Duration = Duration::from_secs(10);
+
+pub use signin::{GoogleSignInClient, SIGN_IN_CALLBACK_PATH, SignInUrls};
+
+/// The HTTP client both Google clients use: every call has a timeout, redirects are never followed.
+fn http_client() -> reqwest::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .connect_timeout(CALL_TIMEOUT)
+        .timeout(CALL_TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
+        .user_agent(concat!("RecipeBox/", env!("CARGO_PKG_VERSION")))
+        .build()
+}
 /// Tries per call, the first included.
 const ATTEMPTS: u32 = 3;
 /// Longest `Retry-After` that is waited out.
@@ -86,14 +100,8 @@ impl GoogleTasksClient {
         public_url: &str,
         urls: GoogleUrls,
     ) -> anyhow::Result<Self> {
-        let http = reqwest::Client::builder()
-            .connect_timeout(CALL_TIMEOUT)
-            .timeout(CALL_TIMEOUT)
-            .redirect(reqwest::redirect::Policy::none())
-            .user_agent(concat!("RecipeBox/", env!("CARGO_PKG_VERSION")))
-            .build()?;
         Ok(Self {
-            http,
+            http: http_client()?,
             client_id,
             client_secret,
             redirect_uri: format!("{}{CALLBACK_PATH}", public_url.trim_end_matches('/')),

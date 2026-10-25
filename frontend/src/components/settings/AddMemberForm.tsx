@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/Input";
 import { api as browserApi, ApiError, type Api, type Role, type User } from "@/lib/api";
 import { MIN_PASSWORD } from "./PasswordForm";
 
-type Errors = { displayName?: string; username?: string; password?: string; form?: string };
-const FIELDS = ["displayName", "username", "password"] as const;
+type Errors = { displayName?: string; username?: string; email?: string; password?: string; form?: string };
+const FIELDS = ["displayName", "username", "email", "password"] as const;
 const USERNAME = /^[a-z0-9_.-]{3,40}$/;
 
 type Props = { onAdded: (user: User) => void; api?: Pick<Api, "createUser"> };
@@ -35,6 +35,7 @@ export function AddMemberForm({ onAdded, api = browserApi }: Props) {
     const data = new FormData(form);
     const displayName = String(data.get("displayName")).trim();
     const username = String(data.get("username")).trim();
+    const email = String(data.get("email")).trim();
     const password = String(data.get("password"));
     const next: Errors = {};
     if (!displayName) next.displayName = "Enter a name.";
@@ -45,13 +46,14 @@ export function AddMemberForm({ onAdded, api = browserApi }: Props) {
     setPending(true);
     setErrors({});
     try {
-      const user = await api.createUser({ displayName, username, password, role });
+      const user = await api.createUser({ displayName, username, password, role, ...(email && { email }) });
       form.reset();
       setRole("member");
       onAdded(user);
       focus("displayName");
     } catch (e) {
-      if (e instanceof ApiError && e.code === "conflict") fail({ username: "That username is taken. Pick another." });
+      if (e instanceof ApiError && e.code === "conflict")
+        fail(email && /email/i.test(e.message) ? { email: "Another member already uses that email." } : { username: "That username is taken. Pick another." });
       else if (e instanceof ApiError && e.code === "validation") {
         const m = e.message.match(/^(\w+): (.+)$/);
         const field = m && (FIELDS as readonly string[]).includes(m[1]) ? (m[1] as (typeof FIELDS)[number]) : null;
@@ -85,6 +87,19 @@ export function AddMemberForm({ onAdded, api = browserApi }: Props) {
           maxLength={40}
           aria-invalid={errors.username ? true : undefined}
           aria-describedby={describe("username", true)}
+        />
+      </Field>
+      <Field label="Google email (optional)" htmlFor="email" hint="Lets them sign in with the Google account that has this address." error={errors.email}>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          inputMode="email"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-invalid={errors.email ? true : undefined}
+          aria-describedby={describe("email", true)}
         />
       </Field>
       <Field

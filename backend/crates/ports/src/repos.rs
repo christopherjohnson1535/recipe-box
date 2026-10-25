@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use domain::{
-    DomainResult, Image, Ingredient, NewUser, Page, Recipe, RecipeInput, RecipeSummary,
-    SearchQuery, Settings, TagCount, User,
+    DomainResult, Identity, Image, Ingredient, NewIdentity, NewUser, Page, Recipe, RecipeInput,
+    RecipeSummary, SearchQuery, Settings, TagCount, User,
     chrono::{DateTime, Utc},
     grocery::{Amount, GeneratedItem, Section},
     uuid::Uuid,
@@ -108,7 +108,8 @@ pub trait UserRepo: Send + Sync {
     /// Whether any user exists (the first-run check).
     async fn any(&self) -> DomainResult<bool>;
 
-    /// Creates a user. `Conflict` when the username is taken (names compare case-insensitively).
+    /// Creates a user. `Conflict` when the username is taken (names compare case-insensitively) or the email is
+    /// (emails compare case-insensitively too).
     async fn create(&self, new: NewUser) -> DomainResult<User>;
 
     /// Creates the first user, only while there are none: of two concurrent calls exactly one succeeds. `Forbidden`
@@ -117,6 +118,18 @@ pub trait UserRepo: Send + Sync {
 
     /// Everyone, ordered by lower-cased display name, then username.
     async fn list(&self) -> DomainResult<Vec<User>>;
+
+    /// The user with that id.
+    async fn find(&self, id: Uuid) -> DomainResult<Option<User>>;
+
+    /// The user whose email is `email` (case-insensitive).
+    async fn find_by_email(&self, email: &str) -> DomainResult<Option<User>>;
+
+    /// Sets or (with `None`) clears a user's email and returns the user. `NotFound` when there is no such user,
+    /// `Conflict` when another user has that email. Replacing or clearing an email that was set also deletes all of
+    /// the user's linked sign-in accounts, in the same step: they were matched through the old address and must not
+    /// outlive it. Setting the first email, or the same one again, keeps the links.
+    async fn set_email(&self, id: Uuid, email: Option<&str>) -> DomainResult<User>;
 
     /// The user with that username (case-insensitive) and their password hash, for sign-in.
     async fn find_with_hash(&self, username: &str) -> DomainResult<Option<(User, String)>>;
@@ -141,6 +154,24 @@ pub trait UserRepo: Send + Sync {
     /// `NotFound` when there is no such user, `Forbidden` when it is the last admin (two concurrent removals
     /// cannot both pass this check).
     async fn remove(&self, id: Uuid) -> DomainResult<()>;
+}
+
+/// Links from members to accounts at an identity provider (ACC-6). A link goes when its member does.
+#[async_trait]
+pub trait IdentityRepo: Send + Sync {
+    /// The link for the provider's account `subject`, whoever owns it.
+    async fn find(&self, provider: &str, subject: &str) -> DomainResult<Option<Identity>>;
+
+    /// The member's links, oldest first.
+    async fn list(&self, user_id: Uuid) -> DomainResult<Vec<Identity>>;
+
+    /// Links the account to the member, stamped with the clock. `Conflict` when that account is already linked
+    /// (to anyone: two calls at once for the same account give exactly one success), `NotFound` when there is no
+    /// such user.
+    async fn create(&self, new: NewIdentity) -> DomainResult<Identity>;
+
+    /// Removes the member's own link `id`. `NotFound` when there is none, also when it belongs to someone else.
+    async fn delete(&self, user_id: Uuid, id: Uuid) -> DomainResult<()>;
 }
 
 /// Sign-in sessions. Only the SHA-256 of the cookie token is stored (`token_hash`).

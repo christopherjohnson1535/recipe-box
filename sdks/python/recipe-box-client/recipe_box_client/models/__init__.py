@@ -3,6 +3,7 @@
 from .add_grocery_item import AddGroceryItem
 from .add_grocery_recipe import AddGroceryRecipe
 from .ai_provider import AiProvider
+from .auth_providers import AuthProviders
 from .capabilities import Capabilities
 from .create_user_body import CreateUserBody
 from .create_user_body_role import CreateUserBodyRole
@@ -17,6 +18,8 @@ from .grocery_list import GroceryList
 from .grocery_recipe import GroceryRecipe
 from .grocery_section import GrocerySection
 from .health import Health
+from .identity import Identity
+from .identity_provider import IdentityProvider
 from .image import Image
 from .import_export_form import ImportExportForm
 from .import_summary import ImportSummary
@@ -39,6 +42,7 @@ from .setup_status import SetupStatus
 from .source_type import SourceType
 from .tag_count import TagCount
 from .update_grocery_item import UpdateGroceryItem
+from .update_user_body import UpdateUserBody
 from .upload_form import UploadForm
 from .user import User
 from .user_ref import UserRef
@@ -48,6 +52,7 @@ __all__ = (
     "AddGroceryItem",
     "AddGroceryRecipe",
     "AiProvider",
+    "AuthProviders",
     "Capabilities",
     "CreateUserBody",
     "CreateUserBodyRole",
@@ -62,6 +67,8 @@ __all__ = (
     "GroceryRecipe",
     "GrocerySection",
     "Health",
+    "Identity",
+    "IdentityProvider",
     "Image",
     "ImportExportForm",
     "ImportSummary",
@@ -84,6 +91,7 @@ __all__ = (
     "SourceType",
     "TagCount",
     "UpdateGroceryItem",
+    "UpdateUserBody",
     "UploadForm",
     "User",
     "UserRef",

@@ -24,9 +24,23 @@ impl std::fmt::Display for Secret {
     }
 }
 
+/// Equal strings, compared in time that depends on their length only (state values, tokens).
+pub fn constant_time_eq(a: &str, b: &str) -> bool {
+    a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0, |d, (x, y)| d | (x ^ y)) == 0
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Secret;
+    use super::{Secret, constant_time_eq};
+
+    #[test]
+    fn constant_time_eq_compares_whole_strings() {
+        assert!(constant_time_eq("abc", "abc"));
+        assert!(!constant_time_eq("abc", "abd"));
+        assert!(!constant_time_eq("abc", "ab"));
+        assert!(!constant_time_eq("", "a"));
+        assert!(constant_time_eq("", ""));
+    }
 
     #[test]
     fn secret_never_prints() {

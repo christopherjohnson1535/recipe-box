@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { ServerError } from "@/components/ServerError";
-import { ApiError, type Capabilities, type GoogleStatus, type Settings, type User } from "@/lib/api";
+import { ApiError, type AuthProviders, type Capabilities, type GoogleStatus, type Identity, type Settings, type User } from "@/lib/api";
 import { redirectToLogin } from "@/lib/login-redirect";
 import { serverApi } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ google?: string }> }) {
-  const { google: googleResult } = await searchParams;
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ google?: string; signin?: string }> }) {
+  const { google: googleResult, signin: signinResult } = await searchParams;
   const api = await serverApi();
   let me: User;
   let users: User[] = [];
@@ -22,10 +22,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // The status line is a nicety: if it can't load, the rest of the page still works.
   const capabilities: Capabilities | null = await api.importCapabilities().catch(() => null);
 
-  const [settings, google]: [Settings | null, GoogleStatus | null] = await Promise.all([
+  const [settings, google, identities, providers]: [Settings | null, GoogleStatus | null, Identity[] | null, AuthProviders | null] = await Promise.all([
     me.role === "admin" ? api.getSettings().catch(() => null) : null,
     api.googleStatus().catch(() => null),
+    api.listIdentities().catch(() => null),
+    api.authProviders().catch(() => null),
   ]);
 
-  return <SettingsView me={me} users={users} capabilities={capabilities} settings={settings} google={google} googleResult={googleResult} />;
+  return (
+    <SettingsView
+      me={me}
+      users={users}
+      capabilities={capabilities}
+      settings={settings}
+      google={google}
+      googleResult={googleResult}
+      identities={identities}
+      providers={providers}
+      signinResult={signinResult}
+    />
+  );
 }

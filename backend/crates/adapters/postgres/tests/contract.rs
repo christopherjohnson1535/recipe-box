@@ -8,8 +8,8 @@ use std::{
 };
 
 use adapter_postgres::{
-    PgGoogleConnectionRepo, PgGroceryRepo, PgImageRepo, PgRecipeRepo, PgSessionRepo,
-    PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo, migrate,
+    PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo, PgImageRepo, PgRecipeRepo,
+    PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo, migrate,
 };
 use domain::{
     grocery::{GeneratedItem, Section},
@@ -95,6 +95,7 @@ impl Schemas {
             tags: Arc::new(PgTagRepo::new(pool.clone())),
             grocery: Arc::new(PgGroceryRepo::new(pool.clone(), clock.clone())),
             google: Arc::new(PgGoogleConnectionRepo::new(pool.clone())),
+            identities: Arc::new(PgIdentityRepo::new(pool.clone(), clock.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
         }
     }
@@ -163,6 +164,12 @@ async fn google_connections_meet_the_contract() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn identities_meet_the_contract() {
+    let Some(db) = Schemas::new() else { return };
+    contract::identity_repo(|c| db.stack(c)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn storage_answers_its_ping() {
     let Some(db) = Schemas::new() else { return };
     let s = db.stack(Arc::new(contract::ManualClock::default()));
@@ -202,6 +209,7 @@ async fn overlapping_recomputes_cannot_overwrite_each_other() {
             display_name: "Tester".into(),
             password_hash: "hash".into(),
             role: ROLE_ADMIN.into(),
+            email: None,
         })
         .await
         .unwrap()

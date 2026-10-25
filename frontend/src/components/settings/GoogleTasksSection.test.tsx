@@ -119,7 +119,7 @@ describe("SettingsView", () => {
   it("has a Google Tasks section for a plain member", () => {
     render(
       <SettingsView
-        me={{ id: "u2", displayName: "Sam", username: "sam", role: "member", createdAt: "2026-10-21T10:00:00Z" }}
+        me={{ id: "u2", displayName: "Sam", username: "sam", role: "member", email: null, createdAt: "2026-10-21T10:00:00Z" }}
         users={[]}
         capabilities={null}
         google={off}

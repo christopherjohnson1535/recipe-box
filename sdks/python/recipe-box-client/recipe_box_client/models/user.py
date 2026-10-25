@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -19,6 +19,7 @@ class User:
     Attributes:
         created_at (datetime.datetime):
         display_name (str):
+        email (None | str): The Google address that may sign in as this member; null when none is set.
         id (UUID):
         role (UserRole):
         username (str):
@@ -26,6 +27,7 @@ class User:
 
     created_at: datetime.datetime
     display_name: str
+    email: None | str
     id: UUID
     role: UserRole
     username: str
@@ -35,6 +37,9 @@ class User:
         created_at = self.created_at.isoformat()
 
         display_name = self.display_name
+
+        email: None | str
+        email = self.email
 
         id = str(self.id)
 
@@ -48,6 +53,7 @@ class User:
             {
                 "createdAt": created_at,
                 "displayName": display_name,
+                "email": email,
                 "id": id,
                 "role": role,
                 "username": username,
@@ -63,6 +69,13 @@ class User:
 
         display_name = d.pop("displayName")
 
+        def _parse_email(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        email = _parse_email(d.pop("email"))
+
         id = UUID(d.pop("id"))
 
         role = UserRole(d.pop("role"))
@@ -72,6 +85,7 @@ class User:
         user = cls(
             created_at=created_at,
             display_name=display_name,
+            email=email,
             id=id,
             role=role,
             username=username,

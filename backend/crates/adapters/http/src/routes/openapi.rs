@@ -13,8 +13,8 @@ use utoipa::{
 };
 
 use super::{
-    auth, export, grocery, health, imports, integrations, media, recipes, settings, setup, tags,
-    users,
+    auth, export, grocery, health, imports, integrations, media, recipes, settings, setup, signin,
+    tags, users,
 };
 use crate::extract::COOKIE_NAME;
 
@@ -27,7 +27,7 @@ use crate::extract::COOKIE_NAME;
     ),
     servers((url = "/", description = "Same origin: the web container proxies /api and /media to the API.")),
     tags(
-        (name = "auth", description = "Sign in, sign out and the current user."),
+        (name = "auth", description = "Sign in (password or Google), sign out, the current user and linked Google accounts."),
         (name = "export", description = "Download or restore the whole recipe box as a ZIP."),
         (name = "grocery", description = "The household grocery list: recipes, items, sections and staples."),
         (name = "health", description = "Liveness and database check."),
@@ -47,6 +47,11 @@ use crate::extract::COOKIE_NAME;
         auth::login,
         auth::logout,
         auth::me,
+        signin::providers,
+        signin::start,
+        signin::callback,
+        signin::identities,
+        signin::unlink,
         recipes::list,
         recipes::create,
         recipes::get,
@@ -73,6 +78,7 @@ use crate::extract::COOKIE_NAME;
         media::serve,
         users::list,
         users::create,
+        users::update,
         users::remove,
         users::set_password,
         export::export_zip,

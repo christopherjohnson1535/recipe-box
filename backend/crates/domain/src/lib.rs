@@ -17,7 +17,7 @@ use chrono::Duration;
 
 pub use error::{DomainError, DomainResult};
 pub use model::*;
-pub use secret::Secret;
+pub use secret::{Secret, constant_time_eq};
 
 /// Soft-deleted recipes are hard-deleted once they are older than this.
 pub const PURGE_AFTER: Duration = Duration::days(1);
@@ -27,6 +27,9 @@ pub const RESTORE_WINDOW_MINUTES: i32 = 10;
 
 /// The `role` value that may manage users.
 pub const ROLE_ADMIN: &str = "admin";
+
+/// The `provider` of a Google identity (ACC-6).
+pub const PROVIDER_GOOGLE: &str = "google";
 
 /// Longest pasted or scraped text an AI import reads; the import service warns when the text is longer.
 pub const MAX_TEXT_INPUT_CHARS: usize = 50_000;

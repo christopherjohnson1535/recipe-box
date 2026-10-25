@@ -4,7 +4,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::ROLE_ADMIN;
+use crate::{ROLE_ADMIN, Secret};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ingredient {
@@ -48,6 +48,8 @@ pub struct User {
     pub id: Uuid,
     pub username: String,
     pub display_name: String,
+    /// Set by an admin; the Google account with this verified address may sign in as this member (ACC-6).
+    pub email: Option<String>,
     pub role: String,
     pub created_at: DateTime<Utc>,
 }
@@ -194,6 +196,43 @@ pub struct NewUser {
     /// A PHC string from the password hasher.
     pub password_hash: String,
     pub role: String,
+    /// Already checked by [`crate::validate::email`].
+    pub email: Option<String>,
+}
+
+/// A member's link to an identity provider's account (ACC-6): `subject` is the provider's stable id for the account,
+/// `email` the address it had when it was linked (shown to the member; never used to sign in).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Identity {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub provider: String,
+    pub subject: String,
+    pub email: String,
+    pub created_at: DateTime<Utc>,
+}
+
+pub struct NewIdentity {
+    pub user_id: Uuid,
+    pub provider: String,
+    pub subject: String,
+    pub email: String,
+}
+
+/// A Google sign-in in progress: what the server must remember between sending the browser to Google and getting it
+/// back. It travels sealed in the `rb_oauth` cookie.
+#[derive(Debug, Clone)]
+pub struct SignInFlow {
+    /// Sent to Google and compared with what comes back.
+    pub state: Secret,
+    pub nonce: Secret,
+    /// The PKCE verifier.
+    pub code_verifier: Secret,
+    /// Where to go after signing in: a same-origin path ([`crate::validate::next_path`]).
+    pub next: String,
+    /// `Some(user)` when that signed-in member is linking a Google account instead of signing in.
+    pub link_user: Option<Uuid>,
+    pub issued_at: DateTime<Utc>,
 }
 
 /// A tag and the number of live recipes that use it.
@@ -271,6 +310,7 @@ mod tests {
             id: Uuid::nil(),
             username: "u".into(),
             display_name: "U".into(),
+            email: None,
             role: role.into(),
             created_at: DateTime::<Utc>::UNIX_EPOCH,
         }

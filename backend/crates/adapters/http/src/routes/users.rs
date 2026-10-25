@@ -2,7 +2,7 @@
 
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -26,13 +26,16 @@ pub async fn list(State(state): State<HttpState>, _admin: AdminUser) -> AppResul
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-#[schema(example = json!({"username": "alex", "displayName": "Alex", "password": "correct horse battery", "role": "member"}))]
+#[schema(example = json!({"username": "alex", "displayName": "Alex", "password": "correct horse battery", "role": "member", "email": "alex@example.com"}))]
 pub struct CreateUserBody {
     username: String,
     display_name: String,
     password: String,
     #[schema(schema_with = role_schema)]
     role: String,
+    /// The Google address that may sign in as this member (optional; trimmed and lower-cased, blank means none).
+    #[serde(default)]
+    email: Option<String>,
 }
 
 /// Adds a household member. Admin only.
@@ -40,7 +43,7 @@ pub struct CreateUserBody {
     (status = 201, description = "User created.", body = User),
     (status = 400, description = "Invalid field (`validation`).", body = ErrorBody),
     (status = 403, description = "Not an admin (`forbidden`).", body = ErrorBody),
-    (status = 409, description = "Username taken (`conflict`).", body = ErrorBody),
+    (status = 409, description = "Username or email taken (`conflict`).", body = ErrorBody),
 ))]
 pub async fn create(
     State(state): State<HttpState>,
@@ -55,9 +58,52 @@ pub async fn create(
             &body.display_name,
             body.password,
             &body.role,
+            body.email.as_deref(),
         )
         .await?;
     Ok((StatusCode::CREATED, Json(user.into())))
+}
+
+/// `email` must be present, as a string or `null` (a missing key is an error, not a clear).
+fn email_field<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    Option::<String>::deserialize(d)
+}
+
+#[derive(Deserialize, ToSchema)]
+#[schema(example = json!({"email": "alex@example.com"}))]
+pub struct UpdateUserBody {
+    /// The Google address that may sign in as this member; `null` or blank clears it.
+    #[serde(deserialize_with = "email_field")]
+    #[schema(required = true)]
+    email: Option<String>,
+}
+
+/// Sets or clears a member's email, the address a Google account must have verified to sign in as them. Admin only.
+/// Replacing or clearing an email that was set also deletes all of the member's linked Google accounts (they were
+/// matched through the old address); setting a first email, or the same one again, keeps them.
+#[utoipa::path(patch, path = "/api/users/{id}", operation_id = "updateUser", tag = "users", security(("session" = [])),
+    params(("id" = Uuid, Path, description = "User id")), request_body = UpdateUserBody, responses(
+    (status = 200, description = "The member now.", body = User),
+    (status = 400, description = "Malformed email or id, or no `email` key (`validation`).", body = ErrorBody),
+    (status = 401, description = "No or expired session (`unauthenticated`).", body = ErrorBody),
+    (status = 403, description = "Not an admin (`forbidden`).", body = ErrorBody),
+    (status = 404, description = "No such user (`not_found`).", body = ErrorBody),
+    (status = 409, description = "Another member has that email (`conflict`).", body = ErrorBody),
+    (status = 413, description = "Body over the size limit (`too_large`).", body = ErrorBody),
+    (status = 500, description = "Something went wrong on the server (`internal`).", body = ErrorBody),
+))]
+pub async fn update(
+    State(state): State<HttpState>,
+    _admin: AdminUser,
+    AppPath(id): AppPath<Uuid>,
+    AppJson(body): AppJson<UpdateUserBody>,
+) -> AppResult<Json<User>> {
+    let user = state
+        .services
+        .users
+        .set_email(id, body.email.as_deref())
+        .await?;
+    Ok(Json(user.into()))
 }
 
 /// Removes a user. Not yourself, not the last admin.

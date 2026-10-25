@@ -22,7 +22,7 @@ Every non-2xx response:
 | 401 | `unauthenticated` | no/expired session |
 | 403 | `forbidden` | not admin; setup already done |
 | 404 | `not_found` | |
-| 409 | `conflict` | username taken; restore window passed; a backup import is already running; a send to Google Tasks is already running for this member |
+| 409 | `conflict` | username or email taken; restore window passed; a backup import is already running; a send to Google Tasks is already running for this member |
 | 405 | `method_not_allowed` | known path, wrong method |
 | 429 | `rate_limited` | too many wrong passwords on `POST /api/auth/login` or on `PUT /api/users/:id/password` with a `currentPassword`; see "Password throttling". Has a `Retry-After` header (seconds) and a message that says how long to wait |
 | 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`), a backup over `MAX_BACKUP_MB` (`/api/import/export`), or any other request body over 1 MB |
@@ -205,7 +205,7 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   - `GET /api/integrations/google` → `200 {configured, connected, connectedAt}` (`connectedAt` null when not connected).
   - `GET /api/integrations/google/connect` (a browser navigation) → `302` to Google's consent page
     (scope `https://www.googleapis.com/auth/tasks`, offline access) with a random `state`, also set in the cookie
-    `rb_google_state` (httpOnly, SameSite=Lax, Secure like `rb_session`, Path `/api/integrations/google`, 10 minutes).
+    `rb_google_state` (httpOnly, SameSite=Lax, always Secure, Path `/api/integrations/google`, 10 minutes).
     `422 google_disabled` when not configured. Without a session it answers `302 /login?next=/settings` (and sets no
     cookie) instead of 401, because it is a page navigation.
   - `GET /api/integrations/google/callback?code=…&state=…` (Google redirects here) → checks `state`
@@ -257,7 +257,59 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
 - **Users (admin)**: changing **your own** password requires `currentPassword` (401 `unauthenticated` if wrong, same
   message as a bad login); an admin resetting **someone else's** doesn't. Password at least 10 characters. Ends that
   user's other sessions (the caller's current session stays when it is their own password). `DELETE` ends the deleted
-  user's sessions and refuses yourself and the last admin.
+  user's sessions and refuses yourself and the last admin. Every user has `email` (string or `null`): the address a
+  Google account must have verified to sign in as them (ACC-6). `POST /api/users` takes an optional `email`;
+  `PATCH /api/users/{id}` `{"email": string | null}` (the key must be present) sets or clears it and answers `200 User`.
+  Emails are trimmed and lower-cased, blank means none; a malformed one is `400 validation` (`email: ...`), one another
+  member has is `409 conflict`, an unknown id `404`, a member calling it `403`. **Replacing or clearing an email that was
+  set deletes all of that member's linked Google accounts**, in the same transaction as the change: they were matched
+  through the old address and must not outlive it. The member signs in with Google again once an account matches the new
+  email (or links one from Settings). Setting a first email, or the same one again, leaves the links alone.
+- **Sign in with Google (ACC-6).** Optional: on exactly when the Google settings above are set (`GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY`); one OAuth client serves this and the Tasks export, so
+  add `${PUBLIC_URL}/api/auth/google/callback` as a second authorised redirect URI. Google only proves who someone is:
+  it never creates a member (no public sign-up), and the password keeps working. OpenID Connect authorization-code
+  flow with PKCE, run entirely by the API; the browser never sees the client secret, a code or a token.
+  - `GET /api/auth/providers` (public) → `200 {"google": bool}`.
+  - `GET /api/auth/google/start?next=/path` (public; a browser navigation, not `fetch`) → `302` to Google (scopes
+    `openid email profile`, PKCE S256, `state`, `nonce`, `prompt=select_account`, redirect address from `PUBLIC_URL`)
+    and sets `rb_oauth` (httpOnly, SameSite=Lax, always Secure, Path `/api/auth/google`, 10 minutes): the
+    flow record (`state`, `nonce`, PKCE verifier, `next`, who is linking, issue time) sealed with
+    `TOKEN_ENCRYPTION_KEY` (ChaCha20-Poly1305, its own context, so it cannot be opened as a stored refresh token).
+    `next` must be a path on this site: anything else (another address, `//host`, `\`, a scheme, spaces, control or
+    non-ASCII characters) becomes `/`. Google not set up: `404 not_found`.
+  - `GET /api/auth/google/start?link=1` (needs a session) is the same for linking a Google account to the signed-in
+    member from Settings; the account need not share the member's email. Without a session: `302 /login?next=/settings`
+    and no cookie. `next` is ignored; a link ends in Settings.
+  - `GET /api/auth/google/callback?code&state&error` (Google redirects here; public) always clears `rb_oauth`; Google
+    not set up: `404 not_found`. Checks, all before anything is stored: the cookie opens and is at most 10 minutes
+    old; `state` equals the sealed one (constant-time); no `error`; the code is exchanged (client secret and PKCE
+    verifier in the request body); the ID token has an RS256 signature from Google's published keys (JWKS, fetched
+    each time; the key is picked by `kid`, other algorithms are refused), `iss` is `https://accounts.google.com` or
+    `accounts.google.com`, `aud` is our client id, `exp` has not passed (30 s leeway), `nonce` equals the sealed one,
+    `sub` and `email` are present, and `email_verified` is true. Then, **sign-in mode:** an existing link for
+    `(google, sub)` signs that member in (even if either email has changed since); else the member whose `email`
+    equals the verified Google email is linked and signed in; else nobody (nothing is created). Success sets
+    `rb_session` exactly like password login (`SESSION_DAYS`) and answers `302` to `next`. A Google account that is no
+    member: `302 /login?error=google_not_member`. Any other failure (no, wrong or old cookie or `state`, a refusal or
+    `error=access_denied`, a bad or unverified ID token, Google unreachable): `302 /login?error=google_failed`, no
+    session. A malformed query (a repeated `code`, say) is treated as an empty one: the same `google_failed` redirect,
+    cookie cleared, never JSON. **Rate limit:** every callback is counted per client address (the same address
+    detection and lock-out as password sign-in: five unsuccessful callbacks lock the address for 30 s, doubling to 15
+    minutes; a callback that ends in a sign-in, a link or `google_not_member` is not counted against it). While locked
+    the callback answers `302 /login?error=google_failed` (also for a link started in Settings) without calling
+    Google, still clearing `rb_oauth`; there is no `429` because this is a page navigation. A request whose address
+    cannot be told (a proxy that hides it) is not counted. **Link mode** (the request must carry the session of the member who started it): `302
+    /settings?signin=linked` (also when it was already linked to them), `/settings?signin=taken` (that Google account is
+    linked to another member), or `/settings?signin=error` (anything else, including a different or missing session);
+    no session is started.
+  - `GET /api/auth/identities` → `200 [{"id", "provider": "google", "email", "createdAt"}]`, the caller's linked
+    accounts, oldest first (`email` is the Google address when it was linked; the Google subject is never returned).
+    Works whether or not Google is set up.
+  - `DELETE /api/auth/identities/{id}` → `204`; an unknown id or one that belongs to someone else is `404`. The member
+    can sign in with Google again later if their email still matches.
+  - Links also end when an admin replaces or clears the member's email (`PATCH /api/users/{id}`, above). Removing a
+    member removes their links. Codes, tokens and the client secret are never logged or put in an address.
 - **Export and import (admin, ACC-5).** `GET /api/export` streams every live recipe and its photos as a zip
   (`application/zip`, `Content-Disposition: attachment; filename="recipe-box-export-YYYY-MM-DD.zip"`, `Cache-Control:
   no-store`). It is built chunk by chunk, so memory use does not grow with the number of photos; a failure part-way cuts

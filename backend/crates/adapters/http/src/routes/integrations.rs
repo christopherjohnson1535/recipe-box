@@ -9,10 +9,11 @@ use axum::{
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use cookie::time;
+use domain::constant_time_eq;
 use serde::Deserialize;
 
 use crate::{
-    HttpConfig, HttpState,
+    HttpState,
     dto::GoogleStatus,
     error::{AppError, AppQuery, AppResult, ErrorBody},
     extract::CurrentUser,
@@ -22,24 +23,41 @@ const STATE_COOKIE: &str = "rb_google_state";
 const STATE_PATH: &str = "/api/integrations/google";
 const STATE_MINUTES: i64 = 10;
 
-fn state_cookie(config: &HttpConfig, state: String) -> Cookie<'static> {
-    Cookie::build((STATE_COOKIE, state))
-        .path(STATE_PATH)
+/// A short-lived cookie for an OAuth round trip (`name` at `path`): httpOnly, SameSite=Lax so it comes back with
+/// Google's redirect, always Secure (browsers keep Secure cookies on `http://localhost` too; Google only redirects
+/// to HTTPS or localhost), gone after `minutes`.
+pub(crate) fn flow_cookie(
+    name: &'static str,
+    path: &'static str,
+    value: String,
+    minutes: i64,
+) -> Cookie<'static> {
+    Cookie::build((name, value))
+        .path(path)
         .http_only(true)
         .same_site(SameSite::Lax)
-        .secure(config.cookie_secure)
-        .max_age(time::Duration::minutes(STATE_MINUTES))
+        .secure(true)
+        .max_age(time::Duration::minutes(minutes))
         .build()
 }
 
-fn clear_state_cookie() -> Cookie<'static> {
-    let mut gone = Cookie::build(STATE_COOKIE).path(STATE_PATH).build();
+/// The cookie that clears `name` at `path`.
+pub(crate) fn clear_flow_cookie(name: &'static str, path: &'static str) -> Cookie<'static> {
+    let mut gone = Cookie::build(name).path(path).secure(true).build();
     gone.make_removal();
     gone
 }
 
+fn state_cookie(state: String) -> Cookie<'static> {
+    flow_cookie(STATE_COOKIE, STATE_PATH, state, STATE_MINUTES)
+}
+
+fn clear_state_cookie() -> Cookie<'static> {
+    clear_flow_cookie(STATE_COOKIE, STATE_PATH)
+}
+
 /// A plain `302 Found`, which is what the contract says (axum's own redirects are 303 and 307).
-fn found(location: &str) -> Response {
+pub(crate) fn found(location: &str) -> Response {
     (
         StatusCode::FOUND,
         [(header::LOCATION, location.to_string())],
@@ -49,17 +67,12 @@ fn found(location: &str) -> Response {
 
 /// The signed-in member, or `None` for a missing or expired session; any other failure stays an error. The connect and
 /// callback routes are page navigations, so they answer a signed-out visitor with a redirect, not JSON.
-fn member(user: Result<CurrentUser, AppError>) -> AppResult<Option<CurrentUser>> {
+pub(crate) fn member(user: Result<CurrentUser, AppError>) -> AppResult<Option<CurrentUser>> {
     match user {
         Ok(user) => Ok(Some(user)),
         Err(AppError::Unauthenticated(_)) => Ok(None),
         Err(e) => Err(e),
     }
-}
-
-/// Equal strings, in time that depends on their length only.
-fn same(a: &str, b: &str) -> bool {
-    a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0, |d, (x, y)| d | (x ^ y)) == 0
 }
 
 /// Whether this member can send the list to Google Tasks.
@@ -88,10 +101,7 @@ pub async fn connect(
         return Ok((jar, found("/login?next=/settings")));
     }
     let (url, random) = state.services.google.consent()?;
-    Ok((
-        jar.add(state_cookie(&state.config, random)),
-        found(url.as_str()),
-    ))
+    Ok((jar.add(state_cookie(random)), found(url.as_str())))
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,7 +134,9 @@ pub async fn callback(
     let expected = jar.get(STATE_COOKIE).map(|c| c.value().to_string());
     let jar = jar.add(clear_state_cookie());
     let checked = match (&user, &q.error, &q.state, &expected, &q.code) {
-        (Some(_), None, Some(got), Some(want), Some(code)) if same(got, want) => Some(code),
+        (Some(_), None, Some(got), Some(want), Some(code)) if constant_time_eq(got, want) => {
+            Some(code)
+        }
         _ => None,
     };
     let connected = match (&user, checked) {
@@ -166,24 +178,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn same_compares_whole_strings() {
-        assert!(same("abc", "abc"));
-        assert!(!same("abc", "abd"));
-        assert!(!same("abc", "ab"));
-        assert!(!same("", "a"));
-        assert!(same("", ""));
-    }
-
-    #[test]
     fn the_state_cookie_has_the_agreed_attributes() {
-        let config = HttpConfig {
-            cookie_secure: true,
-            max_upload_bytes: 1,
-            max_backup_bytes: 1,
-            version: "test",
-        };
         assert_eq!(
-            state_cookie(&config, "s".into()).to_string(),
+            state_cookie("s".into()).to_string(),
             "rb_google_state=s; HttpOnly; SameSite=Lax; Secure; Path=/api/integrations/google; Max-Age=600"
         );
     }

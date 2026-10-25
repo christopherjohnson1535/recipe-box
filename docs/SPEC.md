@@ -74,8 +74,9 @@ depend on `app`, the server, another adapter, `axum` or `sqlx`.
 - UI: editorial magazine style (requirements → Visual style), defined in `docs/UI.md` and
   `.tastemaker/style-lock.md`; tastemaker rules apply. Pages compose `src/components/ui/*` only. Open-licensed,
   self-hosted fonts only; never imitate a specific publication's logo, masthead or proprietary typeface.
-- Every API route except `GET /api/health`, `GET /api/setup`, `POST /api/setup`, `POST /api/auth/login` requires a
-  session. Admin-only routes check `role = 'admin'`.
+- Every API route except `GET /api/health`, `GET /api/setup`, `POST /api/setup`, `POST /api/auth/login`,
+  `GET /api/auth/providers` and the Google sign-in pair (`GET /api/auth/google/start`, `GET /api/auth/google/callback`;
+  the start's `link=1` mode and the callback's link mode need a session) requires a session. Admin-only routes check `role = 'admin'`.
 - Link import fetches go through `safe_fetch` only (public IPs, re-checked on every redirect, 15 s timeout, 5 MB cap).
 - Uploaded images are decoded and re-encoded (never stored as sent), max 15 MB in, long edge ≤ 2400 px out.
 - Secrets only in env vars; AI keys never reach the browser.
@@ -118,7 +119,7 @@ Anything else needs a one-line reason in the agent's report.
 | `AI_MODEL` | api | `claude-sonnet-5-5` | |
 | `MAX_UPLOAD_MB` | api | `15` | per file; photo import allows 6 files per request |
 | `MAX_BACKUP_MB` | api | `512` | largest backup zip `POST /api/import/export` accepts; spooled to a temp file |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY` | api | — | Google Tasks export (GRO-5): all four or none, else the API refuses to start. `TOKEN_ENCRYPTION_KEY` is 32 random bytes in base64 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY` | api | — | Google Tasks export (GRO-5) and Sign in with Google (ACC-6), one OAuth client for both: all four or none, else the API refuses to start. `TOKEN_ENCRYPTION_KEY` is 32 random bytes in base64 |
 | `HEIF_CONVERT` | api | `heif-convert` | libheif CLI used to read HEIC photos (installed in the API image) |
 | `API_INTERNAL_URL` | web | `http://api:8080` | runtime proxy target |
 | `PUBLIC_HOSTNAME` | caddy | — | deployed HTTPS |
@@ -126,6 +127,10 @@ Anything else needs a one-line reason in the agent's report.
 ## Data model (Postgres, `backend/crates/adapters/postgres/migrations/0001_init.sql`)
 - `users(id uuid pk, username citext unique, display_name text, password_hash text, role text check in
   ('admin','member'), created_at timestamptz)`
+- Sign in with Google (`0005_google_sign_in.sql`, ACC-6): `users.email citext unique null` (set by an admin; the match
+  key for a first Google sign-in) and `user_identities(id uuid pk, user_id fk → users on delete cascade, provider text,
+  subject text, email citext, created_at, unique(provider, subject))`. A link is the Google `sub`, so a later change of
+  email on either side does not break it. Only a member can get a link; Google never creates a user.
 - `sessions(id uuid pk, user_id fk → users on delete cascade, token_hash bytea unique, created_at, expires_at)` —
   cookie `rb_session` holds a random 32-byte token (base64url); only its SHA-256 is stored.
 - `images(id uuid pk, file_name text, width int, height int, bytes int, created_by fk users, created_at)` —
@@ -159,6 +164,8 @@ Anything else needs a one-line reason in the agent's report.
 | GET `/api/setup` → `{ needsSetup }` | — | — | done |
 | POST `/api/setup` `{username, displayName, password}` | — | ACC-2 | done (only when no users) |
 | POST `/api/auth/login` / POST `/api/auth/logout` / GET `/api/auth/me` | —/s/s | ACC-1/3 | done |
+| GET `/api/auth/providers` → `{google}`, GET `/api/auth/google/start`, GET `/api/auth/google/callback` | — | ACC-6 | #26 |
+| GET `/api/auth/identities`, DELETE `/api/auth/identities/:id` | s | ACC-6 | #26 |
 | GET `/api/recipes?q=&tag=&sort=&limit=&offset=` | s | FND-1–4 | list + paging done; `q` full-text and `sort` → issue |
 | POST `/api/recipes`, GET/PUT/DELETE `/api/recipes/:id`, POST `/api/recipes/:id/restore` | s | REC-1/2 | done |
 | GET `/api/tags` → `[{name, count}]` | s | FND-3 | done |
@@ -277,6 +284,24 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   `app::GoogleTasksService` reads the grocery list through `GroceryService`. With Google not configured the server wires
   a disabled `GoogleTasks` that answers `google_disabled`. Tests use a local stub of Google's OAuth and Tasks endpoints
   (`backend/tests/common/google.rs`). Behaviour: `docs/API.md` → *Google Tasks export*.
+- **Sign in with Google (ACC-6):** the API runs an OpenID Connect authorization-code flow with PKCE (confidential
+  client; the browser never sees the secret or a token). It reuses the Google Tasks settings
+  (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY`): the feature is on whenever they
+  are set, with no new variables, and one OAuth client serves both. The owner adds a second redirect URI,
+  `${PUBLIC_URL}/api/auth/google/callback`, and the scopes `openid`, `userinfo.email`, `userinfo.profile`.
+  1. `start` seals `state`, `nonce`, the PKCE verifier, the safe `next` path and the time into the `rb_oauth` cookie
+     (HttpOnly, SameSite=Lax, Path `/api/auth/google`, 10 minutes; sealed with the token cipher, no server-side
+     record) and redirects to Google with `prompt=select_account`.
+  2. `callback` always clears `rb_oauth`, then checks `state`, the cookie's age, exchanges the code, and validates the
+     ID token: signature (Google's JWKS), `iss`, `aud` = our client ID, `exp`, `nonce`, and `email_verified = true`.
+  3. A link on `(google, sub)` signs that user in. Otherwise a user whose `email` equals the verified Google email gets
+     a link and is signed in. Otherwise nothing is created and the browser goes to `/login?error=google_not_member`.
+     Any other failure goes to `/login?error=google_failed`.
+  4. Success starts the normal `rb_session` (`SESSION_DAYS`) and redirects to `next` (same-origin path only, else `/`).
+  A signed-in member can also link with `start?link=1` (**Connect Google** in Settings), which skips the email rule,
+  and remove a link with `DELETE /api/auth/identities/:id`. Google's endpoints are fixed hosts (never taken from the
+  request, never through `safe_fetch`); the redirect URI comes from `PUBLIC_URL`, never the Host header.
+  Password sign-in is unchanged. Behaviour: `docs/API.md`; guide: wiki *Google Sign-In*.
 - **Cooking mode (KIT-2/3):** `navigator.wakeLock.request('screen')`, re-acquire on `visibilitychange`.
 
 ## Containers and deploy

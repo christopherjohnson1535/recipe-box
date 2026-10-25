@@ -2,10 +2,10 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "@/test/server";
 import { user } from "@/test/handlers";
-import { ApiError, createApi } from "./api";
+import { ApiError, createApi, GOOGLE_LINK_URL, googleSignInUrl } from "./api";
 
 /** Records the one request an override receives. */
-function capture(method: "get" | "post" | "delete", path: string, respond: () => Response) {
+function capture(method: "get" | "post" | "patch" | "delete", path: string, respond: () => Response) {
   const seen: { request: Request; body: string } = { request: undefined as never, body: "" };
   server.use(
     http[method](path, async ({ request }) => {
@@ -101,5 +101,33 @@ describe("createApi", () => {
     await expect(createApi().disconnectGoogle()).resolves.toBeUndefined();
     expect(seen.request.method).toBe("DELETE");
     expect(new URL(seen.request.url).pathname).toBe("/api/integrations/google");
+  });
+
+  it("reads the sign-in providers and the member's linked Google accounts, and unlinks one", async () => {
+    server.use(
+      http.get("*/api/auth/providers", () => HttpResponse.json({ google: true })),
+      http.get("*/api/auth/identities", () => HttpResponse.json([{ id: "i1", provider: "google", email: "a@b.co", createdAt: "2026-10-20T10:00:00Z" }])),
+    );
+    const api = createApi();
+    await expect(api.authProviders()).resolves.toEqual({ google: true });
+    await expect(api.listIdentities()).resolves.toMatchObject([{ id: "i1", email: "a@b.co" }]);
+    const seen = capture("delete", "*/api/auth/identities/:id", () => new HttpResponse(null, { status: 204 }));
+    await expect(api.deleteIdentity("a/b")).resolves.toBeUndefined();
+    expect(new URL(seen.request.url).pathname).toBe("/api/auth/identities/a%2Fb");
+  });
+
+  it("sets or clears a member's email with a PATCH that always carries the key", async () => {
+    const seen = capture("patch", "*/api/users/:id", () => HttpResponse.json(user));
+    await createApi().updateUserEmail("u1", "sam@example.com");
+    expect(seen.request.method).toBe("PATCH");
+    expect(new URL(seen.request.url).pathname).toBe("/api/users/u1");
+    expect(JSON.parse(seen.body)).toEqual({ email: "sam@example.com" });
+    await createApi().updateUserEmail("u1", null);
+    expect(JSON.parse(seen.body)).toEqual({ email: null });
+  });
+
+  it("builds the Google sign-in and link addresses as plain paths", () => {
+    expect(googleSignInUrl("/recipes/a b?x=1&y=2")).toBe("/api/auth/google/start?next=%2Frecipes%2Fa%20b%3Fx%3D1%26y%3D2");
+    expect(GOOGLE_LINK_URL).toBe("/api/auth/google/start?link=1");
   });
 });

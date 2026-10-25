@@ -38,6 +38,9 @@ impl World {
             tags: store.clone(),
             grocery: store.clone(),
             google_connections: store.clone(),
+            identities: store.clone(),
+            google_signin: Arc::new(app::DisabledGoogleSignIn),
+            flows: Arc::new(app::DisabledGoogleSignIn),
             health: store.clone(),
             media,
             backup: Arc::new(adapter_memory::MemoryBackup::default()),
@@ -72,7 +75,7 @@ const PASSWORD: &str = "correct horse";
 
 async fn user(s: &Services, name: &str, role: &str) -> User {
     s.users
-        .create(name, name, PASSWORD.into(), role)
+        .create(name, name, PASSWORD.into(), role, None)
         .await
         .unwrap()
 }
@@ -312,7 +315,7 @@ async fn new_users_are_validated_in_order() {
         pw: &str,
         role: &str,
     ) -> DomainResult<User> {
-        s.users.create(name, display, pw.into(), role).await
+        s.users.create(name, display, pw.into(), role, None).await
     }
     let s = World::new().services();
     assert!(

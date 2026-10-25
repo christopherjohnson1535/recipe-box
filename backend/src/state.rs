@@ -1,25 +1,25 @@
 use std::sync::Arc;
 
 use adapter_fs_media::FsMediaStore;
-use adapter_google::GoogleTasksClient;
+use adapter_google::{GoogleSignInClient, GoogleTasksClient};
 use adapter_html::HtmlPageReader;
 use adapter_http_fetch::HttpPageFetcher;
 use adapter_postgres::{
-    PgGoogleConnectionRepo, PgGroceryRepo, PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo,
-    PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo,
+    PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo, PgImageRepo, PgPool, PgRecipeRepo,
+    PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo,
 };
-use app::{Deps, DisabledGoogleTasks, Services};
+use app::{Deps, DisabledGoogleSignIn, DisabledGoogleTasks, Services};
 use ports::{
-    GoogleConnectionRepo, GoogleTasks, GroceryRepo, ImageRepo, MediaStore, PageFetcher,
-    RecipeExtractor, RecipeRepo, SessionRepo, SettingsRepo, SpawnedTask, StorageHealth, TagRepo,
-    TaskSpawner, TokenCipher, UserRepo,
+    FlowSealer, GoogleConnectionRepo, GoogleSignIn, GoogleTasks, GroceryRepo, IdentityRepo,
+    ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo, SessionRepo, SettingsRepo,
+    SpawnedTask, StorageHealth, TagRepo, TaskSpawner, TokenCipher, UserRepo,
 };
 
 use crate::{
     auth::{password::Argon2Hasher, session::RandomTokens},
     clock::Clock,
     config::{Config, GoogleConfig},
-    crypto::{ChaChaCipher, NoCipher},
+    crypto::{ChaChaCipher, ChaChaFlowSealer, NoCipher},
     import::{ai::Ai, safe_fetch::FetchPolicy},
     media::ImageCrateCodec,
 };
@@ -47,6 +47,7 @@ pub struct AppState {
     pub tags: Arc<dyn TagRepo>,
     pub grocery: Arc<dyn GroceryRepo>,
     pub google_connections: Arc<dyn GoogleConnectionRepo>,
+    pub identities: Arc<dyn IdentityRepo>,
     pub media: Arc<dyn MediaStore>,
     pub health: Arc<dyn StorageHealth>,
     pub config: Arc<Config>,
@@ -59,6 +60,11 @@ pub struct AppState {
     pub ai: Arc<dyn RecipeExtractor>,
     /// Google sign-in and Tasks. Disabled unless the four Google settings are set; tests point it at a stub.
     pub google: Arc<dyn GoogleTasks>,
+    /// Sign in with Google (ACC-6). Disabled unless the four Google settings are set; tests point it at a fake
+    /// identity provider.
+    pub google_signin: Arc<dyn GoogleSignIn>,
+    /// Seals the `rb_oauth` cookie of a sign-in in progress.
+    pub flows: Arc<dyn FlowSealer>,
     /// Seals the stored Google refresh tokens.
     pub cipher: Arc<dyn TokenCipher>,
     /// Proxies whose `X-Forwarded-For` the rate limiter believes (`TRUSTED_PROXIES`). None by default.
@@ -80,6 +86,9 @@ impl AppState {
             tags: self.tags.clone(),
             grocery: self.grocery.clone(),
             google_connections: self.google_connections.clone(),
+            identities: self.identities.clone(),
+            google_signin: self.google_signin.clone(),
+            flows: self.flows.clone(),
             health: self.health.clone(),
             media: self.media.clone(),
             backup: Arc::new(crate::backup::ZipBackup),
@@ -115,7 +124,7 @@ impl AppState {
     /// Like [`AppState::new`] with the given clock driving the repositories and every time rule.
     pub fn with_clock(pool: PgPool, config: Config, clock: Clock) -> anyhow::Result<Self> {
         let ai = Arc::new(Ai::from_config(&config)?);
-        let (google, cipher) = google_from_config(config.google.as_ref())?;
+        let google = google_from_config(config.google.as_ref())?;
         let port_clock: Arc<dyn ports::Clock> = Arc::new(clock.clone());
         Ok(Self {
             recipes: Arc::new(PgRecipeRepo::new(pool.clone(), port_clock.clone())),
@@ -124,36 +133,55 @@ impl AppState {
             sessions: Arc::new(PgSessionRepo::new(pool.clone(), port_clock.clone())),
             settings: Arc::new(PgSettingsRepo::new(pool.clone(), port_clock.clone())),
             tags: Arc::new(PgTagRepo::new(pool.clone())),
-            grocery: Arc::new(PgGroceryRepo::new(pool.clone(), port_clock)),
+            grocery: Arc::new(PgGroceryRepo::new(pool.clone(), port_clock.clone())),
             google_connections: Arc::new(PgGoogleConnectionRepo::new(pool.clone())),
+            identities: Arc::new(PgIdentityRepo::new(pool.clone(), port_clock.clone())),
             media: Arc::new(FsMediaStore::new(config.media_dir.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
             config: Arc::new(config),
             fetch_policy: FetchPolicy::default(),
             clock,
             ai,
-            google,
-            cipher,
+            google: google.tasks,
+            google_signin: google.signin,
+            flows: google.flows,
+            cipher: google.cipher,
             trusted_proxies: Default::default(),
             throttle: app::Throttle::new(),
         })
     }
 }
 
-/// The Google adapter and token cipher for the config, or the disabled pair when Google is not set up.
-fn google_from_config(
-    google: Option<&GoogleConfig>,
-) -> anyhow::Result<(Arc<dyn GoogleTasks>, Arc<dyn TokenCipher>)> {
+/// The Google adapters for the config, or the disabled ones when Google is not set up.
+struct GoogleAdapters {
+    tasks: Arc<dyn GoogleTasks>,
+    signin: Arc<dyn GoogleSignIn>,
+    flows: Arc<dyn FlowSealer>,
+    cipher: Arc<dyn TokenCipher>,
+}
+
+fn google_from_config(google: Option<&GoogleConfig>) -> anyhow::Result<GoogleAdapters> {
     Ok(match google {
-        Some(g) => (
-            Arc::new(GoogleTasksClient::new(
+        Some(g) => GoogleAdapters {
+            tasks: Arc::new(GoogleTasksClient::new(
                 g.client_id.clone(),
                 g.client_secret.clone(),
                 &g.public_url,
             )?),
-            Arc::new(ChaChaCipher::new(&g.token_key)),
-        ),
-        None => (Arc::new(DisabledGoogleTasks), Arc::new(NoCipher)),
+            signin: Arc::new(GoogleSignInClient::new(
+                g.client_id.clone(),
+                g.client_secret.clone(),
+                &g.public_url,
+            )?),
+            flows: Arc::new(ChaChaFlowSealer::new(&g.token_key)),
+            cipher: Arc::new(ChaChaCipher::new(&g.token_key)),
+        },
+        None => GoogleAdapters {
+            tasks: Arc::new(DisabledGoogleTasks),
+            signin: Arc::new(DisabledGoogleSignIn),
+            flows: Arc::new(DisabledGoogleSignIn),
+            cipher: Arc::new(NoCipher),
+        },
     })
 }
 

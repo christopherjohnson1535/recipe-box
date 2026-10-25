@@ -187,6 +187,7 @@ a restart clears them.
 ## Google Tasks (optional)
 Lets each member send the grocery list to their own Google Tasks (GRO-5). Without these settings the app runs as
 usual and only that button is off. Everything below is free; no Google verification is needed for a household.
+The same four settings also switch on [Sign in with Google](#sign-in-with-google-optional); there is no separate setup.
 
 1. In the [Google Cloud console](https://console.cloud.google.com/) create a project (any name).
 2. **APIs & Services > Library**: enable the **Google Tasks API**.
@@ -282,6 +283,34 @@ then unreadable and ignored.
   the lock frees itself after 2 minutes.
 - The API log shows `COOKIE_SECURE` / `PUBLIC_URL` warnings, or Google's consent page shows a redirect error: see the
   `PUBLIC_URL` table above.
+
+## Sign in with Google (optional)
+Lets a household member tap **Sign in with Google** instead of typing a password (ACC-6). It uses the **same** Google
+OAuth client and the same four variables as [Google Tasks](#google-tasks-optional), so there is nothing new to put in
+`.env`: when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL` and `TOKEN_ENCRYPTION_KEY` are set, the button
+appears on the sign-in page; when they are not, the app behaves as before. Google never creates accounts: only
+members the admin already added can get in (the admin sets their email in **Settings > Household**, or the member
+uses **Connect Google** in Settings while signed in). The wiki page *Google Sign-In* walks members and admins through it.
+
+Two changes to the client you made for Google Tasks (or follow the Google Tasks steps first if you have no client yet):
+1. **Authorised redirect URIs**: add a second one next to the Tasks one, `<PUBLIC_URL>/api/auth/google/callback`.
+   Add one per address you use, and nothing else:
+
+   | Environment | `PUBLIC_URL` | Redirect URI to add |
+   |---|---|---|
+   | On the PC itself | `http://localhost:3000` | `http://localhost:3000/api/auth/google/callback` |
+   | Tailscale, VPS or managed host | `https://recipes.example.com` | `https://recipes.example.com/api/auth/google/callback` |
+
+   Google rejects plain-`http://` LAN addresses such as `http://192.168.1.20:3000`, so the iPad needs the HTTPS
+   address (see the `PUBLIC_URL` table above). The API builds the redirect URI from `PUBLIC_URL` only, so it must match
+   the console character for character (scheme, host, port, path, no trailing slash), or Google shows
+   `redirect_uri_mismatch`.
+2. **Data access** (older consoles: OAuth consent screen > Scopes): add `openid`, `.../auth/userinfo.email` and
+   `.../auth/userinfo.profile`. These are non-sensitive, so no verification is needed. Add each household member's
+   Google account under **Audience > Test users** while the app is in *Testing*: only listed accounts get past Google.
+
+Restart is only needed if you changed `.env`. Sign-in sessions last `SESSION_DAYS`, like password sign-in. The 7-day
+refresh-token expiry above applies to Google Tasks only: signing in does not keep a Google token.
 
 ## Backups
 `sh scripts/backup.sh` and `sh scripts/restore.sh backups/<time>` (OPS-6). User-facing guide, with scheduling and

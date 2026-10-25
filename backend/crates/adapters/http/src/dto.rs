@@ -168,9 +168,39 @@ pub struct User {
     pub id: Uuid,
     pub username: String,
     pub display_name: String,
+    /// The Google address that may sign in as this member; null when none is set.
+    #[schema(required = true)]
+    pub email: Option<String>,
     #[schema(schema_with = role_schema)]
     pub role: String,
     pub created_at: DateTime<Utc>,
+}
+
+/// Which ways to sign in this server offers besides the password.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AuthProviders {
+    /// Sign in with Google is set up (the Google OAuth client is configured).
+    pub google: bool,
+}
+
+/// A Google account linked to the signed-in member.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Identity {
+    pub id: Uuid,
+    #[schema(schema_with = provider_schema)]
+    pub provider: String,
+    /// The account's address when it was linked.
+    pub email: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// `provider` is a text column; Google is the only provider so far.
+pub fn provider_schema() -> utoipa::openapi::Object {
+    utoipa::openapi::Object::builder()
+        .schema_type(utoipa::openapi::Type::String)
+        .enum_values(Some([domain::PROVIDER_GOOGLE]))
+        .build()
 }
 
 /// `role` is a text column; the schema lists the two values the API accepts and returns.
@@ -350,8 +380,20 @@ impl From<domain::User> for User {
             id: u.id,
             username: u.username,
             display_name: u.display_name,
+            email: u.email,
             role: u.role,
             created_at: u.created_at,
+        }
+    }
+}
+
+impl From<domain::Identity> for Identity {
+    fn from(i: domain::Identity) -> Self {
+        Self {
+            id: i.id,
+            provider: i.provider,
+            email: i.email,
+            created_at: i.created_at,
         }
     }
 }

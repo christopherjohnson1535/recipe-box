@@ -9,7 +9,7 @@ use std::{future::Future, pin::Pin, time::Duration};
 
 use async_trait::async_trait;
 use domain::{
-    AiProvider, DomainResult, PhotoMode, RecipeDraft, Secret,
+    AiProvider, DomainResult, PhotoMode, RecipeDraft, Secret, SignInFlow,
     chrono::{DateTime, Utc},
     url::Url,
     uuid::Uuid,
@@ -22,8 +22,8 @@ pub mod contract;
 
 pub use repos::{
     Compute, GoogleConnection, GoogleConnectionRepo, GroceryItem, GroceryList, GroceryRepo,
-    ImageRepo, ListedRecipe, NewGroceryItem, RecipeRepo, SessionRepo, SettingsRepo, StorageHealth,
-    TagRepo, UserRepo,
+    IdentityRepo, ImageRepo, ListedRecipe, NewGroceryItem, RecipeRepo, SessionRepo, SettingsRepo,
+    StorageHealth, TagRepo, UserRepo,
 };
 
 /// The one source of "now" for every time rule (restore window, session expiry, purge). Repositories are built
@@ -228,6 +228,53 @@ pub trait GoogleTasks: Send + Sync {
         tasklist_id: &str,
         sections: &[TaskSection],
     ) -> DomainResult<()>;
+}
+
+/// A Google account that proved who it is: the claims of a checked ID token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoogleAccount {
+    /// Google's stable id for the account (`sub`); the email can change, this cannot.
+    pub subject: String,
+    /// The account's address, lower-cased.
+    pub email: String,
+    /// Whether Google says it has verified `email`.
+    pub email_verified: bool,
+}
+
+/// Sign in with Google (ACC-6): the OpenID Connect authorization-code flow with PKCE, confidential client. Google
+/// only says who someone is; nothing here creates a member. The client secret, the code and the tokens never leave
+/// the implementation and never appear in an error or a log.
+#[async_trait]
+pub trait GoogleSignIn: Send + Sync {
+    /// Whether the server has a Google OAuth client. The one method that works either way.
+    fn configured(&self) -> bool;
+
+    /// Where to send the browser: scopes `openid email profile`, `prompt=select_account`, the redirect address
+    /// below `PUBLIC_URL`, and the PKCE S256 challenge derived from `code_verifier`. `state` and `nonce` come
+    /// back unchanged in the redirect and the ID token. `GoogleDisabled` when not configured.
+    fn authorize_url(&self, state: &str, nonce: &str, code_verifier: &str) -> DomainResult<Url>;
+
+    /// Trades the `code` of the redirect (with the PKCE `code_verifier`) for an ID token and checks it: signature
+    /// against Google's published keys, issuer, audience (our client id), expiry and `nonce`. Whether the email is
+    /// verified is reported, not enforced. `Google` for any refusal or unreadable answer, `GoogleDisabled` when not
+    /// configured.
+    async fn account(
+        &self,
+        code: &str,
+        nonce: &str,
+        code_verifier: &Secret,
+    ) -> DomainResult<GoogleAccount>;
+}
+
+/// Packs a [`domain::SignInFlow`] into text for the `rb_oauth` cookie, sealed so the browser can neither read nor
+/// change it, and unpacks it again.
+pub trait FlowSealer: Send + Sync {
+    /// Cookie-safe text that only `open` can read back. Two seals of the same flow differ.
+    fn seal(&self, flow: &SignInFlow) -> DomainResult<String>;
+
+    /// The flow in `sealed`. `Validation` when it was not made by this key, was changed, or is not a flow (a
+    /// sealed Google refresh token, for one): the purposes never mix. `GoogleDisabled` when not configured.
+    fn open(&self, sealed: &str) -> DomainResult<SignInFlow>;
 }
 
 /// Seals secrets before they are stored. The key never leaves the implementation.

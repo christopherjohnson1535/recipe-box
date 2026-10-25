@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.create_user_body_role import CreateUserBodyRole
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="CreateUserBody")
 
@@ -15,19 +16,23 @@ T = TypeVar("T", bound="CreateUserBody")
 class CreateUserBody:
     """
     Example:
-        {'displayName': 'Alex', 'password': 'correct horse battery', 'role': 'member', 'username': 'alex'}
+        {'displayName': 'Alex', 'email': 'alex@example.com', 'password': 'correct horse battery', 'role': 'member',
+            'username': 'alex'}
 
     Attributes:
         display_name (str):
         password (str):
         role (CreateUserBodyRole):
         username (str):
+        email (None | str | Unset): The Google address that may sign in as this member (optional; trimmed and lower-
+            cased, blank means none).
     """
 
     display_name: str
     password: str
     role: CreateUserBodyRole
     username: str
+    email: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,6 +44,12 @@ class CreateUserBody:
 
         username = self.username
 
+        email: None | str | Unset
+        if isinstance(self.email, Unset):
+            email = UNSET
+        else:
+            email = self.email
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -49,6 +60,8 @@ class CreateUserBody:
                 "username": username,
             }
         )
+        if email is not UNSET:
+            field_dict["email"] = email
 
         return field_dict
 
@@ -63,11 +76,21 @@ class CreateUserBody:
 
         username = d.pop("username")
 
+        def _parse_email(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        email = _parse_email(d.pop("email", UNSET))
+
         create_user_body = cls(
             display_name=display_name,
             password=password,
             role=role,
             username=username,
+            email=email,
         )
 
         create_user_body.additional_properties = d

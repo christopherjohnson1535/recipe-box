@@ -13,21 +13,24 @@ mod imports;
 mod maintenance;
 mod media;
 mod recipes;
+mod signin;
 mod throttle;
 mod users;
 
 use std::sync::Arc;
 
 use ports::{
-    BackupFormat, Clock, GoogleConnectionRepo, GoogleTasks, GroceryRepo, ImageCodec, ImageRepo,
-    MediaStore, PageFetcher, PageReader, PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo,
-    SessionTokens, SettingsRepo, StorageHealth, TagRepo, TaskSpawner, TokenCipher, UserRepo,
+    BackupFormat, Clock, FlowSealer, GoogleConnectionRepo, GoogleSignIn, GoogleTasks, GroceryRepo,
+    IdentityRepo, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader, PasswordHasher,
+    RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo,
+    TaskSpawner, TokenCipher, UserRepo,
 };
 
 pub use auth::{AuthService, NewSession};
 pub use export::{ExportJob, ExportService, ImportReport};
 pub use google::{
-    DisabledGoogleTasks, GoogleExport, GoogleStatus, GoogleTasksService, TASK_LIST_TITLE,
+    DisabledGoogleSignIn, DisabledGoogleTasks, GoogleExport, GoogleStatus, GoogleTasksService,
+    TASK_LIST_TITLE,
 };
 pub use grocery::{GroceryItemView, GroceryListView, GroceryRecipeView, GroceryService, ItemPatch};
 pub use imports::{
@@ -36,6 +39,7 @@ pub use imports::{
 pub use maintenance::{BackfillReport, Maintenance, PurgeReport};
 pub use media::{MediaService, Stored};
 pub use recipes::{RecipeService, SettingsService, TagService};
+pub use signin::{Callback, FLOW_MAX_AGE, SignInOutcome, SignInService, Started};
 pub use throttle::{Attempt, Scope, Throttle};
 pub use users::UserService;
 
@@ -50,6 +54,7 @@ pub struct Deps {
     pub tags: Arc<dyn TagRepo>,
     pub grocery: Arc<dyn GroceryRepo>,
     pub google_connections: Arc<dyn GoogleConnectionRepo>,
+    pub identities: Arc<dyn IdentityRepo>,
     pub health: Arc<dyn StorageHealth>,
     pub media: Arc<dyn MediaStore>,
     pub backup: Arc<dyn BackupFormat>,
@@ -62,6 +67,10 @@ pub struct Deps {
     pub reader: Arc<dyn PageReader>,
     /// Google sign-in and Tasks; `DisabledGoogleTasks` when the server has no Google OAuth client.
     pub google: Arc<dyn GoogleTasks>,
+    /// Sign in with Google; `DisabledGoogleSignIn` when the server has no Google OAuth client.
+    pub google_signin: Arc<dyn GoogleSignIn>,
+    /// Seals the record of a sign-in in progress (the `rb_oauth` cookie).
+    pub flows: Arc<dyn FlowSealer>,
     /// Seals the stored Google refresh tokens.
     pub cipher: Arc<dyn TokenCipher>,
     /// Runs cleanup that must outlive a dropped request.
@@ -80,6 +89,7 @@ pub struct Services {
     pub recipes: RecipeService,
     pub users: UserService,
     pub auth: AuthService,
+    pub signin: SignInService,
     pub settings: SettingsService,
     pub tags: TagService,
     pub grocery: GroceryService,
@@ -97,6 +107,7 @@ impl Services {
         Self {
             recipes: RecipeService::new(&d),
             users: UserService::new(&d, auth.clone()),
+            signin: SignInService::new(&d, auth.clone()),
             auth,
             settings: SettingsService::new(&d),
             tags: TagService::new(&d),
