@@ -43,16 +43,16 @@ Raspberry Pi: use a 64-bit OS (Raspberry Pi OS 64-bit or Ubuntu arm64) on a Pi 4
 on its own. A 32-bit OS (armv7) has no image: build on the Pi with `docker compose up -d --build` instead.
 
 ## HTTPS and `COOKIE_SECURE`
-`COOKIE_SECURE` (default `false`) decides whether the `rb_session` sign-in cookie carries the `Secure` flag. The API
-reads only this setting; it does not look at `X-Forwarded-Proto` or the address you typed. So set it to match how
-people reach the site:
+`COOKIE_SECURE` (default `false`) decides whether the `rb_session` sign-in cookie carries the `Secure` flag. It does not
+look at `X-Forwarded-Proto` or the address you typed, so set it to match how people reach the site. Two more settings
+tell the sign-in throttle who is calling when a proxy sits in front (see "Proxy headers" below):
 
-| How you open Recipe Box | `COOKIE_SECURE` | `WEB_BIND` |
-|---|---|---|
-| `http://localhost:3000` on the same machine, or `http://<pc-ip>:3000` on your Wi-Fi (no install, no offline) | `false` | `127.0.0.1` / `0.0.0.0` |
-| `https://<pc>.<tailnet>.ts.net` (Tailscale serve) | `true` | `127.0.0.1` |
-| `https://recipes.example.com` (Caddy profile) | `true` | `127.0.0.1` |
-| Managed host (HTTPS from the host) | `true`, on the `api` service | not used |
+| How you open Recipe Box | `COOKIE_SECURE` | `WEB_BIND` | `TRUST_PROXY_HEADERS` |
+|---|---|---|---|
+| `http://localhost:3000` on the same machine, or `http://<pc-ip>:3000` on your Wi-Fi (no install, no offline) | `false` | `127.0.0.1` / `0.0.0.0` | `false` |
+| `https://<pc>.<tailnet>.ts.net` (Tailscale serve) | `true` | `127.0.0.1` | `false` (see below) |
+| `https://recipes.example.com` (Caddy profile) | `true` | `127.0.0.1` | `true` |
+| Managed host (HTTPS from the host), e.g. Fly | `true`, on the `api` service | not used | `false` unless you have confirmed the host's header (see below); set `TRUSTED_PROXIES` on the `api` to the host's private network |
 
 - `true` and then opening the plain `http://` address: the browser refuses to keep a `Secure` cookie from an
   insecure page, so sign-in appears to succeed and the next page asks you to sign in again. Use the HTTPS address, or
@@ -65,9 +65,19 @@ people reach the site:
   `COOKIE_SECURE=true`, and not when it is `false`.
 - The API refuses to start if `COOKIE_SECURE=true` is combined with `IMPORT_ALLOW_HOST` (a test-only setting). After
   a change to `.env`, run `docker compose up -d` again so the `api` container is recreated.
-- Behind a proxy the API sees the web container as the client, not the visitor. Caddy and the web container pass
-  `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` along, but the API does not read them yet. Anything
-  that needs the visitor's address (sign-in throttling, tracked in #33) will have to say which proxy header to trust.
+
+**Proxy headers (sign-in throttling, #33).** Wrong passwords are slowed per username and per client address. The API
+uses the TCP peer as the address, and reads `X-Forwarded-For` only when the peer is in `TRUSTED_PROXIES`
+(comma-separated IPs or CIDR networks; Compose defaults to the private Docker ranges, which only the `web` container
+can reach; empty trusts none). From a trusted peer it walks the header from the right and takes the first address that
+is not itself trusted. If the peer is trusted but no client can be told (no header, a garbled one, only trusted
+hops), no address is counted and only the per-username throttle applies, so nobody can lock out the household by
+sharing one proxy address.
+- `TRUST_PROXY_HEADERS` (on `web`, default `false`): when `true`, the Next web container forwards only the right-most
+  `X-Forwarded-For` entry (the one the proxy in front of it added) to the API and drops every other client-address
+  header. Set it `true` only when a proxy you control always sets that header and nothing else can reach port 3000,
+  so keep `WEB_BIND=127.0.0.1`: a client reaching port 3000 directly could otherwise choose its own address.
+- `false` is always safe: the web container sends no address and only the per-username throttle applies.
 
 **Claim the admin account first.** The first visit to a new server creates the admin account, for whoever gets
 there first. On a public address (B, C) open it and finish setup yourself before you share the address or leave it
@@ -81,7 +91,8 @@ unattended.
    - Install Tailscale on the PC and on the iPad and sign in to the same account.
    - Admin console → DNS: turn on **MagicDNS**, then under **HTTPS Certificates** choose **Enable HTTPS**. The names of
      your machines then appear in public certificate logs, so give the PC a name you do not mind being public.
-   - `.env`: `COOKIE_SECURE=true`. Leave `WEB_BIND=127.0.0.1` (`tailscale serve` proxies to `127.0.0.1` only).
+   - `.env`: `COOKIE_SECURE=true`. Leave `WEB_BIND=127.0.0.1` (`tailscale serve` proxies to `127.0.0.1` only) and
+     `TRUST_PROXY_HEADERS=false` (Tailscale's docs do not say it sets `X-Forwarded-For`).
      `docker compose up -d`.
    - On the PC: `tailscale serve --bg 3000`. It prints the `https://<pc-name>.<tailnet>.ts.net` address; open it on
      the iPad (Tailscale must be on there). `tailscale serve status` shows it; `tailscale serve reset` removes it.
@@ -96,9 +107,10 @@ Full page: [Deploy-VPS-Caddy](wiki/Deploy-VPS-Caddy.md).
 1. Create a small Linux VM (1 vCPU / 1–2 GB RAM is enough), install Docker Engine.
 2. Point a DNS name (e.g. `recipes.example.com`) at the VM's IP (an `A` record, plus `AAAA` for IPv6). Open ports 80
    and 443 only, plus 22 for SSH.
-3. `.env`: `PUBLIC_HOSTNAME=recipes.example.com`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`, and optionally `IMAGE_TAG=<release tag>` (default `latest`).
+3. `.env`: `PUBLIC_HOSTNAME=recipes.example.com`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`, `TRUST_PROXY_HEADERS=true`, and optionally `IMAGE_TAG=<release tag>` (default `latest`).
 4. `docker compose -f docker-compose.yml -f deploy/compose.prod.yml --profile https up -d`.
-5. `PUBLIC_HOSTNAME` must be set: Caddy has nothing to serve without it and the `caddy` container restarts in a loop.
+5. `PUBLIC_HOSTNAME` must be set: Caddy has nothing to serve without it. With it empty, `docker compose --profile https up`
+   stops with "PUBLIC_HOSTNAME is empty" (the `hostname-check` service).
    The certificate is issued on the first request, a few seconds after the DNS name resolves to the VM
    (`docker compose logs caddy`). Keep the `caddy_data` volume: it holds the certificate and account.
 6. Open the address and create the admin account at once (see above).
@@ -110,7 +122,7 @@ stays `127.0.0.1` here and the `db` and `api` services publish nothing: only Cad
 ## C. Managed container hosts
 Run three things from the same images: Postgres (the host's managed Postgres), `api` (a persistent volume at
 `/data/media`, private) and `web` (public HTTPS, `API_INTERNAL_URL` pointing at the api's private address). The API
-has no public port. Set `COOKIE_SECURE=true` on the `api`. Walkthrough with ready-made config for **Fly.io**:
+has no public port. Set `COOKIE_SECURE=true` on the `api`, keep `TRUST_PROXY_HEADERS` off on the `web`, and set `TRUSTED_PROXIES` on the `api` to the host's private network. Walkthrough with ready-made config for **Fly.io**:
 [Deploy-Fly](wiki/Deploy-Fly.md) and `deploy/fly/`. Other hosts need the same four settings:
 - `DATABASE_URL` for the managed database, `MEDIA_DIR=/data/media` on a volume that user `10001` can write (the image
   runs as that user; a fresh volume is owned by root, so `chown 10001:10001 /data/media` once).

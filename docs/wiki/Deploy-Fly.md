@@ -58,11 +58,17 @@ Change the tag in both toml files and run both `fly deploy` commands (add `--ha=
 [[Backup and Restore]] expect the Compose stack, so on Fly use the cluster's backups for the database and
 `fly ssh sftp` / `fly ssh console` to copy `/data/media`.
 
+## Sign-in throttle settings
+Leave `TRUST_PROXY_HEADERS` unset (off) on the web app. The sign-in throttle then counts wrong passwords per username only, which is safe. Do not turn it on until you have confirmed that Fly's edge sets or overwrites `X-Forwarded-For` (rather than appending to a client-sent value) in front of the web app: Recipe Box reads only that header's right-most entry, and Fly's documentation names `Fly-Client-IP` as the visitor's address, which Recipe Box does not read. Not confirmed when this page was written; check the header against Fly's "request headers" page, for example with a small echo app, before enabling it.
+
+On the api, `TRUSTED_PROXIES` is set in `deploy/fly/api.fly.toml` to `fdaa::/16`, Fly's private (6PN) network, so the web app's private address counts as a proxy and the whole household is not throttled as one address. Verify the range against Fly's private-networking page for your organisation; if it is wrong the throttle falls back to treating the web app's address as the client, so about 20 wrong tries across the household can slow everyone's sign-in until the lock expires.
+
 ## Settings any other host needs
 - `DATABASE_URL` for the managed database; `MEDIA_DIR=/data/media` on a persistent volume the container user (10001)
   can write; one `api` instance only (photos live on that volume).
 - `COOKIE_SECURE=true` on the `api`; `BIND_ADDR=[::]:8080` where the private network is IPv6 (Fly), else the default.
 - `web`: public HTTPS to port 3000; `API_INTERNAL_URL` = the api's private URL. The `api` has no public address.
+- `TRUST_PROXY_HEADERS` off on `web` unless the host's proxy header is confirmed; `TRUSTED_PROXIES` on `api` = the private network the web app reaches it over (see above).
 - Health checks: `GET /api/health` (api, 8080) and `GET /login` (web, 3000).
 
 | Symptom | Cause and fix |

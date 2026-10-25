@@ -11,9 +11,12 @@ In the repo folder, edit `.env`:
 POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
 COOKIE_SECURE=true
 WEB_BIND=127.0.0.1
+TRUST_PROXY_HEADERS=false
 ```
 Then `docker compose up -d` (add `-f docker-compose.yml -f deploy/compose.prod.yml` to use the published images, and
 `IMAGE_TAG=<release tag>` in `.env` to pin a release once one exists; the default `latest` is the newest build of `main`, see [Cutting a release](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/DEPLOY.md#cutting-a-release-owner)). Check `docker compose ps`: `db`, `api`, `web` healthy.
+
+`TRUST_PROXY_HEADERS=false` is the default; leave it. `tailscale serve` forwards from the Tailscale service on the PC, and Tailscale's documentation lists the identity headers it adds but does not say it sets `X-Forwarded-For`. With `true` and no such header, a device on your tailnet could send its own and pick the address the sign-in throttle counts. With `false`, only the per-username throttle applies, which is enough when only your own devices can connect. (To verify before changing it: run `tailscale serve` to a small header-echo server and look for `X-Forwarded-For`.)
 
 Use `openssl rand -hex 24` for the password: it goes into `DATABASE_URL` as-is, so symbols such as `@` or `/` would break it. Postgres fixes the password the first time the `pgdata` volume starts; changing it later in `.env` does not change it.
 

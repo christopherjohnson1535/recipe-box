@@ -18,6 +18,8 @@ primary_region = "iad"
   # The site is served over HTTPS by Fly, so sign-in cookies carry the Secure flag.
   COOKIE_SECURE = "true"
   SESSION_DAYS = "30"
+  # Fly's private (6PN) network, where the web app's address comes from. Only trusted peers' X-Forwarded-For is read.
+  TRUSTED_PROXIES = "fdaa::/16"
   AI_PROVIDER = "none"
   RUST_LOG = "info"
 
