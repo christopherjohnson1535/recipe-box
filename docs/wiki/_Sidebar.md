@@ -3,6 +3,7 @@
 - [[Getting Started]]
 - [[Adding and Editing Recipes]]
 - [[Importing Recipes]]
+- [[Save from Safari]]
 - [[Finding Recipes]]
 - [[Household Members]]
 - [[Using on iPad]]

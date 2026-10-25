@@ -4,6 +4,7 @@ import { AiImportSection } from "@/components/settings/AiImportSection";
 import { ExportSection } from "@/components/settings/ExportSection";
 import { HouseholdSection } from "@/components/settings/HouseholdSection";
 import { PhotosSection } from "@/components/settings/PhotosSection";
+import { SaveFromSafariSection } from "@/components/settings/SaveFromSafariSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { Capabilities, Settings, User } from "@/lib/api";
 
@@ -17,6 +18,7 @@ export function SettingsView({ me, users, capabilities, settings = null }: { me:
       {me.role === "admin" && settings && <PhotosSection initial={settings.plateTreatment} />}
       {me.role === "admin" && <ExportSection />}
       <AppearanceSection />
+      <SaveFromSafariSection />
       <AiImportSection capabilities={capabilities} />
     </div>
   );
