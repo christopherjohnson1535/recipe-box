@@ -57,11 +57,18 @@ fn every_fixture_line_reads_as_expected() {
         if got.key != want_key {
             problems.push(format!("key {:?}, want {want_key:?}", got.key));
         }
-        if classify(want_key) != want_section {
+        if classify(&got.key) != want_section {
             problems.push(format!(
                 "section {}, want {want_section}",
                 classify(&got.key)
             ));
+        }
+        // The page's scaled text, as scale.fixture.test.ts also checks it against scaleIngredient.
+        for (factor, want) in line["scaled"].as_object().into_iter().flatten() {
+            let got = scale_servings(text, factor.parse().unwrap());
+            if got != want.as_str().unwrap() {
+                problems.push(format!("x{factor} reads {got:?}, want {want}"));
+            }
         }
         if !problems.is_empty() {
             misses.push(format!("{text:?}: {}", problems.join("; ")));
@@ -229,13 +236,174 @@ fn unparseable_lines_are_kept_and_blank_ones_skipped() {
         ],
         &HashMap::new(),
     );
+    // "salt to taste" is salt: it joins the teaspoon of salt, which gives the item its name.
     let names: Vec<&str> = items.iter().map(|i| i.name.as_str()).collect();
-    assert_eq!(names, ["2 cups plus 2 tbsp flour", "salt", "salt to taste"]);
-    let flour = &items[0];
-    assert!(flour.amounts.is_empty());
+    assert_eq!(names, ["2 cups plus 2 tbsp flour", "salt"]);
+    assert!(items[0].amounts.is_empty());
     assert_eq!(items[1].amounts, vec![amount(1.0, None, Some("tsp"))]);
-    assert!(items[2].amounts.is_empty());
+    assert_eq!(items[1].recipe_ids.len(), 2);
     assert!(build(&[(&["", " "], 1.0)], &HashMap::new()).is_empty());
+    let alone = build(&[(&["Salt to taste"], 1.0)], &HashMap::new());
+    assert_eq!(alone[0].name, "Salt to taste");
+    assert_eq!(alone[0].key, "salt");
+}
+
+#[test]
+fn no_amount_is_ever_infinite_or_absurd() {
+    // R1-1, R2-1, R5-1: "1/0" or a 400-digit number once stored an infinite amount that no later read could decode.
+    for text in [
+        "1/0 cup flour",
+        "0/0 cup flour",
+        "1 cup flour/0",
+        &format!("{} g flour", "9".repeat(400)),
+        "99999999999999999999 g flour",
+        "1,000,000,001 g flour",
+        "0 cups flour",
+        "0/5 cup flour",
+        "0 to 0 cups flour",
+    ] {
+        let line = parse_line(text);
+        assert_eq!(line.amount, None, "{text}");
+        assert_eq!(line.name, text.trim(), "{text}: kept whole");
+        assert_eq!(scale_servings(text, 2.0), text, "{text}: never scaled");
+    }
+    let big = "1000000000 g flour";
+    assert_eq!(parse_line(big).amount.unwrap().min, 1e9);
+    // Sums and scales stop at the same bound.
+    let items = build(&[(&[big, big], 10.0), (&[big], 10.0)], &HashMap::new());
+    let a = &items[0].amounts[0];
+    assert!(a.min.is_finite() && a.min <= 1e9, "{a:?}");
+    let odd = build(&[(&["2 cups flour"], f64::NAN)], &HashMap::new());
+    assert_eq!(odd[0].amounts, vec![amount(2.0, None, Some("cup"))]);
+    assert_eq!(format_quantity(f64::INFINITY), "1,000,000,000,000");
+    assert_eq!(format_quantity(f64::NAN), "⅛");
+}
+
+#[test]
+fn a_space_before_a_unicode_fraction_is_part_of_the_number() {
+    // R2-2, R5-2: "1 ½ cups" is one and a half cups, not one.
+    let a = parse_line("1 ½ cups milk");
+    assert_eq!(a.amount, Some(amount(1.5, None, Some("cup"))));
+    assert_eq!(a.key, "milk");
+    assert_eq!(scale_servings("1 ½ cups milk", 2.0), "3 cups milk");
+    assert_eq!(
+        parse_line("1 ½ - 2 cups milk").amount,
+        Some(amount(1.5, Some(2.0), Some("cup")))
+    );
+    let items = build(
+        &[(&["1 ¼ cups milk"], 1.0), (&["1 cup milk"], 2.0)],
+        &HashMap::new(),
+    );
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].amounts, vec![amount(3.25, None, Some("cup"))]);
+}
+
+#[test]
+fn cans_are_pantry_whatever_is_in_them() {
+    for (line, key) in [
+        ("1 can corn", "canned corn"),
+        ("1 (14 oz) can of tomatoes", "canned tomato"),
+        ("2 (15 oz) cans of black beans", "canned black bean"),
+        ("1 can tuna", "canned tuna"),
+        ("1 tin tomatoes", "canned tomato"),
+        ("1 can frozen peas", "frozen pea"),
+    ] {
+        let got = parse_line(line);
+        assert_eq!(got.key, key, "{line}");
+        let section = classify(&got.key);
+        assert_eq!(
+            section,
+            if line.contains("frozen") {
+                Section::Freezer
+            } else {
+                Section::Pantry
+            },
+            "{line}"
+        );
+    }
+    // Canned and fresh tomatoes are different things to buy.
+    let items = build(&[(&["2 tomatoes", "1 can tomatoes"], 1.0)], &HashMap::new());
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].section, Section::Produce);
+    assert_eq!(items[1].section, Section::Pantry);
+    assert_eq!(items[1].name, "tomatoes");
+}
+
+#[test]
+fn garlic_cloves_merge_whichever_way_round() {
+    let items = build(
+        &[
+            (&["4 garlic cloves, minced"], 1.0),
+            (&["3 cloves garlic"], 1.0),
+        ],
+        &HashMap::new(),
+    );
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].key, "garlic");
+    assert_eq!(items[0].amounts, vec![amount(7.0, None, Some("clove"))]);
+    // A name that merely ends in a unit-like word stays a name.
+    assert_eq!(parse_line("2 cinnamon").amount.unwrap().unit, None);
+    assert_eq!(parse_line("1 head").amount, None);
+}
+
+#[test]
+fn notes_and_prep_words_do_not_split_items() {
+    let items = build(
+        &[
+            (
+                &["1 tsp salt", "2 cups chopped onion", "Pepper, to taste"],
+                1.0,
+            ),
+            (
+                &["Salt to taste", "1 onion, chopped", "1 tsp black pepper"],
+                1.0,
+            ),
+        ],
+        &HashMap::new(),
+    );
+    let keys: Vec<&str> = items.iter().map(|i| i.key.as_str()).collect();
+    assert_eq!(keys, ["onion", "black pepper", "pepper", "salt"]);
+    assert_eq!(items[0].amounts.len(), 2);
+    assert_eq!(items[3].amounts, vec![amount(1.0, None, Some("tsp"))]);
+    assert_eq!(items[3].recipe_ids.len(), 2);
+}
+
+#[test]
+fn nothing_to_buy_keeps_the_line_whole() {
+    for text in [
+        "1 cup -2",
+        "1 1/2 cups of",
+        "2 x 400g tins tomatoes",
+        "1 ½-inch piece ginger",
+    ] {
+        assert_eq!(parse_line(text).amount, None, "{text}");
+    }
+}
+
+#[test]
+fn a_nul_never_reaches_a_name_or_key() {
+    let line = parse_line("flour\0");
+    assert_eq!(line.name, "flour");
+    assert_eq!(line.key, "flour");
+    assert_eq!(parse_line("2 cups\0 flour").key, "flour");
+}
+
+#[test]
+fn units_cover_the_long_spellings() {
+    for (text, unit) in [
+        ("1 gallon milk", "gal"),
+        ("500 milliliters milk", "ml"),
+        ("2 kilograms flour", "kg"),
+        ("2 tbsps butter", "tbsp"),
+        ("2 tsps salt", "tsp"),
+        ("1 pkg yeast", "package"),
+    ] {
+        assert_eq!(
+            parse_line(text).amount.unwrap().unit.as_deref(),
+            Some(unit),
+            "{text}"
+        );
+    }
 }
 
 #[test]

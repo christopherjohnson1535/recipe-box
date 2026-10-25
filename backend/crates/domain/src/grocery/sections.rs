@@ -1,6 +1,7 @@
 //! Store sections for merge keys: a keyword dictionary, whole-word phrases, the longest phrase wins.
 
 use super::Section;
+use super::key::singular;
 
 // Phrases are singular merge-key words. Among phrases of equal length the later one in the key wins, because the
 // last word names the thing ("tomato paste" is a paste, "peanut butter" needs its own entry because both are items).
@@ -145,6 +146,9 @@ const PRODUCE: &[&str] = &[
     "kohlrabi",
     "plantain",
     "tomatillo",
+    "herb",
+    "lemon juice",
+    "lime juice",
 ];
 
 const MEAT: &[&str] = &[
@@ -204,6 +208,9 @@ const MEAT: &[&str] = &[
     "mince",
     "ground meat",
     "bratwurst",
+    "sirloin",
+    "ribeye",
+    "tenderloin",
     "meat",
 ];
 
@@ -264,6 +271,8 @@ const FRIDGE: &[&str] = &[
     "pizza dough",
     "orange juice",
     "creamer",
+    "half and half",
+    "cotija",
 ];
 
 const FREEZER: &[&str] = &[
@@ -279,6 +288,7 @@ const FREEZER: &[&str] = &[
     "edamame",
     "hash brown",
     "tater tot",
+    "whipped topping",
 ];
 
 const PANTRY: &[&str] = &[
@@ -467,34 +477,86 @@ const PANTRY: &[&str] = &[
     "water",
     "applesauce",
     "egg noodle",
+    "soup",
+    "cream of chicken",
+    "cream of celery",
+    "juice",
+    "shortening",
+    "lard",
+    "ghee",
+    "tortellini",
+    "gnocchi",
+    "ravioli",
+    "udon",
+    "farro",
+    "barley",
+    "bulgur",
+    "polenta",
+    "grits",
+    "flaxseed",
+    "arrowroot",
+    "marinara",
+    "sriracha",
+    "hoisin",
+    "gochujang",
+    "harissa",
+    "horseradish",
+    "dressing",
+    "old bay",
+    "bisquick",
+    "bagel",
+    "baguette",
+    "cornflake",
+    "bamboo shoot",
+    "bourbon",
+    "vodka",
+    "whiskey",
+    "rum",
+    "brandy",
 ];
 
-fn tokens(key: &str) -> Vec<&str> {
+/// The lower-case words of a key, accents folded ("purée" -> "puree") and each made singular ("tomatoes" -> "tomato").
+fn tokens(key: &str) -> Vec<String> {
     key.split_whitespace()
         .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()))
         .filter(|t| !t.is_empty())
+        .map(|t| {
+            let folded: String = t
+                .chars()
+                .map(|c| match c {
+                    'á' | 'à' | 'â' | 'ä' => 'a',
+                    'é' | 'è' | 'ê' | 'ë' => 'e',
+                    'í' | 'ì' | 'î' | 'ï' => 'i',
+                    'ó' | 'ò' | 'ô' | 'ö' => 'o',
+                    'ú' | 'ù' | 'û' | 'ü' => 'u',
+                    'ñ' => 'n',
+                    'ç' => 'c',
+                    c => c,
+                })
+                .collect();
+            singular(&folded)
+        })
         .collect()
 }
 
-fn has_phrase(words: &[&str], phrase: &str) -> Option<usize> {
+fn has_phrase(words: &[String], phrase: &str) -> Option<usize> {
     let p: Vec<&str> = phrase.split(' ').collect();
     words
         .windows(p.len())
-        .rposition(|w| w == p.as_slice())
+        .rposition(|w| w.iter().zip(&p).all(|(a, b)| a == b))
         .map(|at| at + p.len())
 }
 
-/// The built-in section for a merge key: "frozen" -> Freezer, "canned"/"dried"/"can of" -> Pantry, else the longest
+/// The built-in section for a merge key: "frozen" -> Freezer, "canned"/"dried"/"can"/"tin" -> Pantry, else the longest
 /// dictionary phrase (the last one in the key on a tie), else Other.
 pub fn classify(key: &str) -> Section {
     let words = tokens(key);
-    if words.contains(&"frozen") {
+    let has = |w: &str| words.iter().any(|x| x == w);
+    if has("frozen") {
         return Section::Freezer;
     }
-    if words.contains(&"canned")
-        || words.contains(&"dried")
-        || has_phrase(&words, "can of").is_some()
-    {
+    // "can" stands alone only in a line kept whole: "14-oz can diced tomatoes", "2 x 400g tins tomatoes".
+    if has("canned") || has("dried") || has("can") || has("tin") {
         return Section::Pantry;
     }
     let lists: [(Section, &[&str]); 5] = [
@@ -547,6 +609,25 @@ mod tests {
             ("garlic powder", Section::Pantry),
             ("ice cream", Section::Freezer),
             ("dried oregano", Section::Pantry),
+            ("canned tuna", Section::Pantry),
+            ("14-oz can diced tomato", Section::Pantry),
+            ("tomato puree", Section::Pantry),
+            ("tomato purée", Section::Pantry),
+            ("diced tomatoes with green chiles", Section::Pantry),
+            ("cream of celery soup", Section::Pantry),
+            ("cream of chicken soup", Section::Pantry),
+            ("half and half", Section::Fridge),
+            ("half-and-half", Section::Fridge),
+            ("apple juice", Section::Pantry),
+            ("lemon juice", Section::Produce),
+            ("orange juice", Section::Fridge),
+            ("shortening", Section::Pantry),
+            ("tortellini", Section::Pantry),
+            ("sriracha", Section::Pantry),
+            ("sirloin", Section::Meat),
+            ("herb", Section::Produce),
+            ("brussels sprout", Section::Produce),
+            ("bourbon", Section::Pantry),
             ("xyzzy", Section::Other),
         ] {
             assert_eq!(classify(key), want, "{key}");

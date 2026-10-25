@@ -6,6 +6,8 @@ const EIGHTHS: [&str; 8] = ["", "⅛", "¼", "⅜", "½", "⅝", "¾", "⅞"];
 
 /// 1.5 -> "1½", 0.333 -> "⅓", 12.4 -> "12", 1234 -> "1,234". Eighths below 4, quarters below 10; never "0".
 pub fn format_quantity(v: f64) -> String {
+    // Not a number or absurdly large: show a bounded value rather than a saturated cast.
+    let v = if v.is_nan() { 0.0 } else { v.min(1e12) };
     if v >= 10.0 {
         let digits = (v.round() as u64).to_string();
         let mut out = String::new();

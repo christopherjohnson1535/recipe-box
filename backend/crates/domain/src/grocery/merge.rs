@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::key::plural_key;
+use super::parse::MAX_AMOUNT;
 use super::{Amount, Section, classify, parse_line};
 use crate::Ingredient;
 
@@ -25,11 +26,12 @@ pub struct GeneratedItem {
     pub recipe_ids: Vec<Uuid>,
 }
 
-/// Adds `b` to `a` (same unit): min + min, max + max, a missing max counting as the min.
+/// Adds `b` to `a` (same unit): min + min, max + max, a missing max counting as the min. Sums stop at `MAX_AMOUNT`, so
+/// no amount is ever infinite.
 fn add(a: &mut Amount, b: &Amount) {
     a.max = (a.max.is_some() || b.max.is_some())
-        .then(|| a.max.unwrap_or(a.min) + b.max.unwrap_or(b.min));
-    a.min += b.min;
+        .then(|| (a.max.unwrap_or(a.min) + b.max.unwrap_or(b.min)).min(MAX_AMOUNT));
+    a.min = (a.min + b.min).min(MAX_AMOUNT);
 }
 
 /// Parses every line (blank ones skipped), scales the amounts and merges by key. Amounts with the same unit (or both
@@ -41,7 +43,14 @@ pub fn build_items(
 ) -> Vec<GeneratedItem> {
     let mut items: Vec<GeneratedItem> = Vec::new();
     let mut at: HashMap<String, usize> = HashMap::new();
+    // Items named by a line with no amount ("salt to taste") take the name of the first line that has one.
+    let mut named_by_amount: Vec<bool> = Vec::new();
     for recipe in recipes {
+        let scale = if recipe.scale.is_finite() && recipe.scale > 0.0 {
+            recipe.scale
+        } else {
+            1.0
+        };
         for ingredient in recipe
             .ingredients
             .iter()
@@ -60,6 +69,7 @@ pub fn build_items(
                     section,
                     recipe_ids: vec![],
                 });
+                named_by_amount.push(false);
                 items.len() - 1
             });
             let item = &mut items[i];
@@ -69,8 +79,12 @@ pub fn build_items(
             let Some(mut amount) = line.amount else {
                 continue;
             };
-            amount.min *= recipe.scale;
-            amount.max = amount.max.map(|m| m * recipe.scale);
+            if !named_by_amount[i] {
+                named_by_amount[i] = true;
+                item.name = line.name.clone();
+            }
+            amount.min = (amount.min * scale).min(MAX_AMOUNT);
+            amount.max = amount.max.map(|m| (m * scale).min(MAX_AMOUNT));
             match item.amounts.iter_mut().find(|a| a.unit == amount.unit) {
                 Some(existing) => add(existing, &amount),
                 None => item.amounts.push(amount),

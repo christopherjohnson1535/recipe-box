@@ -3,7 +3,7 @@
 
 use super::Amount;
 use super::format::format_quantity;
-use super::key::{clean_words, key_of};
+use super::key::{clean_words, key_of, strip_prep};
 
 /// An ingredient line read: the amount (None when there is none or it is ambiguous), the cleaned name and its merge key.
 #[derive(Debug, Clone, PartialEq)]
@@ -44,16 +44,18 @@ fn canon_unit(w: &str) -> Option<&'static str> {
         "lb" | "lbs" | "pound" | "pounds" => "lb",
         "oz" | "ounce" | "ounces" => "oz",
         "g" | "gram" | "grams" => "g",
-        "kg" => "kg",
-        "ml" => "ml",
+        "kg" | "kilogram" | "kilograms" => "kg",
+        "ml" | "milliliter" | "milliliters" | "millilitre" | "millilitres" => "ml",
         "l" | "liter" | "liters" | "litre" | "litres" => "l",
-        "tsp" | "teaspoon" | "teaspoons" => "tsp",
-        "tbsp" | "tablespoon" | "tablespoons" => "tbsp",
+        "tsp" | "tsps" | "teaspoon" | "teaspoons" => "tsp",
+        "tbsp" | "tbsps" | "tablespoon" | "tablespoons" => "tbsp",
         "cup" | "cups" => "cup",
         "clove" | "cloves" => "clove",
         "pinch" | "pinches" => "pinch",
         "dash" | "dashes" => "dash",
-        "can" | "cans" => "can",
+        "can" | "cans" | "tin" | "tins" => "can",
+        "jar" | "jars" => "jar",
+        "bag" | "bags" => "bag",
         "stick" | "sticks" => "stick",
         "slice" | "slices" => "slice",
         "bunch" | "bunches" => "bunch",
@@ -61,11 +63,11 @@ fn canon_unit(w: &str) -> Option<&'static str> {
         "head" | "heads" => "head",
         "stalk" | "stalks" => "stalk",
         "piece" | "pieces" => "piece",
-        "package" | "packages" => "package",
+        "package" | "packages" | "pkg" | "pkgs" => "package",
         "handful" | "handfuls" => "handful",
         "quart" | "quarts" | "qt" => "qt",
         "pint" | "pints" | "pt" => "pt",
-        "gal" => "gal",
+        "gal" | "gallon" | "gallons" => "gal",
         _ => return None,
     })
 }
@@ -85,7 +87,7 @@ fn skip_ws(c: &[char], mut i: usize) -> usize {
 }
 
 /// Ends of the number alternatives at `i`, in the order of scale.ts's `NUMBER`: "1,000", "1 1/2", "1-1/2", "1½",
-/// "1/2", "2.5", "½". The caller takes the first one the rest of the pattern accepts.
+/// "1 ½", "1/2", "2.5", "½". The caller takes the first one the rest of the pattern accepts.
 fn number_ends(c: &[char], i: usize) -> Vec<usize> {
     let mut ends = Vec::new();
     let d = digits(c, i);
@@ -120,8 +122,8 @@ fn number_ends(c: &[char], i: usize) -> Vec<usize> {
     if c.get(d) == Some(&'-') && digits(c, d + 1) > d + 1 {
         ends.extend(frac_end(digits(c, d + 1)));
     }
-    if glyph(c.get(d)).is_some() {
-        ends.push(d + 1);
+    if glyph(c.get(j)).is_some() {
+        ends.push(j + 1);
     }
     ends.extend(frac_end(d));
     let e = digits(c, d + 1);
@@ -198,8 +200,15 @@ fn match_quantity(c: &[char]) -> Option<Qty> {
     None
 }
 
-/// "plus 2 tbsp", "and 1 cup", "+ 2", "cup/240 ml", "1/2-inch": a second amount follows, so the line has no single quantity.
+/// "plus 2 tbsp", "and 1 cup", "+ 2", "cup/240 ml", "1/2-inch", "x 400g", "½-inch": a second amount follows, so the
+/// line has no single quantity.
 fn second_amount(r: &[char]) -> bool {
+    if glyph(r.first()).is_some()
+        || (matches!(r.first(), Some('x' | 'X' | '×'))
+            && r.get(skip_ws(r, 1)).is_some_and(char::is_ascii_digit))
+    {
+        return true;
+    }
     let after_ws_digit = |i: usize| {
         let j = skip_ws(r, i);
         r.get(j).is_some_and(char::is_ascii_digit)
@@ -273,10 +282,21 @@ fn slashed(text: &str) -> Vec<char> {
         .collect()
 }
 
+/// Largest quantity a line may carry; beyond it (or at zero, or not a number at all: "1/0") the line has no amount.
+pub(super) const MAX_AMOUNT: f64 = 1e9;
+
 /// Reads a line like scale.ts `splitIngredient`: the quantity match and the text after it. None when there is no
-/// quantity or a second amount follows.
+/// quantity, it is zero or absurd, or a second amount follows.
 fn split(c: &[char]) -> Option<(Qty, String)> {
     let q = match_quantity(c)?;
+    let (a, b) = (
+        parse_number(&c[q.a.0..q.a.1]),
+        q.b.map(|s| parse_number(&c[s.0..s.1])),
+    );
+    let sane = |v: f64| v.is_finite() && v <= MAX_AMOUNT;
+    if !sane(a) || !b.is_none_or(sane) || a.max(b.unwrap_or(a)) <= 0.0 {
+        return None;
+    }
     let rest: String = c[q.end..].iter().collect();
     let rest = rest.trim_start();
     let rest_chars: Vec<char> = rest.chars().collect();
@@ -292,12 +312,13 @@ fn leading_word(s: &str) -> &str {
 
 /// Reads one ingredient line. Never fails: a line without a usable amount keeps its whole text as the name.
 pub fn parse_line(text: &str) -> ParsedLine {
-    let t = text.trim();
+    let t = text.replace('\0', "");
+    let t = t.trim();
     match parse_amount(t) {
-        Some((amount, words)) => ParsedLine {
+        Some((amount, words, key)) => ParsedLine {
             amount: Some(amount),
             name: words.join(" "),
-            key: key_of(&words),
+            key,
         },
         None => ParsedLine {
             amount: None,
@@ -307,7 +328,16 @@ pub fn parse_line(text: &str) -> ParsedLine {
     }
 }
 
-fn parse_amount(t: &str) -> Option<(Amount, Vec<String>)> {
+/// Units a count's noun can stand in for: "4 garlic cloves" reads like "4 cloves garlic".
+const NOUN_UNITS: [&str; 7] = ["clove", "stalk", "sprig", "head", "bunch", "slice", "stick"];
+/// Herbs and ginger measured in teaspoons are the dried spice, not the fresh bunch.
+const DRIED_WHEN_SMALL: [&str; 12] = [
+    "thyme", "basil", "rosemary", "dill", "sage", "parsley", "tarragon", "mint", "chive",
+    "cilantro", "ginger", "marjoram",
+];
+
+/// The amount, the name's words and the merge key of a line; None when the line has no usable amount.
+fn parse_amount(t: &str) -> Option<(Amount, Vec<String>, String)> {
     let c = slashed(t);
     let (q, mut rest) = split(&c)?;
     let num = |s: Span| parse_number(&c[s.0..s.1]);
@@ -323,15 +353,43 @@ fn parse_amount(t: &str) -> Option<(Amount, Vec<String>)> {
         let word = leading_word(after);
         if let Some(u) = canon_unit(&word.to_lowercase()) {
             unit = Some(u);
-            rest = after[word.len()..].to_string();
+            rest = after[word.len()..].trim_start().to_string();
         }
     }
     if unit.is_some() && rest.get(..3).is_some_and(|p| p.eq_ignore_ascii_case("of ")) {
         rest = rest[3..].to_string();
     }
-    let words = clean_words(&rest);
-    if words.is_empty() {
+    let raw = clean_words(&rest);
+    // "4 garlic cloves": a unit word after the head noun is the unit.
+    let mut words = strip_prep(&raw);
+    if unit.is_none()
+        && words.len() > 1
+        && let Some(u) = words
+            .last()
+            .and_then(|w| canon_unit(w))
+            .filter(|u| NOUN_UNITS.contains(u))
+    {
+        unit = Some(u);
+        words.pop();
+    }
+    // Nothing to buy: "1 cup -2", "1 1/2 cups of".
+    if words
+        .iter()
+        .all(|w| w == "of" || w.chars().all(|ch| ch.is_ascii_digit()))
+    {
         return None;
+    }
+    let mut key = key_of(&words);
+    let has = |w: &str| words.iter().any(|x| x == w);
+    match unit {
+        // The unit decides the aisle: "1 can tomatoes" is canned, not "2 tomatoes".
+        Some("can" | "jar") if !has("canned") && !has("frozen") => key = format!("canned {key}"),
+        Some("tsp" | "dash" | "pinch")
+            if raw.len() == words.len() && DRIED_WHEN_SMALL.contains(&key.as_str()) =>
+        {
+            key = format!("dried {key}");
+        }
+        _ => {}
     }
     let (a, b) = (num(q.a), q.b.map(num));
     let (min, max) = match b {
@@ -346,12 +404,13 @@ fn parse_amount(t: &str) -> Option<(Amount, Vec<String>)> {
             unit: unit.map(str::to_string),
         },
         words,
+        key,
     ))
 }
 
 /// "cup" -> "cups" above one; abbreviations never change (scale.ts `pluralize`).
 fn pluralize(unit: &str, value: f64) -> String {
-    const BASES: [&str; 20] = [
+    const BASES: [&str; 24] = [
         "cup",
         "clove",
         "can",
@@ -372,6 +431,10 @@ fn pluralize(unit: &str, value: f64) -> String {
         "piece",
         "package",
         "handful",
+        "gallon",
+        "tin",
+        "jar",
+        "bag",
     ];
     let lower = unit.to_ascii_lowercase();
     for base in BASES {

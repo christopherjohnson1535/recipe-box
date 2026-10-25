@@ -1,8 +1,33 @@
 //! The merge key: what two ingredient lines must share to land on one grocery item.
 
-const SIZE_WORDS: [&str; 5] = ["large", "medium", "small", "extra-large", "big"];
+const SIZE_WORDS: [&str; 7] = [
+    "large",
+    "medium",
+    "small",
+    "extra-large",
+    "big",
+    "medium-sized",
+    "jumbo",
+];
+/// Prep and state words in front of a name that change nothing about what is bought ("2 cups chopped onion").
+/// Kept on purpose: dried, frozen, canned, ground, smoked, toasted.
+const PREP_WORDS: [&str; 20] = [
+    "chopped", "minced", "diced", "sliced", "grated", "shredded", "crushed", "peeled", "fresh",
+    "freshly", "finely", "roughly", "coarsely", "thinly", "thickly", "melted", "softened", "cubed",
+    "sifted", "packed",
+];
+/// Phrases that end a name without being part of it: "salt to taste", "parsley for garnish".
+const TRAILING: [&[&str]; 6] = [
+    &["to", "taste"],
+    &["as", "needed"],
+    &["for", "serving"],
+    &["for", "garnish"],
+    &["if", "desired"],
+    &["optional"],
+];
 /// Words that end in "s" but are not plurals, or whose plural is the same word.
-const INVARIANT: [&str; 9] = [
+const INVARIANT: [&str; 10] = [
+    "brussels",
     "molasses",
     "hummus",
     "asparagus",
@@ -45,12 +70,42 @@ pub(super) fn clean_words(name: &str) -> Vec<String> {
             words.push(w.to_string());
         }
     }
+    let ends_with = |words: &[String], t: &[&str]| {
+        words.len() > t.len()
+            && words[words.len() - t.len()..]
+                .iter()
+                .zip(t)
+                .all(|(a, b)| a == b)
+    };
+    while let Some(t) = TRAILING.iter().find(|t| ends_with(&words, t)) {
+        words.truncate(words.len() - t.len());
+    }
     words
+}
+
+/// `words` without the prep words that lead them ("chopped fresh basil" -> "basil"); at least one word is kept.
+/// "crushed" stays in front of tomatoes and red pepper, where it is part of the product.
+pub(super) fn strip_prep(words: &[String]) -> Vec<String> {
+    let mut at = 0;
+    while at + 1 < words.len() && PREP_WORDS.contains(&words[at].as_str()) {
+        let product = words[at] == "crushed"
+            && (words[at + 1].starts_with("tomato") || words[at + 1] == "red");
+        if product {
+            break;
+        }
+        at += 1;
+    }
+    let mut out = words[at..].to_vec();
+    // "freshly ground black pepper" is the pepper.
+    if out.len() > 1 && out[0] == "ground" && out.last().is_some_and(|w| w == "pepper") {
+        out.remove(0);
+    }
+    out
 }
 
 /// Lower-case, prep notes and size words dropped, whitespace collapsed, last word made singular.
 pub fn merge_key(name: &str) -> String {
-    key_of(&clean_words(name))
+    key_of(&strip_prep(&clean_words(name)))
 }
 
 pub(super) fn key_of(words: &[String]) -> String {
@@ -65,7 +120,7 @@ pub(super) fn key_of(words: &[String]) -> String {
     }
 }
 
-fn singular(w: &str) -> String {
+pub(super) fn singular(w: &str) -> String {
     if w.len() <= 3
         || !w.ends_with('s')
         || w.ends_with("ss")
@@ -76,14 +131,12 @@ fn singular(w: &str) -> String {
     }
     match w {
         "leaves" => return "leaf".into(),
+        "chilies" => return "chili".into(),
         "loaves" => return "loaf".into(),
         "halves" => return "half".into(),
         _ => {}
     }
-    let keep_ie = matches!(
-        w,
-        "cookies" | "brownies" | "smoothies" | "veggies" | "chilies" | "pies"
-    );
+    let keep_ie = matches!(w, "cookies" | "brownies" | "smoothies" | "veggies" | "pies");
     match w.strip_suffix("ies") {
         Some(stem) if w.len() > 4 && !keep_ie => return format!("{stem}y"),
         _ => {}
@@ -135,7 +188,21 @@ mod tests {
             ("tomatoes (about 2 lb)", "tomato"),
             ("Extra-Large Eggs", "egg"),
             ("extra large eggs", "egg"),
-            ("fresh   basil  leaves", "fresh basil leaf"),
+            ("fresh   basil  leaves", "basil leaf"),
+            ("chopped fresh basil", "basil"),
+            ("finely minced garlic", "garlic"),
+            ("shredded cheddar cheese", "cheddar cheese"),
+            ("medium-sized onion", "onion"),
+            ("crushed tomatoes", "crushed tomato"),
+            ("crushed red pepper", "crushed red pepper"),
+            ("crushed garlic", "garlic"),
+            ("dried oregano", "dried oregano"),
+            ("frozen peas", "frozen pea"),
+            ("ground beef", "ground beef"),
+            ("freshly ground black pepper", "black pepper"),
+            ("chopped", "chopped"),
+            ("chilies", "chili"),
+            ("brussels sprouts", "brussels sprout"),
             ("blueberries", "blueberry"),
             ("potatoes", "potato"),
             ("peaches", "peach"),
@@ -145,7 +212,14 @@ mod tests {
             ("asparagus", "asparagus"),
             ("couscous", "couscous"),
             ("red pepper flakes", "red pepper flake"),
-            ("salt to taste", "salt to taste"),
+            ("salt to taste", "salt"),
+            ("Salt (to taste)", "salt"),
+            ("pepper as needed", "pepper"),
+            ("parsley for garnish", "parsley"),
+            ("cilantro, for serving", "cilantro"),
+            ("walnuts optional", "walnut"),
+            ("salt and pepper to taste", "salt and pepper"),
+            ("to taste", "to taste"),
             ("cloves", "clove"),
             ("", ""),
         ] {
