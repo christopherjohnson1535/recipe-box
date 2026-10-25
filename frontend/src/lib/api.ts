@@ -2,7 +2,6 @@
 // and on the server (API_INTERNAL_URL + the caller's forwarded cookie, see server-api.ts).
 
 import type { components } from "./api-types";
-// Hand-written until the grocery endpoints are in the generated types.
 import type { GroceryItem, GroceryList, GrocerySection, ItemPatch } from "@/components/groceries/types";
 
 // Every shape below is generated from the backend's OpenAPI spec (docs/openapi.json, see docs/API.md).
