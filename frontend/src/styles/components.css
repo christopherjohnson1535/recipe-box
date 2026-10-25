@@ -16,9 +16,9 @@
   --button-ghost-fg: var(--color-ink);
   --button-ghost-underline: var(--color-rule-strong);
   --button-ghost-hover: var(--color-accent);
-  --button-danger-bg: var(--color-accent);
-  --button-danger-fg: var(--color-on-accent);
-  --button-danger-bg-hover: var(--color-accent-hover);
+  --button-danger-bg: var(--color-danger);
+  --button-danger-fg: var(--color-on-danger);
+  --button-danger-bg-hover: var(--color-danger-hover);
 
   /* Input */
   --input-bg: var(--color-paper);
@@ -102,8 +102,8 @@
 
 /*
  * Per-edition overrides that are set here rather than in a theme file: photos sit a touch dimmer in the evening, the
- * full-cream double rule was the brightest object on the page, so evening uses the muted ink, and the ink-filled
- * timer chips and floating bar (cream in the evening) become deep umber panels instead.
+ * full-ink double rule was the brightest object on the page, so evening uses the muted ink, and the ink-filled
+ * timer chips and floating bar (near-white in the evening) become paper-deep panels instead.
  * Same selectors as themes/evening.css; tokens.test.ts checks the two blocks set identical values.
  */
 :root {

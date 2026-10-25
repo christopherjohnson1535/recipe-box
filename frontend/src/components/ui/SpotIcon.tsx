@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { SpotName } from "./spot-icons";
 
-// One line weight, one small claret detail each. `line` is drawn in --spot-line, `detail` in --spot-detail.
+// One line weight, one small accent detail each. `line` is drawn in --spot-line, `detail` in --spot-detail.
 const DRAWINGS: Record<SpotName, { line: ReactNode; detail: string }> = {
   soups: { line: <path d="M4 11h16c0 4.4-3.6 8-8 8s-8-3.6-8-8zM9 21h6" />, detail: "M9.5 3.5l1 2.5M13.5 3.5l1 2.5" },
   vegetarian: { line: <path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14z" />, detail: "M5 19l8-8" },

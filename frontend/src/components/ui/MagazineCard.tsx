@@ -47,7 +47,7 @@ type CardProps = {
 /**
  * One recipe in the home grid: a 4:3 photo (or a paper plate with a spot icon), a kicker line with tags and time, a
  * display title and a two-line deck. On hover and on keyboard focus the plate scales and turns and the title draws a
- * claret underline (motion.css); under reduced motion only the underline and colour change. The whole card is the link.
+ * accent underline (motion.css); under reduced motion only the underline and colour change. The whole card is the link.
  */
 export function MagazineCard({ href, title, kicker, time, deck, imageSrc, fallbackIcon, index = 0, morphId }: CardProps) {
   return (

@@ -1,32 +1,43 @@
 /*
  * Layer 1: primitives. Raw values with no meaning attached. Only theme files (src/styles/themes/*) read these;
  * nothing else should. Names say what the colour is, not what it is for. See docs/THEMING.md.
+ * Riviera · Charcoal & Saffron (ADR 0009, docs/design/restyle-2026-10-riviera/).
  */
 :root {
-  /* Day edition: warm paper and brown-black ink. */
-  --cream-50: #fbf8f1;
-  --cream-100: #f3eee3;
-  --cream-300: #cdc3b0;
-  --stone-500: #8c8377;
-  --stone-700: #5c554c;
-  --stone-950: #1a1714;
+  /* Cool off-white paper and the light side of the evening edition. */
+  --chalk-50: #f4f4f1;
+  --chalk-75: #eeede8;
+  --chalk-100: #eaeae5;
+  --chalk-300: #d8d9d3;
 
-  /* Evening edition: the same browns, dark side up. */
-  --umber-50: #efe8da;
-  --umber-300: #b3a999;
-  --umber-500: #7a7064;
-  --umber-700: #463e33;
-  --umber-900: #241f19;
-  --umber-950: #16130f;
+  /* Charcoal slate: ink by day, paper by evening, the top band in both. */
+  --slate-300: #a9aeb4;
+  --slate-400: #7d8288;
+  --slate-500: #6d7379;
+  --slate-600: #565c63;
+  --slate-800: #2e3236;
+  --slate-900: #22262b;
+  --slate-925: #1b1e21;
+  --slate-950: #121416;
 
-  /* The one accent: a deep claret, and its lighter evening tints. */
-  --claret-200: #e6a497;
-  --claret-300: #d98c7f;
-  --claret-700: #9b1c1c;
-  --claret-800: #7e1414;
+  /* The one accent: deep saffron by day, brighter saffron by evening and on the band. */
+  --saffron-200: #ecc57a;
+  --saffron-300: #e0b057;
+  --saffron-350: #e9b75a;
+  --saffron-700: #8a5c0c;
+  --saffron-800: #6f4a09;
 
-  /* Print inks for illustration (spot icons, stamps). Mustard is now named by --color-attention (and the
-     darkroom); contrast notes are in tokens.test.ts and docs/UI.md. */
+  /* Danger: a brick red, kept well away from the saffron accent. */
+  --brick-200: #f5b3a6;
+  --brick-300: #ef9a8a;
+  --brick-700: #a33a2b;
+  --brick-800: #86301f;
+
+  /* "Check this": a sea teal, so a flagged row never reads as the accent (mustard sat beside saffron). */
+  --sea-400: #6fb5bd;
+
+  /* Print inks for illustration (spot icons, stamps). No semantic token names them yet; contrast notes are in
+     tokens.test.ts and docs/UI.md. */
   --mustard-500: #d9a21b;
   --fern-700: #3f6b45;
   --tomato-600: #d2492a;

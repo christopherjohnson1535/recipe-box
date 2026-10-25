@@ -3,19 +3,20 @@ import { cx } from "./cx";
 
 /**
  * Every run of text a page sets. Each variant resets case, tracking, weight and style, so one can sit inside
- * another (a small italic source line inside an uppercase byline) without inheriting the wrong look.
+ * another (a small italic source line inside an uppercase Karla byline) without inheriting the wrong look; the reading
+ * variants set Crimson Pro back, since labels are a different family.
  */
 const variants = {
-  /** 19px reading text. */
-  body: "text-body text-ink normal-case tracking-normal font-normal not-italic",
+  /** 20px reading text. */
+  body: "font-text text-body text-ink normal-case tracking-normal font-normal not-italic",
   /** Italic standfirst under a title, empty-state copy. */
-  deck: "text-deck text-ink-muted normal-case tracking-normal font-normal italic",
+  deck: "font-text text-deck text-ink-muted normal-case tracking-normal font-normal italic",
   /** Hints, alerts, small print. */
-  small: "text-small text-ink-muted normal-case tracking-normal font-normal not-italic",
+  small: "font-text text-small text-ink-muted normal-case tracking-normal font-normal not-italic",
   /** Small italic aside, e.g. "Source: …" in a byline. */
-  aside: "text-small normal-case tracking-normal font-normal italic",
+  aside: "font-text text-small normal-case tracking-normal font-normal italic",
   /** Italic body-size note: "No steps listed.", recipe notes. */
-  note: "text-body text-ink-muted normal-case tracking-normal font-normal italic",
+  note: "font-text text-body text-ink-muted normal-case tracking-normal font-normal italic",
   /** Uppercase tracked label in muted ink: counts, metadata. */
   meta: "label text-ink-muted not-italic",
   /** Upright, semibold ink inside italic copy. */

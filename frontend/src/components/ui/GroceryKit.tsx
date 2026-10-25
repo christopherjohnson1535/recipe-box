@@ -157,8 +157,8 @@ export function GrocerySection({ title, count, children }: { title: string; coun
 }
 
 /**
- * One item: the whole row is the tick (a button with `aria-pressed`, 56px tall), then the menu. Amounts come first in claret
- * ("1 cup + 2 tbsp"), then the name. Ticked: a claret line is drawn through it and it turns muted. `disabled` keeps the
+ * One item: the whole row is the tick (a button with `aria-pressed`, 56px tall), then the menu. Amounts come first in accent
+ * ("1 cup + 2 tbsp"), then the name. Ticked: an accent line is drawn through it and it turns muted. `disabled` keeps the
  * text at full strength (the list must stay readable offline).
  */
 export function GroceryRow({
@@ -347,7 +347,7 @@ export function RowMenu({ label, entries, disabled }: { label: string; entries: 
   );
 }
 
-/** The count after "Groceries" in the masthead: a claret numeral, spoken as "(n to buy)". */
+/** The count after "Groceries" in the masthead: an accent numeral, spoken as "(n to buy)". */
 export function NavCount({ n }: { n: number }) {
   return (
     <>

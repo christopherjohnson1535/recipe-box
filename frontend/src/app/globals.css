@@ -1,4 +1,4 @@
-/* tastemaker: lane=editorial-magazine · mood=elegant · macro=app-shell + article/TOC · palette=hand-set, matrix-checked (see .tastemaker/style-lock.md) · motion=one easing, 150-900ms, marks a change of state or place, loops only for a live timer, scan or ticker; editions=day 07:00-18:59, evening 19:00-06:59 or chosen per device */
+/* tastemaker: lane=riviera-editorial · mood=refined · macro=app-shell + article/TOC · palette=hand-set, matrix-checked (see .tastemaker/style-lock.md) · motion=one easing, 150-900ms, marks a change of state or place, loops only for a live timer, scan or ticker; editions=day 07:00-18:59, evening 19:00-06:59 or chosen per device */
 @import "tailwindcss";
 
 /*
@@ -16,28 +16,29 @@
 /* Theme-independent tokens: type, shape, motion. */
 @theme static {
   --font-*: initial;
-  --font-display: "Libre Caslon Display", "Iowan Old Style", Georgia, serif;
-  --font-text: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
+  --font-display: "Marcellus", "Iowan Old Style", Georgia, serif;
+  --font-label: "Karla Variable", "Helvetica Neue", Arial, sans-serif;
+  --font-text: "Crimson Pro Variable", "Iowan Old Style", Georgia, serif;
 
-  /* Type scale: body is 19px for arm's-length iPad reading. */
-  --text-label: 0.875rem; /* uppercase, tracked: kickers, bylines, metadata, buttons */
-  --text-label--letter-spacing: 0.12em;
+  /* Type scale: Crimson Pro sets small, so body is 20px for arm's-length iPad reading. */
+  --text-label: 0.8125rem; /* 13px Karla, uppercase, tracked: kickers, bylines, metadata, buttons; never smaller */
+  --text-label--letter-spacing: 0.14em;
   --text-label--line-height: 1.35;
-  --text-small: 1rem;
+  --text-small: 1.0625rem;
   --text-small--line-height: 1.5;
-  --text-body: 1.1875rem;
+  --text-body: 1.25rem;
   --text-body--line-height: 1.6;
   --text-deck: 1.375rem; /* italic standfirst */
   --text-deck--line-height: 1.45;
-  --text-title-sm: 1.625rem; /* listing titles */
+  --text-title-sm: 1.8125rem; /* card and listing titles */
   --text-title-sm--line-height: 1.2;
   --text-title: 2.25rem; /* section titles, empty states */
   --text-title--line-height: 1.15;
-  --text-numeral: 2rem; /* method step numbers */
+  --text-numeral: 2.125rem; /* method step numbers */
   --text-numeral--line-height: 1;
-  --text-headline: clamp(2.5rem, 2rem + 3vw, 4.5rem); /* page headline */
+  --text-headline: clamp(2.5rem, 2rem + 2.6vw, 4.25rem); /* page headline */
   --text-headline--line-height: 1.05;
-  --text-wordmark: clamp(1.875rem, 1.6rem + 0.6vw, 2.125rem);
+  --text-wordmark: clamp(2rem, 1.6rem + 1.2vw, 2.75rem); /* 44px on a desktop */
   --text-wordmark--line-height: 1;
   --text-wordmark-lg: clamp(2.75rem, 2rem + 4vw, 4rem);
   --text-wordmark-lg--line-height: 1;
@@ -109,16 +110,16 @@ body {
 
 /* Helper classes. Like component tokens, only components/ui uses these (guard test). */
 @layer components {
-  /* Libre Caslon Display ships one weight; never let the browser fake a bold. */
+  /* Marcellus ships one weight and no italic; never let the browser fake a bold or a slant. */
   .font-display {
     font-weight: 400;
     font-synthesis: none;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
   }
 
-  /* Uppercase, tracked label: kickers, bylines, metadata, field labels, buttons. */
+  /* Uppercase, tracked Karla label: kickers, bylines, metadata, field labels, buttons. */
   .label {
-    font-family: var(--font-text);
+    font-family: var(--font-label);
     font-size: var(--text-label);
     line-height: var(--text-label--line-height);
     letter-spacing: var(--text-label--letter-spacing);
@@ -129,10 +130,10 @@ body {
 
   /* Quieter label voice for chips, nav and meta; buttons, field labels and kickers keep the 600 .label. */
   .label-quiet {
-    font-family: var(--font-text);
+    font-family: var(--font-label);
     font-size: var(--text-label);
     line-height: var(--text-label--line-height);
-    letter-spacing: 0.1em;
+    letter-spacing: var(--text-label--letter-spacing);
     text-transform: uppercase;
     font-weight: 500;
     font-variant-numeric: lining-nums tabular-nums;

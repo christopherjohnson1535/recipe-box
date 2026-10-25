@@ -157,15 +157,15 @@ describe("preference storage", () => {
 describe("applyEdition", () => {
   const metas = () => {
     document.head.innerHTML =
-      '<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf8f1"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16130f">';
+      '<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f4f1"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121416">';
     return [...document.querySelectorAll("meta")].map((m) => m);
   };
   const colours = (list: HTMLMetaElement[]) => list.map((m) => m.content);
 
   it.each([
-    ["clock", at(20), false, "evening", ["#16130f", "#16130f"]],
-    ["day", at(23), true, "day", ["#fbf8f1", "#fbf8f1"]],
-    ["evening", at(12), false, "evening", ["#16130f", "#16130f"]],
+    ["clock", at(20), false, "evening", ["#121416", "#121416"]],
+    ["day", at(23), true, "day", ["#f4f4f1", "#f4f4f1"]],
+    ["evening", at(12), false, "evening", ["#121416", "#121416"]],
   ] as [EditionPreference, Date, boolean, string, string[]][])("%s sets data-theme and theme-color", (pref, now, dark, theme, colour) => {
     localStorage.setItem(EDITION_KEY, pref);
     const list = metas();
@@ -181,7 +181,7 @@ describe("applyEdition", () => {
     list.forEach((m) => m.setAttribute("content", "#000000"));
     expect(applyEdition(document, at(12), true)).toBe("evening");
     expect(document.documentElement.dataset.theme).toBeUndefined();
-    expect(colours(list)).toEqual(["#fbf8f1", "#16130f"]);
+    expect(colours(list)).toEqual(["#f4f4f1", "#121416"]);
   });
 });
 
@@ -189,16 +189,16 @@ describe("pinning an edition", () => {
   const metaColour = () => document.querySelector<HTMLMetaElement>("meta")?.content;
 
   it("holds against every re-apply, theme-color included, and unpin recomputes the person's edition", () => {
-    document.head.innerHTML = '<meta name="theme-color" content="#fbf8f1">';
+    document.head.innerHTML = '<meta name="theme-color" content="#f4f4f1">';
     pinEdition(document, "evening");
     expect(document.documentElement.dataset.theme).toBe("evening");
-    expect(metaColour()).toBe("#16130f");
+    expect(metaColour()).toBe("#121416");
     localStorage.setItem(EDITION_KEY, "day");
     expect(applyEdition(document, at(10), false)).toBe("evening");
     expect(document.documentElement.dataset.theme).toBe("evening");
     expect(unpinEdition(document, at(10), false)).toBe("day");
     expect(document.documentElement.dataset.theme).toBe("day");
-    expect(metaColour()).toBe("#fbf8f1");
+    expect(metaColour()).toBe("#f4f4f1");
     expect(document.documentElement.hasAttribute(PIN_ATTRIBUTE)).toBe(false);
   });
 

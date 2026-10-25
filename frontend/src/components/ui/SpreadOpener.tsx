@@ -5,7 +5,7 @@ import { Morph, photoName, titleName } from "./morph";
 
 type SpreadOpenerProps = {
   title: string;
-  /** Tags, set as a claret small-caps line above the headline. */
+  /** Tags, set as an accent small-caps line above the headline. */
   kicker?: ReactNode;
   /** Italic standfirst under the headline. */
   deck?: ReactNode;
