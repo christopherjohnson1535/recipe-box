@@ -63,7 +63,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for branches, PR titles and the definitio
 - [Contribute](CONTRIBUTING.md) · [Test](docs/TESTING.md) · [Theme the UI](docs/THEMING.md) · [Develop](docs/wiki/Development.md)
 
 **Reference** (look things up)
-- [API contract](docs/API.md) · [Client SDKs](docs/SDK.md) · [Requirements](docs/REQUIREMENTS.md) · [Spec and data model](docs/SPEC.md) · [UI guide](docs/UI.md) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md)
+- [API contract](docs/API.md) · [Client SDKs](docs/SDK.md) · [Adding a storage adapter](docs/STORAGE-ADAPTERS.md) · [Requirements](docs/REQUIREMENTS.md) · [Spec and data model](docs/SPEC.md) · [UI guide](docs/UI.md) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md)
 
 **Explanation** (understand why)
 - [Architecture decision records](docs/adr/README.md) · [Software factory](docs/FACTORY.md) · [Wiki: Architecture](docs/wiki/Architecture.md) · [Roadmap](docs/wiki/Roadmap.md)

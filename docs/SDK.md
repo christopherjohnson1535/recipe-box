@@ -56,6 +56,8 @@ exercised even on a fresh stack, and it deletes its recipe and logs out even whe
 already has an admin (for example after `just e2e`), set `RECIPE_BOX_USER` and `RECIPE_BOX_PASSWORD` to that
 account; otherwise the test fails on a 401 from `login` and says so. Defaults: `sdk-smoke` / `sdk-smoke-password-123`.
 
+Adding a storage backend instead? See [Adding a storage adapter](STORAGE-ADAPTERS.md).
+
 ## Adding a language
 
 1. Pick a generator and pin its exact version (for example `openapi-generator-cli` or a language-native tool).
