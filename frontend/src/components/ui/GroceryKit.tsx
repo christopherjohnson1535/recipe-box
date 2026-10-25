@@ -30,6 +30,20 @@ export function ListBody({ ref, children }: { ref?: Ref<HTMLDivElement>; childre
 }
 
 /**
+ * The foot of the list: a hairline, then Show staples at the left, Clear ticked and Empty list at the right. On a phone Clear
+ * ticked (the common one) takes the full width on top and the two quiet links share the line under it. Any slot may be empty.
+ */
+export function ListActions({ staples, clear, empty }: { staples?: ReactNode; clear?: ReactNode; empty: ReactNode }) {
+  return (
+    <div className="grid grid-cols-2 items-center gap-x-6 gap-y-2 border-t border-(--rule-hair) pt-4 sm:flex sm:flex-wrap sm:justify-end print:hidden">
+      {staples && <div className="justify-self-start sm:mr-auto">{staples}</div>}
+      {clear && <div className="max-sm:order-first max-sm:col-span-2 max-sm:[&>button]:w-full">{clear}</div>}
+      <div className="col-start-2 justify-self-end sm:col-start-auto">{empty}</div>
+    </div>
+  );
+}
+
+/**
  * The recipes on the list, folded away with one tap. Native `details`. `defaultOpen` is read once, when the shelf first
  * appears: a recipe added or taken off later never folds or opens it under the reader. It is a quiet head (hairline, muted)
  * so the heavy rule stays with the store sections the person shops from.

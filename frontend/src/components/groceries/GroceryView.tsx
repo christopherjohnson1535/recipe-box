@@ -8,7 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmInline } from "@/components/ui/ConfirmInline";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
-import { GroceryRow, GrocerySection, ListBody, RecipeRow, RecipeShelf, RowMenu, ScaleStepper, type MenuEntry } from "@/components/ui/GroceryKit";
+import { GroceryRow, GrocerySection, ListActions, ListBody, RecipeRow, RecipeShelf, RowMenu, ScaleStepper, type MenuEntry } from "@/components/ui/GroceryKit";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -293,30 +293,35 @@ export function GroceryView() {
         </ListBody>
 
         {(list.items.length > 0 || list.recipes.length > 0) && (
-          <div className="grid grid-cols-2 items-center gap-x-6 gap-y-2 border-t border-(--rule-hair) pt-4 sm:flex sm:flex-wrap sm:justify-end">
-            {staples > 0 && (
-              <Button variant="ghost" className="justify-self-start sm:mr-auto" onClick={() => setShowStaples((s) => !s)}>
-                {showStaples ? `Hide staples (${staples})` : `Show staples (${staples})`}
+          <ListActions
+            staples={
+              staples > 0 && (
+                <Button variant="ghost" onClick={() => setShowStaples((s) => !s)}>
+                  {showStaples ? `Hide staples (${staples})` : `Show staples (${staples})`}
+                </Button>
+              )
+            }
+            clear={
+              list.items.length > 0 && (
+                <Button
+                  variant="secondary"
+                  disabled={ticked === 0 || !online}
+                  {...offlineAttrs}
+                  onClick={() => {
+                    listTop.current?.focus({ preventScroll: true }); // this button is about to disable itself
+                    void g.clearChecked(ticked);
+                  }}
+                >
+                  Clear ticked{ticked > 0 ? ` (${ticked})` : ""}
+                </Button>
+              )
+            }
+            empty={
+              <Button variant="ghost" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
+                Empty list
               </Button>
-            )}
-            {list.items.length > 0 && (
-              <Button
-                variant="secondary"
-                className="max-sm:order-first max-sm:col-span-2 max-sm:w-full"
-                disabled={ticked === 0 || !online}
-                {...offlineAttrs}
-                onClick={() => {
-                  listTop.current?.focus({ preventScroll: true }); // this button is about to disable itself
-                  void g.clearChecked(ticked);
-                }}
-              >
-                Clear ticked{ticked > 0 ? ` (${ticked})` : ""}
-              </Button>
-            )}
-            <Button variant="ghost" className="col-start-2 justify-self-end sm:col-start-auto" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
-              Empty list
-            </Button>
-          </div>
+            }
+          />
         )}
         {confirmEmpty && (
           <ConfirmInline
