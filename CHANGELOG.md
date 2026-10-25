@@ -1,15 +1,21 @@
 # Changelog
 
 All notable changes to Recipe Box are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Recipe Box has not tagged a release yet, so Phase 1 is
-listed as a milestone; entries for tagged versions will follow the same layout.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow
+[Semantic Versioning](https://semver.org/) and are git tags `vMAJOR.MINOR.PATCH`; each one publishes
+`ghcr.io/christopherjohnson1535/recipe-box-api` and `-web` images for amd64 and arm64. Recipe Box has not tagged a
+release yet, so Phase 1 is listed as a milestone.
 
-From the first release on, GitHub release notes are generated from merged PR titles and labels
-(`.github/release.yml`), and this file is updated from them when a version is tagged.
+To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, merge, then tag (steps in
+`docs/DEPLOY.md`, "Cutting a release"). GitHub release notes are generated from merged PR titles and labels
+(`.github/release.yml`).
 
 ## [Unreleased]
 
 ### Added
+- Release process (#18): a `v*` tag publishes amd64 + arm64 images to GHCR only after the full CI suite passes,
+  checks both platforms are in the manifest and pull without a login, then creates the GitHub release. Tag table,
+  `IMAGE_TAG` pinning, upgrade/rollback and Raspberry Pi notes in `docs/DEPLOY.md`.
 - Text import (`POST /api/import/text`) and an AI fallback for link import when a page has no recipe data (#12).
 - Repository quality work (tracked in #52): community docs (`CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS`),
   `docs/TESTING.md`, architecture decision records in `docs/adr/`, a PR-title check and release-note categories.

@@ -18,8 +18,26 @@ Build on the host (`docker compose up -d --build`) or use the images CI publishe
 ```sh
 docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d
 ```
-Images: `ghcr.io/christopherjohnson1535/recipe-box-api` and `…-web`, tags `latest` (main), `sha-<short>`, and
-release versions. Both are built for amd64 and arm64 (Raspberry Pi 4/5 works).
+Images: `ghcr.io/christopherjohnson1535/recipe-box-api` and `…-web`, built for linux/amd64 and linux/arm64. Both
+packages are public, so `docker pull` needs no login.
+
+| Tag | Points at | Use it for |
+|---|---|---|
+| `v0.1.0` (also `0.1.0`) | that release, never moves | a deployment you update on purpose (recommended) |
+| `0.1` | the newest `0.1.x` release | patch updates on `pull` |
+| `latest` | the newest build of `main` | trying the newest work |
+| `sha-<short>` | one `main` commit | rolling back to a specific build |
+
+Choose the tag with `IMAGE_TAG` in `.env` (read by `deploy/compose.prod.yml`; default `latest`):
+```sh
+IMAGE_TAG=v0.1.0
+```
+To upgrade, change `IMAGE_TAG`, then `docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull` and
+`… up -d` (migrations run on API start; take a backup first, see below). To roll back, set the previous tag and run
+the same two commands; a release whose migrations changed the schema needs a restore from that backup instead.
+
+Raspberry Pi: use a 64-bit OS (Raspberry Pi OS 64-bit or Ubuntu arm64) on a Pi 4 or 5; Docker pulls the arm64 image
+on its own. A 32-bit OS (armv7) has no image: build on the Pi with `docker compose up -d --build` instead.
 
 ## A. Home PC / server
 1. Docker Desktop (Windows/macOS) or Docker Engine (Linux).
@@ -36,13 +54,38 @@ release versions. Both are built for amd64 and arm64 (Raspberry Pi 4/5 works).
 2. Point a DNS name (e.g. `recipes.example.com`) at the VM's IP. Open ports 80 and 443 only.
 3. `.env`: `PUBLIC_HOSTNAME=recipes.example.com`, `COOKIE_SECURE=true`, `WEB_BIND=127.0.0.1`.
 4. `docker compose -f docker-compose.yml -f deploy/compose.prod.yml --profile https up -d`.
-5. Updates: `docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull && … up -d`.
+5. Updates: set `IMAGE_TAG` to the new release, then `docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull && … up -d`.
 
 ## C. Managed container hosts
 Run three services from the same images: Postgres (use the host's managed Postgres if offered), `api` (env from
 `.env.example`, a persistent volume at `/data/media`, internal only) and `web` (`API_INTERNAL_URL` = the api's
 internal URL, public HTTPS port 3000). Set `COOKIE_SECURE=true`. Host-specific walkthroughs live in the wiki once
 tested (issue: deploy guides).
+
+## Cutting a release (owner)
+Releases are tags `vMAJOR.MINOR.PATCH` on `main`. Pushing one runs CI, which publishes the images and the GitHub release.
+
+One-time setup, before the first tag: GitHub → your profile → Packages → `recipe-box-api` → Package settings →
+Change visibility → Public; the same for `recipe-box-web`. (The packages exist after the first green `main` run.)
+Until then the release job's anonymous pull fails and no release is created.
+
+1. Move the `[Unreleased]` entries in `CHANGELOG.md` under a new `## [0.1.0] - <date>` heading, add the compare
+   link at the bottom, and merge that PR.
+2. Tag the merge commit and push the tag:
+   ```sh
+   git switch main && git pull
+   git tag v0.1.0 && git push --tags
+   ```
+3. Watch the CI run for the tag. After the usual checks and e2e pass, `images` pushes `v0.1.0`, `0.1.0` and `0.1` for
+   both platforms and checks the manifest lists amd64 and arm64; `release` then pulls each image without logging in,
+   on both platforms, and creates the GitHub release with notes generated from merged PR labels
+   (`.github/release.yml`).
+4. Check by hand once (any machine, logged out of ghcr.io):
+   `docker buildx imagetools inspect ghcr.io/christopherjohnson1535/recipe-box-api:v0.1.0` lists `linux/amd64` and
+   `linux/arm64`; on the Pi, `docker pull ghcr.io/christopherjohnson1535/recipe-box-api:v0.1.0` works.
+
+A failed run publishes nothing for that tag. Fix on `main`, then move the tag:
+`git tag -f v0.1.0 <fixed-commit> && git push -f origin v0.1.0` (only before anyone deploys it; otherwise tag `v0.1.1`).
 
 ## Backups
 `sh scripts/backup.sh` writes `backups/<time>/db.dump` + `media.tar`; copy that folder off the machine.

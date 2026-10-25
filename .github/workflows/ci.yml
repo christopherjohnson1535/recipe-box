@@ -290,8 +290,9 @@ jobs:
   images:
     # Multi-arch images (OPS-3): built on every run so a PR proves arm64 still builds; pushed to GHCR only on main
     # and version tags. The API cross-compiles for arm64 (see backend/Dockerfile), so no QEMU emulation of rustc.
+    # Waits for the compose and e2e jobs so a version tag only ever publishes images that passed the full suite.
     runs-on: ubuntu-latest
-    needs: [compose]
+    needs: [compose, e2e]
     permissions:
       contents: read
       packages: write
@@ -321,9 +322,11 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      - id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: ${{ matrix.context }}
           platforms: linux/amd64,linux/arm64
@@ -332,3 +335,38 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Both platforms published
+        if: github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/recipe-box-${{ matrix.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" | tee manifest.txt
+          grep -q 'linux/amd64' manifest.txt
+          grep -q 'linux/arm64' manifest.txt
+
+  release:
+    # Version tags only (docs/DEPLOY.md "Cutting a release"): checks that both images pull without credentials on
+    # both platforms, then creates the GitHub release with notes generated from merged PRs (.github/release.yml).
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [images]
+    permissions:
+      contents: write
+    steps:
+      - name: Images pull anonymously (amd64 + arm64)
+        env:
+          OWNER: ${{ github.repository_owner }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # This job never logs in to GHCR, so a private package fails here: make both packages public first.
+          for name in api web; do
+            for arch in amd64 arm64; do
+              docker pull --quiet --platform "linux/$arch" "ghcr.io/$OWNER/recipe-box-$name:$TAG"
+            done
+          done
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$TAG"
