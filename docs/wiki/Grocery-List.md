@@ -32,7 +32,7 @@ Type in the **Add an item** box: "paper towels" or "2 lb potatoes". The amount i
 Under the list, **Send to…** takes what is still to buy out of Recipe Box as plain text. Ticked items are left out, and so are staples unless **Show staples** is on.
 
 - **Share list** appears on iPad, iPhone and other devices with a share sheet. Pick Notes, Reminders, Keep, Messages or any app that takes text.
-- **Copy list** appears where there is no share sheet (a computer, say). It copies the text; paste it anywhere.
+- **Copy list** appears where there is no share sheet (a computer, say). It copies the text; paste it anywhere. If your browser won't let the page copy (this can happen on a plain `http://` address), the text appears in a box, already selected: copy it from there.
 
 The text starts with "Groceries", then each store section with its items under it:
 
@@ -49,7 +49,7 @@ Fridge
 ### Google Tasks
 If your household has switched on Google Tasks, **Send to Google Tasks** puts the list in your own Google account, so you can shop from the Google Tasks app or Gmail's side panel. If the button isn't there, Google Tasks is off for your household: ask whoever looks after Recipe Box (the admin) to follow the **Google Tasks** section of the [deploy guide](https://github.com/christopherjohnson1535/recipe-box/blob/main/docs/DEPLOY.md#google-tasks-optional).
 
-1. **Connect once.** Tap **Connect Google Tasks** (here, or in **Settings > Google Tasks**). You go to Google's page to allow access, then land back in Settings. Everyone connects their own Google account. Google says the app is unverified; that is expected, choose **Continue**.
+1. **Connect once.** Tap **Connect Google Tasks** (here, or in **Settings > Google Tasks**). You go to Google's page to allow access, then land back in Settings. Everyone connects their own Google account. Google says the app is unverified; that is expected, choose **Continue**. On an iPad or iPhone, do this in Safari (or your browser), not in the Home Screen app: the Home Screen app opens Google's page in a window that doesn't know you're signed in, so the connection fails. Open Recipe Box in Safari, go to **Settings > Google Tasks** and connect there. After that, **Send to Google Tasks** works in the Home Screen app too.
 2. **Send.** Tap **Send to Google Tasks**. A list called **Groceries** appears in Google Tasks with one task per store section (Produce, Meat, Fridge, Freezer, Pantry, Other) and each item as a subtask under it ("1 cup + 2 tbsp milk"). Recipe Box tells you how many items it sent.
 3. **Send again whenever the list changes.** Each send replaces what is in the Google list, so it never doubles up. Anything you added to that Google list by hand is replaced too, and so is any other list of yours that is called Groceries: keep your own lists under another name. Ticking in Google Tasks does not tick the item in Recipe Box.
 
