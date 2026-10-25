@@ -39,9 +39,10 @@ export function keepablePage(res: { status: number; redirected: boolean }, html:
 
 /**
  * A response that means nobody is signed in, so everything kept is dropped and a signed-out device shows nothing from
- * cache: a 401, a redirect that ended on /login, or a page navigation answered with a redirect (navigations are
- * fetched with `redirect: "manual"`, and in this app only the sign-in gate redirects a page: no cookie → /login).
- * A wrong password on login or on a password change is also a 401; dropping the offline copies then costs nothing.
+ * cache: a 401 on a GET, a redirect that ended on /login, or a page navigation answered with a redirect (navigations
+ * are fetched with `redirect: "manual"`; in this app the sign-in gate redirects a page to /login and /setup redirects
+ * once the first account exists, and either means "not a signed-in view"). The worker only sees GETs, so a POST that
+ * answers 401 (a wrong password) never gets here.
  */
 export function signedOut(res: { status: number; redirected: boolean; url: string; type?: string }): boolean {
   if (res.status === 401 || res.type === "opaqueredirect") return true;

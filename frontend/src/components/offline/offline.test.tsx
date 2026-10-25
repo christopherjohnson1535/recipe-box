@@ -49,6 +49,15 @@ describe("SavedRecipes", () => {
     expect(screen.queryByRole("list")).toBeNull();
   });
 
+  it("does not claim there are no recipes before it has looked", async () => {
+    let finish!: (k: { href: string; title: string }[]) => void;
+    render(<SavedRecipes load={() => new Promise((r) => (finish = r))} />);
+    expect(screen.getByText("This page isn’t saved on this device.")).toBeTruthy();
+    expect(screen.queryByText(/no recipes are yet|still open/)).toBeNull();
+    await act(async () => finish([]));
+    expect(screen.getByText(/no recipes are yet/)).toBeTruthy();
+  });
+
   it("reloads on Try again", () => {
     const reload = vi.fn();
     vi.stubGlobal("location", { ...window.location, reload });

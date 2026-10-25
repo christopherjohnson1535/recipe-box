@@ -238,11 +238,17 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
     are content ids). Everything else is network-only; a document with no copy falls back to `/offline`, which lists
     the recipes kept on the device.
   - Caps: 60 pages, 30 API responses, 200 photos, 30 days since last use, purge on quota error.
-  - Signed out never comes from cache: a 401, a page answered with a redirect, or a redirect to `/login` wipes the
-    `rb-*` caches; Sign out wipes them too; `/login`, `/setup`, lists, search and settings are never cached.
+  - Signed out never comes from cache: a GET answered 401, a page navigation answered with a redirect (the sign-in
+    gate, `/setup`) or a redirect to `/login` wipes the `rb-*` caches (the worker does not see POSTs, so a wrong
+    password does not); Sign out and a successful sign-in wipe them too; `/login`, `/setup`, lists, search and
+    settings are never cached. A wipe bumps a generation: a fetch that started before it is not stored, is checked
+    again right before the put and removed if a wipe landed in between (`worker-plugins.ts`).
+  - `Cache-Control: no-store` is deliberately not honoured: Next.js sends it on every dynamic page and the API on
+    recipe JSON, and keeping exactly those is the feature. Responses that are not a plain 200, are redirected or set a
+    cookie are skipped. The protection is the allowlist above plus the wipes.
   - A new worker re-fetches the kept pages on activate so they point at the new build's chunks.
   - UI: `OfflineBanner` in the app layout; Save (recipe form), Delete and the import buttons are disabled offline with the
-    reason beside them (`OfflineNote`). Edits are blocked, not queued. iOS may evict caches; the server stays the
+    reason beside them (`OfflineNote`, tied to the button with `aria-describedby`). Edits are blocked, not queued. iOS may evict caches; the server stays the
     source of truth.
 - **Cooking mode (KIT-2/3):** `navigator.wakeLock.request('screen')`, re-acquire on `visibilitychange`.
 

@@ -48,9 +48,11 @@ export function SavedRecipes({ load = keptRecipes }: { load?: () => Promise<Kept
         actions={<Button onClick={() => window.location.reload()}>Try again</Button>}
       >
         <p>
-          {kept && kept.length === 0
-            ? "This page isn’t saved on this device, and no recipes are yet. Open a recipe while you’re online and it stays readable here."
-            : "This page isn’t saved on this device. Recipes you’ve opened here before still open."}
+          {kept === null
+            ? "This page isn’t saved on this device."
+            : kept.length === 0
+              ? "This page isn’t saved on this device, and no recipes are yet. Open a recipe while you’re online and it stays readable here."
+              : "This page isn’t saved on this device. Recipes you’ve opened here before still open."}
         </p>
       </EmptyState>
       {kept && kept.length > 0 && (

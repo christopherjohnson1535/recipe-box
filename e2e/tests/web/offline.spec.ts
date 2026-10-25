@@ -63,8 +63,20 @@ async function goOnline(context: BrowserContext) {
   await context.setOffline(false);
 }
 
-const keptCount = (page: Page) =>
-  page.evaluate(async () => (await caches.keys()).filter((n) => n.startsWith("rb-")).length);
+const keptCount = (page: Page, prefix = "rb-") =>
+  page.evaluate(async (prefix) => (await caches.keys()).filter((n) => n.startsWith(prefix)).length, prefix);
+
+/**
+ * Nothing kept, and it stays that way: a first zero can be the moment between a wipe and a fetch that started before
+ * it storing its page. Each further read comes after a round trip through the worker, so late writes have had their turn.
+ */
+async function expectWiped(page: Page, prefix = "rb-") {
+  await expect.poll(() => keptCount(page, prefix), { message: "the worker still keeps pages" }).toBe(0);
+  for (let i = 0; i < 3; i++) {
+    await page.evaluate(() => fetch("/api/health", { cache: "no-store" }).then((r) => r.status));
+    expect(await keptCount(page, prefix), await where(page)).toBe(0);
+  }
+}
 
 test("a recipe opened before loads offline, with its photo, and other pages fall back", async ({ memberPage: page, member, context }) => {
   const recipe = await recipeWithPhoto(member);
@@ -76,7 +88,10 @@ test("a recipe opened before loads offline, with its photo, and other pages fall
   await expect(page.getByText("Simmer for 20 minutes.")).toBeVisible();
   const photo = page.getByRole("img", { name: `${recipe.title}, photo` });
   await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
-  await expect(page.getByText("You’re offline")).toBeVisible();
+  await expect(page.getByText("You’re offline", { exact: true })).toBeVisible();
+  const del = page.getByRole("button", { name: "Delete" });
+  await expect(del).toBeDisabled();
+  await expect(del).toHaveAccessibleDescription(/Deleting needs the server/);
 
   // A page this device never kept: the offline page, listing what it did keep.
   await page.goto("/settings");
@@ -105,7 +120,7 @@ test("signing out drops everything kept, so nothing is served from the cache", a
   await hydrated(signOut);
   await signOut.click();
   await expect(page).toHaveURL(/\/login/);
-  await expect.poll(() => keptCount(page)).toBe(0);
+  await expectWiped(page);
 
   await goOffline(context, page);
   await page.goto(`/recipes/${recipe.id}`);
@@ -121,5 +136,38 @@ test("an expired session also drops what was kept", async ({ memberPage: page, m
   await context.clearCookies();
   await page.goto(`/recipes/${recipe.id}`);
   await expect(page).toHaveURL(/\/login/);
-  await expect.poll(() => keptCount(page)).toBe(0);
+  await expectWiped(page);
+});
+
+test("a 401 on the recipe API also drops what was kept", async ({ memberPage: page, member, context }) => {
+  const recipe = await recipeWithPhoto(member);
+  await openAndKeep(page, recipe.id);
+
+  await context.clearCookies();
+  const status = await page.evaluate((id) => fetch(`/api/recipes/${id}`).then((r) => r.status), recipe.id);
+  expect(status).toBe(401);
+  await expectWiped(page);
+});
+
+test("a second member signing in on the same browser sees none of the first one's pages", async ({ memberPage: page, member, makeUser, context }) => {
+  const second = await makeUser();
+  const recipe = await recipeWithPhoto(member);
+  await openAndKeep(page, recipe.id);
+
+  // The first session ends without Sign out (it expired, or the cookie was cleared); no request tells the worker.
+  await context.clearCookies();
+  await page.goto("/login");
+  await page.getByLabel("Username").fill(second.user.username);
+  await page.getByLabel("Password").fill(second.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+  // Recipes are shared by the household, so the second member's own home page may keep photos; the first one's pages must be gone.
+  await expectWiped(page, "rb-pages");
+  await expectWiped(page, "rb-api");
+
+  await goOffline(context, page);
+  await page.goto(`/recipes/${recipe.id}`);
+  await expect(page.getByRole("heading", { name: "You’re offline", level: 1 })).toBeVisible();
+  await expect(page.getByText(recipe.title)).toHaveCount(0);
+  await goOnline(context);
 });
