@@ -79,6 +79,8 @@ pub struct UpdateUserBody {
 }
 
 /// Sets or clears a member's email, the address a Google account must have verified to sign in as them. Admin only.
+/// Replacing or clearing an email that was set also deletes all of the member's linked Google accounts (they were
+/// matched through the old address); setting a first email, or the same one again, keeps them.
 #[utoipa::path(patch, path = "/api/users/{id}", operation_id = "updateUser", tag = "users", security(("session" = [])),
     params(("id" = Uuid, Path, description = "User id")), request_body = UpdateUserBody, responses(
     (status = 200, description = "The member now.", body = User),

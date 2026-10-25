@@ -14,6 +14,7 @@ pub async fn identity_repo<F: Fn(Arc<dyn Clock>) -> Stack>(make: F) {
     listing_is_per_member_oldest_first(&make).await;
     unlinking_is_for_the_owner(&make).await;
     links_need_a_user_and_go_with_them(&make).await;
+    a_changed_or_cleared_email_takes_the_links(&make).await;
 }
 
 fn link(user_id: Uuid, subject: &str, email: &str) -> NewIdentity {
@@ -243,4 +244,72 @@ async fn links_need_a_user_and_go_with_them<F: Fn(Arc<dyn Clock>) -> Stack>(make
             .unwrap()
             .is_none()
     );
+}
+
+async fn a_changed_or_cleared_email_takes_the_links<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let member =
+        c.s.users
+            .create(new_user("member", "Member", "member"))
+            .await
+            .unwrap()
+            .id;
+    let linked = |subject: &'static str| {
+        let c = &c;
+        async move {
+            c.s.identities
+                .create(link(member, subject, "m@example.com"))
+                .await
+                .unwrap();
+            c.s.identities
+                .find(PROVIDER_GOOGLE, subject)
+                .await
+                .unwrap()
+                .is_some()
+        }
+    };
+
+    // The first email, or the same one again (in other letters), keeps the links, as do other members' links.
+    assert!(linked("sub-1").await);
+    c.s.identities
+        .create(link(c.user, "sub-admin", "a@example.com"))
+        .await
+        .unwrap();
+    c.s.users
+        .set_email(member, Some("m@example.com"))
+        .await
+        .unwrap();
+    c.s.users
+        .set_email(member, Some("M@Example.com"))
+        .await
+        .unwrap();
+    assert_eq!(c.s.identities.list(member).await.unwrap().len(), 1);
+
+    // A different email ends them, all of them, and only that member's.
+    assert!(linked("sub-2").await);
+    c.s.users
+        .set_email(member, Some("other@example.com"))
+        .await
+        .unwrap();
+    assert!(c.s.identities.list(member).await.unwrap().is_empty());
+    assert_eq!(c.s.identities.list(c.user).await.unwrap().len(), 1);
+
+    // So does clearing it.
+    assert!(linked("sub-3").await);
+    c.s.users.set_email(member, None).await.unwrap();
+    assert!(c.s.identities.list(member).await.unwrap().is_empty());
+
+    // A refused change (the address is another member's) changes nothing.
+    c.s.users
+        .set_email(c.user, Some("a@example.com"))
+        .await
+        .unwrap();
+    c.s.users
+        .set_email(member, Some("first@example.com"))
+        .await
+        .unwrap();
+    assert!(linked("sub-4").await);
+    let clash = c.s.users.set_email(member, Some("a@example.com")).await;
+    assert!(matches!(clash, Err(DomainError::Conflict(_))), "{clash:?}");
+    assert_eq!(c.s.identities.list(member).await.unwrap().len(), 1);
 }

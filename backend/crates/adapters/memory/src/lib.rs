@@ -564,8 +564,13 @@ impl UserRepo for MemoryStore {
             return Err(email_conflict());
         }
         let stored = s.users.get_mut(&id).expect("checked above");
+        let old = stored.user.email.take();
         stored.user.email = email.map(str::to_string);
-        Ok(stored.user.clone())
+        let user = stored.user.clone();
+        if old.is_some_and(|old| email.is_none_or(|new| !old.eq_ignore_ascii_case(new))) {
+            s.identities.retain(|i| i.user_id != id);
+        }
+        Ok(user)
     }
 
     async fn find_with_hash(&self, username: &str) -> DomainResult<Option<(User, String)>> {

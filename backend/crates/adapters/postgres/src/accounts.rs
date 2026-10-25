@@ -169,18 +169,35 @@ impl UserRepo for PgUserRepo {
         Ok(row.map(Into::into))
     }
 
+    // One transaction: a changed or cleared email takes the member's linked accounts with it.
     async fn set_email(&self, id: Uuid, email: Option<&str>) -> DomainResult<User> {
+        let mut tx = self.pool.begin().await.map_err(db)?;
+        let old: Option<Option<String>> =
+            sqlx::query_scalar("select email::text from users where id = $1 for update")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(db)?;
+        let old = old.ok_or_else(no_such_user)?;
         let sql = format!("update users set email = $2 where id = $1 returning {USER_COLUMNS}");
         let row = sqlx::query_as::<_, UserRow>(sqlx::AssertSqlSafe(sql))
             .bind(id)
             .bind(email)
-            .fetch_optional(&self.pool)
+            .fetch_one(&mut *tx)
             .await
             .map_err(|e| match violation(&e) {
                 Some(ErrorKind::UniqueViolation) => email_taken(),
                 _ => db(e),
             })?;
-        row.map(Into::into).ok_or_else(no_such_user)
+        if old.is_some_and(|old| email.is_none_or(|new| !old.eq_ignore_ascii_case(new))) {
+            sqlx::query("delete from user_identities where user_id = $1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await
+                .map_err(db)?;
+        }
+        tx.commit().await.map_err(db)?;
+        Ok(row.into())
     }
 
     // The caller trims the username, as the route did.

@@ -126,7 +126,9 @@ pub trait UserRepo: Send + Sync {
     async fn find_by_email(&self, email: &str) -> DomainResult<Option<User>>;
 
     /// Sets or (with `None`) clears a user's email and returns the user. `NotFound` when there is no such user,
-    /// `Conflict` when another user has that email.
+    /// `Conflict` when another user has that email. Replacing or clearing an email that was set also deletes all of
+    /// the user's linked sign-in accounts, in the same step: they were matched through the old address and must not
+    /// outlive it. Setting the first email, or the same one again, keeps the links.
     async fn set_email(&self, id: Uuid, email: Option<&str>) -> DomainResult<User>;
 
     /// The user with that username (case-insensitive) and their password hash, for sign-in.
