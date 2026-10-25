@@ -137,6 +137,11 @@ Anything else needs a one-line reason in the agent's report.
   - `steps`: `[{ "text": "Preheat oven…", "section": null }]`
 - `tags(id serial pk, name citext unique)`, `recipe_tags(recipe_id fk cascade, tag_id fk cascade, pk both)`.
 - `recipe_photos(recipe_id fk cascade, image_id fk, position int)` — original import photos (PHO-7).
+- Groceries (`0003_grocery.sql`, GRO): `grocery_list(id uuid pk, created_at, updated_at)` (one row: the household's
+  active list), `grocery_list_recipe(list_id fk cascade, recipe_id fk recipes cascade, scale real, added_at, pk both)`,
+  `grocery_item(id uuid pk, list_id fk cascade, key text, name text, amounts jsonb, section text, checked bool,
+  cleared bool, manual bool, recipe_ids uuid[])` (`key` is the merge key of a generated item, unique per list among
+  generated items), `grocery_section_override(key text pk, section text)`, `grocery_staple(key text pk)`.
 - Soft delete: `DELETE /api/recipes/:id` sets `deleted_at`; `POST /api/recipes/:id/restore` clears it within 10 min
   (REC-2); a periodic task purges rows deleted > 1 day.
 
@@ -159,6 +164,7 @@ Anything else needs a one-line reason in the agent's report.
 | GET/POST `/api/users`, DELETE `/api/users/:id`, PUT `/api/users/:id/password` | admin | ACC-2 | **501 stub** → issue |
 | GET `/api/export`, POST `/api/import/export` | admin | ACC-5 | done (#20); archive format in API.md |
 
+| GET `/api/grocery`, POST `/api/grocery/recipes`, DELETE `/api/grocery/recipes/:id`, POST `/api/grocery/items`, PATCH/DELETE `/api/grocery/items/:id`, POST `/api/grocery/clear-checked`, DELETE `/api/grocery` | s | GRO-1–4 | #79 |
 `RecipeDraft` = recipe fields without id/timestamps + `warnings: string[]` + `duplicateOf: uuid|null` +
 `imageId` (already stored) + `photoImageIds`. Drafts are never saved by the import endpoints — the client POSTs the
 reviewed draft to `/api/recipes`.
@@ -250,6 +256,11 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   - UI: `OfflineBanner` in the app layout; Save (recipe form), Delete and the import buttons are disabled offline with the
     reason beside them (`OfflineNote`, tied to the button with `aria-describedby`). Edits are blocked, not queued. iOS may evict caches; the server stays the
     source of truth.
+- **Groceries (GRO):** the parser, merge key, amount arithmetic/formatting and the section dictionary are pure code in
+  `domain::grocery` (table-driven tests over `backend/crates/domain/tests/fixtures/ingredient-lines.json`, which the
+  frontend scaler test also reads so both sides agree on quantities and units). `ports::GroceryRepo` stores the list;
+  `app::GroceryService` does recompute (in one repo call, under a lock on the list row) and the item rules. Behaviour:
+  `docs/API.md` → *Grocery list*.
 - **Cooking mode (KIT-2/3):** `navigator.wakeLock.request('screen')`, re-acquire on `visibilitychange`.
 
 ## Containers and deploy
