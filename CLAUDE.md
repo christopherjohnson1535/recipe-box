@@ -64,6 +64,24 @@ For an issue:
 6. Update docs: `docs/API.md` if a contract changed, the matching wiki page in `docs/wiki/`, and README if setup changed.
 7. Open a PR that says `Closes #<n>`, ticks the issue's acceptance checklist, and lists checks run.
 
+## Where new backend code goes
+The API is a Cargo workspace in `backend/` (ADR `docs/adr/0008-hexagonal-backend.md`). Dependencies point inward:
+adapters → `app` → `ports` → `domain`; the server crate (`backend/src`) wires them. Crate table: `docs/SPEC.md`.
+
+| You are adding… | It goes in |
+|---|---|
+| A data shape, a business rule, input validation, an error variant | `backend/crates/domain` |
+| A new outbound need (storage, clock, network, AI, files) | A trait in `backend/crates/ports`, an adapter implementing it, and the wiring. For storage, add cases to `ports::contract` (feature `contract`) so every adapter is held to them |
+| A use case or workflow | A method on a service in `backend/crates/app/src`, with a unit test on `adapter-memory` in `app/tests/` |
+| SQL, a table, a migration | `backend/crates/adapters/postgres` (`src`, `migrations/`); never in `app` or the HTTP adapter |
+| An endpoint | `backend/crates/adapters/http/src/routes/*` + DTO in `dto.rs` + a service method; handlers parse, call one service, map. Then `just openapi` to regenerate `docs/openapi.json` |
+| Wiring, config, process start, adapters with no crate of their own (argon2, image codec, HEIC) | `backend/src` (`state.rs` builds `Deps`) |
+
+Never let `sqlx`, `axum`, `reqwest` (or `utoipa`, `tokio`, `hyper`) into `domain`, `ports` or `app`. CI checks it with
+`cargo tree` in the backend job of `.github/workflows/ci.yml`; it also keeps `reqwest` to the `http-fetch` and
+`anthropic` adapters and the HTTP adapter off `sqlx`, `image` and `argon2`. Guides: `docs/STORAGE-ADAPTERS.md`
+(adding a storage adapter), `docs/SDK.md` (adding a client SDK).
+
 ## Rules that never bend
 - Link import only fetches public addresses through `backend/crates/adapters/http-fetch/src/safe_fetch.rs` (re-checked per redirect).
 - Uploaded images are decoded and re-encoded; never served as uploaded.

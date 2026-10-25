@@ -1,7 +1,7 @@
 # Recipe Box API
 
-Rust (axum 0.8, sqlx 0.9, tokio) API for Recipe Box. Contract: [`docs/API.md`](../docs/API.md); plan and module
-map: [`docs/SPEC.md`](../docs/SPEC.md).
+Rust (axum 0.8, sqlx 0.9, tokio) API for Recipe Box. Contract: [`docs/API.md`](../docs/API.md); crates and
+dependency rule: [`docs/SPEC.md`](../docs/SPEC.md).
 
 ## Run locally
 
@@ -45,25 +45,40 @@ cargo clippy --all-targets -- -D warnings
 TEST_DATABASE_URL=postgres://recipes:recipes@127.0.0.1:5432/recipes_test cargo test
 ```
 
-Integration tests (`tests/api.rs`) give each test its own schema in `TEST_DATABASE_URL` and drop it afterwards; the
+Integration tests (`tests/*.rs`) give each test its own schema in `TEST_DATABASE_URL` and drop it afterwards; the
 role needs `create` on that database (and the `citext` extension, created in `public` on first run). Without
 `TEST_DATABASE_URL` they print a note and pass, so `cargo test` alone runs only the unit tests.
 
 ## Layout
 
-- `src/main.rs` — config, tracing, pool, migrations, purge task, graceful shutdown (SIGTERM / Ctrl-C).
-- `src/lib.rs` — module tree, hourly `purge` and the display backfill (both run `app::Maintenance` and log).
-- `crates/app/` — the use-case services (`Services`): every rule that is not a data shape, a transport or storage.
-- `crates/adapters/http/` — the axum adapter: `routes/*` (one file per area), `extract.rs` (`CurrentUser` /
-  `AdminUser`, cookie `rb_session`), `error.rs` (`AppError` and the `AppJson` / `AppQuery` / `AppPath` extractors),
-  `dto.rs` (API types) and the OpenAPI spec. Handlers parse, call one service, map.
-- `crates/adapters/postgres/` — the Postgres adapter: repositories, row structs, `migrations/` and `migrate()`.
-- `src/routes/*` — what the adapter does not have yet: link/text/photo import routes, wired with the adapter's
-  routes by `router()`.
-- `src/auth/*`, `src/media.rs`, `src/plate.rs` — outbound adapters: argon2id hashing, session tokens (SHA-256 stored),
-  the image codec and the print-style rendition.
-- `src/import/*` — link/text/photo import.
-- `src/error.rs`, `src/models.rs` — re-exports of the adapter's error and API types for the import code.
+A Cargo workspace (`Cargo.toml` here). The server package is `recipe-box-api`; the rest are in `crates/`.
+Dependencies point inward: adapters → `app` → `ports` → `domain`. The server wires them.
+
+| Path | Crate | What it holds |
+|---|---|---|
+| `crates/domain/` | `recipe-box-domain` | Types, `DomainError`, validation, constants. No web, database or OpenAPI crates. |
+| `crates/ports/` | `recipe-box-ports` | The outbound traits, and with feature `contract` the storage contract suite (`ports::contract`). |
+| `crates/app/` | `recipe-box-app` | Use-case services (`Services`, built from `Deps`). Tests in `crates/app/tests/` run on `adapter-memory`. |
+| `crates/adapters/http/` | `recipe-box-adapter-http` | axum routes (`routes/*`), `extract.rs` (`CurrentUser` / `AdminUser`, cookie `rb_session`), `error.rs` (`AppError`, `AppJson` / `AppQuery` / `AppPath`), `dto.rs`, OpenAPI. Handlers parse, call one service, map. |
+| `crates/adapters/postgres/` | `recipe-box-adapter-postgres` | Repositories, `migrations/`, `migrate()`. |
+| `crates/adapters/memory/` | `recipe-box-adapter-memory` | In-memory ports for tests. |
+| `crates/adapters/fs-media/` | `recipe-box-adapter-fs-media` | `MediaStore` on a directory. |
+| `crates/adapters/http-fetch/` | `recipe-box-adapter-http-fetch` | The SSRF-guarded page fetcher (`safe_fetch.rs`). |
+| `crates/adapters/html/` | `recipe-box-adapter-html` | Page reader: JSON-LD, microdata, readable text. |
+| `crates/adapters/anthropic/` | `recipe-box-adapter-anthropic` | `RecipeExtractor` on the Anthropic Messages API. |
+
+The server crate (`src/`):
+- `main.rs` — config, tracing, pool, migrations, purge task, graceful shutdown (SIGTERM / Ctrl-C).
+- `lib.rs` — module tree, hourly `purge` and the display backfill (both run `app::Maintenance` and log).
+- `state.rs` — `AppState`: builds the adapters and `app::Deps`; `routes/mod.rs` builds the router from the HTTP adapter.
+- `auth/*`, `media.rs`, `plate.rs`, `clock.rs` — adapters with no crate of their own: argon2id hashing, session
+  tokens (SHA-256 stored), the image codec, the print-style rendition, the clock.
+- `import/*` — extractor selection (`ai.rs`), HEIC converter (`photo.rs`).
+- `error.rs`, `models.rs` — re-exports of the adapter's error and API types for the import code.
+- `bin/openapi.rs` — prints the OpenAPI spec (`just openapi`).
+
+`tests/` holds the HTTP integration tests. CI checks the dependency rule with `cargo tree`; see
+"Where new backend code goes" in [`CLAUDE.md`](../CLAUDE.md).
 
 ## Docker
 

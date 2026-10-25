@@ -3,9 +3,17 @@
 Filled-in copy of `.claude/skills/factory-plan/templates/agent-preamble.md` for this repo.
 
 ## Where things are
-- Repo root: the folder containing `docs/SPEC.md` (in the cloud sandbox: `/home/claude/recipebox`).
-- Backend: `backend/` (Rust, axum). Frontend: `frontend/` (Next.js 16). Containers: `docker-compose.yml`.
+- Repo root: the folder containing `docs/SPEC.md` (your working directory is normally inside it; do not hard-code a path).
+- Backend: `backend/` (Rust, axum; a Cargo workspace, see below). Frontend: `frontend/` (Next.js 16). Containers: `docker-compose.yml`.
 - Postgres for tests: a local server is available in the sandbox; use `TEST_DATABASE_URL` from your brief.
+
+## Backend layers
+Dependencies point inward: adapters → `app` → `ports` → `domain`; the server crate `backend/src` wires them.
+- Rule or validation → `backend/crates/domain`. Use case → a service in `backend/crates/app`. SQL and migrations →
+  `backend/crates/adapters/postgres`. Endpoint → `backend/crates/adapters/http` (route + DTO + service method; then
+  `just openapi`). Wiring → `backend/src`.
+- A new port (trait in `backend/crates/ports`) needs an adapter and, for storage, contract tests in `ports::contract`.
+- Never let `sqlx`, `axum` or `reqwest` into `domain`, `ports` or `app`; CI fails on it. Details: `CLAUDE.md`.
 
 ## Checks
 `just check-backend` / `just check-frontend` (or `just check` for both) run the checks CI runs; raw commands are in
