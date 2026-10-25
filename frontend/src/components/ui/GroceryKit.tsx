@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { buttonClass } from "./Button";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
@@ -40,6 +41,35 @@ export function ListActions({ staples, clear, empty }: { staples?: ReactNode; cl
       {clear && <div className="max-sm:order-first max-sm:col-span-2 max-sm:[&>button]:w-full">{clear}</div>}
       <div className="col-start-2 justify-self-end sm:col-start-auto">{empty}</div>
     </div>
+  );
+}
+
+/**
+ * Where the list goes next (GRO-5): a quiet label, the buttons in a wrapping row (full width one per line on a phone), then
+ * whatever the buttons have to say (hint, confirmation, error) beneath them. Not printed.
+ */
+export function SendArea({ label, actions, children }: { label: string; actions: ReactNode; children?: ReactNode }) {
+  const id = useId();
+  return (
+    <div role="group" aria-labelledby={id} className="flex flex-col gap-3 print:hidden">
+      <p id={id} className="label text-ink-muted">
+        {label}
+      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center max-sm:[&>*]:w-full">{actions}</div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A link that leaves the app for a full page load (the API's connect address, which answers with a redirect to Google), so
+ * not next/link, which would prefetch it. With a `variant` it is set as that button; without, as an inline link.
+ */
+export function HardLink({ href, variant, children }: { href: string; variant?: "primary" | "secondary" | "ghost"; children: ReactNode }) {
+  return (
+    <a href={href} className={variant ? buttonClass(variant) : "link"}>
+      {children}
+    </a>
   );
 }
 

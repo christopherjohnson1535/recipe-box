@@ -25,6 +25,10 @@ export type Settings = Schemas["Settings"];
 export type RecipeSort = Schemas["RecipeSort"];
 export type RecipePage = Schemas["RecipePage"];
 export type ImportSummary = Schemas["ImportSummary"];
+export type GoogleStatus = Schemas["GoogleStatus"];
+export type GoogleExport = Schemas["GoogleExport"];
+/** Connecting is a full-page navigation (a link, not a fetch): Google's consent page, then back to /settings?google=connected|error. */
+export const GOOGLE_CONNECT_URL = "/api/integrations/google/connect";
 export type RecipeQuery = { q?: string; tag?: string; sort?: RecipeSort; limit?: number; offset?: number };
 
 /** Dispatched on `window` after every grocery write, so the nav badge (and any other open view) refetches. */
@@ -154,6 +158,12 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, ini
     removeGroceryItem: (itemId: string) => groceryWrite<void>("DELETE", `/api/grocery/items/${id(itemId)}`),
     clearGroceryChecked: () => groceryWrite<GroceryList>("POST", "/api/grocery/clear-checked"),
     emptyGrocery: () => groceryWrite<void>("DELETE", "/api/grocery"),
+
+    googleStatus: () => get<GoogleStatus>("/api/integrations/google"),
+    disconnectGoogle: () => request<void>("DELETE", "/api/integrations/google"),
+    /** Replaces the member's Google Tasks "Groceries" list with the unticked items (staples only when asked). */
+    exportGroceryToGoogleTasks: (includeStaples: boolean) =>
+      request<GoogleExport>("POST", "/api/grocery/export/google-tasks", { includeStaples } satisfies Schemas["GoogleExportRequest"]),
 
     exportAll: () => get<Blob>("/api/export"),
     importExport: (file: Blob) => {

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { ServerError } from "@/components/ServerError";
-import { ApiError, type Capabilities, type Settings, type User } from "@/lib/api";
+import { ApiError, type Capabilities, type GoogleStatus, type Settings, type User } from "@/lib/api";
 import { redirectToLogin } from "@/lib/login-redirect";
 import { serverApi } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ google?: string }> }) {
+  const { google: googleResult } = await searchParams;
   const api = await serverApi();
   let me: User;
   let users: User[] = [];
@@ -23,5 +24,7 @@ export default async function SettingsPage() {
 
   const settings: Settings | null = me.role === "admin" ? await api.getSettings().catch(() => null) : null;
 
-  return <SettingsView me={me} users={users} capabilities={capabilities} settings={settings} />;
+  const google: GoogleStatus | null = await api.googleStatus().catch(() => null);
+
+  return <SettingsView me={me} users={users} capabilities={capabilities} settings={settings} google={google} googleResult={googleResult} />;
 }

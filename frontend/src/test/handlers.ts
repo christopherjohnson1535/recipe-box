@@ -1,6 +1,6 @@
 import { http, HttpResponse } from "msw";
 import type { GroceryItem, GroceryList } from "@/components/groceries/types";
-import type { Capabilities, Health, Image, Recipe, RecipeDraft, RecipeSummary, Tag, User } from "@/lib/api";
+import type { Capabilities, GoogleExport, GoogleStatus, Health, Image, Recipe, RecipeDraft, RecipeSummary, Tag, User } from "@/lib/api";
 
 // Typed against the types api.ts re-exports from the generated OpenAPI types (src/lib/api-types.ts).
 // "*/api/..." matches both the browser's relative URLs and server-side absolute ones.
@@ -54,6 +54,10 @@ export const handlers = [
   http.patch("*/api/grocery/items/:id", () => HttpResponse.json(groceryItem)),
   http.delete("*/api/grocery/items/:id", () => new HttpResponse(null, { status: 204 })),
   http.post("*/api/grocery/clear-checked", () => HttpResponse.json(groceryList)),
+  // Google Tasks is off by default; a test that needs it on overrides these.
+  http.get("*/api/integrations/google", () => HttpResponse.json<GoogleStatus>({ configured: false, connected: false, connectedAt: null })),
+  http.delete("*/api/integrations/google", () => new HttpResponse(null, { status: 204 })),
+  http.post("*/api/grocery/export/google-tasks", () => HttpResponse.json<GoogleExport>({ taskListTitle: "Groceries", sections: 0, items: 0 })),
   http.get("*/api/export", () => new HttpResponse("{}", { headers: { "content-type": "application/zip" } })),
   http.post("*/api/import/export", () => HttpResponse.json({ imported: 0, skipped: 0 })),
 ];
