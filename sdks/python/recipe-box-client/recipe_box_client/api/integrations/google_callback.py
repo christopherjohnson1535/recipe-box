@@ -73,7 +73,9 @@ def sync_detailed(
     error: str | Unset = UNSET,
 ) -> Response[Any | ErrorBody]:
     """Where Google sends the browser back. Always ends on the settings page with `?google=connected` or
-    `?google=error`; no token is ever put in the address.
+    `?google=error`; no token is ever put in the address. Without a session (an in-app browser that does
+    not share the
+    app's cookies) nothing is exchanged: it ends on `?google=error`.
 
     Args:
         code (str | Unset):
@@ -109,7 +111,9 @@ def sync(
     error: str | Unset = UNSET,
 ) -> Any | ErrorBody | None:
     """Where Google sends the browser back. Always ends on the settings page with `?google=connected` or
-    `?google=error`; no token is ever put in the address.
+    `?google=error`; no token is ever put in the address. Without a session (an in-app browser that does
+    not share the
+    app's cookies) nothing is exchanged: it ends on `?google=error`.
 
     Args:
         code (str | Unset):
@@ -140,7 +144,9 @@ async def asyncio_detailed(
     error: str | Unset = UNSET,
 ) -> Response[Any | ErrorBody]:
     """Where Google sends the browser back. Always ends on the settings page with `?google=connected` or
-    `?google=error`; no token is ever put in the address.
+    `?google=error`; no token is ever put in the address. Without a session (an in-app browser that does
+    not share the
+    app's cookies) nothing is exchanged: it ends on `?google=error`.
 
     Args:
         code (str | Unset):
@@ -174,7 +180,9 @@ async def asyncio(
     error: str | Unset = UNSET,
 ) -> Any | ErrorBody | None:
     """Where Google sends the browser back. Always ends on the settings page with `?google=connected` or
-    `?google=error`; no token is ever put in the address.
+    `?google=error`; no token is ever put in the address. Without a session (an in-app browser that does
+    not share the
+    app's cookies) nothing is exchanged: it ends on `?google=error`.
 
     Args:
         code (str | Unset):

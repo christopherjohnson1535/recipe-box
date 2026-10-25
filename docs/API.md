@@ -203,15 +203,18 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   `TOKEN_ENCRYPTION_KEY` are all set (the API refuses to start with only some of them). Each household member connects
   their own Google account; the connection is per user, any signed-in member may use it.
   - `GET /api/integrations/google` → `200 {configured, connected, connectedAt}` (`connectedAt` null when not connected).
-  - `GET /api/integrations/google/connect` (a browser navigation, session required) → `302` to Google's consent page
+  - `GET /api/integrations/google/connect` (a browser navigation) → `302` to Google's consent page
     (scope `https://www.googleapis.com/auth/tasks`, offline access) with a random `state`, also set in the cookie
     `rb_google_state` (httpOnly, SameSite=Lax, Secure like `rb_session`, Path `/api/integrations/google`, 10 minutes).
-    `422 google_disabled` when not configured.
-  - `GET /api/integrations/google/callback?code=…&state=…` (Google redirects here; session required) → checks `state`
+    `422 google_disabled` when not configured. Without a session it answers `302 /login?next=/settings` (and sets no
+    cookie) instead of 401, because it is a page navigation.
+  - `GET /api/integrations/google/callback?code=…&state=…` (Google redirects here) → checks `state`
     against the cookie (constant time; missing or different → no exchange), exchanges the code, stores the refresh
     token encrypted (AES-256-GCM or ChaCha20-Poly1305 with `TOKEN_ENCRYPTION_KEY`), clears the cookie and answers
     `302 /settings?google=connected`; any failure (state mismatch, `error=access_denied`, no refresh token, Google
-    error) answers `302 /settings?google=error` and stores nothing; every outcome clears the state cookie. A token that
+    error) answers `302 /settings?google=error` and stores nothing; every outcome clears the state cookie. Without a
+    session (the Home Screen app on iPad or iPhone opens Google's page in a browser that does not share its cookies)
+    it answers `302 /settings?google=error` too, exchanging nothing, rather than 401 JSON. A token that
     does not carry the Tasks scope is not stored. Connecting again replaces the old token, which is simply
     discarded, not revoked at Google (Google's revoke ends the app's whole grant for that account, including the new
     token), and keeps the remembered task list.

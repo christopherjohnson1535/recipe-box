@@ -1451,7 +1451,7 @@
         "tags": [
           "integrations"
         ],
-        "summary": "Where Google sends the browser back. Always ends on the settings page with `?google=connected` or\n`?google=error`; no token is ever put in the address.",
+        "summary": "Where Google sends the browser back. Always ends on the settings page with `?google=connected` or\n`?google=error`; no token is ever put in the address. Without a session (an in-app browser that does not share the\napp's cookies) nothing is exchanged: it ends on `?google=error`.",
         "operationId": "googleCallback",
         "parameters": [
           {
@@ -1484,7 +1484,7 @@
         ],
         "responses": {
           "302": {
-            "description": "To `/settings?google=connected`, or `/settings?google=error` when anything went wrong (nothing is stored then). Clears the `rb_google_state` cookie.",
+            "description": "To `/settings?google=connected`, or `/settings?google=error` when anything went wrong, also without a session (nothing is stored then). Clears the `rb_google_state` cookie.",
             "headers": {
               "Location": {
                 "schema": {
@@ -1537,13 +1537,13 @@
         "operationId": "connectGoogle",
         "responses": {
           "302": {
-            "description": "To Google's consent page. Sets the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes).",
+            "description": "To Google's consent page, setting the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes). Without a session: to `/login?next=/settings`, no cookie.",
             "headers": {
               "Location": {
                 "schema": {
                   "type": "string"
                 },
-                "description": "Google's consent page."
+                "description": "Google's consent page, or `/login?next=/settings`."
               },
               "Set-Cookie": {
                 "schema": {

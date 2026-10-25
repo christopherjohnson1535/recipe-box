@@ -14,7 +14,7 @@ use serde::Deserialize;
 use crate::{
     HttpConfig, HttpState,
     dto::GoogleStatus,
-    error::{AppQuery, AppResult, ErrorBody},
+    error::{AppError, AppQuery, AppResult, ErrorBody},
     extract::CurrentUser,
 };
 
@@ -47,6 +47,16 @@ fn found(location: &str) -> Response {
         .into_response()
 }
 
+/// The signed-in member, or `None` for a missing or expired session; any other failure stays an error. The connect and
+/// callback routes are page navigations, so they answer a signed-out visitor with a redirect, not JSON.
+fn member(user: Result<CurrentUser, AppError>) -> AppResult<Option<CurrentUser>> {
+    match user {
+        Ok(user) => Ok(Some(user)),
+        Err(AppError::Unauthenticated(_)) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 /// Equal strings, in time that depends on their length only.
 fn same(a: &str, b: &str) -> bool {
     a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0, |d, (x, y)| d | (x ^ y)) == 0
@@ -65,15 +75,18 @@ pub async fn status(
 
 /// Starts connecting a Google account. Open it as a page (a browser navigation), not with `fetch`.
 #[utoipa::path(get, path = "/api/integrations/google/connect", operation_id = "connectGoogle", tag = "integrations", security(("session" = [])), responses(
-    (status = 302, description = "To Google's consent page. Sets the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes).",
-        headers(("Location" = String, description = "Google's consent page."), ("Set-Cookie" = String, description = "`rb_google_state`, the random `state` sent to Google."))),
+    (status = 302, description = "To Google's consent page, setting the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes). Without a session: to `/login?next=/settings`, no cookie.",
+        headers(("Location" = String, description = "Google's consent page, or `/login?next=/settings`."), ("Set-Cookie" = String, description = "`rb_google_state`, the random `state` sent to Google."))),
     (status = 422, description = "Google Tasks is not set up on this server (`google_disabled`).", body = ErrorBody),
 ))]
 pub async fn connect(
     State(state): State<HttpState>,
-    _user: CurrentUser,
+    user: Result<CurrentUser, AppError>,
     jar: CookieJar,
 ) -> AppResult<(CookieJar, Response)> {
+    if member(user)?.is_none() {
+        return Ok((jar, found("/login?next=/settings")));
+    }
     let (url, random) = state.services.google.consent()?;
     Ok((
         jar.add(state_cookie(&state.config, random)),
@@ -90,44 +103,48 @@ pub struct CallbackQuery {
 }
 
 /// Where Google sends the browser back. Always ends on the settings page with `?google=connected` or
-/// `?google=error`; no token is ever put in the address.
+/// `?google=error`; no token is ever put in the address. Without a session (an in-app browser that does not share the
+/// app's cookies) nothing is exchanged: it ends on `?google=error`.
 #[utoipa::path(get, path = "/api/integrations/google/callback", operation_id = "googleCallback", tag = "integrations", security(("session" = [])),
     params(
         ("code" = Option<String>, Query, description = "Google's authorisation code."),
         ("state" = Option<String>, Query, description = "Must equal the `rb_google_state` cookie."),
         ("error" = Option<String>, Query, description = "Set by Google when the member declined."),
     ), responses(
-    (status = 302, description = "To `/settings?google=connected`, or `/settings?google=error` when anything went wrong (nothing is stored then). Clears the `rb_google_state` cookie.",
+    (status = 302, description = "To `/settings?google=connected`, or `/settings?google=error` when anything went wrong, also without a session (nothing is stored then). Clears the `rb_google_state` cookie.",
         headers(("Location" = String, description = "`/settings?google=connected` or `/settings?google=error`."), ("Set-Cookie" = String, description = "Clears `rb_google_state`."))),
 ))]
 pub async fn callback(
     State(state): State<HttpState>,
-    CurrentUser(user): CurrentUser,
+    user: Result<CurrentUser, AppError>,
     jar: CookieJar,
     AppQuery(q): AppQuery<CallbackQuery>,
-) -> (CookieJar, Response) {
+) -> AppResult<(CookieJar, Response)> {
+    let user = member(user)?;
     let expected = jar.get(STATE_COOKIE).map(|c| c.value().to_string());
     let jar = jar.add(clear_state_cookie());
-    let checked = match (&q.error, &q.state, &expected, &q.code) {
-        (None, Some(got), Some(want), Some(code)) if same(got, want) => Some(code),
+    let checked = match (&user, &q.error, &q.state, &expected, &q.code) {
+        (Some(_), None, Some(got), Some(want), Some(code)) if same(got, want) => Some(code),
         _ => None,
     };
-    let connected = match checked {
-        Some(code) => match state.services.google.finish(user.id, code).await {
-            Ok(()) => true,
-            Err(e) => {
-                tracing::warn!(error = %e, "could not connect a Google account");
-                false
+    let connected = match (&user, checked) {
+        (Some(CurrentUser(user)), Some(code)) => {
+            match state.services.google.finish(user.id, code).await {
+                Ok(()) => true,
+                Err(e) => {
+                    tracing::warn!(error = %e, "could not connect a Google account");
+                    false
+                }
             }
-        },
-        None => false,
+        }
+        _ => false,
     };
     let to = if connected {
         "/settings?google=connected"
     } else {
         "/settings?google=error"
     };
-    (jar, found(to))
+    Ok((jar, found(to)))
 }
 
 /// Revokes the token at Google (best effort) and forgets the connection and its task list.

@@ -125,12 +125,6 @@ async fn every_route_needs_a_session() {
     let (ctx, _) = app().await;
     for (method, path, body) in [
         (Method::GET, "/api/integrations/google", None),
-        (Method::GET, "/api/integrations/google/connect", None),
-        (
-            Method::GET,
-            "/api/integrations/google/callback?code=c&state=s",
-            None,
-        ),
         (Method::DELETE, "/api/integrations/google", None),
         (
             Method::POST,
@@ -145,6 +139,39 @@ async fn every_route_needs_a_session() {
             "{method} {path}"
         );
     }
+}
+
+/// The two routes a browser navigates to answer a signed-out visitor with a redirect, not JSON: on an iPad Home Screen
+/// app, Google's consent page opens in a browser that does not share the app's cookies.
+#[tokio::test]
+async fn connect_and_callback_without_a_session_redirect_instead_of_answering_401() {
+    let (ctx, stub) = app().await;
+    stub.accept_code("code-1", REFRESH);
+    let state = start(&ctx, &ctx.cookie.clone()).await;
+
+    let res = ctx
+        .call(Method::GET, "/api/integrations/google/connect", None, None)
+        .await;
+    assert_eq!(res.status, StatusCode::FOUND);
+    assert_eq!(res.location.as_deref(), Some("/login?next=/settings"));
+    assert!(res.cookie.is_none(), "no state cookie without a session");
+
+    // the state cookie arrives, the session does not: nothing is exchanged, the cookie is cleared
+    for cookie in [None, Some(format!("rb_google_state={state}"))] {
+        let res = ctx
+            .call(
+                Method::GET,
+                &format!("/api/integrations/google/callback?code=code-1&state={state}"),
+                cookie.as_deref(),
+                None,
+            )
+            .await;
+        assert_eq!(res.status, StatusCode::FOUND);
+        assert_eq!(res.location.as_deref(), Some("/settings?google=error"));
+        assert_state_cookie_cleared(&res, "callback without a session");
+    }
+    assert_eq!(connections_stored(&ctx).await, 0);
+    assert!(stub.requests_to("/token").is_empty());
 }
 
 #[tokio::test]

@@ -340,7 +340,8 @@ export interface paths {
         };
         /**
          * Where Google sends the browser back. Always ends on the settings page with `?google=connected` or
-         *     `?google=error`; no token is ever put in the address.
+         *     `?google=error`; no token is ever put in the address. Without a session (an in-app browser that does not share the
+         *     app's cookies) nothing is exchanged: it ends on `?google=error`.
          */
         get: operations["googleCallback"];
         put?: never;
@@ -2188,7 +2189,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description To `/settings?google=connected`, or `/settings?google=error` when anything went wrong (nothing is stored then). Clears the `rb_google_state` cookie. */
+            /** @description To `/settings?google=connected`, or `/settings?google=error` when anything went wrong, also without a session (nothing is stored then). Clears the `rb_google_state` cookie. */
             302: {
                 headers: {
                     /** @description `/settings?google=connected` or `/settings?google=error`. */
@@ -2228,10 +2229,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description To Google's consent page. Sets the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes). */
+            /** @description To Google's consent page, setting the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes). Without a session: to `/login?next=/settings`, no cookie. */
             302: {
                 headers: {
-                    /** @description Google's consent page. */
+                    /** @description Google's consent page, or `/login?next=/settings`. */
                     Location?: string;
                     /** @description `rb_google_state`, the random `state` sent to Google. */
                     "Set-Cookie"?: string;
