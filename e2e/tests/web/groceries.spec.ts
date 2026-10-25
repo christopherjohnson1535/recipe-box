@@ -126,13 +126,14 @@ test("the list fits a phone or an iPad and its controls are big enough to touch"
     expect((await c.request.post("/api/grocery/recipes", { data: { recipeId: stew.id, scale: 1 } })).status()).toBe(200);
     expect((await c.request.post("/api/grocery/items", { data: { text: "dish soap" } })).status()).toBe(201);
     await page.goto("/groceries");
+    // The recipe shelf starts folded once three or more recipes are on the (shared) list; open it to reach the steppers.
+    await expect(page.getByText(/^On this list/)).toBeVisible({ timeout: 2_000 });
+    const folded = page.locator("details:not([open]) > summary");
+    if (await folded.count()) await folded.click();
     await expect(page.getByRole("link", { name: `Stew ${word}` })).toBeVisible({ timeout: 2_000 });
     await expect(tick(page, "dish soap").first()).toBeVisible({ timeout: 2_000 });
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    // The recipe shelf starts folded once three or more recipes are on the (shared) list; open it to reach the steppers.
-    const folded = page.locator("details:not([open]) > summary");
-    if (await folded.count()) await folded.click();
     const controls: Locator[] = [
       ...(await page.locator("button[aria-pressed]").all()),
       ...(await page.getByRole("button", { name: /^Options for / }).all()),
