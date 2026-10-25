@@ -8,6 +8,7 @@ A household recipe website: save recipes from links and photos, find them fast, 
 - [[Save from Safari]] — one tap from the iPad share sheet or a desktop bookmark
 - [[Finding Recipes]] — search, tags, sorting
 - [[Grocery List]] — one shared shopping list, grouped by store section
+- [[Google Sign-In]] — sign in with a Google account instead of a password
 - [[Using on iPad]] — Home Screen app, cooking mode, offline
 - [[AI Photo Import]] — optional setup for reading recipes from photos
 - [[Backup and Restore]]

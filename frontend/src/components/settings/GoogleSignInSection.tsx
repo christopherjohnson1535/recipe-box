@@ -25,8 +25,8 @@ const RESULTS: Record<string, Notice> = {
 type Props = {
   /** The member's linked Google accounts as the server saw them on load; null when it couldn't be asked. */
   initial: Identity[] | null;
-  /** Whether the server offers Sign in with Google at all. */
-  available: boolean;
+  /** Whether the server offers Sign in with Google at all; null when it couldn't be asked. */
+  available: boolean | null;
   /** The `?signin=` value the page was opened with. Announced once, then taken out of the address. */
   result?: string;
   api?: Pick<Api, "deleteIdentity">;
@@ -75,7 +75,9 @@ export function GoogleSignInSection({ initial, available, result, api = browserA
       <Heading level={2} id="signin-heading" ruled ref={heading} tabIndex={-1}>
         Sign in with Google
       </Heading>
-      <Text>Use a Google account instead of typing your password. Your username and password keep working.</Text>
+      {(available !== false || (identities?.length ?? 0) > 0) && (
+        <Text>Use a Google account instead of typing your password. Your username and password keep working.</Text>
+      )}
       <div role="status">{notice?.tone === "info" && <Alert tone="info">{notice.text}</Alert>}</div>
       {notice?.tone === "error" && <Alert tone="error">{notice.text}</Alert>}
       {identities === null ? (
@@ -113,7 +115,7 @@ export function GoogleSignInSection({ initial, available, result, api = browserA
                         onConfirm={() => void disconnect(i)}
                         onCancel={() => cancel(i)}
                       >
-                        Disconnect {i.email}? You can still sign in with your username and password.
+                        Disconnect {i.email}? You can still sign in with your username and password. If your household email matches this Google account, signing in with Google links it again; to stop that, ask the admin to change the email.
                       </ConfirmInline>
                     ) : undefined
                   }
@@ -121,7 +123,9 @@ export function GoogleSignInSection({ initial, available, result, api = browserA
               ))}
             </MemberList>
           )}
-          {available ? (
+          {available === null ? (
+            <Text variant="note">Couldn’t check whether Sign in with Google is on. Reload the page to try again.</Text>
+          ) : available ? (
             <>
               <div className="flex">
                 <HardLink href={GOOGLE_LINK_URL} variant="secondary" aria-describedby={hint}>
@@ -130,10 +134,10 @@ export function GoogleSignInSection({ initial, available, result, api = browserA
               </div>
               <Text variant="small" id={hint}>
                 {installed
-                  ? "Connect from Safari (or your browser), not the Home Screen app: open Settings there."
+                  ? "Open Recipe Box in Safari, sign in with your password there, then connect Google from Settings. In the Home Screen app, Google’s page may not carry back here."
                   : identities.length > 0
                     ? "Connect another account. This takes you to Google, then back here."
-                    : "This takes you to Google, then back here. The account doesn’t need to match your household email."}
+                    : "This takes you to Google, then back here. The account doesn’t need to match the Google email your admin set."}
               </Text>
             </>
           ) : (

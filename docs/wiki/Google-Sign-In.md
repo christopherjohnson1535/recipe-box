@@ -13,12 +13,12 @@ If your sign-in page has no Google button, the feature is off. The admin turns i
 
 It only works for people the admin has set up. Either way works:
 - **The admin sets your email.** In **Settings → Household** the admin enters the Google email for your member. The first time you sign in with a Google account whose email matches, Recipe Box links the two.
-- **You connect it yourself.** Sign in with your password, open **Settings**, and choose **Connect Google**. Disconnect there too whenever you like. Once linked, Google sign-in keeps working even if either email changes later.
+- **You connect it yourself.** Sign in with your password, open **Settings**, and choose **Connect Google**. Disconnect there too whenever you like. Once linked, a connected account keeps working. Changing or clearing the email in Household disconnects that member's connected accounts; they sign in with Google again once an account matches the new email, or connect one from Settings.
 
 ## On the iPad Home Screen app
-Sign in with Google is an ordinary link, not a pop-up, so it is built to work in the Home Screen app ([[Using on iPad]]). The address you installed from has to be the HTTPS one: Google will not send you back to a plain `http://192.168...` address.
+The sign-in page is an ordinary link, not a pop-up, and the Home Screen app ([[Using on iPad]]) needs the HTTPS address you installed from: Google will not send you back to a plain `http://192.168...` address.
 
-If you tap the button in the Home Screen app and end up back on the sign-in page with a Google error, sign in with your password in the app instead. (iOS can open Google's page in a window that does not share the app's cookies, which is also why connecting Google Tasks has to be done in Safari; see [[Grocery List]]. Signing in to Safari does not sign in the Home Screen app, because they keep separate cookies.)
+iOS may open Google's page in a separate window that does not share the app's cookies. We have not been able to confirm this on every iPad, so if you tap the button in the app and land back on the sign-in page (perhaps with a Google error), just sign in with your password there. To connect Google from **Settings**, open Recipe Box in Safari, sign in with your password there, then choose **Connect Google**. Safari and the Home Screen app keep separate sign-ins; see also [[Grocery List]] for the same note about Google Tasks.
 
 ## Setting it up (admin)
 This uses the same Google app as the grocery list's Google Tasks export, so there is nothing new to put in `.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL` and `TOKEN_ENCRYPTION_KEY`. It is free, needs a Google account, and takes about 10 minutes. Nothing here needs Google's verification.

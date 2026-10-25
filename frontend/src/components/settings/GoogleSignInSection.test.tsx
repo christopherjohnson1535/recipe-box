@@ -12,7 +12,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const linked: Identity = { id: "i1", provider: "google", email: "chris@gmail.com", createdAt: "2026-10-20T10:00:00Z" };
 const fakeApi = (deleteIdentity = vi.fn().mockResolvedValue(undefined)) => ({ deleteIdentity });
-const open = (initial: Identity[] | null, available: boolean, result?: string, api = fakeApi()) => {
+const open = (initial: Identity[] | null, available: boolean | null, result?: string, api = fakeApi()) => {
   replace.mockClear();
   render(<GoogleSignInSection initial={initial} available={available} result={result} api={api} />);
   return api;
@@ -31,8 +31,20 @@ describe("GoogleSignInSection", () => {
   it("tells a Home Screen app to connect from the browser", () => {
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(display-mode: standalone)" }));
     open([], true);
-    expect(screen.getByText(/Connect from Safari/)).toBeTruthy();
+    expect(screen.getByText(/Open Recipe Box in Safari, sign in with your password there, then connect Google from Settings/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Connect Google" })).toBeTruthy();
+  });
+
+  it("does not claim Sign in with Google is off when the providers could not be loaded", () => {
+    open([], null);
+    expect(screen.getByText(/Couldn’t check whether Sign in with Google is on/)).toBeTruthy();
+    expect(screen.queryByText(/is off for this household/)).toBeNull();
+    expect(screen.queryByRole("link", { name: "deploy guide" })).toBeNull();
+  });
+
+  it("drops the intro when it is off and nothing is connected", () => {
+    open([], false);
+    expect(screen.queryByText(/instead of typing your password/)).toBeNull();
   });
 
   it("lists linked accounts with Disconnect, and still offers another", () => {
@@ -67,6 +79,8 @@ describe("GoogleSignInSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Disconnect chris@gmail.com" }));
     const confirm = screen.getByRole("group", { name: "Confirm" });
     expect(confirm.textContent).toContain("You can still sign in with your username and password.");
+    expect(confirm.textContent).toContain("If your household email matches this Google account, signing in with Google links it again");
+    expect(confirm.textContent).toContain("ask the admin to change the email");
     fireEvent.click(within(confirm).getByRole("button", { name: "Stay connected" }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Disconnect chris@gmail.com" })));
     expect(api.deleteIdentity).not.toHaveBeenCalled();
@@ -136,8 +150,8 @@ describe("HouseholdSection member email", () => {
   it("shows each member's email and the right button for having one or not", () => {
     show(fake());
     expect(screen.getByRole("list", { name: "Household members" }).textContent).toContain("chris · Admin · chris@gmail.com");
-    expect(screen.getByRole("button", { name: "Change Google email for Chris" }).textContent).toBe("Change email");
-    expect(screen.getByRole("button", { name: "Add Google email for Sam" }).textContent).toBe("Add email");
+    expect(screen.getByRole("button", { name: "Change Google email for Chris" }).textContent).toBe("Change Google email");
+    expect(screen.getByRole("button", { name: "Add Google email for Sam" }).textContent).toBe("Add Google email");
   });
 
   it("saves an email, shows it and says so", async () => {
@@ -153,6 +167,34 @@ describe("HouseholdSection member email", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Change Google email for Sam" })));
   });
 
+  it("warns before saving that changing or clearing disconnects Google sign-in, but not for a first email", () => {
+    show(fake());
+    fireEvent.click(screen.getByRole("button", { name: "Add Google email for Sam" }));
+    expect(screen.queryByText(/also disconnects their Google sign-in/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change Google email for Chris" }));
+    expect(screen.getByText(/Changing or clearing the email also disconnects their Google sign-in; they can sign in with Google again with the new email/)).toBeTruthy();
+  });
+
+  it("says the connected accounts were disconnected after a change or clear, not after the same email or a first one", async () => {
+    const updateUserEmail = vi.fn();
+    show(fake(updateUserEmail));
+    const edit = async (name: string, saved: User) => {
+      updateUserEmail.mockResolvedValueOnce(saved);
+      fireEvent.click(screen.getByRole("button", { name }));
+      save();
+      await waitFor(() => expect(screen.queryByLabelText("Google email")).toBeNull());
+    };
+    await edit("Change Google email for Chris", chris); // same address again: links stay
+    expect(screen.getByRole("status").textContent).toBe("Chris can now sign in with Google as chris@gmail.com.");
+    await edit("Add Google email for Sam", { ...sam, email: "sam@gmail.com" }); // first email: links stay
+    expect(screen.getByRole("status").textContent).toBe("Sam can now sign in with Google as sam@gmail.com.");
+    await edit("Change Google email for Sam", { ...sam, email: "sam2@gmail.com" });
+    expect(screen.getByRole("status").textContent).toBe("Sam can now sign in with Google as sam2@gmail.com. Their connected Google accounts were disconnected.");
+    await edit("Change Google email for Chris", { ...chris, email: null });
+    expect(screen.getByRole("status").textContent).toBe("Chris’s Google email was removed. Their connected Google accounts were disconnected.");
+  });
+
   it("clears the email when the field is left blank", async () => {
     const api = fake(vi.fn().mockResolvedValue({ ...chris, email: null }));
     show(api);
@@ -161,7 +203,7 @@ describe("HouseholdSection member email", () => {
     fireEvent.change(screen.getByLabelText("Google email"), { target: { value: "" } });
     save();
     await waitFor(() => expect(api.updateUserEmail).toHaveBeenCalledWith("u1", null));
-    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Chris’s Google email was removed."));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Chris’s Google email was removed. Their connected Google accounts were disconnected."));
   });
 
   it("says another member has the email (409) on the field and keeps the form open", async () => {
@@ -210,6 +252,22 @@ describe("HouseholdSection member email", () => {
     fill("Temporary password", "longenough1");
     submit();
     await waitFor(() => expect(createUser).toHaveBeenLastCalledWith({ displayName: "Bo", username: "bo-b", password: "longenough1", role: "member" }));
+  });
+
+  it("puts a taken username from create on the username, with or without an email", async () => {
+    const createUser = vi.fn().mockRejectedValue(new ApiError(409, "conflict", "That username is already taken."));
+    show({ ...fake(), createUser });
+    const fillAll = (email: string) => {
+      for (const [label, value] of [["Name", "Alex"], ["Username", "chris"], ["Temporary password", "longenough1"], ["Google email (optional)", email]])
+        fireEvent.change(screen.getByLabelText(label), { target: { value } });
+      fireEvent.submit(screen.getByRole("button", { name: "Add member" }).closest("form")!);
+    };
+    fillAll("");
+    await waitFor(() => expect(document.getElementById("username-msg")?.textContent).toContain("taken"));
+    fillAll("alex@gmail.com");
+    await waitFor(() => expect(createUser).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(document.getElementById("username-msg")?.textContent).toContain("taken"));
+    expect(document.getElementById("email-msg")?.textContent ?? "").not.toContain("already uses");
   });
 
   it("puts a taken email from create on the email field, not the username", async () => {

@@ -53,7 +53,7 @@ export function AddMemberForm({ onAdded, api = browserApi }: Props) {
       focus("displayName");
     } catch (e) {
       if (e instanceof ApiError && e.code === "conflict")
-        fail(/email/i.test(e.message) ? { email: "Another member already uses that email." } : { username: "That username is taken. Pick another." });
+        fail(email && /email/i.test(e.message) ? { email: "Another member already uses that email." } : { username: "That username is taken. Pick another." });
       else if (e instanceof ApiError && e.code === "validation") {
         const m = e.message.match(/^(\w+): (.+)$/);
         const field = m && (FIELDS as readonly string[]).includes(m[1]) ? (m[1] as (typeof FIELDS)[number]) : null;

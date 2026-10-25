@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { server } from "@/test/server";
 import LoginPage from "./page";
 
@@ -10,7 +10,20 @@ const providers = (google: boolean) => server.use(http.get("*/api/auth/providers
 const open = async (params: Record<string, string> = {}) => render(await LoginPage({ searchParams: Promise.resolve(params) }));
 const googleLink = () => screen.queryByRole("link", { name: "Sign in with Google" });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("login page: Sign in with Google", () => {
+  it("keeps the button and adds a quiet password fallback in the Home Screen app only", async () => {
+    providers(true);
+    await open();
+    expect(screen.queryByText(/if Google sends you back here/)).toBeNull();
+    cleanup();
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(display-mode: standalone)" }));
+    await open();
+    const note = screen.getByText("In the Home Screen app, if Google sends you back here, sign in with your password.");
+    expect(googleLink()!.getAttribute("aria-describedby")).toBe(note.id);
+  });
+
   it("shows a secondary link under the password form when the server offers it", async () => {
     providers(true);
     await open();

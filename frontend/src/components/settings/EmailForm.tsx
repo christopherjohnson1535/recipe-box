@@ -13,6 +13,9 @@ type Props = {
   api?: Pick<Api, "updateUserEmail">;
 };
 
+/** The API deletes a member's linked Google accounts when their email is replaced or cleared (docs/API.md). */
+const DISCONNECTS = " Changing or clearing the email also disconnects their Google sign-in; they can sign in with Google again with the new email.";
+
 /** Sets or clears the Google address that may sign in as one member. Blank removes it. */
 export function EmailForm({ user, onDone, onCancel, api = browserApi }: Props) {
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +49,7 @@ export function EmailForm({ user, onDone, onCancel, api = browserApi }: Props) {
       <Field
         label="Google email"
         htmlFor={id}
-        hint={`The address ${user.displayName} signs in with on Google. Leave it blank to remove it.`}
+        hint={`The address ${user.displayName} signs in with on Google. Leave it blank to remove it.${user.email ? DISCONNECTS : ""}`}
         error={error ?? undefined}
       >
         <Input

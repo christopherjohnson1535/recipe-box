@@ -67,9 +67,10 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
     setNotice(null);
     if (saved) {
       setUsers((list) => list.map((u) => (u.id === saved.id ? saved : u)));
+      const dropped = user.email !== null && user.email !== saved.email ? " Their connected Google accounts were disconnected." : ""; // API: replacing or clearing deletes the links
       setNotice({
         tone: "info",
-        text: saved.email ? `${saved.displayName} can now sign in with Google as ${saved.email}.` : `${saved.displayName}’s Google email was removed.`,
+        text: (saved.email ? `${saved.displayName} can now sign in with Google as ${saved.email}.` : `${saved.displayName}’s Google email was removed.`) + dropped,
       });
     }
     requestAnimationFrame(() => emailButtons.current.get(user.id)?.focus());
@@ -108,7 +109,7 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
                       setOpen(mine === "email" ? null : { id: u.id, kind: "email" });
                     }}
                   >
-                    {u.email ? "Change email" : "Add email"}
+                    {u.email ? "Change Google email" : "Add Google email"}
                   </Button>
                   {!isYou && (
                     <Button

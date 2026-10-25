@@ -31,7 +31,7 @@ export type GoogleExport = Schemas["GoogleExport"];
 export const GOOGLE_CONNECT_URL = "/api/integrations/google/connect";
 export type AuthProviders = Schemas["AuthProviders"];
 export type Identity = Schemas["Identity"];
-/** Signing in with Google is a full-page navigation (a link, not a fetch or popup, so it works in the Home Screen app too). */
+/** Signing in with Google is a full-page navigation (a link, not a fetch or popup). In an iOS Home Screen app Google's page may open outside the app's cookies, so the sign-in can fail to carry back (unverified on a device); the login page says to use the password then. */
 export const googleSignInUrl = (next: string) => `/api/auth/google/start?next=${encodeURIComponent(next)}`;
 /** Linking a Google account to the signed-in member; the API sends them back to /settings?signin=linked|taken|error. */
 export const GOOGLE_LINK_URL = "/api/auth/google/start?link=1";
