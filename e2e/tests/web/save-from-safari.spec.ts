@@ -33,7 +33,9 @@ test("the bookmarklet sends only the page address to Recipe Box", async ({ membe
 
   // run it on a recipe page, as a bookmark would
   const site = await context.newPage();
-  const link = `${fixtureUrl("publisher.html")}?run=${unique()}`;
+  // The fixture host is not reachable from the browser in the compose stack, so serve a stand-in recipe page.
+  const link = `https://recipes.example.test/pancakes?run=${unique()}`;
+  await site.route("https://recipes.example.test/**", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Pancakes</h1>" }));
   await site.goto(link);
   const opened = context.waitForEvent("page");
   await site.evaluate((c) => new Function(c.slice("javascript:".length))(), code);
