@@ -190,14 +190,16 @@ usual and only that button is off. Everything below is free; no Google verificat
 
 1. In the [Google Cloud console](https://console.cloud.google.com/) create a project (any name).
 2. **APIs & Services > Library**: enable the **Google Tasks API**.
-3. **OAuth consent screen** (shown as **Google Auth platform > Branding / Audience** in newer consoles): user type
-   **External**, publishing status **Testing**. Fill in the app name and your email. Under **Audience > Test users** add
+3. **OAuth consent screen** (shown as **Google Auth platform > Branding / Audience** in newer consoles; the first
+   visit there runs a **Get started** wizard asking for the app name, a support email, the audience and a contact
+   email): user type **External**, publishing status **Testing**. Fill in the app name and your email. Under **Audience > Test users** add
    the Google account of every household member who will use the export (up to 100). Only listed accounts can
    connect. Under **Data Access** adding the scope `https://www.googleapis.com/auth/tasks` is optional; the app asks for it.
-4. **Credentials > Create credentials > OAuth client ID**, type **Web application**. Under **Authorised redirect URIs**
-   add `<PUBLIC_URL>/api/integrations/google/callback`, for example
-   `https://recipes.example.com/api/integrations/google/callback`. Google accepts `http://` only for `localhost`, so a
-   real deployment needs HTTPS (it needs it for the iPad anyway, see above). Copy the client ID and secret.
+4. **Google Auth platform > Clients > Create client** (older consoles: **APIs & Services > Credentials > Create
+   credentials > OAuth client ID**), type **Web application**. Under **Authorised redirect URIs** add
+   `<PUBLIC_URL>/api/integrations/google/callback`, for example
+   `https://recipes.example.com/api/integrations/google/callback`. Copy the client ID and secret. Google checks the
+   redirect URI, which decides what `PUBLIC_URL` can be (next paragraph).
 5. Set four variables in `.env` (all four or none; the API refuses to start with only some of them and says which are
    missing) and restart the API:
    ```sh
@@ -206,35 +208,79 @@ usual and only that button is off. Everything below is free; no Google verificat
    PUBLIC_URL=https://recipes.example.com   # how people reach the site; no trailing slash
    TOKEN_ENCRYPTION_KEY=...   # the output of `openssl rand -base64 32` (exactly 32 bytes)
    ```
-   `PUBLIC_URL` must match the redirect URI character for character (scheme, host and port). Keep
+   `PUBLIC_URL` must match the redirect URI character for character (scheme, host and port), and carry no user name,
+   password, query or fragment (the API refuses to start otherwise). If it is `http://` while `COOKIE_SECURE=true`, or
+   `https://` while `COOKIE_SECURE` is not true, the API starts but logs a warning: one of the two is wrong for how
+   people reach the site (see [HTTPS and `COOKIE_SECURE`](#https-and-cookie_secure)). Keep
    `TOKEN_ENCRYPTION_KEY` safe like the database password: it seals each member's Google refresh token in the
    database, so a database backup alone does not hold usable tokens. Restoring onto a server with a different key (or
-   changing the key) does not break anything else; it only means members connect Google again.
+   changing the key) does not break anything else: sending then answers *not connected* and nothing is deleted, so
+   putting the old key back works, and so does connecting Google again.
 6. Each member opens the Google section of **Settings** and connects. Google warns that the app is unverified (it is
    in Testing); that is expected for a test user: **Continue**, then allow access to Google Tasks.
+
+**Which `PUBLIC_URL` Google accepts.** Google's rules for redirect URIs
+([Using OAuth 2.0 for Web Server Applications, "Redirect URI validation rules"](https://developers.google.com/identity/protocols/oauth2/web-server),
+read 2026-10-25; check the current rules there before relying on an exception) say: the scheme must be `https`
+(`localhost` and its IP addresses are exempt); the host cannot be a raw IP address (the localhost IPs are exempt);
+the host's top-level domain must be on the public suffix list; no user name or password in the URI; no fragment.
+Google never calls the address, only the member's browser does, so it may point at a private machine. For each target:
+
+| Target | `PUBLIC_URL` | Works with Google? |
+|---|---|---|
+| A. Home PC, Tailscale | `https://<pc>.<tailnet>.ts.net` | Yes by the rules above: https, a name (not an IP), top-level domain `net`. |
+| A. Home PC, domain and port forwarding | `https://recipes.example.com` | Yes. |
+| A. Home PC on the LAN, `http://192.168.x.y:3000` or `http://recipes.lan` | the same | **No**: not https, and a raw IP or a made-up top-level domain (`.lan`, `.home`, `.local` are not on the list). Use one of the two rows above, or the next row. |
+| A. Home PC, used from the PC itself | `http://localhost:3000` | Yes (`localhost` is exempt from the https rule). Members must press *Connect* in a browser **on the PC**, at `http://localhost:3000`: on an iPad, `localhost` is the iPad. The stored token then works for sends from every device. |
+| B. VPS with Caddy | `https://recipes.example.com` | Yes. |
+| C. Managed host | the host's https name, or your own domain | Yes (for example a `*.fly.dev` name: https, not an IP, top-level domain `dev`). |
+
+If the rules are not met, the console refuses to save the redirect URI and says why. If the URI was saved but does not
+match `PUBLIC_URL` exactly, Google's consent page shows a `redirect_uri_mismatch` error and the member never reaches
+Settings with a connection. Fix one of the two and try again.
 
 **Refresh tokens expire after 7 days in Testing.** Google's rule: a project with an External consent screen and
 publishing status *Testing* is issued a refresh token that expires in 7 days
 ([Using OAuth 2.0 to Access Google APIs, "Refresh token expiration"](https://developers.google.com/identity/protocols/oauth2);
 [Manage App Audience](https://support.google.com/cloud/answer/15549945): "Authorizations by a test user will expire
 seven days from the time of consent"). So about a week after connecting, sending the list fails with *not connected*:
-the API treats Google's `invalid_grant` answer as a lost connection, forgets the dead token and the app offers
-to connect again; one click and a tap on Google's consent page fix it. Two ways to live with it:
+the API treats Google's `invalid_grant` answer as a lost connection, forgets the dead token (only the token: the
+server still remembers which Google Tasks list it uses) and the app offers to connect again; one click and a tap on
+Google's consent page fix it. Two ways to live with it:
 - **Reconnect when asked** (about weekly). Nothing else is needed, and nothing is lost: the Groceries list in
-  Google Tasks stays and is refilled on the next send.
+  Google Tasks stays, and after reconnecting the next send refills that same list instead of making another.
 - **Publish the app** (consent screen > **Publish app**, status *In production*). Tokens then stop expiring after 7 days.
-  Because Google treats the Tasks scope as a sensitive scope (the consent screen's Data Access page labels it) and the app is not verified, Google keeps showing the "unverified app" warning
-  at connect time and caps the number of accounts that may ever connect at 100 for the life of the project
+  Google may treat the Tasks scope as a sensitive scope (the Data Access page of your project marks sensitive
+  scopes; check there). If it does, and the app is not verified, Google keeps showing the "unverified app" warning
+  at connect time (**Advanced > Go to <app name> (unsafe)** instead of **Continue**) and caps the number of accounts that may ever connect at 100 for the life of the project
   ([Manage App Audience](https://support.google.com/cloud/answer/15549945)); that is plenty for a household. Both
   routes follow Google's documentation; the automated tests use a local stand-in for Google, so neither has been
   tried against live Google.
 
+**The Google list.** Each send empties the member's task list titled `Groceries` and fills it again, so keep other
+things in lists with other names. The list is found by the id the server remembers; with none remembered (the first
+send, after a disconnect, or if the list was deleted in Google) the first list titled exactly `Groceries` is used, and
+one is only made if there is none. Only one send per member runs at a time; a second tap meanwhile is told that a
+send is already running. A send that fails half way (Google busy, a dropped connection) can leave the list partly
+filled; the message says so, and sending again repairs it.
+
 **Disconnecting.** A member disconnects in the same Settings section: the API revokes the token at Google
-and deletes it (and the remembered task list) from the database, even if Google could not be reached to revoke it. The
+and deletes it (and the remembered task list) from the database, even if Google could not be reached to revoke it.
+Connecting again without disconnecting first also revokes the token it replaces. The
 `Groceries` list in Google Tasks is left as it is; delete it in the Tasks app if you want it gone. A member can also
 remove Recipe Box under *Google Account > Security > Third-party access*. Deleting a member in Recipe Box deletes
 their connection too. To switch the feature off for everyone, empty the four variables and restart: stored tokens are
 then unreadable and ignored.
+
+**If it does not work.**
+- *"Google refused the request (403)"* when sending: the **Google Tasks API** is probably not enabled for the project
+  (step 2); the API log has Google's own message. A 403 that names a rate limit is tried again by itself.
+- *"Your Google account is not connected"* right after connecting worked: the 7-day expiry above, a revoked access
+  (*Google Account > Security > Third-party access*), or a changed `TOKEN_ENCRYPTION_KEY`. Connect again.
+- *"A send to Google Tasks is already running."*: wait a few seconds. If a send was cut off (the server restarted),
+  the lock frees itself after 2 minutes.
+- The API log shows `COOKIE_SECURE` / `PUBLIC_URL` warnings, or Google's consent page shows a redirect error: see the
+  `PUBLIC_URL` table above.
 
 ## Backups
 `sh scripts/backup.sh` and `sh scripts/restore.sh backups/<time>` (OPS-6). User-facing guide, with scheduling and

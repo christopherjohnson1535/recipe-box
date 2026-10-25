@@ -93,7 +93,7 @@ Backend, per crate (the `Cargo.toml` files and the CI `cargo tree` guard are the
 | `adapter-fs-media` | tokio (fs), async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
 | `adapter-http-fetch` | reqwest (rustls, stream, json), tokio (net, time), url, async-trait, `domain`, `ports` | tokio |
 | `adapter-html` | scraper, serde_json, url, tokio, async-trait, `domain`, `ports` | tokio |
-| `adapter-google` | reqwest (rustls, json, form), serde, serde_json, tracing, anyhow, async-trait, `domain`, `ports` | tokio |
+| `adapter-google` | reqwest (rustls, json, form), tokio (time), serde, serde_json, tracing, anyhow, async-trait, `domain`, `ports` | tokio |
 | `adapter-anthropic` | reqwest (rustls, stream, json), image, base64, serde_json, tokio, tracing, anyhow, async-trait, `domain`, `ports` | tokio |
 | `recipe-box-api` (server) | all of the above crates except `adapter-memory`, axum, sqlx, tokio, argon2, rand, sha2, base64, image, chrono, uuid, anyhow, async-trait, tracing, tracing-subscriber | serde_json, url, futures-util, http-body-util, tower (util), testcontainers-modules (postgres) |
 
@@ -146,7 +146,9 @@ Anything else needs a one-line reason in the agent's report.
   cleared bool, manual bool, recipe_ids uuid[])` (`key` is the merge key of a generated item, unique per list among
   generated items), `grocery_section_override(key text pk, section text)`, `grocery_staple(key text pk)`.
 - Google Tasks (`0004_google.sql`, GRO-5): `google_connection(user_id uuid pk fk users on delete cascade,
-  refresh_token bytea (nonce ‖ ciphertext), tasklist_id text null, connected_at timestamptz)`.
+  refresh_token bytea null (nonce ‖ ciphertext; null once Google refused it: the row then only remembers the list),
+  tasklist_id text null, connected_at timestamptz, export_started_at timestamptz null (the lease of a running
+  export: one per user at a time, taken by a conditional update, stale after 2 minutes))`. "Connected" = a token is stored.
 - Soft delete: `DELETE /api/recipes/:id` sets `deleted_at`; `POST /api/recipes/:id/restore` clears it within 10 min
   (REC-2); a periodic task purges rows deleted > 1 day.
 
@@ -269,7 +271,8 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   `app::GroceryService` does recompute (in one repo call, under a lock on the list row) and the item rules. Behaviour:
   `docs/API.md` → *Grocery list*.
 - **Google Tasks (GRO-5):** ports `GoogleTasks` (consent URL, code exchange, access token from refresh token, revoke,
-  replace a task list's contents) and `TokenCipher` (seal/open), storage port `GoogleConnectionRepo`. Adapter crate
+  `ensure_list` to find or make the task list and `fill_list` to empty and refill it, so the service can store the
+  list id between the two) and `TokenCipher` (seal/open), storage port `GoogleConnectionRepo`. Adapter crate
   `adapters/google` (reqwest, fixed Google hosts; base URLs injectable for tests); the cipher lives in the server crate;
   `app::GoogleTasksService` reads the grocery list through `GroceryService`. With Google not configured the server wires
   a disabled `GoogleTasks` that answers `google_disabled`. Tests use a local stub of Google's OAuth and Tasks endpoints
