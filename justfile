@@ -71,6 +71,15 @@ openapi:
 openapi-lint:
     npx --yes @redocly/cli@2.71.0 lint docs/openapi.json
 
+# Regenerate the Python reference client in sdks/python/ from docs/openapi.json (generator pinned; see docs/SDK.md)
+sdk-python:
+    uvx --from openapi-python-client==0.29.1 openapi-python-client generate --path docs/openapi.json --config sdks/python/config.yml --output-path sdks/python/recipe-box-client --meta uv --overwrite
+    rm -rf sdks/python/recipe-box-client/.ruff_cache
+
+# Smoke-test the Python client against a running API (default: the e2e compose stack, `docker compose -f docker-compose.e2e.yml up -d --wait`)
+sdk-python-smoke:
+    cd sdks/python/tests && RECIPE_BOX_URL="${RECIPE_BOX_URL:-http://127.0.0.1:3146}" uv run --locked pytest -q
+
 # Start the whole stack in containers (http://localhost:3000)
 up:
     @if [ ! -f .env ]; then cp .env.example .env && echo "created .env from .env.example"; fi

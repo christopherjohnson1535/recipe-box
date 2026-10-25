@@ -5,7 +5,7 @@ error responses and the `rb_session` cookie scheme. It is generated from the Rus
 (`cd backend && cargo run --bin openapi > ../docs/openapi.json`), and `frontend/src/lib/api-types.ts` is generated
 from it (`cd frontend && npm run api:types`). CI fails when either is stale, and when a PR breaks the API relative to
 `main` unless it carries the `breaking-api` label. This file keeps what the spec cannot say: conventions, the error
-table, limits and behaviour.
+table, limits and behaviour. To build a client in another language, see [SDK.md](SDK.md).
 
 Base path: `/api` (the browser reaches it through the frontend origin; Next.js rewrites to the API container).
 JSON uses **camelCase**. Times are RFC 3339 strings. IDs are UUIDs.

@@ -1,0 +1,5 @@
+# Written by the generator run (ruff), not part of the client
+.ruff_cache/
+.venv/
+__pycache__/
+.pytest_cache/
