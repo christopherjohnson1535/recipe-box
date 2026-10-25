@@ -15,7 +15,7 @@ test("a shared link waits for a confirm before anything is fetched", async ({ me
   await expect(page.getByRole("heading", { name: "Check the recipe" })).toBeVisible();
   expect(imports).toBe(1);
   // a draft only: nothing was saved
-  expect((await member.client.listRecipes({ q: "Tomato" })).items.filter((r) => r.sourceUrl === link)).toEqual([]);
+  expect((await member.client.listRecipes({ q: "Tomato" })).total).toBe(0);
 });
 
 test("an address that is not http(s) is refused and never imported", async ({ memberPage: page }) => {
