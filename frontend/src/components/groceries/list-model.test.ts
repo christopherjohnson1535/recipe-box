@@ -15,6 +15,16 @@ describe("amountsText", () => {
     expect(amountsText([{ quantity: "3", unit: null }])).toBe("3");
     expect(amountsText([{ quantity: null, unit: "pinch" }])).toBe("pinch");
     expect(amountsText([])).toBe("");
+  });
+  it("makes word units plural past one and leaves abbreviations alone", () => {
+    expect(amountsText([{ quantity: "5", unit: "clove" }])).toBe("5 cloves");
+    expect(amountsText([{ quantity: "1", unit: "can" }])).toBe("1 can");
+    expect(amountsText([{ quantity: "½", unit: "cup" }])).toBe("½ cup");
+    expect(amountsText([{ quantity: "1½", unit: "cup" }, { quantity: "2", unit: "tbsp" }])).toBe("1½ cups + 2 tbsp");
+    expect(amountsText([{ quantity: "2–3", unit: "bunch" }])).toBe("2–3 bunches");
+    expect(amountsText([{ quantity: "3", unit: "lb" }])).toBe("3 lb");
+  });
+  it("reads a whole line", () => {
     expect(itemText(item({ id: "m", name: "milk", amounts: [{ quantity: "1", unit: "cup" }] }))).toBe("1 cup milk");
     expect(itemText(item({ id: "s", name: "salt to taste" }))).toBe("salt to taste");
   });

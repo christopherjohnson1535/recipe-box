@@ -115,7 +115,7 @@ describe("the list", () => {
     expect(sectionNames().filter((n) => ["Produce", "Meat", "Fridge", "Freezer", "Pantry", "Other"].includes(n!))).toEqual(["Produce", "Meat", "Fridge"]);
     expect(row("1 cup + 2 tbsp milk")).toBeTruthy();
     expect(row("3 onion")).toBeTruthy();
-    expect(row("2 clove garlic")).toBeTruthy();
+    expect(row("2 cloves garlic")).toBeTruthy();
     expect(screen.getByText("4 left to buy")).toBeTruthy(); // the staple is not counted
   });
 
@@ -161,11 +161,11 @@ describe("ticking", () => {
   it("ticks at once, saves, and moves the item to the bottom of its section", async () => {
     const { calls } = serve();
     await open();
-    expect(rowsIn("Produce")).toEqual(["2 clove garlic", "3 onion"]);
-    fireEvent.click(row("2 clove garlic"));
-    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true"); // before the server has answered
+    expect(rowsIn("Produce")).toEqual(["2 cloves garlic", "3 onion"]);
+    fireEvent.click(row("2 cloves garlic"));
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("true"); // before the server has answered
     await waitFor(() => expect(calls).toEqual([{ method: "PATCH", path: "/api/grocery/items/i-garlic", body: { checked: true } }]));
-    expect(rowsIn("Produce")).toEqual(["3 onion", "2 clove garlic"]);
+    expect(rowsIn("Produce")).toEqual(["3 onion", "2 cloves garlic"]);
     expect(screen.getByText("3 left to buy · 1 crossed off")).toBeTruthy();
   });
 
@@ -181,12 +181,12 @@ describe("ticking", () => {
     serve();
     server.use(http.patch("*/api/grocery/items/:id", () => HttpResponse.json({ error: { code: "internal", message: "The server hiccuped." } }, { status: 500 })));
     await open();
-    fireEvent.click(row("2 clove garlic"));
-    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(row("2 cloves garlic"));
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("true");
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("The server hiccuped.");
     expect(alert.closest('[role="status"]')?.className).toContain("fixed"); // pinned to the screen's bottom, not up the page
-    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("false");
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -196,11 +196,11 @@ describe("ticking", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
     await open();
     const release = captureTimer("setTimeout", PENCIL_MS);
-    fireEvent.click(row("2 clove garlic"));
+    fireEvent.click(row("2 cloves garlic"));
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(rowsIn("Produce")).toEqual(["2 clove garlic", "3 onion"]);
+    expect(rowsIn("Produce")).toEqual(["2 cloves garlic", "3 onion"]);
     act(() => release.forEach((fn) => fn()));
-    expect(rowsIn("Produce")).toEqual(["3 onion", "2 clove garlic"]);
+    expect(rowsIn("Produce")).toEqual(["3 onion", "2 cloves garlic"]);
   });
 });
 
@@ -216,15 +216,15 @@ describe("overlapping changes", () => {
       }),
     );
     await open();
-    fireEvent.click(row("2 clove garlic")); // tick
-    fireEvent.click(row("2 clove garlic")); // and untick, before the first answer
+    fireEvent.click(row("2 cloves garlic")); // tick
+    fireEvent.click(row("2 cloves garlic")); // and untick, before the first answer
     await waitFor(() => expect(gates).toHaveLength(2));
-    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("false");
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("false");
     gates[1](); // the second answer first
     await new Promise((r) => setTimeout(r, 30));
     gates[0](); // then the first, which says "ticked"
     await new Promise((r) => setTimeout(r, 30));
-    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("false");
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("false");
   });
 
   it("does not undo a move that worked when an earlier tick on the same item fails late", async () => {
@@ -242,14 +242,14 @@ describe("overlapping changes", () => {
       }),
     );
     await open();
-    fireEvent.click(row("2 clove garlic"));
+    fireEvent.click(row("2 cloves garlic"));
     await waitFor(() => expect(failTick).toBeTypeOf("function"));
     fireEvent.click(screen.getByRole("button", { name: "Options for garlic" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Freezer" }));
-    await waitFor(() => expect(within(screen.getByRole("region", { name: "Freezer" })).getByRole("button", { name: "2 clove garlic" })).toBeTruthy());
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Freezer" })).getByRole("button", { name: "2 cloves garlic" })).toBeTruthy());
     failTick();
     expect((await screen.findByRole("alert")).textContent).toContain("The server hiccuped.");
-    const garlic = within(screen.getByRole("region", { name: "Freezer" })).getByRole("button", { name: "2 clove garlic" });
+    const garlic = within(screen.getByRole("region", { name: "Freezer" })).getByRole("button", { name: "2 cloves garlic" });
     expect(garlic.getAttribute("aria-pressed")).toBe("false"); // the tick is undone, the move is not
   });
 
@@ -262,8 +262,8 @@ describe("overlapping changes", () => {
       }),
     );
     await open();
-    fireEvent.click(row("2 clove garlic"));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "2 clove garlic" })).toBeNull());
+    fireEvent.click(row("2 cloves garlic"));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "2 cloves garlic" })).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -271,8 +271,8 @@ describe("overlapping changes", () => {
     const { state } = serve();
     const older = JSON.parse(JSON.stringify(state)) as GroceryList; // what the service worker would answer with
     await open();
-    fireEvent.click(row("2 clove garlic"));
-    await waitFor(() => expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.click(row("2 cloves garlic"));
+    await waitFor(() => expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("true"));
     await waitFor(() => expect(screen.getByText("3 left to buy · 1 crossed off")).toBeTruthy());
     let asked = 0;
     server.use(
@@ -284,7 +284,7 @@ describe("overlapping changes", () => {
     fireEvent.focus(window);
     await waitFor(() => expect(asked).toBe(1));
     await new Promise((r) => setTimeout(r, 30));
-    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true"); // not un-ticked by the old copy
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("true"); // not un-ticked by the old copy
 
     server.use(http.get("*/api/grocery", () => HttpResponse.json({ ...state, updatedAt: "2026-01-01T00:00:05Z" })));
     fireEvent.focus(window); // a newer answer is taken
@@ -296,11 +296,11 @@ describe("focus", () => {
   it("stays on the item after a keyboard tick even though the row moves", async () => {
     serve();
     await open();
-    const tick = row("2 clove garlic");
+    const tick = row("2 cloves garlic");
     tick.focus();
     fireEvent.click(tick, { detail: 0 });
     tick.blur(); // what a browser does when the row is moved in the page
-    await waitFor(() => expect(document.activeElement).toBe(row("2 clove garlic")));
+    await waitFor(() => expect(document.activeElement).toBe(row("2 cloves garlic")));
   });
 
   it("follows an item that is moved to another section", async () => {
@@ -317,7 +317,7 @@ describe("focus", () => {
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Options for garlic" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "2 clove garlic" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "2 cloves garlic" })).toBeNull());
     expect(document.activeElement).toBe(row("3 onion"));
   });
 
@@ -544,11 +544,11 @@ describe("staying in sync", () => {
       }),
     );
     fireEvent.focus(window); // a refresh starts and waits
-    fireEvent.click(row("2 clove garlic"));
+    fireEvent.click(row("2 cloves garlic"));
     await waitFor(() => expect(state.items.find((i) => i.id === "i-garlic")?.checked).toBe(true));
     release(); // the old answer (garlic unticked) arrives after the tick
     await new Promise((r) => setTimeout(r, 50));
-    expect(row("2 clove garlic").getAttribute("aria-pressed")).toBe("true");
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("true");
   });
 });
 
@@ -561,7 +561,7 @@ describe("offline", () => {
       window.dispatchEvent(new Event("offline"));
     });
     expect(screen.getByText(/This is the last copy of the list/)).toBeTruthy();
-    const tick = row("2 clove garlic") as HTMLButtonElement;
+    const tick = row("2 cloves garlic") as HTMLButtonElement;
     expect(tick.disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByLabelText("Add an item") as HTMLInputElement).disabled).toBe(true);

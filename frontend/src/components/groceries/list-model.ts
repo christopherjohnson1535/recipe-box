@@ -13,12 +13,23 @@ export const SECTIONS: { id: GrocerySection; label: string }[] = [
 export const sectionLabel = (id: GrocerySection) => SECTIONS.find((s) => s.id === id)?.label ?? "Other";
 const rank = (id: GrocerySection) => SECTIONS.findIndex((s) => s.id === id);
 
+/** Units spelled out as words; the API sends them singular ("5 clove"), the list reads "5 cloves". */
+const WORD_UNITS: Record<string, string> = {
+  cup: "cups", clove: "cloves", can: "cans", jar: "jars", bag: "bags", stick: "sticks", slice: "slices", bunch: "bunches",
+  sprig: "sprigs", head: "heads", stalk: "stalks", piece: "pieces", package: "packages", handful: "handfuls", pinch: "pinches", dash: "dashes",
+};
+
+/** One or less than one ("1", "½", "¾", "1/2") stays singular; "1½", "2–3" and "12" are plural. */
+const isSingular = (quantity: string) => quantity === "1" || /^(?:\d\/\d|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])$/u.test(quantity);
+
+function amountText({ quantity, unit }: GroceryAmount): string {
+  const word = unit && quantity && !isSingular(quantity) ? (WORD_UNITS[unit] ?? unit) : unit;
+  return [quantity, word].filter(Boolean).join(" ");
+}
+
 /** "1 cup + 2 tbsp"; empty when the item has no amount. */
 export function amountsText(amounts: GroceryAmount[]): string {
-  return amounts
-    .map((a) => [a.quantity, a.unit].filter(Boolean).join(" "))
-    .filter(Boolean)
-    .join(" + ");
+  return amounts.map(amountText).filter(Boolean).join(" + ");
 }
 
 /** The whole line as it is read out: "1 cup + 2 tbsp milk". */
