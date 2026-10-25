@@ -36,7 +36,7 @@ pub(crate) fn flow_cookie(
         .path(path)
         .http_only(true)
         .same_site(SameSite::Lax)
-        .secure(config.cookie_secure)
+        .secure(true)
         .max_age(time::Duration::minutes(minutes))
         .build()
 }
