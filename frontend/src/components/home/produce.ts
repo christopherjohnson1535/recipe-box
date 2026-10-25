@@ -1,4 +1,4 @@
-import type { Season } from "./issue";
+import type { Season } from "@/lib/local-day";
 
 // shortcut: a fixed Northern-hemisphere list, add a hemisphere/region setting if the household is ever south of the equator.
 export const IN_SEASON: Record<Season, string[]> = {

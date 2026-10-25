@@ -38,7 +38,7 @@
   --text-numeral--line-height: 1;
   --text-headline: clamp(2.5rem, 2rem + 2.6vw, 4.25rem); /* page headline */
   --text-headline--line-height: 1.05;
-  --text-wordmark: clamp(2rem, 1.6rem + 1.2vw, 2.75rem); /* 44px on a desktop */
+  --text-wordmark: clamp(2rem, 1.4rem + 1.6vw, 2.75rem); /* 44px from a 1350px window up */
   --text-wordmark--line-height: 1;
   --text-wordmark-lg: clamp(2.75rem, 2rem + 4vw, 4rem);
   --text-wordmark-lg--line-height: 1;
@@ -52,10 +52,11 @@
 :root {
   --measure: 38rem; /* ~68 characters of body text */
   --measure-form: 44rem; /* the editor: room for a field and its row buttons side by side */
-  --measure-wide: 64rem;
-  --page-width: 72rem;
+  --measure-wide: 72rem; /* the recipe page: ingredient column plus method */
+  --page-width: 90rem; /* 1440px: a 1920 monitor leaves 240px each side */
   --control-height: 2.75rem; /* 44px touch target */
   --gutter: 1rem;
+  --focus-offset: 3px; /* gap between a focused control and its ring */
 }
 
 @media (min-width: 48rem) {
@@ -164,10 +165,10 @@ body {
     color: var(--drop-cap-fg);
   }
 
-  /* Thick-over-thin rule under the masthead and above sidebars. */
+  /* Thin double rule under the masthead and above sidebars: 1px line, 3px gap, 1px line. */
   .rule-double {
-    height: 7px;
-    border-top: 3px solid var(--rule-double);
+    height: 5px;
+    border-top: 1px solid var(--rule-double);
     border-bottom: 1px solid var(--rule-double);
   }
 
@@ -184,7 +185,7 @@ body {
 
 :focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 3px;
+  outline-offset: var(--focus-offset); /* the top band sets a negative one so the ring stays inside it */
 }
 
 ::selection {

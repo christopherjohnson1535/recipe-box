@@ -1,8 +1,12 @@
 # Finding Recipes
 
+## The top of every screen
+A dark band runs across the top of every signed-in screen: today's date on your device's clock, the season and how many
+recipes your household has (left out if the count can't be read), with **Sign out** on the right. Under it are the
+Recipe Box name and the section links, with a thin double line below.
+
 ## The home page
-The top of the home page is set like a magazine cover: an issue line (volume, the number of recipes, the season and
-today's date), then a **cover story**, a recipe with a photo that you haven't touched in a while, with **Start
+The top of the home page is set like a magazine cover: a **cover story**, a recipe with a photo that you haven't touched in a while, with **Start
 cooking** and **Read the recipe**. Under it a slow **In season** ticker lists produce for the time of year (hover over it,
 tab onto it or press **Pause** to stop it; on a touch screen tap it). Below are the recipe cards, with a numbered **Also in this issue** list and a **Haven't
 cooked in a while** panel beside them (under them on an iPad held upright or a phone). While you search or pick a tag,

@@ -8,7 +8,7 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 
 ## Lane
 - Riviera: refined and calm rather than magazine-like, for a long-lived household app. Cool paper, charcoal ink, one
-  saffron accent; a charcoal top band and band-coloured inverse panels (layout lands in #120 and #121).
+  saffron accent; a charcoal top band (since #120) and band-coloured inverse panels (#121).
 
 ## Palette (light: "day edition")
 - Paper `#f4f4f1` (page) · Paper-deep `#eaeae5` (ingredient sidebar, alerts, panels)
@@ -53,16 +53,19 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
   wordmark 44 · headline clamp(40px → 68px).
 
 ## Shape language
-- Square corners (controls 2px), no shadows. Separation by hairline rules; a thick-over-thin double rule under the
-  masthead and atop the ingredient sidebar.
+- Square corners (controls 2px), no shadows. Separation by hairline rules; a thin double rule (1px, 3px gap, 1px) under
+  the masthead and atop the ingredient sidebar.
 
 ## Density & spacing
-- Generous whitespace. Measure 38rem body, 64rem wide column, 72rem page (90rem from #120). Gutter 16px phone / 40px ≥768.
+- Generous whitespace. Measure 38rem body, 72rem wide column (the recipe page), 90rem page. Gutter 16px phone / 40px ≥768.
 - Listing entries: 24px vertical padding between hairlines. Touch targets 44px.
 - Section separation: hairline rules only.
 
 ## Structure (app shell)
-- Masthead: wordmark left, uppercase section links right, double rule.
+- Top band: full-width charcoal strip (band tokens), at least 44px, on the page edges: local date · season · recipe
+  count left (count left out when unknown), Sign out right; print hidden; season drops on a phone.
+- Masthead: Marcellus wordmark (~44px) left, uppercase Karla section links right (active: 2px accent underline), thin
+  double rule under.
 - Home: article-head (kicker, headline, italic deck, actions) → search + tag index → two-column contents listing.
 - Recipe: centred article head (tag kicker, headline, deck or none, byline, actions) → meta strip → photo → drop-cap
   lede (long descriptions) → ingredient sidebar + numbered method → notes.
