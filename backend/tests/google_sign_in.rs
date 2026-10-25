@@ -226,12 +226,12 @@ async fn starting_sends_the_browser_to_google_with_state_nonce_and_pkce() {
     for part in [
         "HttpOnly",
         "SameSite=Lax",
+        "Secure",
         "Path=/api/auth/google",
         "Max-Age=600",
     ] {
         assert!(cookie.contains(part), "{part}: {cookie}");
     }
-    assert!(!cookie.contains("Secure"), "{cookie}");
     assert!(
         !cookie.contains(s.state()) && !cookie.contains(s.nonce()),
         "the record is sealed: {cookie}"

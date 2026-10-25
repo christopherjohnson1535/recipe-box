@@ -253,7 +253,7 @@ async fn connect_redirects_to_google_with_a_state_that_is_also_in_a_cookie() {
     assert_eq!(
         cookie,
         format!(
-            "rb_google_state={state}; HttpOnly; SameSite=Lax; Path=/api/integrations/google; Max-Age=600"
+            "rb_google_state={state}; HttpOnly; SameSite=Lax; Secure; Path=/api/integrations/google; Max-Age=600"
         )
     );
     assert_eq!(state.len(), 43, "32 random bytes, base64url");
