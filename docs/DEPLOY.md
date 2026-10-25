@@ -84,8 +84,12 @@ Until then the release job's anonymous pull fails and no release is created.
    `docker buildx imagetools inspect ghcr.io/christopherjohnson1535/recipe-box-api:v0.1.0` lists `linux/amd64` and
    `linux/arm64`; on the Pi, `docker pull ghcr.io/christopherjohnson1535/recipe-box-api:v0.1.0` works.
 
-A failed run publishes nothing for that tag. Fix on `main`, then move the tag:
-`git tag -f v0.1.0 <fixed-commit> && git push -f origin v0.1.0` (only before anyone deploys it; otherwise tag `v0.1.1`).
+The `images` job pushes before the `release` job runs, so a run that fails at `release` (for example because the
+packages are still private) leaves the images for that tag published but no GitHub release. Fix the cause and re-run
+the failed job; `release` skips creating a release that already exists. `release` also fails if the tagged commit is
+not on `main`. If the problem is in the code, do not move the tag once its images are published: that breaks the
+"never moves" promise in the tag table above for anyone who pulled it. Tag `v0.1.1` instead. Moving a tag
+(`git tag -f ... && git push -f origin <tag>`) is only acceptable when no image was published for it.
 
 ## Backups
 `sh scripts/backup.sh` writes `backups/<time>/db.dump` + `media.tar`; copy that folder off the machine.
