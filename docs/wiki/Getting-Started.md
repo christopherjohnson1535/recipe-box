@@ -10,7 +10,8 @@ docker compose up -d --build
 ```
 
 Open http://localhost:3000. The first visit asks you to create the **admin** account. Household members are added
-by the admin in **Settings → Household**.
+by the admin in **Settings → Household**. If you would rather tap **Sign in with Google** than type a password, see
+[[Google Sign-In]].
 
 ## Reaching it from an iPad on the same Wi‑Fi
 Set `WEB_BIND=0.0.0.0` in `.env`, run `docker compose up -d`, and open `http://<your-computer's-IP>:3000`.

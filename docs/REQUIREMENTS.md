@@ -92,6 +92,7 @@ Priority: **Must** = first usable version, **Should** = next, **Could** = nice t
 | ACC-3 | Sessions last 30 days on a device so the iPad stays signed in | Must |
 | ACC-4 | Each recipe records who added and last edited it | Should |
 | ACC-5 | Export all recipes (JSON + photos) and import that export back | Should |
+| ACC-6 | Sign in with Google for existing members | Should |
 
 ### 7. Deploy and operate (OPS)
 | ID | Requirement | Priority |
