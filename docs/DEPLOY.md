@@ -185,8 +185,41 @@ a restart clears them.
   do not publish port 3000 elsewhere. The software cannot check this for you.
 
 ## Backups
-`sh scripts/backup.sh` writes `backups/<time>/db.dump` + `media.tar`; copy that folder off the machine.
-`sh scripts/restore.sh backups/<time>` restores (asks for confirmation). Test a restore after setting up.
+`sh scripts/backup.sh` and `sh scripts/restore.sh backups/<time>` (OPS-6). User-facing guide, with scheduling and
+off-site copies: wiki page `docs/wiki/Backup-and-Restore.md`. Reference:
+
+- **What a backup is.** A folder `backups/<UTC time>/` with `db.dump` (`pg_dump --format=custom`, no owners or grants),
+  `media.tar`, `backup.info` (counts and versions, derived from the dump itself) and `SHA256SUMS`. Created with mode
+  700/600. The database is dumped first, then the photos, so a photo can outlive its recipe in a backup but never the
+  reverse. The folder is written under `.partial-*` and renamed on success; both files are read back before that.
+- **No secrets.** The dump excludes the `sessions` table data (token hashes). `.env`, `POSTGRES_PASSWORD` and
+  `ANTHROPIC_API_KEY` are never read. It does contain accounts with argon2 password hashes and all recipes: private,
+  but not secret-free. The test suite greps every backup file for the stack's database password, API key and the
+  users' passwords.
+- **Settings** (environment, also for cron): `BACKUP_DIR` (default `backups`, relative to the repo folder),
+  `BACKUP_KEEP` (default 14 timestamped backups; `0` = keep all; only `YYYYMMDD-HHMMSS` folders are pruned, after a
+  successful run), `BACKUP_NAME` (explicit folder name, never pruned), `BACKUP_MODE` (`compose`, the default, uses
+  the `db` and `api` services of whatever `COMPOSE_FILE` selects, so the production override works too; `direct`
+  uses `DATABASE_URL` + `MEDIA_DIR` and local `psql`/`pg_dump`/`pg_restore` 16+, for installs without Docker).
+- **Restore safety.** Verifies `SHA256SUMS`; exit 3 for a backup with a database version above the running one
+  (newest row of `_sqlx_migrations`, compared with what the running API applied) or from a newer PostgreSQL major;
+  exit 3 when the target holds any user, recipe or photo file unless `--force`, and then writes
+  `backups/pre-restore-<time>` first; asks for `yes` unless `--yes`; stops `api`, restores the database in a single
+  transaction (`--clean --if-exists --single-transaction --exit-on-error`: all or nothing), unpacks the photos beside
+  the old ones and swaps them in only when the archive read cleanly, starts `api`, and compares users, recipes and
+  photo files with the backup (exit 1 on a mismatch). An older backup restores as is; the API migrates it on start.
+  The API is restarted even when the restore fails. Exit codes: 0 done, 1 failed or cancelled, 2 usage, 3 refused.
+- **Scheduling** is cron / Task Scheduler on the host (examples in the wiki page). There is deliberately no backup
+  container in the Compose file: it would need the Docker socket, which is root on the host, to do what one cron line
+  does.
+- **Fly.io and other managed hosts**: see `docs/wiki/Deploy-Fly.md`, "Upgrade and backups"; the Compose-based scripts do not apply there.
+- **Tests.** `e2e/tests/backup/backup-restore.spec.ts` (Playwright, TypeScript) seeds a stack (accounts, recipes with
+  several photos, a deleted recipe), runs the real scripts, wipes the stack's volumes, restores and asserts every
+  recipe, every photo's bytes, search, tags and trash are identical, plus the refusals above and retention. CI job
+  `backup` runs it against `docker-compose.backup-e2e.yml` (`cd e2e && npm run test:backup:compose`); without Docker
+  `npm run test:backup` runs the same file against local Postgres and a cargo-built API (`BACKUP_MODE=direct`).
+  Not covered: restoring a backup older than the running schema (needs a real older release image).
+- The in-app zip export (ACC-5) is a different feature: portable recipes and photos, no accounts.
 
 ## Health
 - `GET /api/health` through the web port → `{"status":"ok","db":"ok"}`.
