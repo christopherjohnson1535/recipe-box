@@ -58,7 +58,7 @@ with sync_playwright() as p:
         pages = {"home": "/", "home-q": "/?q=" + (items[0]["title"].split()[0] if items else "a"),
                  "home-tag": f"/?tag={tag}", "recipe": f"/recipes/{rid}", "recipe-long": f"/recipes/{lid}",
                  "new": "/recipes/new", "edit": f"/recipes/{rid}/edit", "cook": f"/recipes/{rid}/cook",
-                 "import-link": "/import", "import-photo": "/import?mode=photo", "settings": "/settings",
+                 "groceries": "/groceries", "import-link": "/import", "import-photo": "/import?mode=photo", "settings": "/settings",
                  "notfound": "/recipes/00000000-0000-0000-0000-000000000000"}
         for size, (w, h) in sizes.items():
             pg.set_viewport_size({"width": w, "height": h})

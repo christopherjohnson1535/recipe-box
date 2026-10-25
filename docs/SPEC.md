@@ -180,6 +180,7 @@ reviewed draft to `/api/recipes`.
 | `/recipes/[id]/edit` | edit form | placeholder |
 | `/recipes/[id]/cook` | cooking mode (KIT-2/3) | placeholder |
 | `/import` | link / photo / text import → draft review → save | placeholder |
+| `/groceries` | household shopping list: recipes on it, items by store section, tick/move/staple/add, polled every 20 s (GRO-1–4) | working |
 | `/settings` | account, household members (admin), AI status, export | placeholder |
 - Signed-out users are redirected to `/login` (or `/setup` when the API says `needsSetup`), via `src/proxy.ts`
   (Next 16's middleware) checking for the `rb_session` cookie, and server-side `GET /api/auth/me`.
@@ -237,10 +238,10 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   `src/app/serwist/[path]/route.ts` and served at `/serwist/sw.js` (production builds only). Rules in
   `src/components/offline/rules.ts`.
   - Precache (app shell): `.next/static` (scripts, styles, fonts), `public/` icons and the static `/offline` page.
-  - Runtime, allowlist only: recipe pages `/recipes/:id` and `/recipes/:id/cook` (network-first, 5 s timeout, keyed
+  - Runtime, allowlist only: recipe pages `/recipes/:id` and `/recipes/:id/cook` and the grocery list page `/groceries` (network-first, 5 s timeout, keyed
     by path; kept only when 200, not redirected and marked by `KeepOffline`, so the server-error page never replaces a
     good copy; after an in-app navigation the page asks the worker to fetch it with `CACHE_URLS`; a kept recipe
-    page also keeps the photos it names and its cooking mode), `GET /api/recipes/:id` (network-first), `/media/*` (cache-first: names
+    page also keeps the photos it names and its cooking mode), `GET /api/recipes/:id` and `GET /api/grocery` (network-first; grocery writes are never kept, and the page ignores a kept copy older than the list it already shows), `/media/*` (cache-first: names
     are content ids). Everything else is network-only; a document with no copy falls back to `/offline`, which lists
     the recipes kept on the device.
   - Caps: 60 pages, 30 API responses, 200 photos, 30 days since last use, purge on quota error.

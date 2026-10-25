@@ -3,7 +3,7 @@ import { cx } from "./cx";
 import { Heading } from "./Heading";
 
 /** The ingredient sidebar: paper-deep panel under a double rule, the title with the scale control opposite. */
-export function IngredientPanel({ id, scale, children }: { id: string; scale?: ReactNode; children: ReactNode }) {
+export function IngredientPanel({ id, scale, footer, children }: { id: string; scale?: ReactNode; /** Actions that belong to the whole list, set under the last row. */ footer?: ReactNode; children: ReactNode }) {
   return (
     <aside aria-labelledby={id} className="flex flex-col gap-3 self-start bg-(--panel-bg) px-5 pt-1 pb-5 sm:px-6">
       <div className="rule-double -mx-5 sm:-mx-6" aria-hidden="true" />
@@ -14,6 +14,7 @@ export function IngredientPanel({ id, scale, children }: { id: string; scale?: R
         {scale}
       </div>
       {children}
+      {footer && <div className="mt-1 flex flex-col items-start gap-3 pt-3 max-sm:items-stretch print:hidden">{footer}</div>}
     </aside>
   );
 }

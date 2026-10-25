@@ -1,22 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { keepablePage, KEEP_MARKER, MEDIA, mediaIn, pageKey, RECIPE_API, RECIPE_PAGE, RECIPE_READ_PAGE, recipeTitle, signedOut } from "./rules";
+import { keepablePage, KEEP_MARKER, MEDIA, mediaIn, pageKey, KEPT_API, KEPT_PAGE, RECIPE_READ_PAGE, recipeTitle, signedOut } from "./rules";
 
 const ID = "0f8e2b4c-1a2b-4c3d-8e9f-0123456789ab";
 const kept = `<html><head><meta ${KEEP_MARKER} content="1"/><title>Lasagne · Recipe Box</title></head></html>`;
 
 describe("what the worker keeps", () => {
   it("keeps recipe pages and cooking mode, nothing else", () => {
-    expect(RECIPE_PAGE.test(`/recipes/${ID}`)).toBe(true);
-    expect(RECIPE_PAGE.test(`/recipes/${ID}/cook`)).toBe(true);
+    expect(KEPT_PAGE.test(`/recipes/${ID}`)).toBe(true);
+    expect(KEPT_PAGE.test(`/recipes/${ID}/cook`)).toBe(true);
     for (const p of ["/", "/login", "/setup", "/settings", "/import", "/recipes/new", `/recipes/${ID}/edit`, "/recipes/abc"]) {
-      expect(RECIPE_PAGE.test(p), p).toBe(false);
+      expect(KEPT_PAGE.test(p), p).toBe(false);
     }
     expect(RECIPE_READ_PAGE.test(`/recipes/${ID}/cook`)).toBe(false);
   });
 
+  it("keeps the grocery list page and GET /api/grocery, and none of its writes or neighbours", () => {
+    expect(KEPT_PAGE.test("/groceries")).toBe(true);
+    for (const p of ["/groceries/", "/groceries/x", "/grocery", "/api/grocery"]) expect(KEPT_PAGE.test(p), p).toBe(false);
+    expect(KEPT_API.test("/api/grocery")).toBe(true);
+    for (const p of ["/api/grocery/items", `/api/grocery/items/${ID}`, "/api/grocery/recipes", "/api/grocery/clear-checked", "/api/groceries", "/groceries"]) {
+      expect(KEPT_API.test(p), p).toBe(false);
+    }
+    expect(RECIPE_READ_PAGE.test("/groceries")).toBe(false); // it is not listed among the kept recipes
+    expect(pageKey("https://box.example/groceries?x=1")).toBe("https://box.example/groceries");
+  });
+
   it("keeps one recipe from the API and the media files, not lists or auth", () => {
-    expect(RECIPE_API.test(`/api/recipes/${ID}`)).toBe(true);
-    for (const p of ["/api/recipes", "/api/auth/me", `/api/recipes/${ID}/restore`]) expect(RECIPE_API.test(p), p).toBe(false);
+    expect(KEPT_API.test(`/api/recipes/${ID}`)).toBe(true);
+    for (const p of ["/api/recipes", "/api/auth/me", `/api/recipes/${ID}/restore`]) expect(KEPT_API.test(p), p).toBe(false);
     expect(MEDIA.test(`/media/${ID}.jpg`)).toBe(true);
     expect(MEDIA.test(`/media/${ID}.display.jpg`)).toBe(true);
     expect(MEDIA.test("/media/../etc/passwd")).toBe(false);

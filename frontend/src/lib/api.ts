@@ -2,6 +2,7 @@
 // and on the server (API_INTERNAL_URL + the caller's forwarded cookie, see server-api.ts).
 
 import type { components } from "./api-types";
+import type { GroceryItem, GroceryList, GrocerySection, ItemPatch } from "@/components/groceries/types";
 
 // Every shape below is generated from the backend's OpenAPI spec (docs/openapi.json, see docs/API.md).
 type Schemas = components["schemas"];
@@ -26,6 +27,9 @@ export type RecipePage = Schemas["RecipePage"];
 export type ImportSummary = Schemas["ImportSummary"];
 export type RecipeQuery = { q?: string; tag?: string; sort?: RecipeSort; limit?: number; offset?: number };
 
+/** Dispatched on `window` after every grocery write, so the nav badge (and any other open view) refetches. */
+export const GROCERY_CHANGED = "grocery:changed";
+
 /** A non-2xx API response (`code` from the API's error body) or `network` when the API can't be reached. */
 export class ApiError extends Error {
   constructor(
@@ -48,7 +52,8 @@ export type ApiOptions = {
   fetch?: typeof fetch;
 };
 
-export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: ApiOptions = {}) {
+// The default looks `fetch` up per call, so a fetch installed after this module loads (tests, polyfills) is the one used.
+export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, init) => fetch(input, init) }: ApiOptions = {}) {
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const headers = new Headers();
     if (cookie) headers.set("cookie", cookie);
@@ -83,6 +88,12 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
 
   const get = <T>(path: string) => request<T>("GET", path);
   const id = encodeURIComponent;
+  /** A grocery write that worked: tell the rest of the page. */
+  const groceryWrite = async <T>(method: string, path: string, body?: unknown) => {
+    const result = await request<T>(method, path, body);
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(GROCERY_CHANGED));
+    return result;
+  };
 
   return {
     health: () => get<Health>("/api/health"),
@@ -132,6 +143,17 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = fetch }: Ap
 
     getSettings: () => get<Settings>("/api/settings"),
     updateSettings: (body: Settings) => request<Settings>("PUT", "/api/settings", body),
+
+    getGrocery: () => get<GroceryList>("/api/grocery"),
+    /** Adds the recipe, or sets the scale of one already on the list. */
+    addGroceryRecipe: (recipeId: string, scale = 1) => groceryWrite<GroceryList>("POST", "/api/grocery/recipes", { recipeId, scale }),
+    removeGroceryRecipe: (recipeId: string) => groceryWrite<GroceryList>("DELETE", `/api/grocery/recipes/${id(recipeId)}`),
+    addGroceryItem: (text: string, section?: GrocerySection) =>
+      groceryWrite<GroceryItem>("POST", "/api/grocery/items", section ? { text, section } : { text }),
+    patchGroceryItem: (itemId: string, patch: ItemPatch) => groceryWrite<GroceryItem>("PATCH", `/api/grocery/items/${id(itemId)}`, patch),
+    removeGroceryItem: (itemId: string) => groceryWrite<void>("DELETE", `/api/grocery/items/${id(itemId)}`),
+    clearGroceryChecked: () => groceryWrite<GroceryList>("POST", "/api/grocery/clear-checked"),
+    emptyGrocery: () => groceryWrite<void>("DELETE", "/api/grocery"),
 
     exportAll: () => get<Blob>("/api/export"),
     importExport: (file: Blob) => {

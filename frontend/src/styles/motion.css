@@ -174,9 +174,13 @@ li:target > button {
     animation: target-flash 2.5s var(--ease-out) 1s both;
   }
 }
-/* Keep focused and linked content clear of the floating bar. */
-html:has(.floating-bar) {
+/* Keep focused and linked content clear of the floating bar (and the grocery selection bar). */
+html:has(.floating-bar, .selection-bar) {
   scroll-padding-bottom: 7rem;
+}
+/* While the grocery selection bar is up, leave room under the page for it: the last panel ends well above the pill, never behind it. */
+html:has(.selection-bar) main {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 7rem);
 }
 
 /* Reduced motion removes all movement. Opacity changes (the stamp, the arrival fades) become instant or stay still. */

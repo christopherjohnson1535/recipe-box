@@ -5,6 +5,7 @@
 - [[Importing Recipes]]
 - [[Save from Safari]]
 - [[Finding Recipes]]
+- [[Grocery List]]
 - [[Household Members]]
 - [[Using on iPad]]
 - [[Household Members]]

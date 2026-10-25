@@ -1,15 +1,21 @@
+import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+import { cx } from "./cx";
 
 /**
  * Where toasts appear: a polite live region pinned to the bottom of the screen. It stays mounted (empty) so a toast
- * that arrives later is announced. Hidden when printing.
+ * that arrives later is announced. Hidden when printing. `lifted` sits it above a bar pinned to the bottom (the grocery
+ * selection bar).
  */
-export function ToastRegion({ children }: { children?: ReactNode }) {
+export function ToastRegion({ children, lifted }: { children?: ReactNode; lifted?: boolean }) {
   return (
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 pl-[max(var(--gutter),env(safe-area-inset-left))] pr-[max(var(--gutter),env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] print:hidden"
+      className={cx(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 pl-[max(var(--gutter),env(safe-area-inset-left))] pr-[max(var(--gutter),env(safe-area-inset-right))] print:hidden",
+        lifted ? "pb-[calc(env(safe-area-inset-bottom)+5.5rem)]" : "pb-[max(1rem,env(safe-area-inset-bottom))]",
+      )}
     >
       {children}
     </div>
@@ -37,6 +43,16 @@ export function ToastAction({ type = "button", ...rest }: ComponentProps<"button
     <button
       type={type}
       className={`label min-h-control shrink-0 px-3 text-(--toast-action-fg) underline underline-offset-[0.3em] hover:decoration-2 disabled:opacity-55 ${focus}`}
+      {...rest}
+    />
+  );
+}
+
+/** A link in a toast ("Open the list"): looks like ToastAction. */
+export function ToastLink({ className, ...rest }: ComponentProps<typeof Link>) {
+  return (
+    <Link
+      className={cx("label inline-flex min-h-control shrink-0 items-center px-3 text-(--toast-action-fg) underline underline-offset-[0.3em] hover:decoration-2", focus, className)}
       {...rest}
     />
   );
