@@ -8,8 +8,8 @@ use std::{
 };
 
 use adapter_postgres::{
-    PgGroceryRepo, PgImageRepo, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth,
-    PgTagRepo, PgUserRepo, migrate,
+    PgGoogleConnectionRepo, PgGroceryRepo, PgImageRepo, PgRecipeRepo, PgSessionRepo,
+    PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo, migrate,
 };
 use domain::{
     grocery::{GeneratedItem, Section},
@@ -94,6 +94,7 @@ impl Schemas {
             settings: Arc::new(PgSettingsRepo::new(pool.clone(), clock.clone())),
             tags: Arc::new(PgTagRepo::new(pool.clone())),
             grocery: Arc::new(PgGroceryRepo::new(pool.clone(), clock.clone())),
+            google: Arc::new(PgGoogleConnectionRepo::new(pool.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
         }
     }
@@ -153,6 +154,12 @@ async fn accounts_meet_the_contract() {
 async fn groceries_meet_the_contract() {
     let Some(db) = Schemas::new() else { return };
     contract::grocery_repo(|c| db.stack(c)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn google_connections_meet_the_contract() {
+    let Some(db) = Schemas::new() else { return };
+    contract::google_connection_repo(|c| db.stack(c)).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -8,6 +8,9 @@ from .create_user_body import CreateUserBody
 from .create_user_body_role import CreateUserBodyRole
 from .error_body import ErrorBody
 from .error_detail import ErrorDetail
+from .google_export import GoogleExport
+from .google_export_request import GoogleExportRequest
+from .google_status import GoogleStatus
 from .grocery_amount import GroceryAmount
 from .grocery_item import GroceryItem
 from .grocery_list import GroceryList
@@ -50,6 +53,9 @@ __all__ = (
     "CreateUserBodyRole",
     "ErrorBody",
     "ErrorDetail",
+    "GoogleExport",
+    "GoogleExportRequest",
+    "GoogleStatus",
     "GroceryAmount",
     "GroceryItem",
     "GroceryList",

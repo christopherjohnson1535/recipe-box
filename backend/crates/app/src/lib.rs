@@ -7,6 +7,7 @@
 
 mod auth;
 mod export;
+mod google;
 mod grocery;
 mod imports;
 mod maintenance;
@@ -18,13 +19,16 @@ mod users;
 use std::sync::Arc;
 
 use ports::{
-    BackupFormat, Clock, GroceryRepo, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader,
-    PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo,
-    StorageHealth, TagRepo, TaskSpawner, UserRepo,
+    BackupFormat, Clock, GoogleConnectionRepo, GoogleTasks, GroceryRepo, ImageCodec, ImageRepo,
+    MediaStore, PageFetcher, PageReader, PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo,
+    SessionTokens, SettingsRepo, StorageHealth, TagRepo, TaskSpawner, TokenCipher, UserRepo,
 };
 
 pub use auth::{AuthService, NewSession};
 pub use export::{ExportJob, ExportService, ImportReport};
+pub use google::{
+    DisabledGoogleTasks, GoogleExport, GoogleStatus, GoogleTasksService, TASK_LIST_TITLE,
+};
 pub use grocery::{GroceryItemView, GroceryListView, GroceryRecipeView, GroceryService, ItemPatch};
 pub use imports::{
     Capabilities, ImportNotes, ImportService, Imported, NoneExtractor, PhotoFailure,
@@ -45,6 +49,7 @@ pub struct Deps {
     pub settings: Arc<dyn SettingsRepo>,
     pub tags: Arc<dyn TagRepo>,
     pub grocery: Arc<dyn GroceryRepo>,
+    pub google_connections: Arc<dyn GoogleConnectionRepo>,
     pub health: Arc<dyn StorageHealth>,
     pub media: Arc<dyn MediaStore>,
     pub backup: Arc<dyn BackupFormat>,
@@ -55,6 +60,10 @@ pub struct Deps {
     pub extractor: Arc<dyn RecipeExtractor>,
     pub fetcher: Arc<dyn PageFetcher>,
     pub reader: Arc<dyn PageReader>,
+    /// Google sign-in and Tasks; `DisabledGoogleTasks` when the server has no Google OAuth client.
+    pub google: Arc<dyn GoogleTasks>,
+    /// Seals the stored Google refresh tokens.
+    pub cipher: Arc<dyn TokenCipher>,
     /// Runs cleanup that must outlive a dropped request.
     pub spawner: Arc<dyn TaskSpawner>,
     /// Largest accepted upload (`MAX_UPLOAD_MB`); also caps a page photo downloaded by link import.
@@ -74,6 +83,7 @@ pub struct Services {
     pub settings: SettingsService,
     pub tags: TagService,
     pub grocery: GroceryService,
+    pub google: GoogleTasksService,
     pub media: MediaService,
     pub imports: ImportService,
     pub export: ExportService,
@@ -83,13 +93,15 @@ pub struct Services {
 impl Services {
     pub fn new(d: Deps) -> Self {
         let auth = AuthService::new(&d);
+        let grocery = GroceryService::new(&d);
         Self {
             recipes: RecipeService::new(&d),
             users: UserService::new(&d, auth.clone()),
             auth,
             settings: SettingsService::new(&d),
             tags: TagService::new(&d),
-            grocery: GroceryService::new(&d),
+            google: GoogleTasksService::new(&d, grocery.clone()),
+            grocery,
             media: MediaService::new(&d),
             imports: ImportService::new(&d),
             export: ExportService::new(&d),

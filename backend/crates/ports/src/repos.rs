@@ -348,3 +348,54 @@ pub trait GroceryRepo: Send + Sync {
     /// and water.
     async fn staples(&self) -> DomainResult<HashSet<String>>;
 }
+
+/// A member's link to their Google account.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GoogleConnection {
+    /// The refresh token as sealed by a [`crate::TokenCipher`]; storage never sees it in the clear. `None` after
+    /// Google refused the token ([`GoogleConnectionRepo::forget_token`]): the member is not connected, but the
+    /// remembered task list stays for the next connection.
+    pub sealed_token: Option<Vec<u8>>,
+    /// The Google Tasks list the grocery list was last sent to.
+    pub tasklist_id: Option<String>,
+    /// When the token was stored.
+    pub connected_at: DateTime<Utc>,
+}
+
+/// At most one Google connection per user. A user's connection goes when the user does.
+#[async_trait]
+pub trait GoogleConnectionRepo: Send + Sync {
+    async fn get(&self, user_id: Uuid) -> DomainResult<Option<GoogleConnection>>;
+
+    /// Stores the token and `connected_at`, replacing an earlier connection's token; the remembered task list
+    /// stays (a list of another account is simply not found at Google). `NotFound` when there is no such user.
+    async fn upsert(
+        &self,
+        user_id: Uuid,
+        sealed_token: Vec<u8>,
+        connected_at: DateTime<Utc>,
+    ) -> DomainResult<()>;
+
+    /// Remembers the task list. Does nothing when the user has no connection.
+    async fn set_tasklist(&self, user_id: Uuid, tasklist_id: &str) -> DomainResult<()>;
+
+    /// Forgets the token only (Google no longer accepts it); the row and its task list stay. Not an error when
+    /// there is no connection.
+    async fn forget_token(&self, user_id: Uuid) -> DomainResult<()>;
+
+    /// Forgets the connection and its task list. Not an error when there is none.
+    async fn delete(&self, user_id: Uuid) -> DomainResult<()>;
+
+    /// Takes the user's export lease at `now`: `true` when nobody holds it or the holder started before
+    /// `stale_before` (it died without releasing); `false` when someone holds it, or there is no connection. One
+    /// export per user at a time, across server processes.
+    async fn claim_export(
+        &self,
+        user_id: Uuid,
+        now: DateTime<Utc>,
+        stale_before: DateTime<Utc>,
+    ) -> DomainResult<bool>;
+
+    /// Gives the lease back. Not an error when it is not held or there is no connection.
+    async fn release_export(&self, user_id: Uuid) -> DomainResult<()>;
+}

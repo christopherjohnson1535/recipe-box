@@ -20,6 +20,13 @@ pub enum DomainError {
     AiDisabled,
     #[error("{0}")]
     Ai(String),
+    #[error("Google Tasks is not set up on this server.")]
+    GoogleDisabled,
+    #[error("Your Google account is not connected. Connect it in Settings.")]
+    GoogleNotConnected,
+    /// Google's API failed (timeout, 5xx, a reply we could not read). The message never holds a token.
+    #[error("{0}")]
+    Google(String),
     #[error("{0}")]
     NoRecipeFound(String),
     #[error("That address is not allowed.")]

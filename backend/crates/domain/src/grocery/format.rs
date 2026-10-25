@@ -52,6 +52,22 @@ pub fn format_amount_quantity(a: &Amount) -> String {
     }
 }
 
+/// An item as one line: its amounts side by side, then the name ("1 cup + 2 tbsp milk", "3 onions", "salt").
+pub fn item_title(amounts: &[Amount], name: &str) -> String {
+    let amounts: Vec<String> = amounts
+        .iter()
+        .map(|a| match &a.unit {
+            Some(unit) => format!("{} {unit}", format_amount_quantity(a)),
+            None => format_amount_quantity(a),
+        })
+        .collect();
+    if amounts.is_empty() {
+        name.to_string()
+    } else {
+        format!("{} {name}", amounts.join(" + "))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,6 +89,26 @@ mod tests {
             (7.125, "7¼"),
         ] {
             assert_eq!(format_quantity(v), want, "{v}");
+        }
+    }
+
+    #[test]
+    fn an_item_reads_amounts_then_name() {
+        let a = |min, max, unit: Option<&str>| Amount {
+            min,
+            max,
+            unit: unit.map(Into::into),
+        };
+        for (amounts, want) in [
+            (vec![], "milk"),
+            (vec![a(3.0, None, None)], "3 milk"),
+            (
+                vec![a(1.0, None, Some("cup")), a(2.0, None, Some("tbsp"))],
+                "1 cup + 2 tbsp milk",
+            ),
+            (vec![a(2.0, Some(3.0), Some("lb"))], "2–3 lb milk"),
+        ] {
+            assert_eq!(item_title(&amounts, "milk"), want);
         }
     }
 }

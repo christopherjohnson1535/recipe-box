@@ -32,6 +32,7 @@ web container; the API port is not published.
 | `ANTHROPIC_API_KEY` | — | required when `AI_PROVIDER=anthropic` |
 | `AI_MODEL` | `claude-sonnet-5-5` | |
 | `MAX_UPLOAD_MB` | `15` | request body limit and max upload size |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY` | — | Google Tasks export; all four or none (see `docs/DEPLOY.md`) |
 | `RUST_LOG` | `info` | tracing filter, e.g. `info,recipe_box_api=debug,tower_http=debug` |
 
 ## Test
@@ -70,6 +71,7 @@ Dependencies point inward: adapters → `app` → `ports` → `domain`. The serv
 | `crates/adapters/http-fetch/` | `recipe-box-adapter-http-fetch` | The SSRF-guarded page fetcher (`safe_fetch.rs`). |
 | `crates/adapters/html/` | `recipe-box-adapter-html` | Page reader: JSON-LD, microdata, readable text. |
 | `crates/adapters/anthropic/` | `recipe-box-adapter-anthropic` | `RecipeExtractor` on the Anthropic Messages API. |
+| `crates/adapters/google/` | `recipe-box-adapter-google` | `GoogleTasks` on Google's OAuth and Tasks APIs (grocery export). |
 
 The server crate (`src/`):
 - `main.rs` — config, tracing, pool, migrations, purge task, graceful shutdown (SIGTERM / Ctrl-C).

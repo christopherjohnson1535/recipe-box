@@ -17,9 +17,11 @@ import { Text } from "@/components/ui/Text";
 import { Toast, ToastDismiss, ToastRegion } from "@/components/ui/Toast";
 import { TextLink } from "@/components/ui/TextLink";
 import { splitIngredient } from "@/lib/scale";
+import { SendList } from "./SendList";
 import { amountsText, groupItems, SECTIONS, toBuy } from "./list-model";
 import { scaleLabel, stepScale } from "./scale-steps";
 import type { GroceryItem, GroceryRecipe } from "./types";
+import { useGoogleStatus } from "./use-google-status";
 import { useGroceryList } from "./use-grocery-list";
 
 const OFFLINE = "groceries-offline";
@@ -50,6 +52,7 @@ function LoadingList() {
 export function GroceryView() {
   const g = useGroceryList();
   const online = useOnline();
+  const [google, setGoogle] = useGoogleStatus();
   const [showStaples, setShowStaples] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [text, setText] = useState("");
@@ -291,6 +294,17 @@ export function GroceryView() {
             </div>
           )}
         </ListBody>
+
+        {(list.items.length > 0 || list.recipes.length > 0) && (
+          <SendList
+            list={list}
+            showStaples={showStaples}
+            online={online}
+            offlineId={OFFLINE}
+            google={google}
+            onNotConnected={() => setGoogle((s) => s && { ...s, connected: false, connectedAt: null })}
+          />
+        )}
 
         {(list.items.length > 0 || list.recipes.length > 0) && (
           <ListActions

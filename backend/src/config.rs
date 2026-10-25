@@ -29,6 +29,100 @@ pub struct Config {
     pub max_upload_mb: usize,
     /// Largest backup archive `POST /api/import/export` takes.
     pub max_backup_mb: usize,
+    /// The Google OAuth client for the Tasks export; `None` turns the feature off.
+    pub google: Option<GoogleConfig>,
+}
+
+/// `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL` and `TOKEN_ENCRYPTION_KEY`: all four or none.
+#[derive(Clone)]
+pub struct GoogleConfig {
+    pub client_id: String,
+    pub client_secret: Secret,
+    /// `http(s)://host[/path]` without a trailing slash.
+    pub public_url: String,
+    /// The decoded `TOKEN_ENCRYPTION_KEY`.
+    pub token_key: [u8; 32],
+}
+
+/// `Debug` shows the address and client id only: `Config` is logged in places, and the key must never be.
+impl std::fmt::Debug for GoogleConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GoogleConfig")
+            .field("client_id", &self.client_id)
+            .field("public_url", &self.public_url)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The four Google settings as given (blank counts as unset). `None` when none is set; an error naming what is
+/// missing when only some are, or when a value is not usable.
+pub fn google_config(
+    client_id: Option<String>,
+    client_secret: Option<String>,
+    public_url: Option<String>,
+    token_key: Option<String>,
+) -> anyhow::Result<Option<GoogleConfig>> {
+    let trimmed = |v: Option<String>| v.map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+    let (id, secret, url, key) = (
+        trimmed(client_id),
+        trimmed(client_secret),
+        trimmed(public_url),
+        trimmed(token_key),
+    );
+    let missing: Vec<&str> = [
+        ("GOOGLE_CLIENT_ID", id.is_none()),
+        ("GOOGLE_CLIENT_SECRET", secret.is_none()),
+        ("PUBLIC_URL", url.is_none()),
+        ("TOKEN_ENCRYPTION_KEY", key.is_none()),
+    ]
+    .into_iter()
+    .filter_map(|(name, absent)| absent.then_some(name))
+    .collect();
+    let (Some(client_id), Some(secret), Some(url), Some(key)) = (id, secret, url, key) else {
+        if missing.len() == 4 {
+            return Ok(None);
+        }
+        bail!(
+            "Google Tasks needs GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, PUBLIC_URL and TOKEN_ENCRYPTION_KEY \
+             together; missing: {}",
+            missing.join(", ")
+        );
+    };
+    let parsed = domain::url::Url::parse(&url).ok().filter(|u| {
+        matches!(u.scheme(), "http" | "https")
+            && u.host_str().is_some()
+            && u.query().is_none()
+            && u.fragment().is_none()
+            // Google refuses a redirect address with userinfo, and it would end up in every redirect_uri.
+            && u.username().is_empty()
+            && u.password().is_none()
+    });
+    if parsed.is_none() {
+        bail!(
+            "PUBLIC_URL must be an http(s) address such as https://recipes.example.com (no user name, password, query or fragment)"
+        );
+    }
+    Ok(Some(GoogleConfig {
+        client_id,
+        client_secret: Secret::new(secret),
+        public_url: url.trim_end_matches('/').to_string(),
+        token_key: crate::crypto::parse_key(&key).map_err(anyhow::Error::msg)?,
+    }))
+}
+
+/// A sentence for the log when `PUBLIC_URL` and `COOKIE_SECURE` disagree about HTTPS: the session cookie is then not
+/// Secure on an https site, or Secure on a site browsers reach over http (and so never sent back).
+pub fn scheme_mismatch(public_url: &str, cookie_secure: bool) -> Option<&'static str> {
+    let https = public_url.starts_with("https://");
+    match (https, cookie_secure) {
+        (false, true) => Some(
+            "COOKIE_SECURE=true but PUBLIC_URL is http: browsers will not send the Secure cookies back over http",
+        ),
+        (true, false) => Some(
+            "PUBLIC_URL is https but COOKIE_SECURE is not true: set COOKIE_SECURE=true so the session cookie is Secure",
+        ),
+        _ => None,
+    }
 }
 
 impl Config {
@@ -46,13 +140,26 @@ impl Config {
         if ai_provider == "anthropic" && anthropic_api_key.is_none() {
             bail!("AI_PROVIDER=anthropic needs ANTHROPIC_API_KEY");
         }
+        let cookie_secure = var("COOKIE_SECURE", "false")
+            .parse()
+            .context("COOKIE_SECURE must be true or false")?;
+        let google = google_config(
+            env::var("GOOGLE_CLIENT_ID").ok(),
+            env::var("GOOGLE_CLIENT_SECRET").ok(),
+            env::var("PUBLIC_URL").ok(),
+            env::var("TOKEN_ENCRYPTION_KEY").ok(),
+        )?;
+        if let Some(warning) = google
+            .as_ref()
+            .and_then(|g| scheme_mismatch(&g.public_url, cookie_secure))
+        {
+            tracing::warn!("{warning}");
+        }
         Ok(Self {
             database_url: var("DATABASE_URL", "postgres://recipes:recipes@db:5432/recipes"),
             media_dir: var("MEDIA_DIR", "/data/media").into(),
             bind_addr: var("BIND_ADDR", "0.0.0.0:8080"),
-            cookie_secure: var("COOKIE_SECURE", "false")
-                .parse()
-                .context("COOKIE_SECURE must be true or false")?,
+            cookie_secure,
             session_days: parse_session_days(&var("SESSION_DAYS", "30"))?,
             ai_provider,
             anthropic_api_key,
@@ -67,6 +174,7 @@ impl Config {
                 .ok()
                 .filter(|m| (1..=65_536).contains(m))
                 .context("MAX_BACKUP_MB must be a whole number from 1 to 65536")?,
+            google,
         })
     }
 
@@ -132,5 +240,125 @@ mod import_allow_host_tests {
         assert!(check_import_allow_host("", true).is_ok());
         assert!(check_import_allow_host("  ", true).is_ok());
         assert!(check_import_allow_host("fixture:4146", false).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod google_tests {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+    use super::google_config;
+
+    fn key() -> Option<String> {
+        Some(STANDARD.encode([5u8; 32]))
+    }
+
+    fn some(s: &str) -> Option<String> {
+        Some(s.to_string())
+    }
+
+    #[test]
+    fn none_set_means_google_is_off() {
+        assert!(google_config(None, None, None, None).unwrap().is_none());
+        assert!(
+            google_config(some(""), some("  "), None, some("\n"))
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn all_four_turn_it_on_and_a_trailing_slash_is_dropped() {
+        let g = google_config(
+            some("id"),
+            some("secret"),
+            some("https://r.example.com/"),
+            key(),
+        )
+        .unwrap()
+        .expect("on");
+        assert_eq!(g.client_id, "id");
+        assert_eq!(g.client_secret.expose(), "secret");
+        assert_eq!(g.public_url, "https://r.example.com");
+        assert_eq!(g.token_key, [5u8; 32]);
+        let local = google_config(some("id"), some("s"), some("http://localhost:3000"), key())
+            .unwrap()
+            .unwrap();
+        assert_eq!(local.public_url, "http://localhost:3000");
+    }
+
+    #[test]
+    fn some_but_not_all_names_what_is_missing() {
+        let e = google_config(some("id"), None, some("https://r.example.com"), None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            e.contains("missing: GOOGLE_CLIENT_SECRET, TOKEN_ENCRYPTION_KEY"),
+            "{e}"
+        );
+        let e = google_config(None, None, some("https://r.example.com"), None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            e.contains("missing: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, TOKEN_ENCRYPTION_KEY"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn the_address_and_the_key_must_be_usable() {
+        for bad in [
+            "recipes.example.com",
+            "ftp://r.example.com",
+            "https://",
+            "https://r.example.com/?x=1",
+            "https://me:pw@r.example.com",
+            "https://me@r.example.com",
+        ] {
+            let e = google_config(some("id"), some("s"), some(bad), key()).unwrap_err();
+            assert!(
+                e.to_string().starts_with("PUBLIC_URL must be"),
+                "{bad}: {e}"
+            );
+        }
+        for bad in [STANDARD.encode([5u8; 16]), "%%%".to_string()] {
+            let e = google_config(
+                some("id"),
+                some("s"),
+                some("https://r.example.com"),
+                Some(bad),
+            )
+            .unwrap_err();
+            assert!(
+                e.to_string().starts_with("TOKEN_ENCRYPTION_KEY must"),
+                "{e}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_public_url_that_disagrees_with_cookie_secure_is_worth_a_warning() {
+        use super::scheme_mismatch;
+        assert!(scheme_mismatch("https://r.example.com", true).is_none());
+        assert!(scheme_mismatch("http://localhost:3000", false).is_none());
+        assert!(scheme_mismatch("http://r.example.com", true).is_some());
+        assert!(scheme_mismatch("https://r.example.com", false).is_some());
+    }
+
+    #[test]
+    fn the_secrets_do_not_print() {
+        let g = google_config(
+            some("id"),
+            some("hunter2"),
+            some("https://r.example.com"),
+            key(),
+        )
+        .unwrap()
+        .unwrap();
+        let shown = format!("{g:?}");
+        assert!(
+            !shown.contains("hunter2") && !shown.contains("5, 5"),
+            "{shown}"
+        );
     }
 }

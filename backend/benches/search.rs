@@ -104,6 +104,7 @@ async fn run(url: &str, schema: &str, media_dir: &std::path::Path) -> Duration {
         ai_model: "bench".into(),
         max_upload_mb: 2,
         max_backup_mb: 8,
+        google: None,
     };
     let clock = Clock::fixed(Utc.with_ymd_and_hms(2026, 1, 15, 12, 0, 0).unwrap());
     let state = AppState::with_clock(pool.clone(), config, clock).unwrap();

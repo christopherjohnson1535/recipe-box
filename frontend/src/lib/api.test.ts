@@ -95,4 +95,11 @@ describe("createApi", () => {
     expect(rec.inputs).toEqual(["/api/recipes/a%2Fb"]);
     expect(new URL(seen.request.url).pathname).toBe("/api/recipes/a%2Fb");
   });
+
+  it("disconnects Google Tasks with a DELETE and takes the 204 for an answer", async () => {
+    const seen = capture("delete", "*/api/integrations/google", () => new HttpResponse(null, { status: 204 }));
+    await expect(createApi().disconnectGoogle()).resolves.toBeUndefined();
+    expect(seen.request.method).toBe("DELETE");
+    expect(new URL(seen.request.url).pathname).toBe("/api/integrations/google");
+  });
 });

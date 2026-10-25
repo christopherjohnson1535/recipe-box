@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RecipeShelf, RowMenu, ScaleStepper, SelectCard, SelectionBar } from "./GroceryKit";
+import { RecipeShelf, RowMenu, ScaleStepper, SelectCard, SelectionBar, SendArea } from "./GroceryKit";
 
 function menu(onSelect = vi.fn()) {
   render(
@@ -189,5 +189,17 @@ describe("SelectCard and SelectionBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onAction).toHaveBeenCalled();
     expect(onCancel).toHaveBeenCalled();
+  });
+});
+
+describe("SendArea", () => {
+  it("labels the group, and sets its message under the buttons", () => {
+    render(
+      <SendArea label="Send to…" actions={<button type="button">Copy list</button>}>
+        <p>Copied.</p>
+      </SendArea>,
+    );
+    const group = screen.getByRole("group", { name: "Send to…" });
+    expect(group.textContent).toBe("Send to…Copy list" + "Copied.");
   });
 });

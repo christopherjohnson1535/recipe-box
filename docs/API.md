@@ -22,7 +22,7 @@ Every non-2xx response:
 | 401 | `unauthenticated` | no/expired session |
 | 403 | `forbidden` | not admin; setup already done |
 | 404 | `not_found` | |
-| 409 | `conflict` | username taken; restore window passed; a backup import is already running |
+| 409 | `conflict` | username taken; restore window passed; a backup import is already running; a send to Google Tasks is already running for this member |
 | 405 | `method_not_allowed` | known path, wrong method |
 | 429 | `rate_limited` | too many wrong passwords on `POST /api/auth/login` or on `PUT /api/users/:id/password` with a `currentPassword`; see "Password throttling". Has a `Retry-After` header (seconds) and a message that says how long to wait |
 | 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`), a backup over `MAX_BACKUP_MB` (`/api/import/export`), or any other request body over 1 MB |
@@ -30,6 +30,9 @@ Every non-2xx response:
 | 422 | `no_recipe_found` | page/photo had no recipe |
 | 422 | `ai_disabled` | AI needed but `AI_PROVIDER=none` |
 | 502 | `ai_error` | the AI provider failed: timeout, rejected key, busy after one retry, or a reply we could not read |
+| 422 | `google_disabled` | Google Tasks needed but not configured (`GOOGLE_CLIENT_ID` etc. unset) |
+| 409 | `google_not_connected` | Google Tasks export without a connected Google account, or the connection was revoked or expired at Google, or the stored token cannot be opened (`TOKEN_ENCRYPTION_KEY` changed) |
+| 502 | `google_error` | Google's API failed: timeout, 5xx, still throttled after three tries, a refusal, or a reply we could not read |
 | 422 | `blocked_address` | URL resolves to a non-public IP |
 | 502 | `site_blocked` | site returned 401/403/429/503 or a bot check — UI offers paste-text |
 | 502 | `fetch_failed` | DNS, timeout, too large, other HTTP error |
@@ -196,6 +199,61 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
     stays off the list until its amounts change). Unknown item ids are 404.
   - `POST /api/grocery/clear-checked` clears every ticked item the same way and answers `200 GroceryList`.
     `DELETE /api/grocery` empties the list (recipes and items; overrides and staples are kept) and answers `204`.
+- **Google Tasks export (GRO-5).** Optional: on only when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL` and
+  `TOKEN_ENCRYPTION_KEY` are all set (the API refuses to start with only some of them). Each household member connects
+  their own Google account; the connection is per user, any signed-in member may use it.
+  - `GET /api/integrations/google` → `200 {configured, connected, connectedAt}` (`connectedAt` null when not connected).
+  - `GET /api/integrations/google/connect` (a browser navigation) → `302` to Google's consent page
+    (scope `https://www.googleapis.com/auth/tasks`, offline access) with a random `state`, also set in the cookie
+    `rb_google_state` (httpOnly, SameSite=Lax, Secure like `rb_session`, Path `/api/integrations/google`, 10 minutes).
+    `422 google_disabled` when not configured. Without a session it answers `302 /login?next=/settings` (and sets no
+    cookie) instead of 401, because it is a page navigation.
+  - `GET /api/integrations/google/callback?code=…&state=…` (Google redirects here) → checks `state`
+    against the cookie (constant time; missing or different → no exchange), exchanges the code, stores the refresh
+    token encrypted (AES-256-GCM or ChaCha20-Poly1305 with `TOKEN_ENCRYPTION_KEY`), clears the cookie and answers
+    `302 /settings?google=connected`; any failure (state mismatch, `error=access_denied`, no refresh token, Google
+    error) answers `302 /settings?google=error` and stores nothing; every outcome clears the state cookie. Without a
+    session (the Home Screen app on iPad or iPhone opens Google's page in a browser that does not share its cookies)
+    it answers `302 /settings?google=error` too, exchanging nothing, rather than 401 JSON. A token that
+    does not carry the Tasks scope is not stored. Connecting again replaces the old token, which is simply
+    discarded, not revoked at Google (Google's revoke ends the app's whole grant for that account, including the new
+    token), and keeps the remembered task list.
+    `code` and `state` are not written to the request log (it records the path of a request, not its query string).
+  - `DELETE /api/integrations/google` → revokes the token at Google (best effort: a failed revoke is logged and the
+    local token is deleted anyway) and forgets the stored task list → `204`. Deleting a user deletes their connection.
+    "Connected" in `GET /api/integrations/google` means a token is stored: after `invalid_grant` (below) the member
+    is not connected, although the server still remembers their task list for the next connection.
+  - `POST /api/grocery/export/google-tasks` `{includeStaples?: bool}` (default false) → `200 {taskListTitle, sections,
+    items}` (counts sent). Sends the current list's unticked items (staples only with `includeStaples`) to a Google
+    Tasks list titled `Groceries`: one parent task per non-empty section in store order (`Produce`, `Meat`, `Fridge`,
+    `Freezer`, `Pantry`, `Other`), each item a subtask in list order, titled with its amounts and name as the list
+    shows it (`1 cup + 2 tbsp milk`).
+    - *Which Google list.* The list id is remembered per user, and stored as soon as the list exists, before it is
+      filled. With none remembered (first send, or the remembered list was deleted in Google) the member's task lists
+      are searched for one titled exactly `Groceries` and the first is reused (and emptied: keep your own lists under
+      another name); only if there is none is a new one made. So a reconnect, a restored backup or a send that
+      failed half way never leaves a second `Groceries`.
+    - *Re-sending.* The list is emptied first (completed and hidden tasks too, subtasks before their parents, a
+      task that is already gone counts as deleted), then filled, so it never duplicates and a half-filled list
+      from a failed send is repaired by the next one. An empty grocery list still answers 200 with zero counts and
+      leaves the Google list empty.
+    - *Throttling.* A 429, or a 403 with the reason `rateLimitExceeded` or `userRateLimitExceeded`, is tried again
+      after `Retry-After` (at most 10 s) or a short pause, up to three tries in all. Listing and deleting tasks is
+      also tried again after a 5xx or a lost connection; making a task is not (it might have been made). Filling a
+      list gives up after 100 s.
+    - *One at a time.* A member can have one send running at a time, across server processes (a lease on the
+      member's connection, taken when the send starts and released when it ends; one older than 2 minutes is taken
+      to have died). A second send meanwhile answers `409 conflict`, message `A send to Google Tasks is already
+      running.`; sending again a moment later is fine.
+    - Errors: `422 google_disabled`; `409 google_not_connected` when there is no token, when Google answers
+      `invalid_grant` (revoked, or expired after 7 days in Testing: only the token is forgotten, the remembered list
+      stays, so the UI offers to reconnect and the next send reuses the list), or when the stored token cannot be
+      opened (a changed `TOKEN_ENCRYPTION_KEY`: nothing is deleted, so putting the key back works); `409 conflict`
+      (above); `502 google_error` when Google fails or keeps refusing. After a 502 the Google list may be partly
+      filled, and the message then says so; sending again starts over.
+  - The refresh token never leaves the API: no response, log line or error message contains it or an access token.
+- **Share as text** (GRO-5) needs no API: the web app builds the text from `GET /api/grocery` (section headings in
+  store order, unticked items beneath, staples per the page's toggle) and hands it to `navigator.share`, or copies it.
 - **Users (admin)**: changing **your own** password requires `currentPassword` (401 `unauthenticated` if wrong, same
   message as a bad login); an admin resetting **someone else's** doesn't. Password at least 10 characters. Ends that
   user's other sessions (the caller's current session stays when it is their own password). `DELETE` ends the deleted

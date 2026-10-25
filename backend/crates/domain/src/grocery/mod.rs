@@ -10,7 +10,7 @@ mod sections;
 
 use serde::{Deserialize, Serialize};
 
-pub use format::{format_amount_quantity, format_quantity};
+pub use format::{format_amount_quantity, format_quantity, item_title};
 pub use key::merge_key;
 pub use merge::{GeneratedItem, RecipeLines, build_items};
 pub use parse::{ParsedLine, parse_line, scale_servings};
@@ -52,6 +52,18 @@ impl Section {
             Section::Freezer => "freezer",
             Section::Pantry => "pantry",
             Section::Other => "other",
+        }
+    }
+
+    /// The heading a person reads ("Produce").
+    pub fn title(self) -> &'static str {
+        match self {
+            Section::Produce => "Produce",
+            Section::Meat => "Meat",
+            Section::Fridge => "Fridge",
+            Section::Freezer => "Freezer",
+            Section::Pantry => "Pantry",
+            Section::Other => "Other",
         }
     }
 

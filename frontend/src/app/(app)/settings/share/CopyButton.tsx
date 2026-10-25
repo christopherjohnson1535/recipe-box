@@ -3,17 +3,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
+import { copyText } from "@/lib/copy-text";
 
 /** Copies `value`. Says so in words (announced politely); if the browser refuses, says that instead. */
 export function CopyButton({ value, label, disabled }: { value: string; label: string; disabled?: boolean }) {
   const [state, setState] = useState<"idle" | "done" | "failed">("idle");
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setState("done");
-    } catch {
-      setState("failed");
-    }
+    setState((await copyText(value)) ? "done" : "failed");
   }
   return (
     <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-2">

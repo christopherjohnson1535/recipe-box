@@ -41,7 +41,7 @@ adapters/*  →  app  →  ports  →  domain          the server crate (backend
 | Crate (package) | Path | Holds | Must not depend on |
 |---|---|---|---|
 | `recipe-box-domain` (`domain`) | `backend/crates/domain` | Types (`Recipe`, `RecipeDraft`, `User`…), `DomainError`, `Secret`, `validate`, constants (`RESTORE_WINDOW_MINUTES`, `PURGE_AFTER`) | web, database, async runtime, OpenAPI |
-| `recipe-box-ports` (`ports`) | `backend/crates/ports` | Outbound traits: `RecipeRepo`, `ImageRepo`, `UserRepo`, `SessionRepo`, `SettingsRepo`, `TagRepo`, `StorageHealth`, `Clock`, `MediaStore`, `PasswordHasher`, `SessionTokens`, `ImageCodec`, `RecipeExtractor`, `PageFetcher`, `PageReader`, `TaskSpawner`; feature `contract` adds `ports::contract`, the storage contract suite | as `domain`, plus anything an adapter would pull in |
+| `recipe-box-ports` (`ports`) | `backend/crates/ports` | Outbound traits: `RecipeRepo`, `ImageRepo`, `UserRepo`, `SessionRepo`, `SettingsRepo`, `TagRepo`, `StorageHealth`, `Clock`, `MediaStore`, `PasswordHasher`, `SessionTokens`, `ImageCodec`, `RecipeExtractor`, `PageFetcher`, `PageReader`, `TaskSpawner`, `GoogleTasks`, `TokenCipher`, `GoogleConnectionRepo`; feature `contract` adds `ports::contract`, the storage contract suite | as `domain`, plus anything an adapter would pull in |
 | `recipe-box-app` (`app`) | `backend/crates/app` | Use-case services built from `Deps` into `Services` (recipes, users, auth, media, imports, maintenance), each holding `Arc<dyn Port>` | `axum`, `sqlx`, `reqwest`, `tokio`, `utoipa`, `hyper`, and `image`/`argon2`/`rand`/`sha2`/`base64` |
 | `recipe-box-adapter-http` (`adapter_http`) | `backend/crates/adapters/http` | Inbound axum adapter: `routes/*`, `extract.rs` (`CurrentUser`, `AdminUser`), `error.rs` (`AppError`), `dto.rs`, OpenAPI | `sqlx`, `reqwest`, `image`, `argon2`, the server crate |
 | `recipe-box-adapter-postgres` (`adapter_postgres`) | `backend/crates/adapters/postgres` | `Pg*` repositories, `migrations/`, `migrate()` | |
@@ -50,12 +50,13 @@ adapters/*  →  app  →  ports  →  domain          the server crate (backend
 | `recipe-box-adapter-http-fetch` (`adapter_http_fetch`) | `backend/crates/adapters/http-fetch` | `HttpPageFetcher` and `safe_fetch` (SSRF guard) | `app`, the server, other adapters, `axum`, `sqlx` |
 | `recipe-box-adapter-html` (`adapter_html`) | `backend/crates/adapters/html` | `HtmlPageReader`: JSON-LD, microdata, readable text | same as `http-fetch` |
 | `recipe-box-adapter-anthropic` (`adapter_anthropic`) | `backend/crates/adapters/anthropic` | `AnthropicProvider`: `RecipeExtractor` on the Messages API | same as `http-fetch` |
-| `recipe-box-api` | `backend/src` | The server: config, wiring, process start. Still holds the adapters that have no crate of their own: `auth/` (argon2id `PasswordHasher`, `SessionTokens`), `media.rs` (`ImageCodec` on the `image` crate), `plate.rs`, `import/photo.rs` (HEIC via `heif-convert`), `clock.rs`, `import/ai.rs` (picks the extractor) | `reqwest` as a direct dependency |
+| `recipe-box-adapter-google` (`adapter_google`) | `backend/crates/adapters/google` | `GoogleTasksClient`: `GoogleTasks` on Google's OAuth and Tasks APIs | same as `http-fetch` |
+| `recipe-box-api` | `backend/src` | The server: config, wiring, process start. `crypto.rs` is the `TokenCipher` (ChaCha20-Poly1305). Still holds the adapters that have no crate of their own: `auth/` (argon2id `PasswordHasher`, `SessionTokens`), `media.rs` (`ImageCodec` on the `image` crate), `plate.rs`, `import/photo.rs` (HEIC via `heif-convert`), `clock.rs`, `import/ai.rs` (picks the extractor) | `reqwest` as a direct dependency |
 
 CI enforces the rule with `cargo tree` (`.github/workflows/ci.yml`, backend job): `domain`, `ports` and `app` may not
 pull in `axum`, `sqlx`, `reqwest`, `tokio`, `utoipa` or `hyper`; `app` also stays free of `image`, `argon2`, `rand`,
 `sha2` and `base64`; `adapter-http` may not reach `sqlx`, `reqwest`, `image`, `argon2` or the server crate; only
-`http-fetch`, `anthropic` and the server crate may have `reqwest` in their tree; the three import adapters may not
+`http-fetch`, `anthropic`, `google` and the server crate may have `reqwest` in their tree; the four outbound adapters may not
 depend on `app`, the server, another adapter, `axum` or `sqlx`.
 
 ## How we write code
@@ -92,6 +93,7 @@ Backend, per crate (the `Cargo.toml` files and the CI `cargo tree` guard are the
 | `adapter-fs-media` | tokio (fs), async-trait, `domain`, `ports` | `ports` (feature `contract`), tokio |
 | `adapter-http-fetch` | reqwest (rustls, stream, json), tokio (net, time), url, async-trait, `domain`, `ports` | tokio |
 | `adapter-html` | scraper, serde_json, url, tokio, async-trait, `domain`, `ports` | tokio |
+| `adapter-google` | reqwest (rustls, json, form), tokio (time), serde, serde_json, tracing, anyhow, async-trait, `domain`, `ports` | tokio |
 | `adapter-anthropic` | reqwest (rustls, stream, json), image, base64, serde_json, tokio, tracing, anyhow, async-trait, `domain`, `ports` | tokio |
 | `recipe-box-api` (server) | all of the above crates except `adapter-memory`, axum, sqlx, tokio, argon2, rand, sha2, base64, image, chrono, uuid, anyhow, async-trait, tracing, tracing-subscriber | serde_json, url, futures-util, http-body-util, tower (util), testcontainers-modules (postgres) |
 
@@ -116,6 +118,7 @@ Anything else needs a one-line reason in the agent's report.
 | `AI_MODEL` | api | `claude-sonnet-5-5` | |
 | `MAX_UPLOAD_MB` | api | `15` | per file; photo import allows 6 files per request |
 | `MAX_BACKUP_MB` | api | `512` | largest backup zip `POST /api/import/export` accepts; spooled to a temp file |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY` | api | — | Google Tasks export (GRO-5): all four or none, else the API refuses to start. `TOKEN_ENCRYPTION_KEY` is 32 random bytes in base64 |
 | `HEIF_CONVERT` | api | `heif-convert` | libheif CLI used to read HEIC photos (installed in the API image) |
 | `API_INTERNAL_URL` | web | `http://api:8080` | runtime proxy target |
 | `PUBLIC_HOSTNAME` | caddy | — | deployed HTTPS |
@@ -142,6 +145,10 @@ Anything else needs a one-line reason in the agent's report.
   `grocery_item(id uuid pk, list_id fk cascade, key text, name text, amounts jsonb, section text, checked bool,
   cleared bool, manual bool, recipe_ids uuid[])` (`key` is the merge key of a generated item, unique per list among
   generated items), `grocery_section_override(key text pk, section text)`, `grocery_staple(key text pk)`.
+- Google Tasks (`0004_google.sql`, GRO-5): `google_connection(user_id uuid pk fk users on delete cascade,
+  refresh_token bytea null (nonce ‖ ciphertext; null once Google refused it: the row then only remembers the list),
+  tasklist_id text null, connected_at timestamptz, export_started_at timestamptz null (the lease of a running
+  export: one per user at a time, taken by a conditional update, stale after 2 minutes))`. "Connected" = a token is stored.
 - Soft delete: `DELETE /api/recipes/:id` sets `deleted_at`; `POST /api/recipes/:id/restore` clears it within 10 min
   (REC-2); a periodic task purges rows deleted > 1 day.
 
@@ -165,6 +172,7 @@ Anything else needs a one-line reason in the agent's report.
 | GET `/api/export`, POST `/api/import/export` | admin | ACC-5 | done (#20); archive format in API.md |
 
 | GET `/api/grocery`, POST `/api/grocery/recipes`, DELETE `/api/grocery/recipes/:id`, POST `/api/grocery/items`, PATCH/DELETE `/api/grocery/items/:id`, POST `/api/grocery/clear-checked`, DELETE `/api/grocery` | s | GRO-1–4 | #79 |
+| GET/DELETE `/api/integrations/google`, GET `/api/integrations/google/connect`, GET `/api/integrations/google/callback`, POST `/api/grocery/export/google-tasks` | s | GRO-5 | #81 |
 `RecipeDraft` = recipe fields without id/timestamps + `warnings: string[]` + `duplicateOf: uuid|null` +
 `imageId` (already stored) + `photoImageIds`. Drafts are never saved by the import endpoints — the client POSTs the
 reviewed draft to `/api/recipes`.
@@ -262,6 +270,13 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   frontend scaler test also reads so both sides agree on quantities and units). `ports::GroceryRepo` stores the list;
   `app::GroceryService` does recompute (in one repo call, under a lock on the list row) and the item rules. Behaviour:
   `docs/API.md` → *Grocery list*.
+- **Google Tasks (GRO-5):** ports `GoogleTasks` (consent URL, code exchange, access token from refresh token, revoke,
+  `ensure_list` to find or make the task list and `fill_list` to empty and refill it, so the service can store the
+  list id between the two) and `TokenCipher` (seal/open), storage port `GoogleConnectionRepo`. Adapter crate
+  `adapters/google` (reqwest, fixed Google hosts; base URLs injectable for tests); the cipher lives in the server crate;
+  `app::GoogleTasksService` reads the grocery list through `GroceryService`. With Google not configured the server wires
+  a disabled `GoogleTasks` that answers `google_disabled`. Tests use a local stub of Google's OAuth and Tasks endpoints
+  (`backend/tests/common/google.rs`). Behaviour: `docs/API.md` → *Google Tasks export*.
 - **Cooking mode (KIT-2/3):** `navigator.wakeLock.request('screen')`, re-acquire on `visibilitychange`.
 
 ## Containers and deploy

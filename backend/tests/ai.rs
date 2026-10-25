@@ -316,6 +316,7 @@ async fn config_debug_hides_the_key_and_ai_enum_follows_config() {
         ai_model: "m".into(),
         max_upload_mb: 2,
         max_backup_mb: 8,
+        google: None,
     };
     let shown = format!("{config:?}");
     assert!(

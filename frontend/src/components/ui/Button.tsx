@@ -5,7 +5,7 @@ import { cx } from "./cx";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const base =
-  "label inline-flex min-h-control items-center justify-center gap-2 whitespace-nowrap rounded-control max-sm:max-w-full max-sm:py-2 max-sm:whitespace-normal transition-[background-color,border-color,color] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-55";
+  "label inline-flex min-h-control items-center justify-center gap-2 whitespace-nowrap rounded-control max-sm:max-w-full max-sm:py-2 max-sm:whitespace-normal transition-[background-color,border-color,color] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:cursor-not-allowed aria-disabled:opacity-55";
 const variants: Record<Variant, string> = {
   primary:
     "px-4 max-sm:text-center bg-(--button-primary-bg) text-(--button-primary-fg) hover:bg-(--button-primary-bg-hover) hover:text-(--button-primary-fg-hover)",
@@ -38,4 +38,12 @@ export function Button({ variant, pending, className, children, disabled, type =
 
 export function ButtonLink({ variant, className, ...rest }: ComponentProps<typeof Link> & { variant?: Variant }) {
   return <Link className={buttonClass(variant, className)} {...rest} />;
+}
+
+/**
+ * A link that leaves the app for a full page load (the API's connect address, which answers with a redirect to Google), so
+ * not next/link, which would prefetch it. With a `variant` it is set as that button; without, as an inline link.
+ */
+export function HardLink({ variant, className, ...rest }: ComponentProps<"a"> & { variant?: Variant }) {
+  return <a className={variant ? buttonClass(variant, className) : cx("link", className)} {...rest} />;
 }

@@ -44,6 +44,23 @@ export function ListActions({ staples, clear, empty }: { staples?: ReactNode; cl
 }
 
 /**
+ * Where the list goes next (GRO-5): a quiet label, the buttons in a wrapping row (full width one per line on a phone), then
+ * whatever the buttons have to say (hint, confirmation, error) beneath them. Not printed.
+ */
+export function SendArea({ label, actions, children }: { label: string; actions: ReactNode; children?: ReactNode }) {
+  const id = useId();
+  return (
+    <div role="group" aria-labelledby={id} className="flex flex-col gap-3 print:hidden">
+      <p id={id} className="label text-ink-muted">
+        {label}
+      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center max-sm:[&>*]:w-full">{actions}</div>
+      {children}
+    </div>
+  );
+}
+
+/**
  * The recipes on the list, folded away with one tap. Native `details`. `defaultOpen` is read once, when the shelf first
  * appears: a recipe added or taken off later never folds or opens it under the reader. It is a quiet head (hairline, muted)
  * so the heavy rule stays with the store sections the person shops from.

@@ -111,6 +111,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/grocery/export/google-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sends the unticked items to the member's Google Tasks list `Groceries`: one parent task per store section, the
+         *     items as subtasks. The list is emptied first, so sending again never duplicates. One send per member at a time.
+         */
+        post: operations["exportGroceryToGoogleTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/grocery/items": {
         parameters: {
             query?: never;
@@ -287,6 +307,62 @@ export interface paths {
          *     the AI as plain text when AI is on (LNK-3).
          */
         post: operations["importFromUrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether this member can send the list to Google Tasks. */
+        get: operations["getGoogleStatus"];
+        put?: never;
+        post?: never;
+        /** Revokes the token at Google (best effort) and forgets the connection and its task list. */
+        delete: operations["disconnectGoogle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where Google sends the browser back. Always ends on the settings page with `?google=connected` or
+         *     `?google=error`; no token is ever put in the address. Without a session (an in-app browser that does not share the
+         *     app's cookies) nothing is exchanged: it ends on `?google=error`.
+         */
+        get: operations["googleCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/google/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Starts connecting a Google account. Open it as a page (a browser navigation), not with `fetch`. */
+        get: operations["connectGoogle"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -554,6 +630,28 @@ export interface components {
             message: string;
             /** @description Photo import only: the photos were stored but no draft could be made. */
             photoImageIds?: string[] | null;
+        };
+        /** @description What was sent to Google Tasks. */
+        GoogleExport: {
+            /** @description Subtasks: the items beneath them. */
+            items: number;
+            /** @description Parent tasks: the store sections that had something to buy. */
+            sections: number;
+            /** @description The Google Tasks list used (`Groceries`). */
+            taskListTitle: string;
+        };
+        GoogleExportRequest: {
+            /** @description Also send items marked as staples (default false). */
+            includeStaples?: boolean | null;
+        };
+        /** @description Whether this member can send the grocery list to Google Tasks. */
+        GoogleStatus: {
+            /** @description The server has a Google OAuth client. When false, nothing else here works and `connected` is false. */
+            configured: boolean;
+            /** @description This member connected their Google account. */
+            connected: boolean;
+            /** Format: date-time */
+            connectedAt: string | null;
         };
         /** @description One amount of a grocery item: `quantity` as a cook writes it (`1½`, `2–3`), `unit` in its short form. */
         GroceryAmount: {
@@ -1209,6 +1307,93 @@ export interface operations {
             };
             /** @description Something went wrong on the server (`internal`). */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    exportGroceryToGoogleTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoogleExportRequest"];
+            };
+        };
+        responses: {
+            /** @description What was sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleExport"];
+                };
+            };
+            /** @description Malformed body (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No Google account connected, or Google no longer accepts the connection (`google_not_connected`; the token is then forgotten, the task list is remembered), or a send for this member is already running (`conflict`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Body over the size limit (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Google Tasks is not set up on this server (`google_disabled`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Google failed: timeout, 5xx, a refusal or an unreadable reply (`google_error`). The list in Google Tasks may be partly filled; sending again starts over. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1905,6 +2090,176 @@ export interface operations {
             };
             /** @description The site refused us (`site_blocked`), the fetch failed or timed out (`fetch_failed`), or the AI fallback failed (`ai_error`). */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getGoogleStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleStatus"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    disconnectGoogle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected. Also when nothing was connected, or Google could not be reached to revoke. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    googleCallback: {
+        parameters: {
+            query?: {
+                /** @description Google's authorisation code. */
+                code?: string;
+                /** @description Must equal the `rb_google_state` cookie. */
+                state?: string;
+                /** @description Set by Google when the member declined. */
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To `/settings?google=connected`, or `/settings?google=error` when anything went wrong, also without a session (nothing is stored then). Clears the `rb_google_state` cookie. */
+            302: {
+                headers: {
+                    /** @description `/settings?google=connected` or `/settings?google=error`. */
+                    Location?: string;
+                    /** @description Clears `rb_google_state`. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    connectGoogle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To Google's consent page, setting the `rb_google_state` cookie (httpOnly, SameSite=Lax, 10 minutes). Without a session: to `/login?next=/settings`, no cookie. */
+            302: {
+                headers: {
+                    /** @description Google's consent page, or `/login?next=/settings`. */
+                    Location?: string;
+                    /** @description `rb_google_state`, the random `state` sent to Google. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Google Tasks is not set up on this server (`google_disabled`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

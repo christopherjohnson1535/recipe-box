@@ -214,6 +214,7 @@ async fn deleting_images_removes_the_original_and_the_rendition() {
         ai_model: "test".into(),
         max_upload_mb: 2,
         max_backup_mb: 8,
+        google: None,
     };
     let state = AppState::new(app.pool.clone(), config).unwrap();
     let id: Uuid = image["id"].as_str().unwrap().parse().unwrap();

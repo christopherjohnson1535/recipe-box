@@ -287,6 +287,57 @@ pub struct UpdateGroceryItem {
     pub staple: Option<bool>,
 }
 
+/// Whether this member can send the grocery list to Google Tasks.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GoogleStatus {
+    /// The server has a Google OAuth client. When false, nothing else here works and `connected` is false.
+    pub configured: bool,
+    /// This member connected their Google account.
+    pub connected: bool,
+    #[schema(required = true)]
+    pub connected_at: Option<DateTime<Utc>>,
+}
+
+impl From<app::GoogleStatus> for GoogleStatus {
+    fn from(s: app::GoogleStatus) -> Self {
+        Self {
+            configured: s.configured,
+            connected: s.connected,
+            connected_at: s.connected_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GoogleExportRequest {
+    /// Also send items marked as staples (default false).
+    pub include_staples: Option<bool>,
+}
+
+/// What was sent to Google Tasks.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GoogleExport {
+    /// The Google Tasks list used (`Groceries`).
+    pub task_list_title: String,
+    /// Parent tasks: the store sections that had something to buy.
+    pub sections: usize,
+    /// Subtasks: the items beneath them.
+    pub items: usize,
+}
+
+impl From<app::GoogleExport> for GoogleExport {
+    fn from(e: app::GoogleExport) -> Self {
+        Self {
+            task_list_title: e.task_list_title,
+            sections: e.sections,
+            items: e.items,
+        }
+    }
+}
+
 /// Raw bytes in a response (an image or a zip).
 #[derive(ToSchema)]
 #[schema(value_type = String, format = Binary)]
