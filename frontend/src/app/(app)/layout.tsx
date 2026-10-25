@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { RouteFocus } from "@/components/RouteFocus";
 import { SaveStamp } from "@/components/ui/SaveStamp";
 import { UndoToast } from "@/components/undo/UndoToast";
 import { ServerError } from "@/components/ServerError";
 import { ApiError, type User } from "@/lib/api";
+import { redirectToLogin } from "@/lib/login-redirect";
 import { serverApi } from "@/lib/server-api";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   try {
     user = await (await serverApi()).me();
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/login"); // expired or revoked session
+    if (e instanceof ApiError && e.status === 401) await redirectToLogin(); // expired or revoked session
     failure = e;
   }
 

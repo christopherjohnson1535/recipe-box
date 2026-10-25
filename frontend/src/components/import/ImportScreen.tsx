@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { RecipeForm, type RecipeFormInitial } from "@/components/recipe-form/RecipeForm";
 import { Alert } from "@/components/ui/Alert";
+import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Heading } from "@/components/ui/Heading";
 import { Pending } from "@/components/ui/Pending";
@@ -65,7 +66,22 @@ type Review = {
   warnings: string[];
 };
 
-export function ImportScreen({ initialMode = "link", initialUrl = "", api = browserApi }: { initialMode?: ImportMode; initialUrl?: string; api?: ImportApi }) {
+/**
+ * `initialUrl` is an address handed over by the Shortcut or bookmarklet (already checked by `parseSharedUrl`). It is only
+ * ever shown for confirmation: the page is not fetched until the signed-in person presses the button, so a link on
+ * another site cannot make this server fetch pages on its own. `sharedRejected` says an address arrived but was refused.
+ */
+export function ImportScreen({
+  initialMode = "link",
+  initialUrl = "",
+  sharedRejected = false,
+  api = browserApi,
+}: {
+  initialMode?: ImportMode;
+  initialUrl?: string;
+  sharedRejected?: boolean;
+  api?: ImportApi;
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<ImportMode>(initialUrl ? "link" : initialMode);
   const [caps, setCaps] = useState<Capabilities | null>(null);
@@ -82,7 +98,7 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
   const request = useRef(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const reviewCount = useRef(0);
-  const autoStarted = useRef(false);
+  const [confirming, setConfirming] = useState(initialUrl !== "");
   const stored = useRef(new Map<File, Image>());
 
   useEffect(() => {
@@ -95,15 +111,6 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
       live = false;
     };
   }, [api]);
-
-  // `?url=` (from the Shortcut or bookmarklet) starts the link import once.
-  useEffect(() => {
-    if (initialUrl && !autoStarted.current) {
-      autoStarted.current = true;
-      void importLink();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on arrival
-  }, []);
 
   // A draft has arrived: move to it. A field error: put the cursor back in the field.
   useEffect(() => {
@@ -222,6 +229,17 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
       regions: [],
       warnings: [],
     });
+  }
+
+  function confirmShared() {
+    setConfirming(false);
+    void importLink(initialUrl);
+  }
+
+  function declineShared() {
+    setConfirming(false);
+    setUrl("");
+    window.history.replaceState(null, "", "/import?mode=link");
   }
 
   function stopWaiting() {
@@ -346,6 +364,29 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
     );
   }
 
+  if (confirming) {
+    const card = hostCard(initialUrl);
+    return (
+      <div className="grid items-start gap-10 lg:grid-cols-2">
+        {card && <DomainCard {...card} />}
+        <div className="flex max-w-measure flex-col gap-6">
+          <Heading level={2} ruled>
+            Import this page?
+          </Heading>
+          <Text variant="deck">Shared from Safari or a bookmark. Nothing is fetched until you say so, and nothing is saved until you have checked the draft.</Text>
+          <Text variant="meta">Address</Text>
+          <CodeBlock>{initialUrl}</CodeBlock>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Button onClick={confirmShared}>Import this recipe</Button>
+            <Button variant="ghost" onClick={declineShared}>
+              Not this one
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // A dark stage beside the form while a request is in flight: the photo and its scan (AI on), or the site's card.
   const wait = hostCard(url);
   const scene = busy === "photo" && mode === "photo" && !aiOff && files[0] ? <PhotoScan file={files[0]} /> : busy === "link" && mode === "link" && wait ? <DomainCard {...wait} /> : null;
@@ -360,6 +401,11 @@ export function ImportScreen({ initialMode = "link", initialUrl = "", api = brow
   const sourceError = here?.field && here.fieldId === "import-source" ? here.message : undefined;
   const inner = (
     <>
+      {sharedRejected && (
+        <Alert tone="error" title="That link can’t be imported">
+          <Text variant="small">The address that was shared isn’t a web page address (it must start with http:// or https://). Paste the recipe link below instead.</Text>
+        </Alert>
+      )}
       {mode === "link" && <LinkPanel url={url} onUrl={setUrl} error={fieldError} busy={busy !== null} onSubmit={() => importLink()} aiOff={aiOff} />}
       {mode === "text" && (
         <TextPanel
