@@ -45,6 +45,15 @@ characters, `notes` 20,000, each ingredient/step line 2,000, at most 500 ingredi
 (400 `validation`, message starts with the field name). `POST /api/auth/logout` always returns 204 and clears the cookie,
 even with no or an expired session.
 
+## Clients outside the browser
+
+Scripts and SDKs use the same session cookie as the web app; there are no bearer tokens or API keys yet.
+
+1. `POST /api/auth/login` with `{"username", "password"}`.
+2. Keep the `rb_session` cookie from the `Set-Cookie` response header and send it back on every later request (any
+   cookie jar does this).
+3. With `COOKIE_SECURE=true` the cookie is `Secure`, so it is only sent over HTTPS.
+
 ## Behaviour the spec does not spell out
 
 Shapes (fields, nullability, enums) are in the spec; read these for rules.

@@ -12,7 +12,7 @@ pub struct Health {
 }
 
 /// Liveness plus a database check.
-#[utoipa::path(get, path = "/api/health", operation_id = "healthCheck", tag = "health", responses(
+#[utoipa::path(get, path = "/api/health", operation_id = "healthCheck", tag = "health", security(()), responses(
     (status = 200, description = "API and database are up.", body = Health),
     (status = 503, description = "The database check failed (`db` is `error`).", body = Health),
 ))]

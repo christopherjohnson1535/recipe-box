@@ -17,7 +17,7 @@ pub struct SetupStatus {
 }
 
 /// Whether the first admin still has to be created.
-#[utoipa::path(get, path = "/api/setup", operation_id = "getSetupStatus", tag = "setup", responses(
+#[utoipa::path(get, path = "/api/setup", operation_id = "getSetupStatus", tag = "setup", security(()), responses(
     (status = 200, description = "Setup status.", body = SetupStatus),
 ))]
 pub async fn status(State(state): State<HttpState>) -> AppResult<Json<SetupStatus>> {
@@ -28,6 +28,7 @@ pub async fn status(State(state): State<HttpState>) -> AppResult<Json<SetupStatu
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(example = json!({"username": "sam", "displayName": "Sam", "password": "correct horse battery"}))]
 pub struct SetupBody {
     username: String,
     display_name: String,
@@ -35,7 +36,7 @@ pub struct SetupBody {
 }
 
 /// Creates the first admin and signs them in. Only allowed while there are no users.
-#[utoipa::path(post, path = "/api/setup", operation_id = "createAdmin", tag = "setup", request_body = SetupBody, responses(
+#[utoipa::path(post, path = "/api/setup", operation_id = "createAdmin", tag = "setup", security(()), request_body = SetupBody, responses(
     (status = 201, description = "Admin created and signed in.", body = User,
         headers(("Set-Cookie" = String, description = "The `rb_session` cookie."))),
     (status = 400, description = "Invalid username, display name or password (`validation`).", body = ErrorBody),

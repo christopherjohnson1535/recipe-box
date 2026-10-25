@@ -11,13 +11,14 @@ use crate::{
 };
 
 #[derive(Deserialize, ToSchema)]
+#[schema(example = json!({"username": "sam", "password": "correct horse battery"}))]
 pub struct LoginBody {
     username: String,
     password: String,
 }
 
 /// Signs in with a username and password.
-#[utoipa::path(post, path = "/api/auth/login", operation_id = "login", tag = "auth", request_body = LoginBody, responses(
+#[utoipa::path(post, path = "/api/auth/login", operation_id = "login", tag = "auth", security(()), request_body = LoginBody, responses(
     (status = 200, description = "Signed in.", body = User,
         headers(("Set-Cookie" = String, description = "The `rb_session` cookie."))),
     (status = 400, description = "Malformed body (`validation`).", body = ErrorBody),
@@ -38,7 +39,7 @@ pub async fn login(
 }
 
 /// Always succeeds, even without a session.
-#[utoipa::path(post, path = "/api/auth/logout", operation_id = "logout", tag = "auth", responses(
+#[utoipa::path(post, path = "/api/auth/logout", operation_id = "logout", tag = "auth", security(()), responses(
     (status = 204, description = "Session deleted and cookie cleared.",
         headers(("Set-Cookie" = String, description = "Clears `rb_session`."))),
 ))]

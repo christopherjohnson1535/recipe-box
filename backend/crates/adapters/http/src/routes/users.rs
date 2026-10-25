@@ -25,6 +25,7 @@ pub async fn list(State(state): State<HttpState>, _admin: AdminUser) -> AppResul
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(example = json!({"username": "alex", "displayName": "Alex", "password": "correct horse battery", "role": "member"}))]
 pub struct CreateUserBody {
     username: String,
     display_name: String,

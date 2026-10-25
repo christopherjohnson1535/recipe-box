@@ -47,6 +47,8 @@ jobs:
           npm run --prefix frontend api:types
       - name: Fail on drift
         run: git diff --exit-code -- docs/openapi.json frontend/src/lib/api-types.ts
+      - name: Lint the spec
+        run: npx --yes @redocly/cli@2.71.0 lint docs/openapi.json
       - name: Fail on breaking changes
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'breaking-api')
         run: |
