@@ -58,8 +58,10 @@ test("a recipe opened before loads offline, with its photo, and other pages fall
   await expect(page.getByText("You’re offline")).toBeVisible();
 
   // A page this device never kept: the offline page, listing what it did keep.
+  const viaWorker = await page.evaluate(() => fetch("/api/health").then((r) => r.status, (e) => String(e)));
+  const diag = `workers=${context.serviceWorkers().map((w) => w.url()).join(",")} healthViaWorker=${viaWorker} browser=${context.browser()?.version()}`;
   await page.goto("/settings").catch(() => undefined);
-  await expect(page.getByRole("heading", { name: "You’re offline", level: 1 }), await where(page)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "You’re offline", level: 1 }), `${diag} ${await where(page)}`).toBeVisible();
   await page.getByRole("link", { name: new RegExp(recipe.title) }).click();
   await expect(page.getByRole("heading", { name: recipe.title, level: 1 })).toBeVisible();
   await context.setOffline(false);
