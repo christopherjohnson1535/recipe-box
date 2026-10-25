@@ -45,7 +45,29 @@ jobs:
           tags: recipe-box-${{ matrix.name }}:scan
           cache-from: type=gha,scope=trivy-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=trivy-${{ matrix.name }}
+      # The vulnerability DBs come from registries that now and then answer with an error or rate limit; this made the
+      # step fail on unchanged code, api and web alike. Try three registries, then run the whole scan once more.
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        id: scan
+        continue-on-error: true
+        env:
+          TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1
+        with:
+          image-ref: recipe-box-${{ matrix.name }}:scan
+          # v0.33.1 installed Trivy v0.65.0 by default and failed before writing any SARIF; pin a current release.
+          version: v0.76.1
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          vuln-type: os,library
+          exit-code: "0"
+          format: sarif
+          output: trivy-${{ matrix.name }}.sarif
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: ${{ steps.scan.outcome == 'failure' }}
+        env:
+          TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1
         with:
           image-ref: recipe-box-${{ matrix.name }}:scan
           # v0.33.1 installed Trivy v0.65.0 by default and failed before writing any SARIF; pin a current release.
