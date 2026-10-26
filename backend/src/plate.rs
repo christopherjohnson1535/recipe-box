@@ -271,7 +271,16 @@ mod tests {
     #[test]
     fn paper_matches_the_frontend_chalk() {
         let css = include_str!("../../frontend/src/styles/primitives.css");
-        let hex = css.split("--chalk-50:").nth(1).unwrap().trim_start()[1..7].to_owned();
+        let value = css
+            .split("--chalk-50:")
+            .nth(1)
+            .expect("--chalk-50 not found in primitives.css")
+            .trim_start();
+        assert!(
+            value.starts_with('#') && value.len() >= 7,
+            "--chalk-50 is not a #rrggbb value"
+        );
+        let hex = &value[1..7];
         let rgb: [f32; 3] = std::array::from_fn(|i| {
             f32::from(u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).unwrap())
         });

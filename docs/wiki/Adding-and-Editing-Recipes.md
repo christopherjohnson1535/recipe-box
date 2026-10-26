@@ -7,7 +7,7 @@ imported draft.
 - **Title** is the only required field. Description, servings, prep/cook/total minutes, tags, photo, source and notes
   are optional.
 - **Photo**: choose an image to upload it; a preview appears. Choose another to replace it, or **Remove photo**.
-  Every photo is also given a print-style version (a tidy crop, evened-out brightness and colour, softer tones, a warm paper tint and a little grain) so
+  Every photo is also given a print-style version (a tidy crop, evened-out brightness and colour, softer tones, a faint paper tint and a little grain) so
   snapshots, scans and blog photos look like one set. Your original is kept untouched and can still be opened
   full size. Photos added before this existed are converted in the background the next time the app starts.
   An admin can switch the print style off for the household under **Settings**.

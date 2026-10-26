@@ -30,6 +30,6 @@ font variants of Riviera, and chose **Riviera · Charcoal & Saffron**. Epic #118
 - Later issues build on these tokens: page width, top band and masthead (#120), home layout and evergreen copy (#121),
   every other screen and the wiki (#122). Layout parts of 0006 and `docs/UI.md` stay until those land.
 - Photo plates now tint toward `--chalk-50` (#f4f4f1) (#128). Existing display renditions are left as they are. The
-  shift is at most a few levels in the brightest whites, the display backfill only renders missing renditions, and
-  re-rendering would orphan stored files for no visible gain. A photo gets the new tint when it is next uploaded or
-  re-imported.
+  shift is at most a few levels in the brightest whites. The display backfill only renders missing renditions, and
+  forcing a re-render of every photo is not worth it for that. A photo gets the new tint when it is uploaded again
+  (including a backup restore); editing a recipe that keeps its photo does not re-render it.
