@@ -158,14 +158,17 @@ Durations are defined in `src/styles/motion.css`.
 
 ## Destructive actions
 One pattern for every destructive text action: **Delete** a recipe, **Remove** (a recipe from the grocery list, a member, a
-photo), **Disconnect** (Google), **Empty list** and **Clear ticked**. Clear ticked is recoverable but is set the same way.
+photo), **Disconnect** (Google), **Empty list** and **Clear ticked**, and **Discard** (unsaved edits stashed in the browser). Clear ticked has no confirm step and no undo (it removes only what you already crossed off), but is set the same way.
 - `Button variant="danger-text"` (also `ButtonLink`): the ghost shape (label font, underlined, 44px target, no fill or box) in
   brick red. Tokens `--button-danger-text-fg`, `--button-danger-text-hover` and `--button-danger-text-underline` in
   `components.css` point at `--color-danger` and `--color-danger-hover`; both are held to 4.5:1 on paper and paper-deep in day
-  and evening by `tokens.test.ts`. Never the saffron accent.
+  and evening by `tokens.test.ts`. Never the saffron accent. Disabled or pending, the variant reads in the quiet ghost colours
+  (`--button-ghost-fg`, `--button-ghost-underline`) and does not recolour on hover.
 - Menu items with `danger: true` (grocery item menu, `RowMenu`) read the same tokens.
 - The filled `Button variant="danger"` is only for the confirm step in `ui/ConfirmInline` ("Remove Sam", "Empty list"), which
   opens in place of the thing it affects and starts focus on the safe "Keep".
+- Deliberate exceptions, which stay quiet: cook mode **Clear ticks** (clears only this device's cooking ticks), the import
+  screen's **Start over**, **Go back** and **Not this one** (navigation), and the icon-only × buttons on editor rows, tags and photo thumbnails.
 - The icon-only remove cross (`IconButton icon="remove"`: editor rows, tags, photo thumbnails) is not a text action and keeps
   the ink style.
 
@@ -327,8 +330,9 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
 - **Offline, error and not found**: plain `EmptyState` pages in the page width; the offline page lists the recipes kept
   on the device. An address no route matches is rendered by `app/not-found.tsx`, outside `(app)/layout.tsx`, so it brings its
   own shell: the same one `<header>` with the top band (`ui/DayBand`: date and season, no recipe count, no Sign out), then the
-  masthead (wordmark, the five section links, double rule), then `<main id="main">`. It makes no API call, so it renders with
-  a missing or stale session; the links lead on to sign-in when the session is gone. `(app)/not-found.tsx` (from `notFound()`
+  masthead (wordmark, the five section links, double rule), then `<main id="main">`. It makes no API call, so it needs no session
+  and renders with a stale cookie; a signed-out visitor is asked to sign in first (`src/proxy.ts`), and the links lead on to sign-in
+  when the session is gone. `(app)/not-found.tsx` (from `notFound()`
   in a signed-in route) renders inside the full shell and shows the same `NotFoundContent`.
 - **Loading**: `HomeSkeleton` and `RecipeSkeleton` are static tints in the shape of the page (featured recipe, ruled
   tiles beside the 22rem sidebar; opener, numerals under a double rule, ingredient panel and method). Nothing moves.
