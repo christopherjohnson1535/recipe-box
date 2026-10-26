@@ -13,11 +13,14 @@ export function formatMinutes(minutes: number | null | undefined): string | null
   return [h && `${h} hr`, m && `${m} min`].filter(Boolean).join(" ");
 }
 
-/** "Serves 4" for a bare number or range; a phrase ("makes about 4 bowls") as written; null when empty. */
+// A bare number or range with no words: "4", "4-6", "4–6", "4 to 6", "1/2", "1½". "4 cups" and "12 bars" are not.
+const BARE_SERVINGS = new RegExp(`^(?:${NUMBER})(?:(?:\\s*[-–]\\s*|\\s+to\\s+)(?:${NUMBER}))?$`, "i");
+
+/** "Serves 4" for a bare number or range only; anything with words ("4 cups", "makes 12 cookies") as written, trimmed; null when empty. */
 export function servingsLabel(servings: string | null | undefined): string | null {
   const s = servings?.trim();
   if (!s) return null;
-  return splitIngredient(s).quantity === s ? `Serves ${s}` : s;
+  return BARE_SERVINGS.test(s.replace("\u2044", "/")) ? `Serves ${s}` : s;
 }
 
 /** Consecutive items with the same `section` become one group (REC-3 headings). */

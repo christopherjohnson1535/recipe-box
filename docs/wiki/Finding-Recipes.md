@@ -6,7 +6,7 @@ recipes your household has (left out if the count can't be read), with **Sign ou
 Recipe Box name and the section links, with a thin double line below.
 
 ## The home page
-The top of the home page shows a **Featured** recipe: one with a photo that you haven't touched in a while, with its time and the buttons **Start
+The top of the home page shows a **Featured** recipe: one with a photo that you haven't touched in a while, with its total time and servings (where the recipe has them) and the buttons **Start
 cooking** and **Read the recipe**. Under it a slow **In season** ticker lists produce for the time of year (hover over it,
 tab onto it or press **Pause** to stop it; on a touch screen tap it). Below are your recipes as cards, three across on a wide
 screen (1280 pixels and up), two on an iPad and one on a phone, with a numbered **More to cook** list and a **Haven't cooked in a while** panel beside

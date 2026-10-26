@@ -137,12 +137,22 @@ describe("home page", () => {
     expect(screen.getByText("makes 12 cookies")).toBeTruthy();
   });
 
+  it("shows a servings phrase as written beside the time", async () => {
+    serve([...others, { ...withPhoto, servings: "makes 12 cookies" }]);
+    await home();
+    expect(screen.getByText("3 hr 20 min · makes 12 cookies")).toBeTruthy();
+    expect(screen.queryByText(/Serves/)).toBeNull();
+  });
+
   it("leaves the meta strip out when the featured recipe has neither time nor servings", async () => {
     serve([...others, { ...withPhoto, totalMinutes: null, servings: null }]);
     await home();
     const featured = screen.getByRole("heading", { level: 2, name: "Short Ribs Slow and Low" }).closest("article")!;
     expect(within(featured).getByText("Three hours in the oven.")).toBeTruthy();
-    expect(featured.textContent).not.toMatch(/ hr| min|Serves/);
+    expect(within(featured).queryByText(/ hr| min|Serves/)).toBeNull();
+    // The kicker ("Featured · tags") is the only place the card uses "·"; a time/servings strip would add another.
+    const kicker = within(featured).getByText(/^Featured · /).textContent ?? "";
+    expect((featured.textContent ?? "").replace(kicker, "")).not.toContain("·");
   });
 
   it("hides the featured recipe, ticker and sidebar while filtering", async () => {

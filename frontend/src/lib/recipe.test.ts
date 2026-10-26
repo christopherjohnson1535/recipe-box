@@ -11,12 +11,22 @@ describe("recipe helpers", () => {
   });
 
   it("labels servings", () => {
-    expect(servingsLabel("4")).toBe("Serves 4");
+    for (const s of ["4", "4-6", "4–6", "4 to 6", "1/2", "1½"]) expect(servingsLabel(s)).toBe(`Serves ${s}`);
     expect(servingsLabel(" 4-6 ")).toBe("Serves 4-6");
-    expect(servingsLabel("makes about 4 bowls")).toBe("makes about 4 bowls");
+  });
+
+  it("shows servings with words as written", () => {
+    for (const s of ["4 cups", "6 cloves", "12 bars", "Serves 4", "makes 12 cookies", "makes about 4 bowls"]) {
+      expect(servingsLabel(s)).toBe(s);
+    }
+    expect(servingsLabel("  makes 12 cookies ")).toBe("makes 12 cookies");
+  });
+
+  it("gives no label for nothing", () => {
     expect(servingsLabel("")).toBeNull();
     expect(servingsLabel("   ")).toBeNull();
     expect(servingsLabel(null)).toBeNull();
+    expect(servingsLabel(undefined)).toBeNull();
   });
 
   it("groups consecutive sections", () => {
