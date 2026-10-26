@@ -14,7 +14,7 @@ Installed apps do not follow Safari's tabs: sign in again if you are asked to, a
 the icon and add it again. Long-press the icon for shortcuts (**Import a recipe**, **Write a recipe**).
 
 ## Cooking mode
-Open a recipe → **Start cooking**. Cooking mode is always dark (the evening edition), in large type you can read from across the counter.
+Open a recipe → **Start cooking**. Cooking mode is always dark (the evening colours), in large type you can read from across the counter.
 - **Move on** with the **Next step** and **Back** buttons, by swiping left or right anywhere on the screen, or with the arrow keys.
 - **For this step** lists the ingredients the step names, bright, followed by the rest, dimmed. Held upright only the ones the step names appear, as chips above the step; tap **+N more** for the rest.
 - **Timers**: tap a time written in the step ("10 minutes") to start a timer. Several can run, and they keep going when you change step. A finished timer flashes red and chimes for ten seconds, then stays red (the chime needs one tap on the page first, a browser rule); tap **Dismiss** to clear it. **Close** asks first while a timer is running, since closing stops the timers.
@@ -41,10 +41,10 @@ you'll cook from while you're online: opening a recipe once keeps it, its photo 
 - Offline needs the Home Screen app or Safari on the **HTTPS** address (see [[Deploying]]). iPadOS may clear offline
   data when storage is low; the server always has the real copy.
 
-## Evening edition
-After 7 pm Recipe Box switches to its darker evening edition, which is easier on the eyes at dinnertime, and back to
-the light day edition at 7 am. To change it, open **Settings → Appearance** and choose *Always day*, *Always evening*
-or *Follow this device*. The choice is remembered on that iPad only.
+## Evening colours
+After 7 pm Recipe Box switches to its darker evening colours, which are easier on the eyes at dinnertime, and back to
+the light day colours at 7 am. To change it, open **Settings → Appearance** and choose *By the clock*, *Always day*, *Always evening*
+or *Follow this device*. The choice is remembered on that iPad only. More in [[Appearance and Layout]].
 
 ## Camera import
 Import → Photo → take a picture of the cookbook page. See [[Importing Recipes]].

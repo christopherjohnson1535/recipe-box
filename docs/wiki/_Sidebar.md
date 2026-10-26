@@ -9,6 +9,7 @@
 - [[Household Members]]
 - [[Google Sign-In]]
 - [[Using on iPad]]
+- [[Appearance and Layout]]
 - [[AI Photo Import]]
 - [[Backup and Restore]]
 - [[Deploying]]

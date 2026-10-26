@@ -9,7 +9,7 @@ household app. Record: ADR [0009](../../adr/0009-riviera-charcoal-saffron.md). W
 | 1 | #119 | Palette and fonts, both appearances (tokens only), ADR 0009, this record |
 | 2 | #120 | Page width 90rem, charcoal top band, masthead, thin double rule |
 | 3 | #121 | Home layout and evergreen copy, component renames |
-| 4 | #122 | Every other screen, copy sweep, docs, wiki and screenshots |
+| 4 | #122 | Every other screen, copy sweep, docs, wiki and screenshots (below) |
 
 ## Layout (for #120 and #121)
 A charcoal top band (date · season · recipe count, Sign out), wordmark left with section links right, a thin double
@@ -63,3 +63,22 @@ wordmark 44px · headline clamp(2.5rem → 4.25rem).
 ## Icons
 The R monogram is redrawn in Marcellus: paper `#f4f4f1` on band charcoal `#22262b` with a band-saffron `#e9b75a`
 rule. How to regenerate: `frontend/public/icons/README.md`.
+
+## Screens after #122
+Captured from a seeded local stack (production build), 1600px desktop and iPad (1024px landscape, 768px upright), in the
+day and evening appearances. JPEG crops of the top of each page. The home page is shown in the #121 record.
+
+| File | Screen | Width |
+|---|---|---|
+| `desktop-recipe-day.jpg`, `desktop-recipe-evening.jpg` | Recipe: ingredients, method and the note in the margin column | 1600 |
+| `desktop-groceries-day.jpg`, `desktop-groceries-evening.jpg` | Groceries: list beside the tools panel | 1600 |
+| `desktop-settings-day.jpg`, `desktop-settings-evening.jpg` | Settings in two columns | 1600 |
+| `desktop-add-day.jpg` | Add a recipe with the tips panel | 1600 |
+| `desktop-import-evening.jpg` | Import with "What happens next" | 1600 |
+| `desktop-sign-in-day.jpg` | Sign in | 1600 |
+| `desktop-save-stamp-evening.jpg` | The "In the box · Saved" stamp | 1600 |
+| `ipad-recipe-day.jpg` | Recipe, long description with drop cap and a long note | 1024 |
+| `ipad-recipe-evening.jpg` | Same recipe, single column | 768 |
+| `ipad-groceries-evening.jpg` | Groceries, tools panel under the list | 768 |
+| `ipad-settings-day.jpg` | Settings, one column | 1024 |
+| `ipad-cook-evening.jpg` | Cook mode on the dark stage (no band) | 1024 |

@@ -10,6 +10,7 @@ A household recipe website: save recipes from links and photos, find them fast, 
 - [[Grocery List]] — one shared shopping list, grouped by store section
 - [[Google Sign-In]] — sign in with a Google account instead of a password
 - [[Using on iPad]] — Home Screen app, cooking mode, offline
+- [[Appearance and Layout]] — day and evening colours, wide screens
 - [[AI Photo Import]] — optional setup for reading recipes from photos
 - [[Backup and Restore]]
 

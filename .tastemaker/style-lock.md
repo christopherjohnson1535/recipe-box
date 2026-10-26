@@ -8,9 +8,10 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 
 ## Lane
 - Riviera: refined and calm rather than magazine-like, for a long-lived household app. Cool paper, charcoal ink, one
-  saffron accent; a charcoal top band (since #120) and band-coloured inverse panels (#121).
+  saffron accent; a charcoal top band, band-coloured inverse panels and toasts, paper-deep side panels under a thin
+  double rule, ruled tiles instead of boxed cards.
 
-## Palette (light: "day edition")
+## Palette (light: day)
 - Paper `#f4f4f1` (page) · Paper-deep `#eaeae5` (ingredient sidebar, alerts, panels)
 - Ink `#22262b` (text, primary button fill) — 13.8:1 on paper, 12.6:1 on paper-deep
 - Ink-muted `#565c63` (decks, bylines, metadata, hints) — 6.1:1 on paper, 5.6:1 on paper-deep
@@ -23,7 +24,7 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 - Band `#22262b` / on-band `#f4f4f1` (13.8:1) / band-accent `#e9b75a` (8.3:1)
 - Button label: paper on ink (13.8:1); paper on accent (5.3:1); paper on danger (6.0:1)
 
-## Dark mode: the "evening edition", chosen by the clock
+## Dark mode: evening, chosen by the clock
 - Evening shows 19:00 to 06:59 local time by default, day 07:00 to 18:59. Per device, Settings can pin day, pin
   evening or follow the device (`localStorage` `rb-edition`). `<html data-theme>` carries the result; with no
   attribute the device's `prefers-color-scheme` decides. See `docs/THEMING.md`.
@@ -57,19 +58,26 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
   the masthead and atop the ingredient sidebar.
 
 ## Density & spacing
-- Generous whitespace. Measure 38rem body, 72rem wide column (the recipe page), 90rem page. Gutter 16px phone / 40px ≥768.
+- Generous whitespace. Measure 38rem for reading text, 44rem for forms and the grocery list, 90rem page. Gutter 16px
+  phone / 40px ≥768. Wide screens (≥1280px, the recipe page ≥1440px) put help, tools or the recipe's note in a second
+  column with its own measure.
 - Listing entries: 24px vertical padding between hairlines. Touch targets 44px.
 - Section separation: hairline rules only.
 
-## Structure (app shell)
+## Structure (app shell and screens)
 - Top band: full-width charcoal strip (band tokens), at least 44px, on the page edges: local date · season · recipe
   count left (count left out when unknown), Sign out right; print hidden; season drops on a phone.
 - Masthead: Marcellus wordmark (~44px) left, uppercase Karla section links right (active: 2px accent underline), thin
   double rule under.
-- Home: article-head (kicker, headline, italic deck, actions) → search + tag index → two-column contents listing.
-- Recipe: centred article head (tag kicker, headline, deck or none, byline, actions) → meta strip → photo → drop-cap
-  lede (long descriptions) → ingredient sidebar + numbered method → notes.
-- Auth: centred wordmark + tagline + double rule, form in a hairline frame.
+- Home: featured recipe (text left, framed 3:2 photo right) → ticker → search + tag index → ruled tiles (3 columns from
+  1180px) with a 22rem sidebar from 1024px.
+- Recipe: split opener (tag kicker, headline, deck or none, byline, actions, photo right) → numerals band between a thin
+  double rule and a hairline → drop-cap lede (long descriptions) → ingredient panel + numbered method (+ the note in a
+  margin column from 1440px).
+- Add, Edit, Import: form at 44rem with a tips panel beside it from 1280px. Groceries: list at 44rem, tools panel beside
+  it. Settings: two columns of sections from 1280px.
+- Auth: centred wordmark + tagline + double rule, form in a hairline frame, no band. Cook mode: full-screen evening
+  overlay, no band.
 
 ## Motion
 - Motion marks a change of state or place. One easing (`--ease-out`), durations 150-900ms, nothing loops except an
@@ -85,12 +93,17 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 ## Do not
 - Use The New Yorker's name, logo, mascot, masthead, or Irvin / Irvin look-alike fonts; copy any publication's identity.
 - Use next/font/google; use @fontsource packages only.
-- Bold or italicise Marcellus; set running text in Karla; set a label under 13px or in lower case (the save stamp's small "Filed" and date lines are the one exception
-  left; #122 sweeps them); add a fourth family.
+- Bold or italicise Marcellus; set running text in Karla; set a label under 13px or in lower case (no exceptions: the save
+  stamp's lines are 13px too); add a fourth family.
 - Use the saffron accent for an error, a destructive action or a "check this" mark (danger and attention own those).
-- Rounded cards, drop shadows, gradients, pills, or accent fills larger than a button.
+- Rounded cards, drop shadows, gradients, pills, or accent fills larger than a button; thick-over-thin borders (a thin
+  double rule or a 1px ink rule closes a block).
+- Use magazine wording in anything a reader sees: volume, issue number, "cover story", "also in this issue", "edition",
+  "forthcoming". The app is a household's recipe box and reads the same in five years (copy rules: `docs/UI.md`).
+- Stretch a field or a paragraph across the 90rem page: wide screens get a second column, not longer lines.
 - Hard-code a hex value outside `primitives.css`.
 
 ## Taste memory
 - Profile priors used: none. Decision log: 2026-10-21 editorial magazine (ADR 0006); 2026-10-25 owner chose Riviera ·
-  Charcoal & Saffron over Maison, Linen, Edition II and four Riviera variants (ADR 0009).
+  Charcoal & Saffron over Maison, Linen, Edition II and four Riviera variants (ADR 0009); the remaining screens, copy
+  rules and wide-screen layouts follow in #122.

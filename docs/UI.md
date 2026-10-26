@@ -4,8 +4,19 @@ Recipe Box is set in the **Riviera · Charcoal & Saffron** direction (ADR 0009, 
 charcoal-slate ink, one deep saffron accent used sparingly, a calm display serif for titles, a small tracked sans for
 labels, a readable text serif at 20px, a narrow reading measure, hairline rules and italic decks. The evening
 appearance is near-black slate with a brighter saffron. Read this before changing any UI so new screens keep the
-style. The app shell (90rem page, charcoal top band, masthead, thin double rule) is done in #120; the home, recipe and
-remaining screens are restyled in #121 and #122, so some page patterns below still describe the editorial layout.
+style.
+
+**What it looks like.** A calm tool for a household, not a magazine. Every signed-in screen sits under a charcoal top
+band (date, season, recipe count, Sign out) and a masthead with the Recipe Box wordmark and the section links, closed by
+a thin double rule. The home page opens on a featured recipe with a framed 3:2 photo; recipes are ruled tiles, not boxed
+cards. Panels that sit beside content (ingredients, tips, the grocery tools) are paper-deep blocks under a thin double
+rule, and the inverse panels and toasts use the band colours. The page is 90rem wide; reading text keeps a 38rem
+measure and form fields keep a 44rem measure, so a wide window gets a second column (help, tools, a margin note), never
+longer lines. Titles are Marcellus, labels Karla in tracked capitals, running text Crimson Pro; one saffron accent,
+used sparingly; no shadows, gradients or rounded cards.
+
+**What it reads like.** A long-lived household app: plain names, no issue, volume or "cover story" metaphors (see
+"Copy rules").
 
 The machine-readable lock (palette, contrast contract, structure) is `.tastemaker/style-lock.md`. The colour tokens
 live in `frontend/src/styles/` in three layers (primitives, semantic themes, component tokens): see
@@ -73,22 +84,37 @@ Layout: `--measure` (38rem, `max-w-measure`), `--measure-form` (44rem, `max-w-fo
 (44px, `min-h-control`). Radius: `--radius-control` (2px).
 
 Tailwind's default colour palette and font stacks are switched off (`--color-*: initial`), so every colour must be a
-token. Dark mode (the "evening edition", `src/styles/themes/evening.css`) redefines the same variables under
+token. Dark mode (the evening appearance, `src/styles/themes/evening.css`) redefines the same variables under
 `:root[data-theme="evening"]` and, when no `data-theme` is set, under `prefers-color-scheme: dark`; components never
-branch on theme (see "Editions" below). Inside a ui component, themed decisions (button
+branch on theme (see "Appearance" below). Inside a ui component, themed decisions (button
 fills, input borders, chip underlines, kicker and numeral colour, focus ring) use component tokens such as
 `bg-(--button-primary-bg)`, so they can be retuned in `src/styles/components.css` without touching the component.
 
 Old scaffold names map as: surface → paper, surface-sunk → paper-deep, text → ink, muted → ink-muted, border → rule,
 border-strong → rule-strong, accent-ink → accent.
 
-## Editions: day and evening
-The app has two editions of the same page: the **day edition** (cool off-white paper, charcoal ink) and the **evening
-edition** (near-black slate, brighter saffron). By default the clock chooses: evening from 19:00 to 06:59 local time, day from 07:00 to 18:59, so the
-iPad is easy on the eyes at dinnertime whatever the device setting. Each device can instead pin day, pin evening or
-follow its own light/dark setting (Settings, Appearance; stored in `localStorage` as `rb-edition`). An inline script in
-the root layout sets `<html data-theme>` before first paint; `EditionController` keeps it current. How it works:
-`docs/THEMING.md`. Components never branch on the edition; they read tokens.
+## Appearance: day and evening
+The app has two appearances of the same page: **day** (cool off-white paper, charcoal ink) and **evening** (near-black
+slate, brighter saffron). By default the clock chooses: evening from 19:00 to 06:59 local time, day from 07:00 to 18:59,
+so the iPad is easy on the eyes at dinnertime whatever the device setting. Each device can instead pin day, pin evening
+or follow its own light/dark setting (Settings, Appearance: "By the clock: evening colours after 7 pm", "Always day",
+"Always evening", "Follow this device"; stored in `localStorage` as `rb-edition`). An inline script in the root layout
+sets `<html data-theme>` before first paint; `EditionController` keeps it current. How it works: `docs/THEMING.md`.
+Components never branch on the appearance; they read tokens. The code keeps the older word (`edition`, `lib/edition.ts`,
+`rb-edition`, `data-edition-pin`) as an internal name; it never reaches a reader.
+
+## Copy rules
+The app is for one household and meant to look the same in five years.
+- No publishing metaphors in anything a reader sees: no volume, issue number, "cover story", "edition", "also in this
+  issue", "forthcoming", "filed under". Use the plain name: Recipes, Groceries, Featured, More to cook, Day and Evening
+  colours.
+- Say what a thing is and what pressing the button does ("Add a recipe", "Import a recipe", "Save changes"). Kickers name
+  the section (Recipes, Shopping list, Settings, Editing), not the genre.
+- A person's name in a byline is fine ("Added by Chris"); so is "Source: …".
+- Dates are never dressed up; use the viewer's local date. No em dashes; use a colon, comma or full stop.
+- Nothing time-bound in the wording (no "this month's", no "new"). The save stamp says "In the box" and "Saved".
+- Code comments, docs and identifiers may keep older names where renaming is churn, but the user-visible string is the
+  plain one.
 
 ## Print inks
 Three illustration colours exist as primitives (`--mustard-500` `#d9a21b`, `--fern-700` `#3f6b45`, `--tomato-600`
@@ -163,8 +189,13 @@ Text and structure:
 - `Logo` (`size="lg"` on auth), `Masthead` + `NavLink` (the app header), `TopBand` + `BandButton` (the charcoal band above it), `SkipLink`.
 - `Contents` + `ContentsEntry`: the two-column contents listing and one entry (kicker, title link, deck, meta,
   thumbnail); the whole entry is clickable and the focus ring wraps it.
-- `Article.tsx`: `Lede` (drop cap) and `SidebarLayout` (ingredients beside the method). The rest of the recipe page
-  is the spread kit below.
+- `Article.tsx`: `Lede` (drop cap) and `SidebarLayout` (ingredients beside the method, and from 1440px a third column,
+  the `rail`, for the recipe's note). The rest of the recipe page is the recipe kit below.
+- `Columns.tsx`: the layouts that use the 90rem page. `WithAside` (a main column at the form measure, 44rem, with a
+  side column of at most 38rem from 1280px; stacked before that, the side column after the main one; `sticky` keeps a
+  short side column in view), `TwoColumns` (two stacks of sections side by side from 1280px; reading order is the left
+  stack, then the right) and `AsidePanel` (the side column's paper-deep block under the thin double rule; `optional`
+  leaves a tip out below 768px). Pages use these, never their own grid templates (the styling guard rejects them).
 
 Controls and states:
 - `ui/Button` / `ButtonLink`: `primary` ink fill (hover turns accent), `secondary` ink outline, `ghost` underlined,
@@ -195,10 +226,11 @@ Controls and states:
 - Share page (#21): `ui/BookmarkTab` (draggable `javascript:` link; the href is set by hand because React refuses it, and a click does nothing), `ui/CodeBlock` (a line to copy exactly, selects whole on tap), `ui/Disclosure` (closed-by-default native `details` note, 44px summary), `ui/Steps` + `Step` (numbered how-to steps with a display numeral).
 - `ui/Alert`: margin note with a 3px left rule on paper-deep.
 - `ui/EmptyState`: display title, italic copy, closing hairline.
-- `ui/Toast` (`ToastRegion`, `Toast`, `ToastAction`, `ToastLink`, `ToastDismiss`): inverse message pinned to the bottom, 44px actions, tokens `--toast-*`. The region is a polite live region and stays mounted (`lifted` sits it above the grocery `SelectionBar`); a `Toast` that reports a failure takes `role="alert"`; hidden in print. Separated by a hairline border, never a shadow. Used by `undo/UndoToast` and the grocery list (a write that didn't save, the result of adding recipes from the home grid).
+- `ui/SaveStamp`: the round "In the box · Saved" stamp (with the date) that lands once, bottom right, when a new recipe is saved; decorative, a hidden status says "Recipe saved.". Its lines are 13px labels like everything else.
+- `ui/Toast` (`ToastRegion`, `Toast`, `ToastAction`, `ToastLink`, `ToastDismiss`): a message in the band colours (charcoal in both appearances, saffron actions) pinned to the bottom, 44px actions, tokens `--toast-*`. The region is a polite live region and stays mounted (`lifted` sits it above the grocery `SelectionBar`); a `Toast` that reports a failure takes `role="alert"`; hidden in print. Separated by a hairline border, never a shadow. Used by `undo/UndoToast` and the grocery list (a write that didn't save, the result of adding recipes from the home grid).
 - Grocery list (#80), all in `ui/GroceryKit.tsx`: `RecipeShelf` (native `details` of the recipes on the list; a quiet hairline head, folded at first from three recipes), `RecipeRow` + `ScaleStepper` (− 1× +; an unusable end is `aria-disabled`, never `disabled`, so keyboard focus stays on it), `GrocerySection` (ruled, letter-spaced head that sticks to the top while its items scroll; rows carry `scroll-mt-14` so focus is never left under it), `GroceryRow` (the whole 56px row is the tick: `aria-pressed`, the recipe page's drawn `.strike`; `data-item-id` lets the page return focus to it), `RowMenu` (three-dot `role="menu"`: arrows, Home/End, Escape and Tab return focus to the button; a group of `checked` entries is a radio set; opens upward when there is no room below the button), `ListBody` (the items area; takes focus from script when a button disappears), `NavCount` (the accent to-buy count after "Groceries" in the masthead), `SelectCard` + `SelectionBar` (choose recipes on the home grid; the bar is fixed at the bottom, class `selection-bar` adds scroll padding like `floating-bar` and 7rem of room under `main`, so the ink panel never ends behind the ink pill). Controls that don't print carry `print:hidden`. Uses existing tokens only. The masthead nav sets in three aligned columns below 640px instead of scrolling sideways. The list column keeps to the form measure (44rem). `IngredientPanel` takes a `footer` (the recipe page's Add to groceries). #81 added `SendArea` (labelled "Send to…" group: buttons in a wrapping row, one per line on a phone, then the hint, confirmation or error beneath; not printed). `HardLink` (a plain `<a>` for a full page load, as a button or as an inline `.link`; used for the Google connect address, which next/link would prefetch) is in `ui/Button.tsx` beside `ButtonLink`. The app side is `groceries/SendList` (Share where `navigator.share` exists, else Copy; Copy works without the clipboard API, on plain http, via `lib/copy-text`, and as a last resort shows the text in a selected read-only box; Send to Google Tasks when the server has Google set up; a Home Screen app is told to connect from the browser instead, `lib/installed-app`) and `settings/GoogleTasksSection`.
-- Recipe spread (#40), all in `ui/`: `SpreadOpener` (split opener: kicker, ~100px headline whose words rise in, italic deck, byline, byline, actions (Start cooking, Edit and Delete; the block has id `opener-actions`); photo full height on the right from 1024px, meeting the rule under it, and a 3:2 band below the text before that; the photo is not printed; without a photo the headline spans the width over a spot icon; titles over 40 characters step down a size; carries the card→page morph names), `NumeralsBand` (items `{ label, value?, text?, parts?, spoken? }` in display numerals (`parts` are number + small unit pairs side by side, "3hr 20min"; `text` sets a phrase like "makes about 4 bowls" in smaller type) between a thick and a thin rule, auto-fit columns so 2×2 on a phone; `spoken` is what screen readers get for shorthand like "3hr 20min"), `IngredientPanel` + `IngredientGroup` + `IngredientRow` + `ScaleControl` (paper-deep panel; each row is a button with `aria-pressed`, a checkbox, an accent tabular quantity column and a line drawn through ticked text, quantity included, which turns muted; print drops the checkbox column; ScaleControl is a labelled radio group, 44px targets), `MethodHeader` + `MethodStep` + `IngredientMention` (dotted accent underline linking to `#ingredient-<i>`; following it focuses the row, and the row is highlighted while it is the `:target`) + `TimerChip` (pill with a clock around the step's own words, so the text reads and copies unchanged; plain text in print), `PullQuote` (single-line notes of 140 characters or fewer in display type, longer ones at body size, a paragraph per line break), `FloatingBar` (fixed pill, hidden (inert, opacity-only under reduced motion) until the opener's actions scroll out of view, watched with an IntersectionObserver in `RecipeBar`, and shown at once without one; with a polite status, in a short form such as "3 checked" below 640px so it stays on one line, and the accent Start cooking link; pages leave `pb-28` under their content; hidden in print). Tokens: `--qty-fg`, `--strike-fg`, `--mention-line`, `--target-bg`, `--timer-*`, `--bar-*`; the evening edition re-points `--timer-*` and `--bar-*` at paper-deep and ink so they do not glare.
-- Cook mode (#41), always the evening edition: the route `recipes/[id]/cook` renders `components/cook/CookMode` (client; step index, timers and voice live above the step view so timers survive step changes; logic in `cook-logic.ts`, optional voice in `use-voice.ts`). UI in `ui/CookKit.tsx`: `CookStage` (a modal `role="dialog"`, the rest of the app `inert` while it is open; it pins the evening edition with `pinEdition`/`unpinEdition` from lib/edition.ts, after an inline `PIN_EVENING_SCRIPT` on the page sets `data-edition-pin` before paint, so `applyEdition` keeps evening and theme-color and leaving recomputes the person's edition; it owns the touch handlers, so a swipe works anywhere but on a control), `CookTopBar` (h1 title; Close asks first while a timer runs), `CookVoiceToggle`, `CookProgress` (one segment per step), `CookColumns` (rail 26% / step 44%, centred / timers 26% from 1024px, each scrolling alone; narrower: one row of chips, the step scrolling, timers above the footer), `CookRail` + `CookRailRow` (lit ingredients first, the rest dimmed; chips show only lit ones until "+N more"), `CookStepText` (40px from 700px, 28px below) + `CookMention` + `CookTimerButton` (kept on one line with the full stop after it), `CookTimers` + `CookTimer` (rings for the first three, compact rows after; a finished timer flashes the accent by colour for 10 s, then stays accent), `CookLive` (polite announcements, step changes included), `CookFooter` with `CookPill` / `CookPillLink` (60px tall; next-step preview hidden on a phone). Back/Next, ←/→ and a swipe move; the audio context is made and resumed on the first tap or key and the chime reuses it. #13 added: `CookToolbar` (a focusable group under the progress bar holding `CookViewToggle` (One step / All steps, two `aria-pressed` buttons), `CookTextButton` ("Clear ticks", shown once anything is ticked; focus moves to the toolbar when it goes) and `CookWakeStatus` ("Screen stays on" with an accent dot while the lock is held; nothing while it is being requested; otherwise a button that opens `CookWakeNote`, a short note on https, iPadOS 18.4+ in the Home Screen app, or Auto-Lock → Never)); `CookRailRow` is now a 44px `aria-pressed` button with the same drawn strike as `IngredientRow` (22px chips from 700px); `CookTick` (checkbox-style Done toggle, 44px) sits beside the step kicker via `CookStepText`'s `action` slot; `CookProgress` shows done steps; `CookStepList` + `CookStepItem` are the all-steps view (accent display numeral, the current step marked by an accent left rule and scrolled into view, done steps muted with the tick, ≥ 24px text, timer chips still live); `CookFooter`'s `summary` ("2 of 6 steps done") replaces the next-step preview in that view, with Finish only. Swipe, arrows and voice next/back only move in the one-step view. State (`components/cook/cook-store.ts`): `cook-ticks:<id>` in localStorage as `{ v: 1, at, ingredients, steps }`, read as empty after 12 hours, dated in the future, or corrupt; out-of-range indexes dropped; synced across tabs by the `storage` event; in-memory fallback when storage throws; nothing ticked on the server render. On the first load the one-step view opens at the first step not done. `cook-view` remembers the view per device. Wake lock: `components/cook/use-wake-lock.ts` requests `screen` while visible, re-requests on `visibilitychange` and after the system releases it, and releases on close. Uses existing tokens only.
+- Recipe kit (#40), all in `ui/`: `SpreadOpener` (split opener: kicker, ~100px headline whose words rise in, italic deck, byline, byline, actions (Start cooking, Edit and Delete; the block has id `opener-actions`); photo full height on the right from 1024px, meeting the rule under it, and a 3:2 band below the text before that; the photo is not printed; without a photo the headline spans the width over a spot icon; titles over 40 characters step down a size; carries the card→page morph names), `NumeralsBand` (items `{ label, value?, text?, parts?, spoken? }` in display numerals (`parts` are number + small unit pairs side by side, "3hr 20min"; `text` sets a phrase like "makes about 4 bowls" in smaller type) between a thin double rule and a hairline, auto-fit columns so 2×2 on a phone; `spoken` is what screen readers get for shorthand like "3hr 20min"), `IngredientPanel` + `IngredientGroup` + `IngredientRow` + `ScaleControl` (paper-deep panel; each row is a button with `aria-pressed`, a checkbox, an accent tabular quantity column and a line drawn through ticked text, quantity included, which turns muted; print drops the checkbox column; ScaleControl is a labelled radio group, 44px targets), `MethodHeader` + `MethodStep` + `IngredientMention` (dotted accent underline linking to `#ingredient-<i>`; following it focuses the row, and the row is highlighted while it is the `:target`) + `TimerChip` (pill with a clock around the step's own words, so the text reads and copies unchanged; plain text in print), `PullQuote` (the recipe's note between a thin double rule and a hairline; single-line notes of 140 characters or fewer in display type, longer ones at body size, a paragraph per line break; set in the margin column from 1440px), `FloatingBar` (fixed pill, hidden (inert, opacity-only under reduced motion) until the opener's actions scroll out of view, watched with an IntersectionObserver in `RecipeBar`, and shown at once without one; with a polite status, in a short form such as "3 checked" below 640px so it stays on one line, and the accent Start cooking link; pages leave `pb-28` under their content; hidden in print). Tokens: `--qty-fg`, `--strike-fg`, `--mention-line`, `--target-bg`, `--timer-*`, `--bar-*`; the evening edition re-points `--timer-*` and `--bar-*` at paper-deep and ink so they do not glare.
+- Cook mode (#41), always the evening appearance: the route `recipes/[id]/cook` renders `components/cook/CookMode` (client; step index, timers and voice live above the step view so timers survive step changes; logic in `cook-logic.ts`, optional voice in `use-voice.ts`). UI in `ui/CookKit.tsx`: `CookStage` (a modal `role="dialog"`, the rest of the app `inert` while it is open; it pins the evening appearance with `pinEdition`/`unpinEdition` from lib/edition.ts, after an inline `PIN_EVENING_SCRIPT` on the page sets `data-edition-pin` before paint, so `applyEdition` keeps evening and theme-color and leaving recomputes the person's own; it owns the touch handlers, so a swipe works anywhere but on a control), `CookTopBar` (h1 title; Close asks first while a timer runs), `CookVoiceToggle`, `CookProgress` (one segment per step), `CookColumns` (rail 26% / step 44%, centred / timers 26% from 1024px, each scrolling alone; narrower: one row of chips, the step scrolling, timers above the footer), `CookRail` + `CookRailRow` (lit ingredients first, the rest dimmed; chips show only lit ones until "+N more"), `CookStepText` (40px from 700px, 28px below) + `CookMention` + `CookTimerButton` (kept on one line with the full stop after it), `CookTimers` + `CookTimer` (rings for the first three, compact rows after; a finished timer flashes the accent by colour for 10 s, then stays accent), `CookLive` (polite announcements, step changes included), `CookFooter` with `CookPill` / `CookPillLink` (60px tall; next-step preview hidden on a phone). Back/Next, ←/→ and a swipe move; the audio context is made and resumed on the first tap or key and the chime reuses it. #13 added: `CookToolbar` (a focusable group under the progress bar holding `CookViewToggle` (One step / All steps, two `aria-pressed` buttons), `CookTextButton` ("Clear ticks", shown once anything is ticked; focus moves to the toolbar when it goes) and `CookWakeStatus` ("Screen stays on" with an accent dot while the lock is held; nothing while it is being requested; otherwise a button that opens `CookWakeNote`, a short note on https, iPadOS 18.4+ in the Home Screen app, or Auto-Lock → Never)); `CookRailRow` is now a 44px `aria-pressed` button with the same drawn strike as `IngredientRow` (22px chips from 700px); `CookTick` (checkbox-style Done toggle, 44px) sits beside the step kicker via `CookStepText`'s `action` slot; `CookProgress` shows done steps; `CookStepList` + `CookStepItem` are the all-steps view (accent display numeral, the current step marked by an accent left rule and scrolled into view, done steps muted with the tick, ≥ 24px text, timer chips still live); `CookFooter`'s `summary` ("2 of 6 steps done") replaces the next-step preview in that view, with Finish only. Swipe, arrows and voice next/back only move in the one-step view. State (`components/cook/cook-store.ts`): `cook-ticks:<id>` in localStorage as `{ v: 1, at, ingredients, steps }`, read as empty after 12 hours, dated in the future, or corrupt; out-of-range indexes dropped; synced across tabs by the `storage` event; in-memory fallback when storage throws; nothing ticked on the server render. On the first load the one-step view opens at the first step not done. `cook-view` remembers the view per device. Wake lock: `components/cook/use-wake-lock.ts` requests `screen` while visible, re-requests on `visibilitychange` and after the system releases it, and releases on close. Uses existing tokens only.
 App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
 - `recipe-page/*`: `RecipeState` (`RecipeStateProvider` keeps the ticked ingredients and the scale per recipe in sessionStorage as `recipe-ticks:<id>` and `recipe-scale:<id>`; the server and hydrating render see nothing ticked, then the stored state appears; `ScaledServings`), `session-store.ts` (the sessionStorage hook, with an in-memory fallback when storage throws), `IngredientChecklist`, `RecipeBar`, `StepText` + `mentions.ts` (`annotateStep`: timers from `splitDurations`, then ingredient names matched on word boundaries, longest first, each linked once per step; the name heuristic is documented there), `DeleteRecipeButton` (ghost Delete, no dialog: deletes, shows the toast, goes home), `byline.ts` (data for "Added by X", "Edited by Y" only when someone else or a later edit) and `LocalDate` (client-formatted `<time>` in the viewer's time zone, empty on the server).
 - `undo/*`: `undo-store.ts` (module list of offers kept across client navigation; one toast each, newest on top, three shown; cleared on sign-out and when the layout unmounts), `UndoToast` (mounted once in `(app)/layout.tsx`; 10 s countdown paused by hover or focus; Undo restores and reopens the recipe; 409 says it is too late).
@@ -214,7 +246,7 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
 - Import as a darkroom (#42): `import/ImportScreen` has Photo / Link / Paste text tabs (`ui/Tabs`, arrow keys). While a request is in flight a `ScanHeading` ("Reading your page") sits over `ui/Darkroom` `ScanStage` (the photo tilted on the `stage` ground with an `attention` scan line and a pulsing dot, motion only) or `DomainCard`. When the draft arrives the photo stays on the left (sticky from 1024px, above the draft below that) with `regions` boxes if the draft has them (further photos in a strip under it), and the right column has `DraftKicker` ("Draft · not saved yet"), `DraftTitle` (typed in once, full title for screen readers) and `DraftRow`s: a check or a `?` badge at the left, the quantity (`splitIngredient`) in accent tabular figures, then the line. Every row is shown; rows with `confidence` under 0.6 get the `attention` wash and the `?` (ink on the attention colour); only the slide-in stagger stops after 12 rows. Warnings go in `DraftNote` (attention rule). AI off: no scan, the photo sits beside the empty form. Reduced motion removes the sweep, dot, typing and slide. The attention colour is only a wash, rule or mark; contrast is tested in `tokens.test.ts`.
 - `settings/*`: `/settings`. `SettingsView` (My account always; Household for admins only; AI import), `PasswordForm` (own password asks for the current one; an admin reset doesn't; errors on the field, 401 lands on Current password), `AddMemberForm`, `HouseholdSection` (list, a Google email panel per member via `EmailForm` that warns changing or clearing disconnects their Google sign-in, reset panel, remove confirmation naming the person; Remove is off for yourself and the last admin, with the reason shown; focus returns to the Reset button or the Household heading), `GoogleSignInSection` (every member: connected Google accounts, Disconnect with confirmation, Connect Google as a `HardLink`; a Home Screen app is told to connect from Safari; a failed providers fetch says it couldn't check rather than "off"), `AiImportSection`.
 - `AppBand`: the `TopBand` with the reader's local date, season, the household's recipe count and Sign out (`use-sign-out.ts` holds the sign-out steps). `AppHeader`: `Masthead` with the app's sections. `RecipeCard`: a recipe as a `RecipeTile`.
-- `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
+- `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`. `recipe-form/FormHelp` and `import/ImportHelp` are the tips beside the editor and the import form (`AsidePanel optional`).
 
 ## Page patterns
 - **App shell** (every signed-in screen, `app/(app)/layout.tsx`): one page `<header>` (the only banner landmark)
@@ -245,21 +277,43 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   the band above is unchanged. Until the Made-it log (#23) exists, `updatedAt` stands in for "last cooked" and there is
   no cooked-count sticker. Copy is for a long-lived box: "Featured", "More to cook", no issue, volume, edition,
   "cover story" or "the collection" wording.
-- **Recipe** (a feature spread): the split opener (tags kicker, headline, deck if the description is 160 characters
+- **Recipe**: the split opener (tags kicker, headline, deck if the description is 160 characters
   or less, byline with "Added by" and source, actions, photo right), the numerals band (Serves, Prep, Cook, Total;
-  times as `20 min`, `3 hr` or `3hr 20min`), a drop-cap lede when the description is longer, then the ingredient panel
-  (tap to tick, ½× / 1× / 2× scale) beside the method (large accent numerals, linked ingredient names, timer chips),
-  the notes as a pull quote, and the floating bar. Scaling (`lib/scale.ts`) reads a leading quantity (fractions,
-  ranges, a unit from a short list) and rewrites it as a cook would (1½, ¾); lines without one stay as written.
-  Household notes in the margin are not built: the single notes field is the pull quote.
-- **Auth**: centred wordmark, "The household cookbook", double rule, form in a hairline frame. Under the form, when the server offers it, `OrDivider` then `login/GoogleSignIn` (a secondary `HardLink`; in the Home Screen app a quiet line says to use the password if Google sends you back).
-- **Placeholders**: "Forthcoming" kicker, headline, deck, empty state.
+  times as `20 min`, `3 hr` or `3hr 20min`; a thin double rule above, a hairline below), a drop-cap lede when the
+  description is longer, then the ingredient panel (tap to tick, ½× / 1× / 2× scale) beside the method (large accent
+  numerals, linked ingredient names, timer chips; steps keep to the 38rem measure), and the floating bar. The note sits
+  in a margin column from 1440px (22rem ingredients, 38rem method, the rest for the note, so the right side of a 1600px
+  window is used) and below the method before that; with no note the third column is simply empty. Scaling
+  (`lib/scale.ts`) reads a leading quantity (fractions, ranges, a unit from a short list) and rewrites it as a cook would
+  (1½, ¾); lines without one stay as written. The single notes field is the margin note.
+- **Add, Edit and Import**: the head ("Recipes" or "Editing" kicker), then the form at the 44rem measure with a tips panel
+  (`FormHelp`, `ImportHelp`; an `AsidePanel`) beside it from 1280px and below it from 768px; neither is shown on a
+  phone. While an import is running or being reviewed the page uses the full width instead (photo or scan on the left,
+  form or draft on the right from 1024px), so the tips are dropped.
+- **Groceries**: the add field and the list by store section at the 44rem measure (a row's tick and its menu stay within
+  reach); from 1280px an `AsidePanel` beside it holds the recipes on the list, Send to and Clear ticked / Empty list.
+  Below 1280px that panel follows the list.
+- **Settings and Save from Safari**: sections are `Heading ruled` blocks. From 1280px `TwoColumns` sets you and your
+  household on the left (My account, Sign in with Google, Household) and this device and the app's tools on the right
+  (Photos, Export, Google Tasks, Appearance, Save from Safari, AI import); Save from Safari sets the iPad steps beside the
+  computer steps. Below 1280px one column, in the same order. Inputs keep their own measure; they are never stretched.
+- **Auth**: centred wordmark, "The household cookbook", double rule, form in a hairline frame, 32rem wide, outside the
+  app shell (no band). Under the form, when the server offers it, `OrDivider` then `login/GoogleSignIn` (a secondary `HardLink`; in the Home Screen app a quiet line says to use the password if Google sends you back).
+- **Cook mode**: a full-screen overlay with no band and no masthead, always in the evening appearance on the near-black
+  slate; check any change to it in the evening colours only.
+- **Offline, error and not found**: plain `EmptyState` pages in the page width; the offline page lists the recipes kept
+  on the device.
+- **Loading**: `HomeSkeleton` and `RecipeSkeleton` are static tints in the shape of the page (featured recipe, ruled
+  tiles beside the 22rem sidebar; opener, numerals under a double rule, ingredient panel and method). Nothing moves.
 
 ## Dos
 - Keep body text at `text-body` (20px Crimson Pro) and reading columns at `max-w-measure`.
 - Use italics (Crimson Pro) for decks, hints, notes and placeholders; keep headlines roman (Marcellus has no italic).
 - Set every label in Karla through `.label` / `.label-quiet`, uppercase and tracked, 13px or more.
-- Separate with hairlines (`border-rule`) and white space, not boxes.
+- Separate with hairlines (`border-rule`) and white space, not boxes. A block that frames content (numerals, a note, a side
+  panel) is closed by the thin double rule (`Rule variant="double"`) or a 1px ink rule, never a thick one.
+- Use the width: give a wide screen a second column with its own measure (`WithAside`, `TwoColumns`); do not stretch a field
+  or a paragraph.
 - Keep the accent under roughly 5% of any screen: kickers, numerals, links, active underline, focus.
 - Keep 44px targets, a visible `:focus-visible` ring (2px accent, 3px offset), and no horizontal page scroll at 390px.
 - Check any new colour pairing against the contract in `.tastemaker/style-lock.md` (4.5:1 text, 3:1 UI).
@@ -270,5 +324,7 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
 - Never use the saffron accent for errors or destructive actions: that is `danger`.
 - No rounded cards, drop shadows, gradients, pill chips, emoji icons, or large accent fills.
 - No em dashes in UI copy; use a colon, comma or full stop.
+- No magazine-issue wording (volume, issue, cover story, edition, forthcoming) in anything a reader sees: see "Copy rules".
+- No thick-over-thin borders (`border-t-[3px]` over a hairline); no label under 13px, including on the save stamp.
 - No hard-coded hex or font names in components: use tokens.
 - No colour, type or border classes in pages: use or extend a ui component.
