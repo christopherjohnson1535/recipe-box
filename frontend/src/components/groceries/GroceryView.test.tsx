@@ -265,6 +265,34 @@ describe("overlapping changes", () => {
     expect(state.items.map((i) => i.id)).not.toContain("i-garlic");
   });
 
+  it("still sends Clear ticked when the tick it waited for fails, undoing the tick and showing the list that comes back", async () => {
+    const { state, calls } = serve();
+    let release!: () => void;
+    server.use(
+      http.patch("*/api/grocery/items/:id", async ({ request }) => {
+        await new Promise<void>((r) => (release = r)); // the server answers the tick late, and with an error
+        calls.push({ method: "PATCH", path: new URL(request.url).pathname, body: await request.json() });
+        return failure();
+      }),
+      http.post("*/api/grocery/clear-checked", ({ request }) => {
+        calls.push({ method: "POST", path: new URL(request.url).pathname, body: undefined });
+        // The garlic was never ticked on the server, so it stays; the rice is what marks this answer as the clear's own.
+        return HttpResponse.json({ ...state, items: [...state.items, item({ id: "i-rice", name: "rice", section: "pantry" })] });
+      }),
+    );
+    await open();
+    fireEvent.click(row("2 cloves garlic"));
+    await waitFor(() => expect(release).toBeTypeOf("function"));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear ticked (1)" }));
+    await act(async () => {}); // let anything the click sends go out
+    expect(calls).toEqual([]);
+    release();
+    await screen.findByRole("button", { name: "rice" });
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["PATCH /api/grocery/items/i-garlic", "POST /api/grocery/clear-checked"]);
+    expect(screen.getByRole("alert").textContent).toContain("The server hiccuped.");
+    expect(row("2 cloves garlic").getAttribute("aria-pressed")).toBe("false"); // the tick is undone
+  });
+
   it("does not undo a move that worked when an earlier tick on the same item fails late", async () => {
     const { state } = serve();
     let failTick!: () => void;
