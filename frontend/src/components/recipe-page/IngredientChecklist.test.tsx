@@ -121,6 +121,21 @@ describe("StepText", () => {
     expect(container.textContent).toBe(text);
   });
 
+  it("keeps punctuation that follows a timer glued to it, so it cannot wrap onto a line of its own", () => {
+    const text = "Roast for another 60 minutes, until the juices run clear, then rest 10 minutes.";
+    const { container } = render(<p><StepText text={text} ingredients={[]} /></p>);
+    expect(container.textContent).toBe(text);
+    const wrapped = [...container.querySelectorAll("[data-timer-run]")];
+    expect(wrapped.map((el) => el.textContent)).toEqual(["60 minutes,", "10 minutes."]);
+    expect(container.querySelector("p")?.textContent).toContain("60 minutes, until the juices");
+  });
+
+  it("leaves a timer followed by a space or a word on its own", () => {
+    const { container } = render(<p><StepText text="Simmer 20 minutes then serve." ingredients={[]} /></p>);
+    expect(container.querySelectorAll("[data-timer-run]")).toHaveLength(0);
+    expect(container.textContent).toBe("Simmer 20 minutes then serve.");
+  });
+
   it("moves focus to the ingredient row when a mention is followed", () => {
     render(
       <>

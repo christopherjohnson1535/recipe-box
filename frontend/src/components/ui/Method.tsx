@@ -46,10 +46,11 @@ export function IngredientMention({ index, children }: { index: number; children
 
 /**
  * A duration in a step, set as a pill with a clock around the words as written ("12 minutes"), so the step reads and
- * copies the same as without it. Display only (a running timer is #24). Plain text in print.
+ * copies the same as without it. Display only (a running timer is #24). Plain text in print. `after` is the punctuation
+ * that directly follows it in the text ("," or "."): it is set inside a no-wrap run with the pill, so it can't wrap alone.
  */
-export function TimerChip({ children }: { children: ReactNode }) {
-  return (
+export function TimerChip({ children, after }: { children: ReactNode; after?: string }) {
+  const chip = (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-(--rule-hair) bg-(--timer-bg) py-[3px] pr-2.5 pl-2 text-small leading-none whitespace-nowrap text-(--timer-fg) [font-variant-numeric:lining-nums_tabular-nums] print:inline print:border-0 print:bg-transparent print:p-0 print:text-[inherit]">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="size-3.5 print:hidden" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
         <circle cx="12" cy="13" r="8" />
@@ -57,5 +58,13 @@ export function TimerChip({ children }: { children: ReactNode }) {
       </svg>
       {children}
     </span>
+  );
+  return after ? (
+    <span data-timer-run="" className="whitespace-nowrap">
+      {chip}
+      {after}
+    </span>
+  ) : (
+    chip
   );
 }

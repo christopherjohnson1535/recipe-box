@@ -6,15 +6,15 @@ import { cx } from "./cx";
 /**
  * A main column (form or list) with a column of help or tools beside it from 1280px. The main column keeps the form
  * measure (up to 44rem), the side column the reading measure (up to 38rem), so neither is stretched across the 90rem
- * page. Stacked below 1280px, the side column follows the main one. `sticky` keeps a short side column in view while
- * the main one scrolls. Without an `aside` there is no side column (and no empty gap): the main column takes the page.
+ * page. Stacked below 1280px, the side column follows the main one. `sticky` keeps the side column in view while
+ * the main one scrolls (it scrolls on its own when it is taller than the screen). Without an `aside` there is no side column (and no empty gap): the main column takes the page.
  * The tree is the same either way, so a screen can drop its aside while a request runs without remounting the main column.
  */
 export function WithAside({ children, aside, sticky }: { children: ReactNode; aside?: ReactNode; sticky?: boolean }) {
   return (
     <div className={cx("grid grid-cols-1 gap-10 xl:items-start xl:gap-x-16", Boolean(aside) && "xl:grid-cols-[minmax(0,44rem)_minmax(0,38rem)]")}>
       <div className="flex min-w-0 flex-col gap-8">{children}</div>
-      {aside ? <div className={cx("flex min-w-0 max-w-form flex-col gap-8 xl:max-w-none", sticky && "xl:sticky xl:top-6")}>{aside}</div> : null}
+      {aside ? <div className={cx("flex min-w-0 max-w-form flex-col gap-8 xl:max-w-none", sticky && "xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto")}>{aside}</div> : null}
     </div>
   );
 }

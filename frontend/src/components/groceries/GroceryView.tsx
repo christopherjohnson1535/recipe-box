@@ -215,8 +215,9 @@ export function GroceryView() {
     >
       <PageHeader kicker="Shopping list" title="Groceries" description={description} liveDescription />
       {/* From 1280px the list keeps to the form measure, so a row's tick and its options button stay within reach of each other, and
-          the recipes on it, where to send it and the tidy-up buttons sit in the column beside it. Below that they follow the list. */}
+          the recipes on it, where to send it and the tidy-up buttons sit in the column beside it and stay in view while a long list scrolls. Below that they follow the list. */}
       <WithAside
+        sticky
         aside={
           (list.items.length > 0 || list.recipes.length > 0) && (
             <AsidePanel label="This list">
