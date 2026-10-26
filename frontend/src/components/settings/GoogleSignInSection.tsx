@@ -93,7 +93,7 @@ export function GoogleSignInSection({ initial, available, result, api = browserA
                   detail="Google account"
                   actions={
                     <Button
-                      variant="ghost"
+                      variant="danger-text"
                       ref={(el) => {
                         if (el) buttons.current.set(i.id, el);
                         else buttons.current.delete(i.id);

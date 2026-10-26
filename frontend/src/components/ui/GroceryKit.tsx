@@ -30,15 +30,15 @@ export function ListBody({ ref, children }: { ref?: Ref<HTMLDivElement>; childre
 }
 
 /**
- * The foot of the list: a hairline, then Show staples at the left, Clear ticked and Empty list at the right. On a phone Clear
- * ticked (the common one) takes the full width on top and the two quiet links share the line under it. Any slot may be empty.
+ * The foot of the list: a hairline, then Show staples at the left, Clear ticked and Empty list (both destructive text
+ * actions) at the right. The row wraps on a narrow screen. Any slot may be empty.
  */
 export function ListActions({ staples, clear, empty }: { staples?: ReactNode; clear?: ReactNode; empty: ReactNode }) {
   return (
-    <div className="grid grid-cols-2 items-center gap-x-6 gap-y-2 border-t border-(--rule-hair) pt-4 sm:flex sm:flex-wrap sm:justify-end print:hidden">
-      {staples && <div className="justify-self-start sm:mr-auto">{staples}</div>}
-      {clear && <div className="max-sm:order-first max-sm:col-span-2 max-sm:[&>button]:w-full">{clear}</div>}
-      <div className="col-start-2 justify-self-end sm:col-start-auto">{empty}</div>
+    <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2 border-t border-(--rule-hair) pt-4 print:hidden">
+      {staples && <div className="mr-auto">{staples}</div>}
+      {clear}
+      {empty}
     </div>
   );
 }
@@ -89,8 +89,7 @@ export function RecipeRow({ title, meta, stepper, remove }: { title: ReactNode; 
         <p className="text-body leading-snug text-ink [overflow-wrap:anywhere]">{title}</p>
         {meta && <p className="label-quiet text-ink-muted">{meta}</p>}
       </div>
-      {/* The same 56px column as every row's options button, so the cross sits on the line of the three dots. */}
-      <div className="col-start-2 row-start-1 flex w-14 justify-center sm:col-start-3">{remove}</div>
+      <div className="col-start-2 row-start-1 flex justify-end sm:col-start-3">{remove}</div>
       <div className="col-span-2 row-start-2 justify-self-start sm:col-span-1 sm:col-start-2 sm:row-start-1">{stepper}</div>
     </li>
   );
@@ -288,7 +287,7 @@ export function RowMenu({ label, entries, disabled }: { label: string; entries: 
         close(true);
         item.onSelect();
       }}
-      className={`group flex min-h-control w-full cursor-pointer items-center gap-3 px-4 text-left text-small hover:bg-(--panel-bg) focus-visible:bg-(--panel-bg) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring) aria-checked:font-semibold ${item.danger ? "text-danger" : "text-ink hover:text-(--button-ghost-hover)"}`}
+      className={`group flex min-h-control w-full cursor-pointer items-center gap-3 px-4 text-left text-small hover:bg-(--panel-bg) focus-visible:bg-(--panel-bg) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring) aria-checked:font-semibold ${item.danger ? "text-(--button-danger-text-fg) hover:text-(--button-danger-text-hover)" : "text-ink hover:text-(--button-ghost-hover)"}`}
     >
       {radio && (
         <span aria-hidden="true" className="grid size-4 shrink-0 place-items-center">

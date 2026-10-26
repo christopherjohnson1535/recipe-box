@@ -50,7 +50,7 @@ export function PhotoField({ id, label, src, busy, error, onFile, onRemove }: Ph
           />
         </label>
         {src && (
-          <Button variant="ghost" onClick={onRemove} disabled={busy}>
+          <Button variant="danger-text" onClick={onRemove} disabled={busy}>
             Remove photo
           </Button>
         )}

@@ -19,6 +19,9 @@
   --button-danger-bg: var(--color-danger);
   --button-danger-fg: var(--color-on-danger);
   --button-danger-bg-hover: var(--color-danger-hover);
+  --button-danger-text-fg: var(--color-danger); /* destructive text actions (Delete, Remove, Disconnect, Empty list) and danger menu items */
+  --button-danger-text-hover: var(--color-danger-hover);
+  --button-danger-text-underline: var(--color-danger);
 
   /* Input */
   --input-bg: var(--color-paper);

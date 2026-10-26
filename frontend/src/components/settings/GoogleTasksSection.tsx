@@ -90,7 +90,7 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
               </Text>
               {status.connectedAt && <LocalDate iso={status.connectedAt} />}
             </Text>
-            <Button ref={disconnectButton} variant="ghost" aria-expanded={confirming} disabled={confirming} onClick={() => setConfirming(true)}>
+            <Button ref={disconnectButton} variant="danger-text" aria-expanded={confirming} disabled={confirming} onClick={() => setConfirming(true)}>
               Disconnect
             </Button>
           </div>
