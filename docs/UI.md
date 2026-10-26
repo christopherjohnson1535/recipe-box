@@ -4,8 +4,8 @@ Recipe Box is set in the **Riviera · Charcoal & Saffron** direction (ADR 0009, 
 charcoal-slate ink, one deep saffron accent used sparingly, a calm display serif for titles, a small tracked sans for
 labels, a readable text serif at 20px, a narrow reading measure, hairline rules and italic decks. The evening
 appearance is near-black slate with a brighter saffron. Read this before changing any UI so new screens keep the
-style. Layout (page width, top band, masthead, home) is being restyled in #120 to #122; until then the page patterns
-below still describe the editorial layout.
+style. The app shell (90rem page, charcoal top band, masthead, thin double rule) is done in #120; the home, recipe and
+remaining screens are restyled in #121 and #122, so some page patterns below still describe the editorial layout.
 
 The machine-readable lock (palette, contrast contract, structure) is `.tastemaker/style-lock.md`. The colour tokens
 live in `frontend/src/styles/` in three layers (primitives, semantic themes, component tokens): see
@@ -65,8 +65,11 @@ Colour (`bg-*`, `text-*`, `border-*` utilities): `--color-paper`, `--color-paper
 | danger / danger-hover / on-danger | `#a33a2b` / `#86301f` / `#f4f4f1` | `#ef9a8a` / `#f5b3a6` / `#121416` | brick red: errors, destructive buttons; never the accent |
 | attention / on-attention | `#6fb5bd` / `#22262b` | same | sea teal "check this" wash, rule or mark; ink on it |
 | stage / on-stage | `#1b1e21` / `#eeede8` | same | cook-mode and import darkroom ground |
-| band / on-band / band-accent | `#22262b` / `#f4f4f1` / `#e9b75a` | `#22262b` / `#eeede8` / `#e0b057` | the charcoal top band and inverse panels (used from #120) | Layout: `--measure` (38rem, `max-w-measure`), `--measure-form` (44rem, `max-w-form`: the editor, room for a field plus its row buttons), `--measure-wide` (64rem,
-`max-w-measure-wide`), `--page-width` (72rem, `max-w-page`), `--gutter` (`px-gutter`), `--control-height`
+| band / on-band / band-accent | `#22262b` / `#f4f4f1` / `#e9b75a` | `#22262b` / `#eeede8` / `#e0b057` | the charcoal top band and inverse panels (the band since #120) |
+
+Layout: `--measure` (38rem, `max-w-measure`), `--measure-form` (44rem, `max-w-form`: the editor, room for a field plus its row buttons), `--measure-wide` (72rem,
+`max-w-measure-wide`: the recipe page's ingredient column and method), `--page-width` (90rem = 1440px, `max-w-page`; a
+1920 monitor leaves 240px each side), `--gutter` (`px-gutter`), `--control-height`
 (44px, `min-h-control`). Radius: `--radius-control` (2px).
 
 Tailwind's default colour palette and font stacks are switched off (`--color-*: initial`), so every colour must be a
@@ -143,7 +146,7 @@ Durations are defined in `src/styles/motion.css`.
 - `.dot-list`: inline list with middle dots between items ("SERVES 4 · 30 MIN"); the dot trails each item so no line
   starts with an orphan dot.
 - `.drop-cap`: accent drop cap on a lede paragraph.
-- `.rule-double`: thick-over-thin rule (masthead, ingredient sidebar).
+- `.rule-double`: thin double rule, 1px line, 3px gap, 1px line (masthead, ingredient sidebar).
 - `.link`: accent underlined text link.
 
 ## Components (`src/components/ui`)
@@ -156,8 +159,8 @@ Text and structure:
   semibold list group). `ruled` runs a hairline to the column edge ("Method ———").
 - `DotList`: items separated by middle dots; `as="ul"` (children `<li>`) or `as="p"` (children `<span>`),
   `align="center"`, `tone="meta"`.
-- `Rule`: `hair` or `double` (thick-over-thin). `ExternalLink`: accent link to another site, new tab.
-- `Logo` (`size="lg"` on auth), `Masthead` + `NavLink` + `NavButton` (the app header), `SkipLink`.
+- `Rule`: `hair` or `double` (the thin double rule). `ExternalLink`: accent link to another site, new tab.
+- `Logo` (`size="lg"` on auth), `Masthead` + `NavLink` (the app header), `TopBand` + `BandButton` (the charcoal band above it), `SkipLink`.
 - `Contents` + `ContentsEntry`: the two-column contents listing and one entry (kicker, title link, deck, meta,
   thumbnail); the whole entry is clickable and the focus ring wraps it.
 - `Article.tsx`: `Lede` (drop cap) and `SidebarLayout` (ingredients beside the method). The rest of the recipe page
@@ -185,7 +188,7 @@ Controls and states:
   `ui/Pending` (status note with a quiet bar and a way out; token `--progress-fg`). `Heading` takes `ref` and
   `tabIndex` so a page can move focus to a result.
 - `ui/Panel`: tinted (paper-deep) block for an inline form or confirmation. `ui/ConfirmInline`: two-step confirmation in a Panel; focus starts on the safe "Keep" button. `ui/MemberList` + `MemberItem`: people separated by hairlines with name, "You" marker, detail, actions, a note and an opened panel. `ui/DetailList`: label/value pairs as a definition list.
-- Magazine home (#39), all in `ui/`: `IssueLine` (Vol. / No. · season · date under the masthead rule), `CoverStory` (kicker, ~90px headline that is an h2 (the page's h1 is a visually hidden "Recipes"), italic deck, meta, buttons, photo right or above on a phone), `Ticker` (in-season marquee: the looping copy is `aria-hidden`, it pauses under a hovering pointer and on `:focus-within`, a 44px Pause/Play button (or a tap on the text) stops it, reduced motion stops it, hides the button and wraps the list; `components/home/LocalIssue` follows the reader's local clock for the date, season name and ticker after mount), `MagazineCard` + `CardGrid` + `IssueLayout` (4:3 plate or a paper plate with a spot icon, kicker with tags left and time right, display title with a drawn accent underline, two-line deck; the grid sits beside the sidebar from 1024px), `IssueIndex` + `IssueIndexItem` (numbered "Also in this issue") and `FeaturePanel` (the inverse "Haven’t cooked in a while" block; tokens `--feature-*`, same inverse idea as the toast), `SearchField` + `SearchSort` (the display-type search box with a rule beneath and the sort menu set as a quiet label). The empty-box and server-error states omit the issue line by decision ("No. 0" reads oddly).
+- Magazine home (#39), all in `ui/`: `CoverStory` (kicker, ~90px headline that is an h2 (the page's h1 is a visually hidden "Recipes"), italic deck, meta, buttons, photo right or above on a phone), `Ticker` (in-season marquee: the looping copy is `aria-hidden`, it pauses under a hovering pointer and on `:focus-within`, a 44px Pause/Play button (or a tap on the text) stops it, reduced motion stops it, hides the button and wraps the list; `components/home/LocalIssue` exports `LocalTicker`, which follows the reader's local clock for the in-season ticker after mount; the date and season live in the top band), `MagazineCard` + `CardGrid` + `IssueLayout` (4:3 plate or a paper plate with a spot icon, kicker with tags left and time right, display title with a drawn accent underline, two-line deck; the grid sits beside the sidebar from 1024px), `IssueIndex` + `IssueIndexItem` (numbered "Also in this issue") and `FeaturePanel` (the inverse "Haven’t cooked in a while" block; tokens `--feature-*`, same inverse idea as the toast), `SearchField` + `SearchSort` (the display-type search box with a rule beneath and the sort menu set as a quiet label).
 - `ui/Select`: native select set like Input (iPadOS wheel picker); used for the home sort menu. Home search lives in
   `components/search/` (`SearchControls`: debounced 250 ms `router.replace` of `?q=`, uncontrolled input so focus and
   caret survive, Enter/Search/sort push history; `ResultSummary` live count; `NoMatches` with "Clear search").
@@ -210,16 +213,34 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   beside it. `explainImportError` maps every API error code to a title, message and next steps (Try again, Type it in, Sign in, Paste the text instead). Below `lg` the original photos are a horizontal strip above the form.
 - Import as a darkroom (#42): `import/ImportScreen` has Photo / Link / Paste text tabs (`ui/Tabs`, arrow keys). While a request is in flight a `ScanHeading` ("Reading your page") sits over `ui/Darkroom` `ScanStage` (the photo tilted on the `stage` ground with an `attention` scan line and a pulsing dot, motion only) or `DomainCard`. When the draft arrives the photo stays on the left (sticky from 1024px, above the draft below that) with `regions` boxes if the draft has them (further photos in a strip under it), and the right column has `DraftKicker` ("Draft · not saved yet"), `DraftTitle` (typed in once, full title for screen readers) and `DraftRow`s: a check or a `?` badge at the left, the quantity (`splitIngredient`) in accent tabular figures, then the line. Every row is shown; rows with `confidence` under 0.6 get the `attention` wash and the `?` (ink on the attention colour); only the slide-in stagger stops after 12 rows. Warnings go in `DraftNote` (attention rule). AI off: no scan, the photo sits beside the empty form. Reduced motion removes the sweep, dot, typing and slide. The attention colour is only a wash, rule or mark; contrast is tested in `tokens.test.ts`.
 - `settings/*`: `/settings`. `SettingsView` (My account always; Household for admins only; AI import), `PasswordForm` (own password asks for the current one; an admin reset doesn't; errors on the field, 401 lands on Current password), `AddMemberForm`, `HouseholdSection` (list, a Google email panel per member via `EmailForm` that warns changing or clearing disconnects their Google sign-in, reset panel, remove confirmation naming the person; Remove is off for yourself and the last admin, with the reason shown; focus returns to the Reset button or the Household heading), `GoogleSignInSection` (every member: connected Google accounts, Disconnect with confirmation, Connect Google as a `HardLink`; a Home Screen app is told to connect from Safari; a failed providers fetch says it couldn't check rather than "off"), `AiImportSection`.
-- `AppHeader`: `Masthead` with the app's sections and sign-out. `RecipeCard`: a recipe as a `MagazineCard`.
+- `AppBand`: the `TopBand` with the reader's local date, season, the household's recipe count and Sign out (`use-sign-out.ts` holds the sign-out steps). `AppHeader`: `Masthead` with the app's sections. `RecipeCard`: a recipe as a `MagazineCard`.
 - `Placeholder`, `ErrorContent`, `NotFoundContent`, `ServerError`, `RetryButton`.
 
 ## Page patterns
-- **Home** (a magazine cover): the issue line, then the cover story (the photo recipe edited longest ago; its headline
+- **App shell** (every signed-in screen, `app/(app)/layout.tsx`): one page `<header>` (the only banner landmark)
+  holding, in reading and Tab order, the full-width charcoal **top band** (`ui/TopBand`, `--color-band` /
+  `--color-on-band`, at least 44px tall, `print:hidden`) and the **masthead** (`ui/Masthead`, a plain block inside that
+  header: the Marcellus wordmark, about 44px, on the left; Recipes, Groceries with its saffron count, Add, Import and
+  Settings on the right as uppercase Karla labels, the current one with a 2px accent underline; the nav has no
+  `overflow` so the focus rings are never clipped), then the thin double rule (`.rule-double`: 1px ink, 3px gap, 1px
+  ink), then `main`. Band, masthead and `main` share the same edges (`max-w-page px-gutter`, 90rem; gutter 16px phone,
+  40px from 768px); the band itself bleeds to the window edge and its content respects the iOS safe-area side insets.
+  The band's left side is one label line, `Sunday, October 25 · Autumn · 24 recipes`: the date and season come from the
+  browser's clock (`lib/local-day.ts`, `useLocalDay`; the server's UTC day only until it mounts) and the count from a
+  `limit=1` recipe request in the layout. The layout does not wait for that request: it hands the band a promise, the
+  band reads it with `use()` inside a `Suspense` (fallback: the line without the count), and a failed request leaves
+  the count out. Adding a recipe (editor, import), deleting one and undoing a delete all call `router.refresh()`, which
+  re-renders the layout, so the count follows; other changes show on the next reload. Each dot is glued (`nowrap`) to
+  the item before it. On a phone the season drops and the date and count stack, one per line with no dots (the
+  `.dot-list-stack` rule), so a wrapped line never starts or ends on a dot. Sign out (right) stays a 44px target and
+  its focus ring sits inside the band (`--focus-offset`). Sign out ends the session, then `dismissUndo()` and
+  `forgetOffline()`, then goes to `/login`. There is no volume, number or "Issue" wording in the shell.
+- **Home** (a magazine cover): the cover story (the photo recipe edited longest ago; its headline
   is the h1), the in-season ticker, a large search field with the sort menu, the tag index (chips carry spot icons where
   the tag maps to one) and a two-column card grid with a sidebar (numbered "Also in this issue", the inverse "Haven’t
-  cooked in a while" panel) that drops below the grid under 1024px. Logic (cover pick, season, volume, slices) is in
+  cooked in a while" panel) that drops below the grid under 1024px. Logic (cover pick, slices) is in
   `components/home/issue.ts`. Without a photo recipe, the plain "Recipes" head replaces the cover; while searching or
-  filtering the cover, ticker and sidebar are hidden and the issue line stays. Until the Made-it log (#23) exists,
+  filtering the cover, ticker and sidebar are hidden and the band above is unchanged. Until the Made-it log (#23) exists,
   `updatedAt` stands in for "last cooked" and there is no cooked-count sticker.
 - **Recipe** (a feature spread): the split opener (tags kicker, headline, deck if the description is 160 characters
   or less, byline with "Added by" and source, actions, photo right), the numerals band (Serves, Prep, Cook, Total;

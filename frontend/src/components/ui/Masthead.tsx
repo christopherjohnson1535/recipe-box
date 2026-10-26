@@ -1,22 +1,25 @@
 import Link from "next/link";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cx } from "./cx";
 import { Logo } from "./Logo";
 
-/** The app's masthead: wordmark linking home on the left, section links on the right, a double rule under. */
+/**
+ * The app's masthead: wordmark linking home on the left, section links on the right, a thin double rule under. It is a
+ * plain block: the page's `<header>` (the one banner landmark) wraps it and the top band.
+ */
 export function Masthead({ children }: { children: ReactNode }) {
   return (
-    <header className="mx-auto w-full max-w-page px-gutter pt-4 print:hidden">
+    <div className="mx-auto w-full max-w-page px-gutter pt-4 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-1 pb-2">
         <Link href="/" className="inline-flex min-h-control items-center" aria-label="Recipe Box home">
           <Logo />
         </Link>
-        <nav aria-label="Main" className="grid w-full max-w-full grid-cols-[auto_auto_auto] justify-between sm:flex sm:w-auto sm:flex-nowrap sm:items-center sm:overflow-x-auto">
+        <nav aria-label="Main" className="grid w-full max-w-full grid-cols-[auto_auto_auto] justify-between sm:flex sm:ms-auto sm:w-auto sm:flex-nowrap sm:items-center sm:-me-2.5">
           {children}
         </nav>
       </div>
       <div className="rule-double" aria-hidden="true" />
-    </header>
+    </div>
   );
 }
 
@@ -35,9 +38,4 @@ export function NavLink({ href, active, children }: { href: string; active?: boo
       {children}
     </Link>
   );
-}
-
-/** An action in the masthead that looks like a section link (Sign out). */
-export function NavButton({ className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" className={cx(navItem, idle, "disabled:opacity-55", className)} {...rest} />;
 }

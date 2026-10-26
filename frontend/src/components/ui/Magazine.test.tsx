@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CoverStory } from "./CoverStory";
 import { IssueIndex, IssueIndexItem } from "./IssueIndex";
-import { IssueLine } from "./IssueLine";
 import { CardGrid, MagazineCard } from "./MagazineCard";
 import { Ticker } from "./Ticker";
 
@@ -63,12 +62,7 @@ describe("MagazineCard", () => {
   });
 });
 
-describe("IssueLine, CoverStory and IssueIndex", () => {
-  it("prints the issue line", () => {
-    render(<IssueLine volume="II" number={47} name="The Autumn Issue" date="Friday, October 23, 2026" dateTime="2026-10-23" />);
-    expect(screen.getByText("Friday, October 23, 2026").getAttribute("datetime")).toBe("2026-10-23");
-  });
-
+describe("CoverStory and IssueIndex", () => {
   it("sets the cover headline as an h2, omitting an empty deck", () => {
     const { container } = render(<CoverStory title="Short Ribs" kicker="Cover story" imageSrc="/media/a.jpg" actions={<a href="/x">Go</a>} />);
     expect(screen.getByRole("heading", { level: 2, name: "Short Ribs" })).toBeTruthy();

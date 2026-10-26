@@ -27,6 +27,28 @@ describe("AppHeader", () => {
     expect(screen.getByRole("link", { name: "Add" })).toHaveProperty("pathname", "/recipes/new");
   });
 
+  it("no longer carries Sign out: that lives in the top band", () => {
+    nav.path = "/";
+    render(<AppHeader />);
+    expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
+    const nav2 = screen.getByRole("navigation", { name: "Main" });
+    expect(nav2.querySelectorAll("button")).toHaveLength(0);
+    expect(nav2.querySelectorAll("a")).toHaveLength(5);
+  });
+
+  it("sets the wordmark and a double rule above the links, and gives each link a 44px target", () => {
+    nav.path = "/groceries";
+    const { container } = render(<AppHeader />);
+    expect(screen.getByRole("link", { name: "Recipe Box home" }).textContent).toBe("Recipe Box");
+    expect(container.querySelector(".rule-double")).toBeTruthy();
+    expect(container.querySelector("header")).toBeNull(); // the page layout supplies the one banner
+    for (const link of screen.getAllByRole("link", { name: /^(Recipes|Groceries|Add|Import|Settings)/ })) {
+      expect(link.className).toContain("min-h-control");
+    }
+    // The current section carries the 2px accent underline.
+    expect(screen.getByRole("link", { name: /^Groceries/ }).className).toContain("border-(--nav-underline-active)");
+  });
+
   it("marks Add current on /recipes/new only", () => {
     expect(current("/recipes/new")).toEqual(["Add"]);
     expect(current("/recipes/abc")).toEqual(["Recipes"]);

@@ -34,14 +34,14 @@ function serve(items: RecipeSummary[], tags: Tag[] = [{ name: "soups", count: 1 
 }
 const home = async (sp: Record<string, string> = {}) => render(await HomePage({ searchParams: Promise.resolve(sp) }));
 
-describe("home page, magazine layout", () => {
-  it("shows the issue line, cover story, ticker, grid and sidebar", async () => {
+describe("home page", () => {
+  it("shows the cover story, ticker, grid and sidebar", async () => {
     serve([...others, withPhoto]);
     await home();
 
-    expect(screen.getByText(/Vol\.\s*II\s*·\s*No\.\s*10/)).toBeTruthy();
-    expect(screen.getByText("The Autumn Issue")).toBeTruthy();
-    expect(screen.getByText("Thursday, October 22, 2026")).toBeTruthy();
+    // The date, season and count moved to the top band in the layout; the page itself carries no issue line.
+    expect(screen.queryByText(/Vol\.|No\.\s*\d|The \w+ Issue/)).toBeNull();
+    expect(screen.queryByText("Thursday, October 22, 2026")).toBeNull();
 
     expect(screen.getByRole("heading", { level: 2, name: "Short Ribs Slow and Low" })).toBeTruthy();
     expect(screen.getByText("Cover story · braise · sunday")).toBeTruthy();
@@ -77,11 +77,9 @@ describe("home page, magazine layout", () => {
     expect(screen.queryByRole("complementary")).toBeNull(); // too few recipes for panels
   });
 
-  it("hides cover, ticker and sidebar while filtering but keeps the issue line", async () => {
+  it("hides cover, ticker and sidebar while filtering", async () => {
     serve([...others, withPhoto], [{ name: "soups", count: 1 }], [others[0]]);
     await home({ q: "soup" });
-    expect(screen.getByText(/Vol\./)).toBeTruthy();
-    expect(screen.getByText(/No\.\s*10/)).toBeTruthy(); // the whole box, not the one match
     expect(screen.queryByText("Cover story · braise · sunday")).toBeNull();
     expect(screen.queryByRole("region", { name: "In season" })).toBeNull();
     expect(screen.queryByRole("complementary")).toBeNull();
@@ -96,21 +94,6 @@ describe("home page, magazine layout", () => {
     const nav = screen.getAllByRole("navigation", { name: "Filter by tag" })[0];
     expect(within(nav).getByRole("link", { name: /soups/ }).querySelector("svg[data-spot='soups']")).toBeTruthy();
     expect(within(nav).getByRole("link", { name: /party/ }).querySelector("svg")).toBeNull();
-  });
-
-  it("keeps searching when the whole-box count fails, and drops Vol./No.", async () => {
-    server.use(
-      http.get("*/api/recipes", ({ request }) => {
-        const url = new URL(request.url);
-        if (!url.searchParams.has("q")) return HttpResponse.json({ error: "boom" }, { status: 500 });
-        return HttpResponse.json({ items: [others[0]], total: 1 });
-      }),
-      http.get("*/api/tags", () => HttpResponse.json([])),
-    );
-    await home({ q: "soup" });
-    expect(screen.getByRole("region", { name: "1 matching recipes" })).toBeTruthy();
-    expect(screen.getByText("The Autumn Issue")).toBeTruthy();
-    expect(screen.queryByText(/Vol\./)).toBeNull();
   });
 
   it("keeps the empty box state", async () => {
