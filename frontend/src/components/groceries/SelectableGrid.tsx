@@ -40,6 +40,9 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
 
   // Only recipes still on screen count: a search or tag filter can drop chosen ones from the grid.
   const picked = recipes.filter((r) => chosen.has(r.id));
+  // Cook together takes the dishes in the order they were tapped (a Set keeps insertion order), as the picker does.
+  const tapped = [...chosen].filter((id) => picked.some((r) => r.id === id));
+  const together = !online ? "You’re offline: cook together needs the server" : tapped.length === 1 ? "Choose one more to cook together" : tapped.length > MAX_DISHES ? "Cook together takes up to four dishes" : undefined;
 
   const stop = () => {
     setSelecting(false);
@@ -126,10 +129,11 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
           action={adding ? "Adding…" : picked.length === 0 ? "Add to groceries" : `Add ${picked.length} to groceries`}
           onAction={() => void addAll()}
           actionDisabled={picked.length === 0 || adding || !online}
+          hint={together}
           secondary={{
             label: "Cook together",
-            onClick: () => router.push(cookTogetherHref(picked.map((r) => r.id))),
-            disabled: picked.length < 2 || picked.length > MAX_DISHES,
+            onClick: () => router.push(cookTogetherHref(tapped)),
+            disabled: tapped.length < 2 || tapped.length > MAX_DISHES || adding || !online,
           }}
           cancel="Cancel"
           onCancel={stop}

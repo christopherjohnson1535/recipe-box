@@ -82,6 +82,22 @@ export function dishInitials(titles: readonly string[]): string[] {
   });
 }
 
+/** The dishes' names: a title that an earlier dish already has gets a number suffix ("Salad", "Salad 2"), as its mark does, so no two dishes read alike. */
+export function dishNames(titles: readonly string[]): string[] {
+  const seen = new Map<string, number>();
+  return titles.map((title) => {
+    const n = (seen.get(title) ?? 0) + 1;
+    seen.set(title, n);
+    return n === 1 ? title : `${title} ${n}`;
+  });
+}
+
+/** 1 → "1st", 2 → "2nd", 11 → "11th", 22 → "22nd". */
+export function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  return `${n}${teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th"}`;
+}
+
 /** `{ v: 1, at, order: [[dish, step], …] }`. */
 export const serialiseOrder = (order: readonly DishStep[], now: number) =>
   JSON.stringify({ v: 1, at: now, order: order.map((e) => [e.dish, e.step]) });

@@ -133,7 +133,7 @@ export default async function RecipePage({ params }: Params) {
               <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">
                 Start cooking
               </ButtonLink>
-              <ButtonLink href={cookTogetherHref([id])} variant="secondary">
+              <ButtonLink href={cookTogetherHref([id])} variant="secondary" className="w-full sm:w-auto">
                 Cook together
               </ButtonLink>
               <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">

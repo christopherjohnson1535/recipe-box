@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { Recipe, RecipeSummary } from "@/lib/api";
@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 const dish = (id: string, title: string): Recipe => ({
   ...recipe, id, title, ingredients: [{ text: "1 onion" }] as Recipe["ingredients"], steps: [{ text: `Cook the ${title}.` }] as Recipe["steps"],
 });
-const stock = [dish("a", "Apple pie"), dish("b", "Beef stew"), dish("c", "Carrot soup")];
+const stock = [dish("a", "Apple pie"), dish("b", "Beef stew"), dish("c", "Carrot soup"), dish("d", "Dal")];
 
 function serve(box: Recipe[] = stock, listStatus = 200) {
   const asSummary = (r: Recipe): RecipeSummary => ({ ...summary, id: r.id, title: r.title });
@@ -39,7 +39,7 @@ describe("cook together page", () => {
     await page("b,a");
     expect(screen.getByRole("dialog", { name: "Cooking mode" })).toBeTruthy();
     expect(screen.getByText("Cook the Beef stew.")).toBeTruthy(); // the first recipe's first step first
-    expect(screen.getByRole("link", { name: "Close" }).getAttribute("href")).toBe("/recipes/b");
+    expect(screen.getByRole("link", { name: "Close" }).getAttribute("href")).toBe("/"); // the recipes, not one of the dishes
     expect(await title("b,a")).toBe("Cooking together");
   });
 
@@ -66,6 +66,25 @@ describe("cook together page", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Cook together" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Apple pie/ }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("1 chosen")).toBeTruthy();
+    expect(screen.getByText("One of those recipes is no longer in the box.")).toBeTruthy();
+  });
+
+  it("says nothing about a missing recipe when every one was found", async () => {
+    serve();
+    await page("c");
+    expect(screen.queryByText(/no longer in the box/)).toBeNull();
+  });
+
+  it("starts over when the link changes to another set of recipes: nothing is carried across", async () => {
+    serve();
+    expectConsole("error", /Encountered a script tag/);
+    const first = await CookTogetherPage({ searchParams: Promise.resolve({ recipes: "a,b,c" }) });
+    const { rerender } = render(first);
+    fireEvent.click(screen.getByRole("tab", { name: "Carrot soup" })); // the third dish's tab: no such tab in a session of two
+    expect(screen.getByRole("tab", { name: "Carrot soup" }).getAttribute("aria-selected")).toBe("true");
+    rerender(await CookTogetherPage({ searchParams: Promise.resolve({ recipes: "a,d" }) }));
+    expect(screen.getByRole("tab", { name: "Apple pie" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
   });
 
   it("says so when the box has fewer than two recipes", async () => {

@@ -43,7 +43,7 @@ describe("CookTogether: one step", () => {
     expect((screen.getByRole("button", { name: /Back/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("moves through the combined order with the buttons and the arrow keys, ending on Finish at the first recipe", () => {
+  it("moves through the combined order with the buttons and the arrow keys, ending on Finish at the recipes", () => {
     view();
     next();
     const kicker = label("Step 1 of 2 · 2 of 5 overall");
@@ -57,9 +57,9 @@ describe("CookTogether: one step", () => {
     expect(label("Step 1 of 3 · 1 of 5 overall")).toBeTruthy();
     for (let i = 0; i < 4; i++) next();
     expect(label("Step 3 of 3 · 5 of 5 overall")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Finish" }).getAttribute("href")).toBe("/recipes/a");
+    expect(screen.getByRole("link", { name: "Finish" }).getAttribute("href")).toBe("/"); // not one of the dishes' pages
     expect(screen.getByText("Last step")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Close/ }).getAttribute("href")).toBe("/recipes/a");
+    expect(screen.getByRole("link", { name: /Close/ }).getAttribute("href")).toBe("/");
   });
 
   it("moves on a swipe", () => {
@@ -84,15 +84,22 @@ describe("CookTogether: one step", () => {
     expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy(); // Salad 1 is done: opens on Roast 1, the next in the stored order
   });
 
-  it("offers a nudge only for dishes with steps still to come, and none once a dish has run out", () => {
+  it("offers a nudge only for a dish whose next step is not already next, and none once a dish has run out", () => {
+    stored("cook-together:a,b", { order: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]] });
     view();
-    expect(screen.getByRole("button", { name: "Bring Roast’s next step here" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Bring Roast’s next step here" })).toBeTruthy(); // Roast 1 is three places on
     expect(screen.queryByRole("button", { name: /Bring Salad/ })).toBeNull(); // never for the dish being cooked
-    for (let i = 0; i < 3; i++) next(); // Roast 2, the last Roast step
-    expect(screen.queryByRole("button", { name: /Bring Roast/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Bring Salad’s next step here" })).toBeTruthy();
-    next(); // Salad 3, the last step
+    next();
+    next(); // Salad 3: Roast 1 is right after it
     expect(screen.queryByRole("button", { name: /Bring/ })).toBeNull();
+    next(); // Roast 1
+    expect(screen.queryByRole("button", { name: /Bring/ })).toBeNull(); // Salad has run out
+  });
+
+  it("shows no nudge, and no empty gap, when the other dish's next step is already next", () => {
+    const { container } = view(); // round-robin: Roast 1 follows Salad 1
+    expect(screen.queryByRole("button", { name: /Bring/ })).toBeNull();
+    expect(container.querySelector(".mt-6")).toBeNull();
   });
 
   it("ticks a step of its own dish, and Clear ticks takes every dish's ticks away", () => {
@@ -137,7 +144,7 @@ describe("CookTogether: all steps", () => {
     later.focus();
     fireEvent.click(later);
     expect(listed()).toEqual(["Salad step 1", "Roast step 1", "Roast step 2", "Salad step 2", "Salad step 3"]);
-    expect(screen.getByRole("status").textContent).toContain("Moved Salad step 2 later, now 4 of 5");
+    expect(screen.getByRole("status").textContent).toContain("Moved Salad step 2 later. It’s now 4th of 5.");
     expect(document.activeElement).toBe(later);
     expect(JSON.parse(localStorage.getItem("cook-together:a,b")!).order[3]).toEqual([0, 1]);
     fireEvent.click(screen.getByRole("button", { name: "Move Salad step 2 earlier" }));
@@ -183,7 +190,7 @@ describe("CookTogether: all steps", () => {
     expect(screen.getByText("1 of 5 steps done")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Salad step 3 done" })); // any other step leaves it be
     expect(document.querySelector("[aria-current=step]")?.textContent).toContain("Season the beef");
-    expect(screen.getByRole("link", { name: "Finish" }).getAttribute("href")).toBe("/recipes/a");
+    expect(screen.getByRole("link", { name: "Finish" }).getAttribute("href")).toBe("/");
     expect(screen.queryByRole("button", { name: /Next step/ })).toBeNull();
     fireEvent.keyDown(window, { key: "ArrowRight" }); // arrows only move in the one-step view
     expect(document.querySelector("[aria-current=step]")?.textContent).toContain("Season the beef");
@@ -208,12 +215,12 @@ describe("CookTogether: by dish", () => {
       expect.stringContaining("Toss with the olive oil"),
       expect.stringContaining("Serve."),
     ]);
-    expect(salad.getByText("#1 overall")).toBeTruthy();
-    expect(salad.getByText("#3 overall")).toBeTruthy();
-    expect(salad.getByText("#5 overall")).toBeTruthy();
+    expect(salad.getByText("1st of 5")).toBeTruthy();
+    expect(salad.getByText("3rd of 5")).toBeTruthy();
+    expect(salad.getByText("5th of 5")).toBeTruthy();
     const roast = within(screen.getByRole("region", { name: "Roast" }));
-    expect(roast.getByText("#2 overall")).toBeTruthy();
-    expect(roast.getByText("#4 overall")).toBeTruthy();
+    expect(roast.getByText("2nd of 5")).toBeTruthy();
+    expect(roast.getByText("4th of 5")).toBeTruthy();
     fireEvent.click(roast.getByRole("button", { name: "Roast step 2 done" }));
     expect(JSON.parse(localStorage.getItem("cook-ticks:b")!).steps).toEqual([1]);
     expect(screen.getByText("1 of 5 steps done")).toBeTruthy();
@@ -289,6 +296,149 @@ describe("CookTogether: dishes without steps", () => {
   it("says so when no dish has any steps", () => {
     view([{ ...SALAD, steps: [] }, { ...ROAST, steps: [] }]);
     expect(screen.getByRole("heading", { name: "These recipes have no steps yet" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Back to the recipe" }).getAttribute("href")).toBe("/recipes/a");
+    expect(screen.getByRole("link", { name: "Back to recipes" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Edit Salad" }).getAttribute("href")).toBe("/recipes/a/edit");
+    expect(screen.getByRole("link", { name: "Edit Roast" }).getAttribute("href")).toBe("/recipes/b/edit");
+  });
+});
+
+describe("CookTogether: focus and announcements", () => {
+  /**
+   * A real browser blurs the focused element when the subtree holding it is moved (remove + insert); jsdom keeps focus. Make
+   * jsdom blur too, so the test sees what React DOM has to put right (it re-focuses the element that was focused before a commit).
+   */
+  function blurOnMove() {
+    const insertBefore = Node.prototype.insertBefore;
+    vi.spyOn(Node.prototype, "insertBefore").mockImplementation(function <T extends Node>(this: Node, node: T, ref: Node | null) {
+      const had = node.contains(document.activeElement);
+      const result = insertBefore.call(this, node, ref) as T;
+      if (had) (document.activeElement as HTMLElement | null)?.blur();
+      return result;
+    });
+  }
+
+  it("keeps keyboard focus on the button that moved a step, when the browser blurs the moved node (React puts it back)", () => {
+    view();
+    choose("All steps");
+    blurOnMove();
+    const later = screen.getByRole("button", { name: "Move Salad step 2 later" });
+    later.focus();
+    fireEvent.click(later);
+    expect(listed()).toEqual(["Salad step 1", "Roast step 1", "Roast step 2", "Salad step 2", "Salad step 3"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Salad step 2 later" }));
+    const earlier = screen.getByRole("button", { name: "Move Salad step 2 earlier" });
+    earlier.focus();
+    fireEvent.click(earlier); // back where it was: the other dish's step is the one React moves
+    expect(listed()).toEqual(["Salad step 1", "Roast step 1", "Salad step 2", "Roast step 2", "Salad step 3"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Salad step 2 earlier" }));
+    vi.restoreAllMocks();
+  });
+
+  it("says why a move button that cannot move does nothing", () => {
+    view();
+    choose("All steps");
+    fireEvent.click(screen.getByRole("button", { name: "Move Salad step 1 earlier" }));
+    expect(screen.getByRole("status").textContent).toContain("Can’t move earlier: Salad step 1 is already first");
+    fireEvent.click(screen.getByRole("button", { name: "Move Salad step 3 later" }));
+    expect(screen.getByRole("status").textContent).toContain("Can’t move later: Salad step 3 is already last");
+    fireEvent.click(screen.getByRole("button", { name: "Move Roast step 1 later" }));
+    fireEvent.click(screen.getByRole("button", { name: "Move Roast step 1 later" })); // now right before Roast 2
+    fireEvent.click(screen.getByRole("button", { name: "Move Roast step 1 later" }));
+    expect(screen.getByRole("status").textContent).toContain("Can’t move later: Roast’s step 2 comes next");
+    fireEvent.click(screen.getByRole("button", { name: "Move Roast step 2 earlier" }));
+    expect(screen.getByRole("status").textContent).toContain("Can’t move earlier: Roast’s step 1 comes first");
+  });
+
+  it("announces Reset order", () => {
+    view();
+    choose("All steps");
+    fireEvent.click(screen.getByRole("button", { name: "Move Salad step 2 later" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset order" }));
+    expect(screen.getByRole("status").textContent).toContain("Order reset");
+  });
+});
+
+describe("CookTogether: the current step is a step, not a position", () => {
+  const dispatchStorage = () => act(() => void window.dispatchEvent(new StorageEvent("storage", { key: "cook-together:a,b" })));
+
+  it("stays on the same step when another tab reorders the steps", () => {
+    view();
+    next(); // Roast 1
+    expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy();
+    stored("cook-together:a,b", { order: [[0, 0], [0, 1], [1, 0], [1, 1], [0, 2]] }); // Roast 1 is now third
+    dispatchStorage();
+    expect(label("Step 1 of 2 · 3 of 5 overall")).toBeTruthy();
+    expect(screen.getByText("Roast: Roast for 90 minutes.", { exact: false })).toBeTruthy(); // the preview follows the new order
+  });
+
+  it("stays on the same step when the stored order expires and the order snaps back to round-robin", () => {
+    stored("cook-together:a,b", { order: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]] });
+    view();
+    next();
+    next();
+    next(); // Roast 1, fourth in the stored order
+    expect(label("Step 1 of 2 · 4 of 5 overall")).toBeTruthy();
+    localStorage.setItem("cook-together:a,b", JSON.stringify({ v: 1, at: FIXED_NOW.getTime() - 13 * 3600_000, order: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]] }));
+    dispatchStorage();
+    expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy(); // Roast 1 is second in round-robin
+  });
+
+  it("falls back to the first step not done when the current one is gone (a recipe was edited)", () => {
+    const { rerender } = view();
+    for (let i = 0; i < 4; i++) next(); // Salad 3, the last
+    expect(label("Step 3 of 3 · 5 of 5 overall")).toBeTruthy();
+    rerender(<CookTogether dishes={[{ ...SALAD, steps: SALAD.steps.slice(0, 2) }, ROAST]} />);
+    expect(label("Step 1 of 2 · 1 of 4 overall")).toBeTruthy();
+  });
+});
+
+describe("CookTogether: the rail and the layout", () => {
+  it("says 'For this step' on the current dish's tab, and 'All ingredients' on another dish's", () => {
+    view();
+    expect(screen.getByRole("heading", { name: "For this step" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Roast" }));
+    expect(screen.queryByRole("heading", { name: "For this step" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "All ingredients" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Salad" }));
+    expect(screen.getByRole("heading", { name: "For this step" })).toBeTruthy();
+  });
+
+  it("gives By dish the wide layout, and no other view", () => {
+    view();
+    const wide = () => document.querySelector('[class*="22fr_78fr"]') !== null;
+    expect(wide()).toBe(false);
+    choose("All steps");
+    expect(wide()).toBe(false);
+    choose("By dish");
+    expect(wide()).toBe(true);
+    choose("One step");
+    expect(wide()).toBe(false);
+  });
+});
+
+describe("CookTogether: dishes with the same title", () => {
+  const TWIN = { ...SALAD, id: "c" };
+
+  it("names the second one 'Salad 2' everywhere a dish is named, as its mark is", () => {
+    view([SALAD, TWIN]);
+    expect(screen.getAllByRole("tab").map((t) => t.getAttribute("title"))).toEqual(["Salad", "Salad 2"]);
+    next();
+    expect(label("Step 1 of 3 · 2 of 6 overall").parentElement?.textContent).toContain("Salad 2");
+    expect(screen.getByRole("button", { name: "Salad 2 step 1 done" })).toBeTruthy();
+    choose("All steps");
+    expect(screen.getByRole("button", { name: "Move Salad 2 step 1 later" })).toBeTruthy();
+  });
+
+  it("starts a timer for each of them: the second dish's same step is not a double tap", () => {
+    view([{ ...SALAD, steps: ["Chill for 20 minutes."] }, { ...TWIN, steps: ["Chill for 20 minutes."] }]);
+    choose("All steps");
+    const chips = screen.getAllByRole("button", { name: "Start timer: 20 minutes" });
+    expect(chips).toHaveLength(2);
+    fireEvent.click(chips[0]);
+    fireEvent.click(chips[1]); // the same instant: the guard must tell the dishes apart
+    expect(screen.getByRole("group", { name: "Salad · Step 1 · 20 min" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Salad 2 · Step 1 · 20 min" })).toBeTruthy();
+    fireEvent.click(chips[0]); // a double tap on one chip is still one timer
+    expect(screen.getAllByRole("group", { name: /Step 1 · 20 min/ })).toHaveLength(2);
   });
 });

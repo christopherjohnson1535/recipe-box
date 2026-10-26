@@ -4,11 +4,13 @@ import {
   canMove,
   cookTogetherHref,
   dishInitials,
+  dishNames,
   firstOpen,
   interleave,
   isValidOrder,
   move,
   nextOfDish,
+  ordinal,
   orderStale,
   parseOrder,
   parseRecipeIds,
@@ -136,6 +138,19 @@ describe("dishInitials", () => {
   it("falls back to a question mark for emoji or blank titles", () => {
     expect(dishInitials(["🍝 ", "", "  "])).toEqual(["?", "?2", "?3"]);
     expect(dishInitials(["🍝 Pasta"])).toEqual(["P"]);
+  });
+});
+
+describe("dishNames", () => {
+  it("numbers a later dish with the same title, as its mark is", () => {
+    expect(dishNames(["Pasta", "Salad", "Pasta", "Pasta"])).toEqual(["Pasta", "Salad", "Pasta 2", "Pasta 3"]);
+    expect(dishNames(["Soup", "Salad"])).toEqual(["Soup", "Salad"]); // same initial, different dish: the names already differ
+  });
+});
+
+describe("ordinal", () => {
+  it("says 1st, 2nd, 3rd, 4th, and the teens with th", () => {
+    expect([1, 2, 3, 4, 5, 11, 12, 13, 21, 22, 23, 101, 111].map(ordinal)).toEqual(["1st", "2nd", "3rd", "4th", "5th", "11th", "12th", "13th", "21st", "22nd", "23rd", "101st", "111th"]);
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   CookColumns, CookDishColumn, CookDishColumns, CookDishLegend, CookDishMark, CookDishTabs, CookFooter, CookLive, CookMoveButtons, CookNudge,
   CookPill, CookPillLink, CookProgress, CookRail, CookRailRow, CookReorderList, CookStage, CookStepItem, CookStepText, CookTextButton, CookTick,
@@ -12,7 +12,7 @@ import { Text } from "@/components/ui/Text";
 import { splitIngredient } from "@/lib/scale";
 import { clampStep, litIngredients, railOrder } from "./cook-logic";
 import { renderCookStep } from "./cook-step";
-import { bringNext, canMove, dishInitials, firstOpen, interleave, move, nextOfDish, type DishStep } from "./cook-together-logic";
+import { bringNext, canMove, dishInitials, dishNames, firstOpen, interleave, move, nextOfDish, ordinal, type DishStep } from "./cook-together-logic";
 import { readCookTicks, readCookTogetherOrder, useCookTogetherOrder, useCookTogetherView, useDishTicks, type CookTogetherView } from "./cook-store";
 import { CookTimerRack } from "./CookTimerRack";
 import { useCookWake } from "./CookWake";
@@ -29,22 +29,27 @@ const VIEWS: { id: CookTogetherView; label: string }[] = [
   { id: "dishes", label: "By dish" },
 ];
 
+const sameStep = (a: DishStep, b: DishStep) => a.dish === b.dish && a.step === b.step;
+
 /**
  * Cook two to four recipes at once. One combined order of steps (round-robin to begin with; the cook can move steps and pull a
  * dish's next step forward), shown one step at a time, as one list, or in a column per dish. Order, step index and timers live
  * here, above the views, so timers keep running when the step or the view changes. Ticks are each recipe's own (cook-store.ts),
- * so they are shared with single-recipe cook mode.
+ * so they are shared with single-recipe cook mode. The current step is a (dish, step), not a position, so it stays the same
+ * step when the order changes under it (a move here, another tab's move, an expired order). Render it with a `key` of the
+ * dishes' ids: two sessions are two components.
  */
 export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const ids = dishes.map((d) => d.id);
   const stepCounts = dishes.map((d) => d.steps.length);
   const marks = dishInitials(dishes.map((d) => d.title));
-  const [index, setIndex] = useState(0);
+  const names = dishNames(dishes.map((d) => d.title));
+  const [cursor, setCursor] = useState<DishStep | null>(null);
   const [live, announce] = useAnnounce();
   const chime = useCookAudio();
   const { timers, now, running, start, dismiss } = useCookTimers(announce, chime);
   const [view, setView] = useCookTogetherView();
-  const { order, setOrder } = useCookTogetherOrder(ids, stepCounts);
+  const { order, setOrder, reset } = useCookTogetherOrder(ids, stepCounts);
   const { ticks, toggleIngredient, toggleStep, clearAll } = useDishTicks(
     dishes.map((d) => ({ id: d.id, ingredientCount: d.ingredients.length, stepCount: d.steps.length })),
   );
@@ -55,19 +60,23 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   // Reads the store directly, so a later tick or another tab's write never moves the step.
   useEffect(() => {
     const done = dishes.map((d) => readCookTicks(d.id, d.ingredients.length, d.steps.length).steps);
-    const first = firstOpen(readCookTogetherOrder(ids, stepCounts), done);
+    const stored = readCookTogetherOrder(ids, stepCounts);
+    const first = firstOpen(stored, done);
     // Not a lazy useState initial: the server cannot read the store, and the first client render must match its HTML.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (first > 0) setIndex(first);
+    if (first > 0) setCursor(stored[first]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- first load only
   }, []);
 
   const total = order.length;
-  const at = clampStep(index, total);
+  // Where the current step is now; when it is gone (a recipe was edited) the first step not done.
+  const found = cursor ? order.findIndex((e) => sameStep(e, cursor)) : -1;
+  const open = cursor && found < 0 ? firstOpen(order, ticks.map((t) => t.steps)) : 0;
+  const at = clampStep(found >= 0 ? found : open, total);
   const here = order[at] as DishStep | undefined;
   const isDone = (e: DishStep) => ticks[e.dish]?.steps.has(e.step) ?? false;
   const textOf = (e: DishStep) => dishes[e.dish].steps[e.step];
-  const nameOf = (dish: number) => dishes[dish].title;
+  const nameOf = (dish: number) => names[dish];
   const describe = (e: DishStep) => `${nameOf(e.dish)}, step ${e.step + 1} of ${dishes[e.dish].steps.length}: ${textOf(e)}`;
   const mark = (dish: number, size: "sm" | "md") => <CookDishMark dish={dish} initial={marks[dish]} name={nameOf(dish)} size={size} />;
 
@@ -83,14 +92,14 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const go = useCallback(
     (by: number) => {
       if (view !== "one") return; // arrows, swipes and voice move through the one-step view only
-      const to = clampStep(index + by, total);
-      if (to === index) return;
-      setIndex(to);
+      const to = clampStep(at + by, total);
+      if (to === at) return;
+      setCursor(order[to]);
       announce(describe(order[to]));
     },
     // describe only reads props
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, index, total, order, announce],
+    [view, at, total, order, announce],
   );
   useStepKeys(go);
   const swipe = useSwipe(go);
@@ -99,49 +108,67 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
     else go(c === "next" ? 1 : -1);
   });
 
-  // The current step is the same step after a reorder, wherever it ended up.
-  const apply = (next: readonly DishStep[]) => {
-    setOrder(next);
-    if (here) setIndex(next.findIndex((e) => e.dish === here.dish && e.step === here.step));
-  };
   const moveStep = (pos: number, dir: -1 | 1) => {
     const next = move(order, pos, dir);
     if (next === order) return;
     const e = order[pos];
-    apply(next);
-    announce(`Moved ${nameOf(e.dish)} step ${e.step + 1} ${dir < 0 ? "earlier" : "later"}, now ${pos + dir + 1} of ${total}`);
+    const way = dir < 0 ? "earlier" : "later";
+    setOrder(next);
+    announce(`Moved ${nameOf(e.dish)} step ${e.step + 1} ${way}. It’s now ${ordinal(pos + dir + 1)} of ${total}.`);
+  };
+  // A move button that cannot move keeps focus and a tap does nothing: say why, since it is silent otherwise.
+  const explainBlocked = (e: MouseEvent<HTMLElement>, pos: number) => {
+    const button = (e.target as Element).closest("button");
+    if (button?.getAttribute("aria-disabled") !== "true") return;
+    const dir = button.getAttribute("aria-label")?.endsWith("earlier") ? -1 : 1;
+    const way = dir < 0 ? "earlier" : "later";
+    const mine = order[pos];
+    const other = order[pos + dir];
+    announce(
+      other
+        ? `Can’t move ${way}: ${nameOf(other.dish)}’s step ${other.step + 1} comes ${dir < 0 ? "first" : "next"}`
+        : `Can’t move ${way}: ${nameOf(mine.dish)} step ${mine.step + 1} is already ${dir < 0 ? "first" : "last"}`,
+    );
   };
   const bring = (dish: number) => {
     const from = nextOfDish(order, at, dish);
-    const next = bringNext(order, at, dish);
     if (from === -1) return;
-    if (next !== order) apply(next);
+    const next = bringNext(order, at, dish);
+    if (next !== order) setOrder(next);
     announce(`${nameOf(dish)} step ${order[from].step + 1} is next`);
   };
   // Ticking the current step makes the next one current (as in cook mode); any other step leaves the list where it is.
   const tickAt = (pos: number) => {
     const e = order[pos];
-    if (pos === at && !isDone(e)) setIndex(clampStep(pos + 1, total));
+    if (pos === at && !isDone(e)) setCursor(order[clampStep(pos + 1, total)]);
     toggleStep(e.dish, e.step);
   };
 
-  const renderStep = (e: DishStep) =>
-    renderCookStep(textOf(e), dishes[e.dish].ingredients, (text, seconds) => start(timerLabel(e.step + 1, text, nameOf(e.dish)), seconds));
+  const renderStep = (e: DishStep) => renderCookStep(textOf(e), dishes[e.dish].ingredients, (text, seconds) => start(timerLabel(e.step + 1, text, nameOf(e.dish)), seconds));
   const tick = (e: DishStep, onClick: () => void) => (
     <CookTick pressed={isDone(e)} aria-label={`${nameOf(e.dish)} step ${e.step + 1} done`} onClick={onClick}>
       Done
     </CookTick>
   );
 
-  const finishHref = `/recipes/${dishes[0].id}`;
+  // Finishing (or closing) after several dishes goes to the recipes, not to one of them.
+  const finishHref = "/";
   if (total === 0) {
     return (
       <CookStage>
-        <EmptyState title="These recipes have no steps yet" level={1} actions={<ButtonLink href={`/recipes/${dishes[0].id}/edit`}>Edit {dishes[0].title}</ButtonLink>}>
+        <EmptyState
+          title="These recipes have no steps yet"
+          level={1}
+          actions={dishes.map((d, dish) => (
+            <ButtonLink key={d.id} href={`/recipes/${d.id}/edit`}>
+              Edit {nameOf(dish)}
+            </ButtonLink>
+          ))}
+        >
           Add the method and cook mode will walk you through it.
         </EmptyState>
         <ButtonLink href={finishHref} variant="secondary" className="mt-6 self-start">
-          Back to the recipe
+          Back to recipes
         </ButtonLink>
       </CookStage>
     );
@@ -156,7 +183,10 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const current = order[at];
   const next = order[at + 1];
   const railIngredients = dishes[railDish].ingredients;
-  const lit = railDish === current.dish ? litIngredients(textOf(current), railIngredients) : new Set<number>();
+  const onCurrentDish = railDish === current.dish;
+  const lit = onCurrentDish ? litIngredients(textOf(current), railIngredients) : new Set<number>();
+  // The nudge pulls a dish's next step to right after this one: nothing to offer when it is already there.
+  const nudges = dishes.flatMap((_, dish) => (dish !== current.dish && nextOfDish(order, at, dish) > at + 1 ? [dish] : []));
 
   const oneStep = (
     <>
@@ -167,15 +197,15 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
       >
         {renderStep(current)}
       </CookStepText>
-      <div className="mt-6 flex flex-col items-start gap-1">
-        {dishes.map((_, dish) =>
-          dish !== current.dish && nextOfDish(order, at, dish) !== -1 ? (
+      {nudges.length > 0 && (
+        <div className="mt-6 flex flex-col items-start gap-1">
+          {nudges.map((dish) => (
             <CookNudge key={dish} mark={mark(dish, "sm")} onClick={() => bring(dish)}>
               Bring {nameOf(dish)}’s next step here
             </CookNudge>
-          ) : null,
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </>
   );
 
@@ -190,13 +220,16 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
           dish={mark(e.dish, "sm")}
           tick={tick(e, () => tickAt(pos))}
           controls={
-            <CookMoveButtons
-              stepLabel={`${nameOf(e.dish)} step ${e.step + 1}`}
-              canEarlier={canMove(order, pos, -1)}
-              canLater={canMove(order, pos, 1)}
-              onEarlier={() => moveStep(pos, -1)}
-              onLater={() => moveStep(pos, 1)}
-            />
+            // Delegated: the kit's buttons ignore a press they cannot act on, and this says why.
+            <div onClick={(ev) => explainBlocked(ev, pos)}>
+              <CookMoveButtons
+                stepLabel={`${nameOf(e.dish)} step ${e.step + 1}`}
+                canEarlier={canMove(order, pos, -1)}
+                canLater={canMove(order, pos, 1)}
+                onEarlier={() => moveStep(pos, -1)}
+                onLater={() => moveStep(pos, 1)}
+              />
+            </div>
           }
         >
           {renderStep(e)}
@@ -224,7 +257,11 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
                 current={pos === at}
                 done={isDone(e)}
                 tick={tick(e, () => tickAt(pos))}
-                controls={<Text variant="small">#{pos + 1} overall</Text>}
+                controls={
+                  <Text variant="small">
+                    {ordinal(pos + 1)} of {total}
+                  </Text>
+                }
               >
                 {renderStep(e)}
               </CookStepItem>
@@ -252,7 +289,8 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
           {reordered && (
             <CookTextButton
               onClick={() => {
-                apply(roundRobin);
+                reset();
+                announce("Order reset");
                 toolbar.current?.focus(); // the button goes away; keep focus inside the stage
               }}
             >
@@ -274,15 +312,20 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
         {wake.note}
       </CookToolbar>
       <CookColumns
+        wide={view === "dishes"}
         rail={
           <CookDishTabs
             label="Ingredients by dish"
             idPrefix="cook-rail"
-            tabs={dishes.map((d, dish) => ({ id: String(dish), label: d.title, mark: mark(dish, "sm") }))}
+            tabs={dishes.map((_, dish) => ({
+              id: String(dish),
+              label: nameOf(dish),
+              mark: mark(dish, "sm"),
+            }))}
             value={String(railDish)}
             onChange={(v) => setRailDish(Number(v))}
           >
-            <CookRail key={railDish} hiddenCount={railIngredients.length - lit.size} anyLit={lit.size > 0}>
+            <CookRail key={railDish} heading={onCurrentDish ? "For this step" : "All ingredients"} hiddenCount={railIngredients.length - lit.size} anyLit={lit.size > 0}>
               {railIngredients.length === 0 ? (
                 <li>
                   <Text variant="small">No ingredients listed.</Text>
@@ -290,16 +333,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
               ) : (
                 railOrder(railIngredients.length, lit).map(({ index: i, lit: on }) => {
                   const { quantity, rest } = splitIngredient(railIngredients[i]);
-                  return (
-                    <CookRailRow
-                      key={i}
-                      quantity={quantity ?? ""}
-                      name={rest}
-                      lit={on}
-                      ticked={ticks[railDish]?.ingredients.has(i) ?? false}
-                      onToggle={() => toggleIngredient(railDish, i)}
-                    />
-                  );
+                  return <CookRailRow key={i} quantity={quantity ?? ""} name={rest} lit={on} ticked={ticks[railDish]?.ingredients.has(i) ?? false} onToggle={() => toggleIngredient(railDish, i)} />;
                 })
               )}
             </CookRail>
