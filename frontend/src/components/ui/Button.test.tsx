@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { HardLink } from "./Button";
+import { Button, ButtonLink, HardLink } from "./Button";
 
 describe("HardLink", () => {
   it("is a plain anchor (a full page load), as a button or as an inline link", () => {
@@ -17,5 +17,50 @@ describe("HardLink", () => {
     expect(go.getAttribute("aria-describedby")).toBe("why");
     expect(go.className).toContain("min-h-control");
     expect(screen.getByRole("link", { name: "Again" }).className).toBe("link");
+  });
+});
+
+describe("danger-text variant", () => {
+  it("is underlined text in the danger tokens with a 44px target, on a button and on a link", () => {
+    render(
+      <>
+        <Button variant="danger-text">Delete</Button>
+        <ButtonLink href="/x" variant="danger-text">
+          Remove
+        </ButtonLink>
+      </>,
+    );
+    for (const el of [screen.getByRole("button", { name: "Delete" }), screen.getByRole("link", { name: "Remove" })]) {
+      expect(el.className).toContain("min-h-control");
+      expect(el.className).toContain("underline");
+      expect(el.className).toContain("text-(--button-danger-text-fg)");
+      expect(el.className).toContain("not-disabled:not-aria-disabled:hover:text-(--button-danger-text-hover)");
+      expect(el.className).not.toContain("bg-");
+    }
+  });
+
+  it("reads in the quiet ghost colours and does not recolour on hover when disabled or pending", () => {
+    render(
+      <>
+        <Button variant="danger-text" disabled>
+          Clear ticked
+        </Button>
+        <Button variant="danger-text" pending>
+          Deleting…
+        </Button>
+      </>,
+    );
+    for (const el of [screen.getByRole("button", { name: "Clear ticked" }), screen.getByRole("button", { name: "Deleting…" })]) {
+      expect(el).toHaveProperty("disabled", true);
+      expect(el.className).toContain("disabled:text-(--button-ghost-fg)");
+      expect(el.className).toContain("disabled:decoration-(--button-ghost-underline)");
+      expect(el.className).toContain("aria-disabled:text-(--button-ghost-fg)");
+      expect(el.className).not.toMatch(/(^| )hover:/);
+    }
+  });
+
+  it("stays apart from the filled danger button used for the confirm step", () => {
+    render(<Button variant="danger">Remove Sam</Button>);
+    expect(screen.getByRole("button", { name: "Remove Sam" }).className).toContain("bg-(--button-danger-bg)");
   });
 });

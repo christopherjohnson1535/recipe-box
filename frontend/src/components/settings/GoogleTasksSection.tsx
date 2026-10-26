@@ -7,6 +7,7 @@ import { Button, HardLink } from "@/components/ui/Button";
 import { ConfirmInline } from "@/components/ui/ConfirmInline";
 import { ExternalLink } from "@/components/ui/ExternalLink";
 import { Heading } from "@/components/ui/Heading";
+import { Hint } from "@/components/ui/Hint";
 import { Text } from "@/components/ui/Text";
 import { api as browserApi, ApiError, GOOGLE_CONNECT_URL, type Api, type GoogleStatus } from "@/lib/api";
 import { CONNECT_IN_BROWSER, useInstalledApp } from "@/lib/installed-app";
@@ -78,7 +79,7 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
       {status === null ? (
         <Text variant="note">Couldn’t check Google Tasks. Reload the page to try again.</Text>
       ) : !status.configured ? (
-        <Text variant="small">
+        <Text>
           Google Tasks is off for this household. The household admin can turn it on: the steps are in the Google Tasks part of the <ExternalLink href={DEPLOY}>deploy guide</ExternalLink>.
         </Text>
       ) : status.connected ? (
@@ -90,7 +91,7 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
               </Text>
               {status.connectedAt && <LocalDate iso={status.connectedAt} />}
             </Text>
-            <Button ref={disconnectButton} variant="ghost" aria-expanded={confirming} disabled={confirming} onClick={() => setConfirming(true)}>
+            <Button ref={disconnectButton} variant="danger-text" aria-expanded={confirming} disabled={confirming} onClick={() => setConfirming(true)}>
               Disconnect
             </Button>
           </div>
@@ -99,7 +100,7 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
               Disconnect Google Tasks? Recipe Box forgets your connection and asks Google to end its access. Tasks already in your Google list stay where they are.
             </ConfirmInline>
           )}
-          <Text variant="small">If Google ends the connection, connect again when the grocery list asks you to.</Text>
+          <Hint>If Google ends the connection, connect again when the grocery list asks you to.</Hint>
         </>
       ) : (
         <>
@@ -108,9 +109,7 @@ export function GoogleTasksSection({ initial, result, api = browserApi }: Props)
               Connect Google Tasks
             </HardLink>
           </div>
-          <Text variant="small" id={hint}>
-            {installed ? CONNECT_IN_BROWSER : "This takes you to Google’s consent page, then back here."}
-          </Text>
+          <Hint id={hint}>{installed ? CONNECT_IN_BROWSER : "This takes you to Google’s consent page, then back here."}</Hint>
         </>
       )}
     </section>

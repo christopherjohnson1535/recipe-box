@@ -6,6 +6,7 @@ import { Button, HardLink } from "@/components/ui/Button";
 import { ConfirmInline } from "@/components/ui/ConfirmInline";
 import { ExternalLink } from "@/components/ui/ExternalLink";
 import { Heading } from "@/components/ui/Heading";
+import { Hint } from "@/components/ui/Hint";
 import { MemberItem, MemberList } from "@/components/ui/MemberList";
 import { Text } from "@/components/ui/Text";
 import { api as browserApi, ApiError, GOOGLE_LINK_URL, type Api, type Identity } from "@/lib/api";
@@ -93,7 +94,7 @@ export function GoogleSignInSection({ initial, available, result, api = browserA
                   detail="Google account"
                   actions={
                     <Button
-                      variant="ghost"
+                      variant="danger-text"
                       ref={(el) => {
                         if (el) buttons.current.set(i.id, el);
                         else buttons.current.delete(i.id);
@@ -132,16 +133,16 @@ export function GoogleSignInSection({ initial, available, result, api = browserA
                   Connect Google
                 </HardLink>
               </div>
-              <Text variant="small" id={hint}>
+              <Hint id={hint}>
                 {installed
                   ? "Open Recipe Box in Safari, sign in with your password there, then connect Google from Settings. In the Home Screen app, Google’s page may not carry back here."
                   : identities.length > 0
                     ? "Connect another account. This takes you to Google, then back here."
                     : "This takes you to Google, then back here. The account doesn’t need to match the Google email your admin set."}
-              </Text>
+              </Hint>
             </>
           ) : (
-            <Text variant="small">
+            <Text>
               Sign in with Google is off for this household. The household admin can turn it on: the steps are in the <ExternalLink href={DEPLOY}>deploy guide</ExternalLink>.
             </Text>
           )}

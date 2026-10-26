@@ -156,6 +156,22 @@ animation under `@supports`, still under reduced motion), a ticked ingredient ha
 
 Durations are defined in `src/styles/motion.css`.
 
+## Destructive actions
+One pattern for every destructive text action: **Delete** a recipe, **Remove** (a recipe from the grocery list, a member, a
+photo), **Disconnect** (Google), **Empty list** and **Clear ticked**, and **Discard** (unsaved edits stashed in the browser). Clear ticked has no confirm step and no undo (it removes only what you already crossed off), but is set the same way.
+- `Button variant="danger-text"` (also `ButtonLink`): the ghost shape (label font, underlined, 44px target, no fill or box) in
+  brick red. Tokens `--button-danger-text-fg`, `--button-danger-text-hover` and `--button-danger-text-underline` in
+  `components.css` point at `--color-danger` and `--color-danger-hover`; both are held to 4.5:1 on paper and paper-deep in day
+  and evening by `tokens.test.ts`. Never the saffron accent. Disabled or pending, the variant reads in the quiet ghost colours
+  (`--button-ghost-fg`, `--button-ghost-underline`) and does not recolour on hover.
+- Menu items with `danger: true` (grocery item menu, `RowMenu`) read the same tokens.
+- The filled `Button variant="danger"` is only for the confirm step in `ui/ConfirmInline` ("Remove Sam", "Empty list"), which
+  opens in place of the thing it affects and starts focus on the safe "Keep".
+- Deliberate exceptions, which stay quiet: cook mode **Clear ticks** (clears only this device's cooking ticks), the import
+  screen's **Start over**, **Go back** and **Not this one** (navigation), and the icon-only × buttons on editor rows, tags and photo thumbnails.
+- The icon-only remove cross (`IconButton icon="remove"`: editor rows, tags, photo thumbnails) is not a text action and keeps
+  the ink style.
+
 ## Where styling lives (enforced by `src/styles/page-styling.test.ts`)
 - **Only `src/components/ui/*` styles things.** Colour, type, borders, the helper classes below, arbitrary values
   and component tokens appear there and nowhere else.
@@ -199,15 +215,16 @@ Text and structure:
 
 Controls and states:
 - `ui/Button` / `ButtonLink`: `primary` ink fill (hover turns accent), `secondary` ink outline, `ghost` underlined,
-  `danger` accent fill. Labels are `.label`. At least 44px tall; below `sm` long labels wrap (centred) instead of overflowing.
+  `danger` brick-red fill (the confirm step only), `danger-text` (every destructive text action, see "Destructive
+  actions" below). Labels are `.label`. At least 44px tall; below `sm` long labels wrap (centred) instead of overflowing.
 - `ui/PageHeader`: `kicker`, `title` (display headline), `description` (italic deck), `byline`, `actions`,
   `align="start" | "center"`, `reserveDeck` (keeps the deck's height when there is no description); ends with a
   hairline.
-- `ui/Card`: hairline frame, square, no shadow (auth forms).
+- `ui/AuthSection`: a sign-in page's ruled section (see "Page patterns, Auth"). `ui/DayBand`: the top band with only the reader's date and season (pages outside the signed-in shell).
 - `ui/Chip`: tag filter set as quiet Karla labels; selected gets an accent underline; `count` shows muted after the
   name. `ChipRow` wraps the chips onto further lines (never a scroller). `Badge`: accent label for tags.
 - Photos (lead photo, listing thumbnails) read `--photo-filter`: none by day, slightly dimmed in the evening theme.
-- `ui/Field`, `ui/Label`, `ui/Input`: uppercase label, square input with a 3:1 border, italic hint.
+- `ui/Field`, `ui/Label`, `ui/Input`: uppercase label, square input with a 3:1 border, italic hint. `ui/Hint`: that same small italic muted hint for help under a control or a list of steps (`as="span"` inside a status).
 - `ui/Textarea` (shares `inputClass` with `Input`), `ui/Fieldset` (legend over a hairline, optional hint),
   `ui/IconButton` (44px outlined icon button; `icon` is `up`, `down`, `remove` or `heading`, `label` is required;
   `quiet` drops the outline), `ui/ListEditor` (`EditorList` + `EditorItem`: optional accent numeral, section heading
@@ -232,7 +249,7 @@ Controls and states:
 - Recipe kit (#40), all in `ui/`: `SpreadOpener` (split opener: kicker, ~100px headline whose words rise in, italic deck, byline, byline, actions (Start cooking, Edit and Delete; the block has id `opener-actions`); photo full height on the right from 1024px, meeting the rule under it, and a 3:2 band below the text before that; the photo is not printed; without a photo the headline spans the width over a spot icon; titles over 40 characters step down a size; carries the card→page morph names), `NumeralsBand` (items `{ label, value?, text?, parts?, spoken? }` in display numerals (`parts` are number + small unit pairs side by side, "3hr 20min"; `text` sets a phrase like "makes about 4 bowls" in smaller type) between a thin double rule and a hairline, auto-fit columns so 2×2 on a phone; `spoken` is what screen readers get for shorthand like "3hr 20min"), `IngredientPanel` + `IngredientGroup` + `IngredientRow` + `ScaleControl` (paper-deep panel; each row is a button with `aria-pressed`, a checkbox, an accent tabular quantity column and a line drawn through ticked text, quantity included, which turns muted; print drops the checkbox column; ScaleControl is a labelled radio group, 44px targets), `MethodHeader` + `MethodStep` + `IngredientMention` (dotted accent underline linking to `#ingredient-<i>`; following it focuses the row, and the row is highlighted while it is the `:target`) + `TimerChip` (pill with a clock around the step's own words, so the text reads and copies unchanged; plain text in print), `PullQuote` (the recipe's note between a thin double rule and a hairline; single-line notes of 140 characters or fewer in display type, longer ones at body size, a paragraph per line break; set in the margin column from 1440px), `FloatingBar` (fixed pill, hidden (inert, opacity-only under reduced motion) until the opener's actions scroll out of view, watched with an IntersectionObserver in `RecipeBar`, and shown at once without one; with a polite status, in a short form such as "3 checked" below 640px so it stays on one line, and the accent Start cooking link; pages leave `pb-28` under their content; hidden in print). Tokens: `--qty-fg`, `--strike-fg`, `--mention-line`, `--target-bg`, `--timer-*`, `--bar-*`; the evening appearance re-points `--timer-*` and `--bar-*` at paper-deep and ink so they do not glare.
 - Cook mode (#41), always the evening appearance: the route `recipes/[id]/cook` renders `components/cook/CookMode` (client; step index, timers and voice live above the step view so timers survive step changes; logic in `cook-logic.ts`, optional voice in `use-voice.ts`). UI in `ui/CookKit.tsx`: `CookStage` (a modal `role="dialog"`, the rest of the app `inert` while it is open; it pins the evening appearance with `pinEdition`/`unpinEdition` from lib/edition.ts, after an inline `PIN_EVENING_SCRIPT` on the page sets `data-edition-pin` before paint, so `applyEdition` keeps evening and theme-color and leaving recomputes the person's own; it owns the touch handlers, so a swipe works anywhere but on a control), `CookTopBar` (h1 title; Close asks first while a timer runs), `CookVoiceToggle`, `CookProgress` (one segment per step), `CookColumns` (rail 26% / step 44%, centred / timers 26% from 1024px, each scrolling alone; narrower: one row of chips, the step scrolling, timers above the footer), `CookRail` + `CookRailRow` (lit ingredients first, the rest dimmed; chips show only lit ones until "+N more"), `CookStepText` (40px from 700px, 28px below) + `CookMention` + `CookTimerButton` (kept on one line with the full stop after it), `CookTimers` + `CookTimer` (rings for the first three, compact rows after; a finished timer flashes the accent by colour for 10 s, then stays accent), `CookLive` (polite announcements, step changes included), `CookFooter` with `CookPill` / `CookPillLink` (60px tall; next-step preview hidden on a phone). Back/Next, ←/→ and a swipe move; the audio context is made and resumed on the first tap or key and the chime reuses it. #13 added: `CookToolbar` (a focusable group under the progress bar holding `CookViewToggle` (One step / All steps, two `aria-pressed` buttons), `CookTextButton` ("Clear ticks", shown once anything is ticked; focus moves to the toolbar when it goes) and `CookWakeStatus` ("Screen stays on" with an accent dot while the lock is held; nothing while it is being requested; otherwise a button that opens `CookWakeNote`, a short note on https, iPadOS 18.4+ in the Home Screen app, or Auto-Lock → Never)); `CookRailRow` is now a 44px `aria-pressed` button with the same drawn strike as `IngredientRow` (22px chips from 700px); `CookTick` (checkbox-style Done toggle, 44px) sits beside the step kicker via `CookStepText`'s `action` slot; `CookProgress` shows done steps; `CookStepList` + `CookStepItem` are the all-steps view (accent display numeral, the current step marked by an accent left rule and scrolled into view, done steps muted with the tick, ≥ 24px text, timer chips still live); `CookFooter`'s `summary` ("2 of 6 steps done") replaces the next-step preview in that view, with Finish only. Swipe, arrows and voice next/back only move in the one-step view. State (`components/cook/cook-store.ts`): `cook-ticks:<id>` in localStorage as `{ v: 1, at, ingredients, steps }`, read as empty after 12 hours, dated in the future, or corrupt; out-of-range indexes dropped; synced across tabs by the `storage` event; in-memory fallback when storage throws; nothing ticked on the server render. On the first load the one-step view opens at the first step not done. `cook-view` remembers the view per device. Wake lock: `components/cook/use-wake-lock.ts` requests `screen` while visible, re-requests on `visibilitychange` and after the system releases it, and releases on close. Uses existing tokens only.
 App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styling of their own):
-- `recipe-page/*`: `RecipeState` (`RecipeStateProvider` keeps the ticked ingredients and the scale per recipe in sessionStorage as `recipe-ticks:<id>` and `recipe-scale:<id>`; the server and hydrating render see nothing ticked, then the stored state appears; `ScaledServings`), `session-store.ts` (the sessionStorage hook, with an in-memory fallback when storage throws), `IngredientChecklist`, `RecipeBar`, `StepText` + `mentions.ts` (`annotateStep`: timers from `splitDurations`, then ingredient names matched on word boundaries, longest first, each linked once per step; the name heuristic is documented there), `DeleteRecipeButton` (ghost Delete, no dialog: deletes, shows the toast, goes home), `byline.ts` (data for "Added by X", "Edited by Y" only when someone else or a later edit) and `LocalDate` (client-formatted `<time>` in the viewer's time zone, empty on the server).
+- `recipe-page/*`: `RecipeState` (`RecipeStateProvider` keeps the ticked ingredients and the scale per recipe in sessionStorage as `recipe-ticks:<id>` and `recipe-scale:<id>`; the server and hydrating render see nothing ticked, then the stored state appears; `ScaledServings`), `session-store.ts` (the sessionStorage hook, with an in-memory fallback when storage throws), `IngredientChecklist`, `RecipeBar`, `StepText` + `mentions.ts` (`annotateStep`: timers from `splitDurations`, then ingredient names matched on word boundaries, longest first, each linked once per step; the name heuristic is documented there), `DeleteRecipeButton` (`danger-text` Delete, no dialog: deletes, shows the toast, goes home), `byline.ts` (data for "Added by X", "Edited by Y" only when someone else or a later edit) and `LocalDate` (client-formatted `<time>` in the viewer's time zone, empty on the server).
 - `undo/*`: `undo-store.ts` (module list of offers kept across client navigation; one toast each, newest on top, three shown; cleared on sign-out and when the layout unmounts), `UndoToast` (mounted once in `(app)/layout.tsx`; 10 s countdown paused by hover or focus; Undo restores and reopens the recipe; 409 says it is too late).
 - Print: the `@media print` block at the end of `globals.css` sets ink on white, keeps each step whole and prints link URLs; chrome uses `print:hidden`.
 - `recipe-form/RecipeForm`: the editor for new recipes, edits and import review. Props `initial`
@@ -298,12 +315,25 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   household on the left (My account, Sign in with Google, Household) and this device and the app's tools on the right
   (Photos, Export, Google Tasks, Appearance, Save from Safari, AI import); Save from Safari sets the iPad steps beside the
   computer steps. Below 1280px one column, in the same order. Inputs keep their own measure; they are never stretched.
-- **Auth**: centred wordmark, "The household cookbook", double rule, form in a hairline frame, 32rem wide, outside the
-  app shell (no band). Under the form, when the server offers it, `OrDivider` then `login/GoogleSignIn` (a secondary `HardLink`; in the Home Screen app a quiet line says to use the password if Google sends you back).
+  **Text sizes in Settings (and Save from Safari): one size per role.** A section's copy and explanations are `Text` at body
+  size (20px), including the "off" and "couldn’t check" states; help under a field, a control or a list of steps is `ui/Hint`,
+  the small (17px) italic muted hint that `Field`, `Checkbox` and `ChoiceGroup` already use. Notices stay `Alert`s. No
+  `Text variant="small" | "aside" | "deck"` in settings code; `settings.test.tsx` fails on a third size.
+- **Auth** (sign in, first-run setup): outside the app shell (no band), 32rem wide, on bare paper with no box, border or
+  background. Centred wordmark, "The household cookbook" and the thin double rule, then one `ui/AuthSection`: an accent
+  kicker, the `h1` in Marcellus (`text-title`), an italic deck, a hairline, then the form with 24px between fields at full
+  width and a full-width primary button (inputs and buttons keep `min-h-control`). Under the form, when the server offers it,
+  `OrDivider` then `login/GoogleSignIn` (a secondary `HardLink`; in the Home Screen app a `Hint` says to use the password if
+  Google sends you back). Errors are `Alert`s above the form.
 - **Cook mode**: a full-screen overlay with no band and no masthead, always in the evening appearance on the near-black
   slate; check any change to it in the evening colours only.
 - **Offline, error and not found**: plain `EmptyState` pages in the page width; the offline page lists the recipes kept
-  on the device.
+  on the device. An address no route matches is rendered by `app/not-found.tsx`, outside `(app)/layout.tsx`, so it brings its
+  own shell: the same one `<header>` with the top band (`ui/DayBand`: date and season, no recipe count, no Sign out), then the
+  masthead (wordmark, the five section links, double rule), then `<main id="main">`. It makes no API call, so it needs no session
+  and renders with a stale cookie; a signed-out visitor is asked to sign in first (`src/proxy.ts`), and the links lead on to sign-in
+  when the session is gone. `(app)/not-found.tsx` (from `notFound()`
+  in a signed-in route) renders inside the full shell and shows the same `NotFoundContent`.
 - **Loading**: `HomeSkeleton` and `RecipeSkeleton` are static tints in the shape of the page (featured recipe, ruled
   tiles beside the 22rem sidebar; opener, numerals under a double rule, ingredient panel and method). Nothing moves.
 
@@ -322,7 +352,8 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
 ## Don'ts
 - No New Yorker name, logo, mascot, masthead or Irvin-style lettering (see above).
 - No bold or italic display headlines; no fourth font family; no sans for running text (Karla is for labels only).
-- Never use the saffron accent for errors or destructive actions: that is `danger`.
+- Never use the saffron accent for errors or destructive actions: that is `danger`. A destructive text action is
+  `variant="danger-text"`, not `ghost` or `secondary`.
 - No rounded cards, drop shadows, gradients, pill chips, emoji icons, or large accent fills.
 - No em dashes in UI copy; use a colon, comma or full stop.
 - No magazine-issue wording (volume, issue, cover story, edition, forthcoming) in anything a reader sees: see "Copy rules".

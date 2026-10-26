@@ -40,7 +40,7 @@ export function LoginForm({ next }: { next: string }) {
   }
 
   return (
-    <form method="post" onSubmit={onSubmit} className="flex flex-col gap-5">
+    <form method="post" onSubmit={onSubmit} className="flex flex-col gap-6">
       {error && <Alert tone="error">{error}</Alert>}
       <Field label="Username" htmlFor="username">
         <Input id="username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required />

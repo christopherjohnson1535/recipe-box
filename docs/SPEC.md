@@ -71,9 +71,10 @@ depend on `app`, the server, another adapter, `axum` or `sqlx`.
   Read `frontend/node_modules/next/dist/docs/` before using an API you're unsure of — this Next version differs
   from training data (async `params`, etc.). Self-hosted fonts only (`@fontsource-variable/*`).
   `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build` must pass.
-- UI: editorial magazine style (requirements → Visual style), defined in `docs/UI.md` and
-  `.tastemaker/style-lock.md`; tastemaker rules apply. Pages compose `src/components/ui/*` only. Open-licensed,
-  self-hosted fonts only; never imitate a specific publication's logo, masthead or proprietary typeface.
+- UI: the Riviera look, Charcoal & Saffron (requirements → Visual style; ADR 0009): cool paper, charcoal ink, one
+  saffron accent, a day and an evening appearance. Defined in `docs/UI.md` and `.tastemaker/style-lock.md`;
+  tastemaker rules apply. Pages compose `src/components/ui/*` only. Open-licensed, self-hosted fonts only; never
+  imitate a specific publication's logo, masthead or proprietary typeface.
 - Every API route except `GET /api/health`, `GET /api/setup`, `POST /api/setup`, `POST /api/auth/login`,
   `GET /api/auth/providers` and the Google sign-in pair (`GET /api/auth/google/start`, `GET /api/auth/google/callback`;
   the start's `link=1` mode and the callback's link mode need a session) requires a session. Admin-only routes check `role = 'admin'`.

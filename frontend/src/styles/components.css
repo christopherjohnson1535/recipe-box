@@ -19,6 +19,9 @@
   --button-danger-bg: var(--color-danger);
   --button-danger-fg: var(--color-on-danger);
   --button-danger-bg-hover: var(--color-danger-hover);
+  --button-danger-text-fg: var(--color-danger); /* destructive text actions (Delete, Remove, Disconnect, Empty list) and danger menu items */
+  --button-danger-text-hover: var(--color-danger-hover);
+  --button-danger-text-underline: var(--color-danger);
 
   /* Input */
   --input-bg: var(--color-paper);
@@ -56,7 +59,6 @@
 
   /* Panels, rules, entries */
   --panel-bg: var(--color-paper-deep);
-  --card-border: var(--color-rule);
   --rule-hair: var(--color-rule);
   --rule-double: var(--color-ink);
   --photo-outline: var(--color-rule); /* the featured photo's 1px outline; evening raises it a step */

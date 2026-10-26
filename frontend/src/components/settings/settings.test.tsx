@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type User } from "@/lib/api";
@@ -7,6 +9,7 @@ import { HouseholdSection } from "./HouseholdSection";
 import { PasswordForm } from "./PasswordForm";
 import { ExportSection } from "./ExportSection";
 import { PhotosSection } from "./PhotosSection";
+import { ShareView } from "@/app/(app)/settings/share/ShareView";
 import { SettingsView } from "./SettingsView";
 
 const refresh = vi.fn();
@@ -326,5 +329,62 @@ describe("ExportSection", () => {
     cleanup();
     render(<SettingsView me={sam} users={[]} capabilities={caps} />);
     expect(screen.queryByRole("heading", { name: "Export and import" })).toBeNull();
+  });
+});
+
+// One size per role across Settings: section copy and explanations are body (20px); help under a field, a control or a
+// list of steps is the small italic muted hint (`Hint`, the voice of `Field`'s hint). Nothing else sets running text.
+describe("Settings text sizes", () => {
+  const settingsDirs = [__dirname, join(__dirname, "../../app/(app)/settings")];
+  const sources = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? sources(join(dir, e.name)) : /\.tsx?$/.test(e.name) && !/\.test\./.test(e.name) ? [join(dir, e.name)] : [],
+    );
+
+  it("sets no running text in the small, aside or deck variants: copy is Text, help is Hint", () => {
+    for (const file of settingsDirs.flatMap(sources)) {
+      expect(readFileSync(file, "utf8"), file).not.toMatch(/variant="(small|aside|deck)"|text-(small|body|deck)\b/);
+    }
+  });
+
+  const caps = { ai: false, provider: "none" } as const;
+  const identity = { id: "i1", provider: "google", email: "chris@example.com", createdAt: "2026-10-21T10:00:00Z" } as const;
+  const pages = {
+    "everything on": () => (
+      <SettingsView
+        me={chris}
+        users={[chris, sam]}
+        capabilities={caps}
+        settings={{ plateTreatment: false }}
+        google={{ configured: true, connected: true, connectedAt: "2026-10-21T10:00:00Z" }}
+        identities={[identity]}
+        providers={{ google: true }}
+      />
+    ),
+    "everything off": () => (
+      <SettingsView me={chris} users={[chris]} capabilities={caps} google={{ configured: false, connected: false, connectedAt: null }} identities={[]} providers={{ google: false }} />
+    ),
+    "not yet connected": () => (
+      <SettingsView me={sam} users={[]} capabilities={{ ai: true, provider: "anthropic" }} google={{ configured: true, connected: false, connectedAt: null }} identities={[]} providers={{ google: true }} />
+    ),
+    "save from Safari": () => <ShareView />,
+  };
+
+  it.each(Object.entries(pages))("%s: sections use body and small only, and small is the italic muted hint", (_name, page) => {
+    const { container } = render(page());
+    const sections = [...container.querySelectorAll("section")];
+    expect(sections.length).toBeGreaterThan(0);
+    const sizes = new Set<string>();
+    for (const el of sections.flatMap((s) => [...s.querySelectorAll("*")])) {
+      for (const c of el.classList) if (/^text-(body|small|deck|title-sm|numeral|wordmark|headline)$/.test(c)) sizes.add(c);
+      if (!el.classList.contains("text-small")) continue;
+      // Small is the hint voice. The exceptions are the other roles that are small by design: a notice (Alert), a
+      // member's detail line, code the person copies, and the folded note (Disclosure).
+      const hint = el.classList.contains("italic") && el.classList.contains("text-ink-muted");
+      const other = el.closest("[role=alert],[role=status]") || el.classList.contains("break-all") || el.classList.contains("font-mono") || el.tagName === "DETAILS";
+      expect(hint || other, `small text that is not a hint: ${el.outerHTML.slice(0, 120)}`).toBeTruthy();
+    }
+    expect([...sizes].filter((c) => c !== "text-body" && c !== "text-small")).toEqual([]);
+    cleanup();
   });
 });

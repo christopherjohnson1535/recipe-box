@@ -25,7 +25,7 @@ export function AiImportSection({ capabilities }: { capabilities: Capabilities |
             AI import is <Text as="span" variant="strong">off</Text>. Links to pages that carry recipe data still import, and you can type recipes in by hand. Photos are saved with the recipe
             but not read.
           </Text>
-          <Text variant="small">
+          <Text>
             An admin turns it on by setting <code>AI_PROVIDER</code> on the server. Steps are on the{" "}
             <ExternalLink href={WIKI}>AI Photo Import</ExternalLink> wiki page.
           </Text>

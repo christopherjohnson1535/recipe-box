@@ -129,7 +129,7 @@ export function HouseholdSection({ currentUserId, initialUsers, api = browserApi
                     </Button>
                   )}
                   <Button
-                    variant="ghost"
+                    variant="danger-text"
                     aria-label={`Remove ${u.displayName}`}
                     disabled={blocked !== null}
                     aria-describedby={blocked ? `remove-note-${u.id}` : undefined}

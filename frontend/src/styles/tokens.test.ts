@@ -91,6 +91,10 @@ const TEXT: [string, string][] = [
   ["--button-ghost-hover", "--color-paper"],
   ["--button-danger-fg", "--button-danger-bg"],
   ["--button-danger-fg", "--button-danger-bg-hover"],
+  ["--button-danger-text-fg", "--color-paper"],
+  ["--button-danger-text-fg", "--color-paper-deep"], // Remove in a grocery panel, Disconnect in a member row
+  ["--button-danger-text-hover", "--color-paper"],
+  ["--button-danger-text-hover", "--color-paper-deep"],
   ["--input-fg", "--input-bg"],
   ["--input-placeholder", "--input-bg"],
   ["--chip-fg", "--color-paper"],
@@ -140,6 +144,8 @@ const UI: [string, string][] = [
   ["--toast-focus", "--toast-bg"],
   ["--button-primary-fg", "--button-primary-bg"], // the focus ring inside the checked ½× / 1× / 2× segment is drawn in this colour
   ["--button-ghost-underline", "--color-paper"],
+  ["--button-danger-text-underline", "--color-paper"],
+  ["--button-danger-text-underline", "--color-paper-deep"],
   ["--button-secondary-border", "--color-paper"],
   ["--chip-underline-selected", "--color-paper"],
   ["--nav-underline-active", "--color-paper"],

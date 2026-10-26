@@ -49,7 +49,7 @@ export function DeleteRecipeButton({
 
   return (
     <>
-      <Button variant="ghost" pending={pending} disabled={!online} aria-describedby={online ? undefined : "delete-offline"} onClick={remove}>
+      <Button variant="danger-text" pending={pending} disabled={!online} aria-describedby={online ? undefined : "delete-offline"} onClick={remove}>
         {pending ? "Deleting…" : "Delete"}
       </Button>
       <OfflineNote id="delete-offline">You’re offline. Deleting needs the server; try again once you’re back online.</OfflineNote>

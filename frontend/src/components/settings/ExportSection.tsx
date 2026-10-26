@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { DownloadButton, FileButton } from "@/components/ui/FileButton";
 import { Heading } from "@/components/ui/Heading";
+import { Hint } from "@/components/ui/Hint";
 import { Text } from "@/components/ui/Text";
 import { api as browserApi, ApiError, type Api } from "@/lib/api";
 
@@ -59,7 +60,7 @@ export function ExportSection({ api = browserApi }: Props) {
           {pending ? "Importing…" : "Import export"}
         </FileButton>
       </div>
-      <Text variant="small">Exports hold recipes and photos, not accounts or settings. Large files can take a minute to import.</Text>
+      <Hint>Exports hold recipes and photos, not accounts or settings. Large files can take a minute to import.</Hint>
     </section>
   );
 }

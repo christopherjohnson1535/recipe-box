@@ -1,9 +1,8 @@
 "use client";
 
 import { Suspense, use } from "react";
-import { bandDate, noon, seasonOf } from "@/lib/local-day";
-import { useLocalDay } from "@/lib/use-local-day";
-import { BandButton, BandCount, TopBand } from "./ui/TopBand";
+import { DayBand } from "./ui/DayBand";
+import { BandButton, BandCount } from "./ui/TopBand";
 import { useSignOut } from "./use-sign-out";
 
 /** Waits for the household's recipe count; a count that could not be read (undefined) adds nothing to the line. */
@@ -27,15 +26,11 @@ export function AppBand({
   count?: Promise<number | undefined>;
   displayName?: string;
 }) {
-  const day = useLocalDay(serverDay);
-  const date = noon(day);
   const { signOut, signingOut } = useSignOut();
 
   return (
-    <TopBand
-      date={bandDate(date)}
-      dateTime={day}
-      season={seasonOf(date)}
+    <DayBand
+      serverDay={serverDay}
       count={
         count && (
           <Suspense fallback={null}>
@@ -47,6 +42,6 @@ export function AppBand({
       <BandButton onClick={signOut} disabled={signingOut} title={displayName ? `Signed in as ${displayName}` : undefined}>
         {signingOut ? "Signing out…" : "Sign out"}
       </BandButton>
-    </TopBand>
+    </DayBand>
   );
 }

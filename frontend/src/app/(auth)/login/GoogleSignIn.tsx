@@ -1,8 +1,8 @@
 "use client";
 
 import { HardLink } from "@/components/ui/Button";
+import { Hint } from "@/components/ui/Hint";
 import { OrDivider } from "@/components/ui/OrDivider";
-import { Text } from "@/components/ui/Text";
 import { googleSignInUrl } from "@/lib/api";
 import { useInstalledApp } from "@/lib/installed-app";
 
@@ -16,9 +16,7 @@ export function GoogleSignIn({ next }: { next: string }) {
         Sign in with Google
       </HardLink>
       {installed && (
-        <Text variant="small" id="google-app-note">
-          In the Home Screen app, if Google sends you back here, sign in with your password.
-        </Text>
+        <Hint id="google-app-note">In the Home Screen app, if Google sends you back here, sign in with your password.</Hint>
       )}
     </div>
   );

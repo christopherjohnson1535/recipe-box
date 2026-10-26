@@ -529,7 +529,7 @@ describe("recipes on the list", () => {
   it("takes a recipe off the list", async () => {
     const { calls } = serve();
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "Take Chili off the list" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Chili from the list" }));
     await waitFor(() => expect(calls).toEqual([{ method: "DELETE", path: "/api/grocery/recipes/r1", body: undefined }]));
     await waitFor(() => expect(screen.queryByText(/On this list/)).toBeNull());
     expect(document.activeElement).toBe(listBody()); // the last recipe's button is gone

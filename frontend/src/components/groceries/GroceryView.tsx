@@ -10,7 +10,6 @@ import { ConfirmInline } from "@/components/ui/ConfirmInline";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { GroceryRow, GrocerySection, ListActions, ListBody, RecipeRow, RecipeShelf, RowMenu, ScaleStepper, type MenuEntry } from "@/components/ui/GroceryKit";
-import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -188,17 +187,19 @@ export function GroceryView() {
           />
         }
         remove={
-          <IconButton
-            icon="remove"
-            quiet
-            label={`Take ${r.title} off the list`}
+          <Button
+            variant="danger-text"
+            aria-label={`Remove ${r.title} from the list`}
             disabled={!online}
+            {...offlineAttrs}
             data-recipe-id={r.recipeId}
             onClick={() => {
               focusBeside("[data-recipe-id]", r.recipeId, "recipeId");
               void g.removeRecipe(r.recipeId, r.title);
             }}
-          />
+          >
+            Remove
+          </Button>
         }
       />
     );
@@ -247,7 +248,7 @@ export function GroceryView() {
                 clear={
                   list.items.length > 0 && (
                     <Button
-                      variant="secondary"
+                      variant="danger-text"
                       disabled={ticked === 0 || !online}
                       {...offlineAttrs}
                       onClick={() => {
@@ -260,7 +261,7 @@ export function GroceryView() {
                   )
                 }
                 empty={
-                  <Button variant="ghost" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
+                  <Button variant="danger-text" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
                     Empty list
                   </Button>
                 }

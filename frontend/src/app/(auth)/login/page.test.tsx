@@ -82,3 +82,18 @@ describe("login page: Sign in with Google", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+describe("login page layout", () => {
+  it("is a ruled section (kicker, title, deck, hairline), not a boxed card", async () => {
+    providers(true);
+    await open();
+    const section = screen.getByRole("heading", { level: 1, name: "Sign in" }).closest("section")!;
+    expect(section.className).not.toMatch(/\b(border|bg-|p[xy]?-\d)/);
+    expect(section.querySelector("header p.label")?.textContent).toBe("Account");
+    expect(section.querySelector("header p.italic")?.textContent).toMatch(/account your household admin made/);
+    expect(section.querySelector("[aria-hidden=true].h-px")).toBeTruthy(); // the hairline under the head
+    // the form's controls keep their 44px targets
+    expect(screen.getByRole("button", { name: "Sign in" }).className).toContain("min-h-control");
+    expect(screen.getByLabelText("Username").className).toContain("min-h-control");
+  });
+});
