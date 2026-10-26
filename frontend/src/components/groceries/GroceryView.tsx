@@ -191,6 +191,7 @@ export function GroceryView() {
             variant="danger-text"
             aria-label={`Remove ${r.title} from the list`}
             disabled={!online}
+            {...offlineAttrs}
             data-recipe-id={r.recipeId}
             onClick={() => {
               focusBeside("[data-recipe-id]", r.recipeId, "recipeId");

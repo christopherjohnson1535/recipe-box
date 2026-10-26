@@ -35,7 +35,7 @@ export function ListBody({ ref, children }: { ref?: Ref<HTMLDivElement>; childre
  */
 export function ListActions({ staples, clear, empty }: { staples?: ReactNode; clear?: ReactNode; empty: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2 border-t border-(--rule-hair) pt-4 print:hidden">
+    <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-2 border-t border-(--rule-hair) pt-4 print:hidden">
       {staples && <div className="mr-auto">{staples}</div>}
       {clear}
       {empty}
