@@ -114,7 +114,6 @@ const TEXT: [string, string][] = [
   ["--entry-kicker-fg", "--color-paper"],
   ["--selection-fg", "--selection-bg"],
   ["--stamp-fg", "--color-paper"], // the save stamp carries text
-  ["--feature-fg", "--feature-bg"], // the inverse home panel
   ["--qty-fg", "--panel-bg"], // ingredient quantities
   ["--timer-fg", "--timer-bg"], // timer chips in a step
   ["--bar-fg", "--bar-bg"], // the floating bar
@@ -151,7 +150,6 @@ const UI: [string, string][] = [
   ["--spot-line", "--color-paper"], // spot icons are graphics, 3:1
   ["--spot-detail", "--color-paper"],
   ["--card-underline", "--color-paper"], // the drawn title underline
-  ["--feature-focus", "--feature-bg"],
   ["--strike-fg", "--panel-bg"], // the drawn line through a ticked ingredient
   ["--mention-line", "--color-paper"], // dotted underline on an ingredient named in a step
   ["--bar-focus", "--bar-bg"],
@@ -203,7 +201,7 @@ describe("design tokens", () => {
     const comp = eveningBlocks(read("components.css"));
     expect(comp.found).toBe(true);
     expect(comp.device).toEqual(comp.attr);
-    expect(Object.keys(comp.attr).sort()).toEqual(["--bar-bg", "--bar-fg", "--bar-focus", "--photo-filter", "--rule-double", "--timer-bg", "--timer-fg"]);
+    expect(Object.keys(comp.attr).sort()).toEqual(["--bar-bg", "--bar-fg", "--bar-focus", "--feature-edge", "--photo-filter", "--photo-outline", "--rule-double", "--timer-bg", "--timer-fg"]);
     // The device block only matches when no attribute is set, so data-theme="day" is never overridden.
     for (const css of [read("themes/evening.css"), read("components.css")]) {
       expect(css).not.toMatch(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{/);
