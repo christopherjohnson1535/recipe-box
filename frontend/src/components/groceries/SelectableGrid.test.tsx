@@ -1,10 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RecipeSummary } from "@/lib/api";
 import { groceryList, summary } from "@/test/handlers";
 import { server } from "@/test/server";
 import { SelectableGrid } from "./SelectableGrid";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+beforeEach(() => push.mockClear());
 
 const r = (id: string, title: string): RecipeSummary => ({ ...summary, id, title });
 const recipes = [r("a", "Apple pie"), r("b", "Beef stew"), r("c", "Carrot soup")];
@@ -101,5 +105,25 @@ describe("SelectableGrid", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(posted).toEqual([]);
     expect(screen.getByRole("link", { name: /Apple pie/ })).toBeTruthy();
+  });
+
+  it("opens the chosen recipes in cook together, enabled for two to four only", () => {
+    const five = [...recipes, r("d", "Dal"), r("e", "Egg salad")];
+    render(<SelectableGrid recipes={five} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    const together = () => screen.getByRole("button", { name: "Cook together" }) as HTMLButtonElement;
+    expect(screen.getByText("Tap recipes to shop for or cook together.")).toBeTruthy();
+    expect(together().disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Apple pie/ }));
+    expect(together().disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Carrot soup/ }));
+    expect(together().disabled).toBe(false);
+    fireEvent.click(together());
+    expect(push).toHaveBeenCalledWith("/cook?recipes=a,c");
+    fireEvent.click(screen.getByRole("button", { name: /Beef stew/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Dal/ }));
+    expect(together().disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /Egg salad/ }));
+    expect(together().disabled).toBe(true); // five is too many
   });
 });

@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { cookTogetherHref, MAX_DISHES } from "@/components/cook/cook-together-logic";
 import { OfflineNote } from "@/components/offline/OfflineNote";
 import { useOnline } from "@/components/offline/use-online";
 import { RecipeCard, cardIcon } from "@/components/RecipeCard";
@@ -14,10 +16,12 @@ import { api, type RecipeSummary } from "@/lib/api";
 
 /**
  * The home grid, with a "Select recipes" mode: tap cards to choose them, then "Add N to groceries" puts each on the list
- * at 1×, one request after another (a failure stops nothing: the rest still go, and the ones that failed stay chosen).
+ * at 1×, one request after another (a failure stops nothing: the rest still go, and the ones that failed stay chosen),
+ * or "Cook together" opens two to four of them in one cook mode.
  */
 export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
   const online = useOnline();
+  const router = useRouter();
   const [selecting, setSelecting] = useState(false);
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const [adding, setAdding] = useState(false);
@@ -71,7 +75,7 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
     <div ref={grid} className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
         {selecting ? (
-          <Text variant="note">Tap the recipes you want to shop for.</Text>
+          <Text variant="note">Tap recipes to shop for or cook together.</Text>
         ) : (
           <Button ref={selectButton} variant="ghost" disabled={!online} aria-describedby={online ? undefined : "select-offline"} onClick={() => setSelecting(true)}>
             Select recipes
@@ -122,6 +126,11 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
           action={adding ? "Adding…" : picked.length === 0 ? "Add to groceries" : `Add ${picked.length} to groceries`}
           onAction={() => void addAll()}
           actionDisabled={picked.length === 0 || adding || !online}
+          secondary={{
+            label: "Cook together",
+            onClick: () => router.push(cookTogetherHref(picked.map((r) => r.id))),
+            disabled: picked.length < 2 || picked.length > MAX_DISHES,
+          }}
           cancel="Cancel"
           onCancel={stop}
         />
