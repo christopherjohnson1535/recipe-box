@@ -100,7 +100,7 @@ describe("Share or Copy", () => {
     const box = sendArea().getByRole("textbox", { name: "The list, to copy" }) as HTMLTextAreaElement;
     expect(box.readOnly).toBe(true);
     expect(box.value).toBe(MILK_LIST);
-    expect(document.activeElement).toBe(box);
+    await waitFor(() => expect(document.activeElement).toBe(box)); // focus and selection are set in an effect, after the commit
     expect(box.value.slice(box.selectionStart, box.selectionEnd)).toBe(MILK_LIST);
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -287,8 +287,9 @@ describe("Send to Google Tasks", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Send to Google Tasks" }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("isn’t connected");
-    expect(alert.querySelector("a")?.getAttribute("href")).toBe("/api/integrations/google/connect");
-    expect(document.activeElement).toBe(alert.querySelector("a")); // the Send button that had focus is gone
+    const link = alert.querySelector("a");
+    expect(link?.getAttribute("href")).toBe("/api/integrations/google/connect");
+    await waitFor(() => expect(document.activeElement).toBe(link)); // moved in an effect; the Send button that had focus is gone
     // the button now reads as the connect link too
     expect(screen.getByRole("link", { name: "Connect Google Tasks" })).toBeTruthy();
     expect(tasksButton()).toBeNull();
