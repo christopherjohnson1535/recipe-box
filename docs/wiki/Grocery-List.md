@@ -29,7 +29,7 @@ Type in the **Add an item** box: "paper towels" or "2 lb potatoes". The amount i
 - **Empty list** removes every recipe and item (it asks first). Your staples and section choices are kept.
 
 ## Sending the list somewhere else
-Under the list, **Send to…** takes what is still to buy out of Recipe Box as plain text. Ticked items are left out, and so are staples unless **Show staples** is on.
+In the panel beside the list (under it on a narrower screen), **Send to…** takes what is still to buy out of Recipe Box as plain text. Ticked items are left out, and so are staples unless **Show staples** is on.
 
 - **Share list** appears on iPad, iPhone and other devices with a share sheet. Pick Notes, Reminders, Keep, Messages or any app that takes text.
 - **Copy list** appears where there is no share sheet (a computer, say). It copies the text; paste it anywhere. If your browser won't let the page copy (this can happen on a plain `http://` address), the text appears in a box, already selected: copy it from there.

@@ -58,7 +58,7 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
   the masthead and atop the ingredient sidebar.
 
 ## Density & spacing
-- Generous whitespace. Measure 38rem for reading text, 44rem for forms and the grocery list, 90rem page. Gutter 16px
+- Generous whitespace. Measure 38rem for reading text, up to 44rem for forms and the grocery list, 90rem page. Gutter 16px
   phone / 40px ≥768. Wide screens (≥1280px, the recipe page ≥1440px) put help, tools or the recipe's note in a second
   column with its own measure.
 - Listing entries: 24px vertical padding between hairlines. Touch targets 44px.
@@ -70,12 +70,12 @@ component tokens; see `docs/THEMING.md`), and this contract is enforced by `fron
 - Masthead: Marcellus wordmark (~44px) left, uppercase Karla section links right (active: 2px accent underline), thin
   double rule under.
 - Home: featured recipe (text left, framed 3:2 photo right) → ticker → search + tag index → ruled tiles (3 columns from
-  1180px) with a 22rem sidebar from 1024px.
+  1280px) with a 22rem sidebar from 1024px.
 - Recipe: split opener (tag kicker, headline, deck or none, byline, actions, photo right) → numerals band between a thin
   double rule and a hairline → drop-cap lede (long descriptions) → ingredient panel + numbered method (+ the note in a
   margin column from 1440px).
-- Add, Edit, Import: form at 44rem with a tips panel beside it from 1280px. Groceries: list at 44rem, tools panel beside
-  it. Settings: two columns of sections from 1280px.
+- Add, Edit, Import: form up to 44rem with a tips panel beside it from 1280px. Groceries: list up to 44rem, tools panel
+  beside it. Settings: two columns of sections from 1280px.
 - Auth: centred wordmark + tagline + double rule, form in a hairline frame, no band. Cook mode: full-screen evening
   overlay, no band.
 

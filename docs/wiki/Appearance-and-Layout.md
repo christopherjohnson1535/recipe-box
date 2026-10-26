@@ -27,7 +27,7 @@ From about 1280 pixels across (a computer, or an iPad held sideways in a large w
   from Safari and AI import on the right.
 - **A recipe** (about 1440 pixels and up): ingredients, method and the recipe's note side by side.
 
-Narrower than that, everything is one column in the same order, and the tip panels are left out on a phone.
+Narrower than that, everything is one column in the same order. The tips beside the recipe form are shown only on a wide screen; the note on the import page also sits under the form on an iPad, and neither is shown on a phone.
 
 ## Saving a recipe
 When a new recipe is saved a round **In the box · Saved** stamp appears in the corner for a moment. Edits show a small

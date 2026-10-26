@@ -226,48 +226,44 @@ export function GroceryView() {
                 </RecipeShelf>
               )}
 
-              {(list.items.length > 0 || list.recipes.length > 0) && (
-                <SendList
-                  list={list}
-                  showStaples={showStaples}
-                  online={online}
-                  offlineId={OFFLINE}
-                  google={google}
-                  onNotConnected={() => setGoogle((s) => s && { ...s, connected: false, connectedAt: null })}
-                />
-              )}
+              <SendList
+                list={list}
+                showStaples={showStaples}
+                online={online}
+                offlineId={OFFLINE}
+                google={google}
+                onNotConnected={() => setGoogle((s) => s && { ...s, connected: false, connectedAt: null })}
+              />
 
-              {(list.items.length > 0 || list.recipes.length > 0) && (
-                <ListActions
-                  staples={
-                    staples > 0 && (
-                      <Button variant="ghost" onClick={() => setShowStaples((s) => !s)}>
-                        {showStaples ? `Hide staples (${staples})` : `Show staples (${staples})`}
-                      </Button>
-                    )
-                  }
-                  clear={
-                    list.items.length > 0 && (
-                      <Button
-                        variant="secondary"
-                        disabled={ticked === 0 || !online}
-                        {...offlineAttrs}
-                        onClick={() => {
-                          listTop.current?.focus({ preventScroll: true }); // this button is about to disable itself
-                          void g.clearChecked(ticked);
-                        }}
-                      >
-                        Clear ticked{ticked > 0 ? ` (${ticked})` : ""}
-                      </Button>
-                    )
-                  }
-                  empty={
-                    <Button variant="ghost" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
-                      Empty list
+              <ListActions
+                staples={
+                  staples > 0 && (
+                    <Button variant="ghost" onClick={() => setShowStaples((s) => !s)}>
+                      {showStaples ? `Hide staples (${staples})` : `Show staples (${staples})`}
                     </Button>
-                  }
-                />
-              )}
+                  )
+                }
+                clear={
+                  list.items.length > 0 && (
+                    <Button
+                      variant="secondary"
+                      disabled={ticked === 0 || !online}
+                      {...offlineAttrs}
+                      onClick={() => {
+                        listTop.current?.focus({ preventScroll: true }); // this button is about to disable itself
+                        void g.clearChecked(ticked);
+                      }}
+                    >
+                      Clear ticked{ticked > 0 ? ` (${ticked})` : ""}
+                    </Button>
+                  )
+                }
+                empty={
+                  <Button variant="ghost" ref={emptyButton} disabled={!online || confirmEmpty} {...offlineAttrs} onClick={() => setConfirmEmpty(true)}>
+                    Empty list
+                  </Button>
+                }
+              />
               {confirmEmpty && (
                 <ConfirmInline
                   confirmLabel="Empty list"

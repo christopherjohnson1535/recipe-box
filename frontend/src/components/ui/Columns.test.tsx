@@ -24,22 +24,40 @@ describe("wide-screen layouts", () => {
     expect(container.innerHTML).toContain("xl:sticky");
   });
 
+  it("WithAside leaves no empty side column when there is no aside", () => {
+    const { container, rerender } = render(<WithAside aside={false}>x</WithAside>);
+    expect(container.firstElementChild?.children).toHaveLength(1);
+    rerender(<WithAside aside={<p>side</p>}>x</WithAside>);
+    expect(container.firstElementChild?.children).toHaveLength(2);
+  });
+
+  it("WithAside keeps the main column's node when the aside comes and goes", () => {
+    const { rerender } = render(<WithAside aside={<p>side</p>}><button>go</button></WithAside>);
+    const button = screen.getByRole("button", { name: "go" });
+    rerender(<WithAside aside={null}><button>go</button></WithAside>);
+    expect(screen.getByRole("button", { name: "go" })).toBe(button);
+  });
+
   it("TwoColumns reads the left stack, then the right", () => {
     render(<TwoColumns left={<p>left</p>} right={<p>right</p>} />);
     expect(screen.getByText("left").compareDocumentPosition(screen.getByText("right")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("AsidePanel is a named landmark; an optional one drops out below 768px", () => {
+  it("AsidePanel is a named landmark; a tip can drop out below 768px or below 1280px", () => {
     render(
       <>
         <AsidePanel label="Always">a</AsidePanel>
-        <AsidePanel label="Tips" optional>
+        <AsidePanel label="Tips" hideBelow="md">
           b
+        </AsidePanel>
+        <AsidePanel label="Wide tips" hideBelow="xl">
+          c
         </AsidePanel>
       </>,
     );
-    expect(screen.getByRole("complementary", { name: "Always" }).className).not.toContain("max-md:hidden");
+    expect(screen.getByRole("complementary", { name: "Always" }).className).not.toMatch(/max-(md|xl):hidden/);
     expect(screen.getByRole("complementary", { name: "Tips" }).className).toContain("max-md:hidden");
+    expect(screen.getByRole("complementary", { name: "Wide tips" }).className).toContain("max-xl:hidden");
   });
 
   it("SidebarLayout puts the rail after the method, and adds nothing when there is no rail", () => {

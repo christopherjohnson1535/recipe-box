@@ -37,13 +37,13 @@ decisions worth knowing before you change a colour:
   comes within 25 degrees of hue of the accent.
 - **Attention moved from mustard to sea teal.** Mustard (`#d9a21b`, hue 43) sat next to saffron (hue 38) and a
   flagged import row read as "accent", not "check this". `--color-attention` is now `--sea-400` (`#6fb5bd`) in both
-  editions: still a wash, rule or mark only, charcoal ink on it (6.5:1), 7.2:1 against the darkroom stage, and the
+  appearances: still a wash, rule or mark only, charcoal ink on it (6.5:1), 7.2:1 against the darkroom stage, and the
   20% wash keeps ink and accent text above 4.5:1. Mustard stays a primitive print ink with no meaning attached.
 - **The band.** `--color-band`, `--color-on-band` and `--color-band-accent` are the charcoal top band and inverse
-  panels. They are dark in both editions (evening only softens the text a touch) and are paired in the contract now,
+  panels. They are dark in both appearances (evening only softens the text a touch) and are paired in the contract now,
   before the shell issue (#120) uses them.
 
-## Editions: how day and evening are chosen
+## Appearances: how day and evening are chosen
 Day is the default token set (`:root`, from `day.css`). Evening is the same names redefined in `evening.css` (and the
 component tokens that evening re-points, such as `--photo-filter`, `--rule-double`, `--photo-outline` and `--feature-edge`, in `components.css`) under two selectors with identical
 values:
@@ -52,9 +52,9 @@ values:
 - `@media (prefers-color-scheme: dark) { :root:not([data-theme]) }`: when no attribute is set (no JavaScript, or the
   device preference). `data-theme="day"` therefore always beats a dark device.
 
-Print (`globals.css`) overrides both so paper is white however the edition was chosen.
+Print (`globals.css`) overrides both so paper is white however the appearance was chosen.
 
-Which edition shows is a per-device preference in `localStorage["rb-edition"]`: `clock` (default; evening 19:00 to
+Which appearance shows is a per-device preference in `localStorage["rb-edition"]`: `clock` (default; evening 19:00 to
 06:59 local), `day`, `evening` or `device` (leave `data-theme` off). `src/lib/edition.ts` holds the rules
 (`resolveEdition`, `msUntilNextSwitch`) and `EDITION_SCRIPT`, built from the same constants. The root layout puts that
 script in `<head>`, so `data-theme` is set before first paint (`<html suppressHydrationWarning>`).
@@ -62,6 +62,8 @@ script in `<head>`, so `data-theme` is set before first paint (`<html suppressHy
 07:00/19:00, when the tab becomes visible, on a `storage` event and when the device scheme changes, and rewrites
 `<meta name="theme-color">` to the paper colour so the iPad status bar matches. Settings, Appearance changes the
 preference and applies it at once. `PAPER` in `edition.ts` is checked against the tokens by `tokens.test.ts`.
+The older word "edition" survives only as an internal name (`edition.ts`, `rb-edition`, `EditionController`); it never
+reaches a reader.
 
 ## Changing a colour
 - **Everywhere a meaning is used** (say, a warmer paper): change the primitive the theme points at, or point the

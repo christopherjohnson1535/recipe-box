@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cx } from "./cx";
 
 /* Pieces of the article layout a recipe page is set in. The opener, numerals, ingredients, method and bar have their own files. */
 
@@ -14,8 +15,14 @@ export function Lede({ children }: { children: ReactNode }) {
  */
 export function SidebarLayout({ sidebar, rail, children }: { sidebar: ReactNode; rail?: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid w-full max-w-page grid-cols-1 gap-x-14 gap-y-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:grid-rows-[auto_1fr] md:gap-y-8 lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] min-[90rem]:grid-cols-[minmax(0,22rem)_minmax(0,38rem)_minmax(0,1fr)]">
-      <div className="md:row-span-2">{sidebar}</div>
+    <div
+      className={cx(
+        "grid w-full max-w-page grid-cols-1 gap-x-14 gap-y-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] min-[90rem]:grid-cols-[minmax(0,22rem)_minmax(0,38rem)_minmax(0,1fr)]",
+        // Two rows only when there is a rail to put under the method; otherwise a spare row adds a gap under the page.
+        Boolean(rail) && "md:grid-rows-[auto_1fr] md:gap-y-8",
+      )}
+    >
+      <div className={cx(Boolean(rail) && "md:row-span-2")}>{sidebar}</div>
       {children}
       {rail && <div className="min-w-0 md:col-start-2 md:max-w-measure min-[90rem]:max-w-none min-[90rem]:col-start-3 min-[90rem]:row-start-1">{rail}</div>}
     </div>

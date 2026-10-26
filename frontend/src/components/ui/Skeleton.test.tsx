@@ -30,8 +30,8 @@ describe("skeletons", () => {
     rememberPhoto("r1", true);
     const withPhoto = render(<RecipeSkeleton />);
     expect(withPhoto.container.querySelector(".aspect-\\[3\\/2\\]")).toBeTruthy();
+    expect(withPhoto.container.querySelectorAll("aside, [class*='md:grid-cols']").length).toBeGreaterThan(0);
     rememberPhoto("r1", false);
-    expect(container.querySelectorAll("aside, [class*='md:grid-cols']")).toBeTruthy();
   });
 
   it("falls back to the plain note on routes it is not shaped for", () => {

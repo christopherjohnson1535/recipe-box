@@ -69,6 +69,34 @@ describe("ImportScreen", () => {
     expect(screen.queryByRole("complementary", { name: "How importing works" })).toBeNull();
   });
 
+  it("keeps the tabs and the form in place, with focus, when a request starts and ends", async () => {
+    let finish!: (d: RecipeDraft) => void;
+    const api = mockApi({ importUrl: vi.fn().mockReturnValue(new Promise<RecipeDraft>((r) => (finish = r))) });
+    render(<ImportScreen api={api} />);
+    const tab = screen.getByRole("tab", { name: "Link" });
+    const field = screen.getByLabelText("Recipe link");
+    tab.focus();
+    importLink();
+    await waitFor(() => expect(api.importUrl).toHaveBeenCalled());
+    // example.com has a site card, so this request shows the dark stage and the help steps aside
+    expect(screen.queryByRole("complementary", { name: "How importing works" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "Link" })).toBe(tab);
+    expect(screen.getByLabelText("Recipe link")).toBe(field);
+    expect(document.activeElement).toBe(tab);
+    await act(async () => finish(draft()));
+  });
+
+  it("says only what is true about importing while AI is off, and describes reading while it is on", async () => {
+    render(<ImportScreen api={mockApi({ importCapabilities: vi.fn().mockResolvedValue({ ai: false, provider: "none" }) })} />);
+    await waitFor(() => expect(screen.getByText(/photos to type it in from/)).toBeTruthy());
+    expect(screen.queryByText(/or the text itself/)).toBeNull();
+  });
+
+  it("describes reading photos and text in the help when AI is on", async () => {
+    render(<ImportScreen api={mockApi()} />);
+    await waitFor(() => expect(screen.getByText(/or the text itself/)).toBeTruthy());
+  });
+
   it("turns Import off while offline, says why, and sends nothing", async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     const api = mockApi();

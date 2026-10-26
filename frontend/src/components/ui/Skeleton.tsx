@@ -56,7 +56,7 @@ function TileSkeleton() {
 
 /**
  * The home page's shape: the featured recipe (text left, 3:2 photo right, above the text on a phone), the ticker, the
- * search row and tag index, then ruled tiles (3 columns from 1180px, 2 from 640px, 1 below) beside a 22rem sidebar
+ * search row and tag index, then ruled tiles (3 columns from 1280px, 2 from 640px, 1 below) beside a 22rem sidebar
  * from 1024px. Other (app) routes get the plain note.
  */
 export function HomeSkeleton() {
@@ -92,7 +92,7 @@ export function HomeSkeleton() {
           <Skeleton className="h-11 w-full sm:hidden" />
         </div>
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-12">
-          <ul className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-12 min-[640px]:grid-cols-2 min-[1180px]:grid-cols-3">
+          <ul className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-12 min-[640px]:grid-cols-2 min-[1280px]:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <TileSkeleton key={i} />
             ))}

@@ -4,10 +4,13 @@ import { Step, Steps } from "@/components/ui/Steps";
 import { Text } from "@/components/ui/Text";
 import { TextLink } from "@/components/ui/TextLink";
 
-/** The side note beside the import form on wide screens: what happens after the button. */
-export function ImportHelp() {
+/**
+ * The side note beside the import form on wide screens: what happens after the button. With AI off (the default) only
+ * links are read and photos are kept to type from, so the note says that instead of promising a reading.
+ */
+export function ImportHelp({ aiOff }: { aiOff: boolean }) {
   return (
-    <AsidePanel optional label="How importing works">
+    <AsidePanel hideBelow="md" label="How importing works">
       <Heading level={2} size="label">
         What happens next
       </Heading>
@@ -17,7 +20,7 @@ export function ImportHelp() {
             <Text as="span" variant="strong">
               Add it.
             </Text>{" "}
-            A link to the recipe, photos of a cookbook page or card, or the text itself.
+            {aiOff ? "A link to the recipe, or photos to type it in from." : "A link to the recipe, photos of a cookbook page or card, or the text itself."}
           </p>
         </Step>
         <Step n={2}>
@@ -25,7 +28,7 @@ export function ImportHelp() {
             <Text as="span" variant="strong">
               Check the draft.
             </Text>{" "}
-            It is read into a draft you can correct. Nothing is saved yet.
+            {aiOff ? "A link is read into a draft you can correct; photos sit beside an empty recipe." : "It is read into a draft you can correct."} Nothing is saved yet.
           </p>
         </Step>
         <Step n={3}>

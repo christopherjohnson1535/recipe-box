@@ -65,8 +65,10 @@ The R monogram is redrawn in Marcellus: paper `#f4f4f1` on band charcoal `#22262
 rule. How to regenerate: `frontend/public/icons/README.md`.
 
 ## Screens after #122
-Captured from a seeded local stack (production build), 1600px desktop and iPad (1024px landscape, 768px upright), in the
-day and evening appearances. JPEG crops of the top of each page. The home page is shown in the #121 record.
+Captured from a seeded local stack (production build) at 1600px desktop and iPad (1024px landscape, 768px upright).
+These are selected screens, not a full set: recipe, groceries and settings are shown in both the day and evening
+appearances; the others in the one the file name gives. There is no 320px shot (phone widths were checked in a browser,
+not recorded here). JPEG crops of the top of each page. The home page is shown in the #121 record.
 
 | File | Screen | Width |
 |---|---|---|

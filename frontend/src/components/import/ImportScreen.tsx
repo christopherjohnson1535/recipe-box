@@ -6,7 +6,7 @@ import { RecipeForm, type RecipeFormInitial } from "@/components/recipe-form/Rec
 import { Alert } from "@/components/ui/Alert";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { WithAside } from "@/components/ui/Columns";
+import { WithAside, WithStage } from "@/components/ui/Columns";
 import { Heading } from "@/components/ui/Heading";
 import { Pending } from "@/components/ui/Pending";
 import { PhotoGallery } from "@/components/ui/PhotoPicker";
@@ -470,26 +470,15 @@ export function ImportScreen({
     </>
   );
   const tabs = <Tabs label="Import from" idPrefix="import" tabs={TABS} value={mode} onChange={pick} />;
+  // One tree whether or not a request is running, so the tabs and the form keep their place (and focus) when it starts and
+  // ends. While a request is in flight the stage already fills the width, so the help beside the form steps aside.
   const panel = (
     <div role="tabpanel" id="import-panel" aria-labelledby={`import-tab-${mode}`} className="flex flex-col gap-6">
-      {stage ? (
-        <div className="grid items-start gap-10 lg:grid-cols-2">
-          {stage}
-          <div className="flex flex-col gap-6">{inner}</div>
-        </div>
-      ) : (
-        inner
-      )}
+      <WithStage stage={stage}>{inner}</WithStage>
     </div>
   );
-  // While a request is in flight the stage already fills the width; otherwise the form has its help beside it.
-  return stage ? (
-    <div className="flex flex-col gap-8">
-      {tabs}
-      {panel}
-    </div>
-  ) : (
-    <WithAside sticky aside={<ImportHelp />}>
+  return (
+    <WithAside sticky aside={stage ? null : <ImportHelp aiOff={aiOff} />}>
       {tabs}
       {panel}
     </WithAside>
