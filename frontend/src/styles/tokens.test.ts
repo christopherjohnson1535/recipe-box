@@ -131,6 +131,8 @@ const TEXT: [string, string][] = [
   ["--color-on-danger", "--color-danger-hover"],
   ["--color-on-band", "--color-band"], // the charcoal top band and inverse panels (#120)
   ["--color-band-accent", "--color-band"], // saffron on the band: active link, counts
+  ["--cook-on-dish-1", "--cook-dish-1"], // the initial in a filled dish mark (cook together)
+  ["--cook-on-dish-3", "--cook-dish-3"],
 ];
 // Non-text UI (borders that show a control, focus rings, state underlines): 3:1.
 const UI: [string, string][] = [
@@ -306,6 +308,35 @@ describe("design tokens", () => {
     expect(hex(t, "--color-danger")).not.toBe(hex(t, "--color-accent"));
     expect(apart("--color-danger", "--color-accent"), `${t} danger vs accent`).toBeGreaterThanOrEqual(25);
     expect(apart("--color-attention", "--color-accent"), `${t} attention vs accent`).toBeGreaterThanOrEqual(25);
+  });
+
+  describe("cook together dish marks (cook mode is always the evening appearance)", () => {
+    const dishes = [1, 2, 3, 4];
+    const filled = [1, 3];
+    const grounds = ["--color-stage", "--color-paper"];
+    const channels = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const distance = (a: string, b: string) => Math.hypot(...channels(a).map((v, i) => v - channels(b)[i]));
+
+    it.each(dishes)("dish %i: the mark is at least 3:1 and the initial in it at least 4.5:1 on the cook ground", (n) => {
+      for (const ground of grounds) {
+        const bg = hex("evening", ground);
+        expect(contrast(hex("evening", `--cook-dish-${n}`), bg), `mark on ${ground}`).toBeGreaterThanOrEqual(3);
+        // On an outline the initial sits straight on the ground; on a fill, on the dish colour (checked in TEXT above).
+        if (!filled.includes(n)) expect(contrast(hex("evening", `--cook-on-dish-${n}`), bg), `initial on ${ground}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+
+    it.each(filled)("dish %i: the initial on the fill is at least 4.5:1 in both appearances", (n) => {
+      for (const t of ["day", "evening"]) expect(contrast(hex(t, `--cook-on-dish-${n}`), hex(t, `--cook-dish-${n}`)), t).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it("the four dish colours are apart from each other, and the two that share a fill are clearly apart", () => {
+      for (const a of dishes) for (const b of dishes.filter((x) => x > a)) {
+        const apart = distance(hex("evening", `--cook-dish-${a}`), hex("evening", `--cook-dish-${b}`));
+        const sameFill = filled.includes(a) === filled.includes(b); // a fill and an outline are also told apart by that
+        expect(apart, `dish ${a} vs ${b}`).toBeGreaterThanOrEqual(sameFill ? 100 : 50);
+      }
+    });
   });
 
   it("the contrast helper matches WCAG", () => {

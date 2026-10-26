@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { cx } from "./cx";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
@@ -410,11 +411,43 @@ export function SelectCard({
 }
 
 /** The bar pinned to the bottom while choosing recipes: a count (from 640px), the add action and a way out. Same inverse pill as the recipe page's floating bar. */
-export function SelectionBar({ status, action, onAction, actionDisabled, cancel, onCancel }: { status: string; action: string; onAction: () => void; actionDisabled?: boolean; cancel: string; onCancel: () => void }) {
+export function SelectionBar({
+  status,
+  action,
+  onAction,
+  actionDisabled,
+  secondary,
+  cancel,
+  onCancel,
+}: {
+  status: string;
+  action: string;
+  onAction: () => void;
+  actionDisabled?: boolean;
+  /** A second way forward, set as an outlined button before the main action ("Cook together"). */
+  secondary?: { label: string; onClick: () => void; disabled?: boolean };
+  cancel: string;
+  onCancel: () => void;
+}) {
   return (
     <div className="selection-bar pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
-      <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) [--focus-ring:var(--bar-focus)] sm:gap-3 sm:pl-6">
+      <div
+        className={cx(
+          "pointer-events-auto flex max-w-full items-center gap-2 border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) [--focus-ring:var(--bar-focus)] sm:gap-3 sm:rounded-full sm:pl-6",
+          secondary ? "flex-wrap justify-center rounded-[1.75rem]" : "rounded-full",
+        )}
+      >
         <p className="label hidden whitespace-nowrap sm:block">{status}</p>
+        {secondary && (
+          <button
+            type="button"
+            onClick={secondary.onClick}
+            disabled={secondary.disabled}
+            className="label inline-flex min-h-control shrink-0 cursor-pointer items-center rounded-full border border-(--bar-fg) px-5 whitespace-nowrap text-(--bar-fg) transition-colors duration-150 hover:bg-(--bar-fg)/10 disabled:cursor-not-allowed disabled:border-(--bar-fg)/40 disabled:opacity-60 disabled:hover:bg-transparent"
+          >
+            {secondary.label}
+          </button>
+        )}
         <button
           type="button"
           onClick={onAction}

@@ -99,6 +99,18 @@
   --bar-action-fg: var(--color-on-accent);
   --bar-focus: var(--color-paper);
   --target-bg: var(--color-paper); /* the ingredient row a step link jumped to */
+
+  /* Cook together (#82): one mark per dish on the cook stage, which is always the evening appearance. Dishes 1 and 3 are
+     filled, 2 and 4 are outlines (and 1, 2 are round, 3, 4 square), so two dishes are told apart without colour. The
+     --cook-on-dish token is the initial inside the mark: dark ink on a fill, the dish colour itself on an outline. */
+  --cook-dish-1: var(--color-accent);
+  --cook-on-dish-1: var(--color-on-accent);
+  --cook-dish-2: var(--color-danger);
+  --cook-on-dish-2: var(--color-danger);
+  --cook-dish-3: var(--color-attention);
+  --cook-on-dish-3: var(--color-on-attention);
+  --cook-dish-4: var(--color-ink);
+  --cook-on-dish-4: var(--color-ink);
 }
 
 /*

@@ -189,6 +189,28 @@ describe("SelectCard and SelectionBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onAction).toHaveBeenCalled();
     expect(onCancel).toHaveBeenCalled();
+    // Without a second action, the bar holds exactly the main action and the way out.
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Add 2 to groceries", "Cancel"]);
+  });
+
+  it("sets a secondary action before the main one", () => {
+    const onSecondary = vi.fn();
+    const onAction = vi.fn();
+    render(<SelectionBar status="2 chosen" action="Add 2 to groceries" onAction={onAction} secondary={{ label: "Cook together", onClick: onSecondary }} cancel="Cancel" onCancel={() => {}} />);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Cook together", "Add 2 to groceries", "Cancel"]);
+    fireEvent.click(screen.getByRole("button", { name: "Cook together" }));
+    expect(onSecondary).toHaveBeenCalledTimes(1);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("can disable the secondary action without touching the main one", () => {
+    const onSecondary = vi.fn();
+    render(<SelectionBar status="1 chosen" action="Add 1 to groceries" onAction={() => {}} secondary={{ label: "Cook together", onClick: onSecondary, disabled: true }} cancel="Cancel" onCancel={() => {}} />);
+    const secondary = screen.getByRole("button", { name: "Cook together" }) as HTMLButtonElement;
+    expect(secondary.disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Add 1 to groceries" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(secondary);
+    expect(onSecondary).not.toHaveBeenCalled();
   });
 });
 

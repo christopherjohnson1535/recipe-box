@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Children, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from "react";
+import { Children, useId, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { pinEdition, unpinEdition } from "@/lib/edition";
 import { cx } from "./cx";
 
@@ -256,11 +256,19 @@ export function CookRailRow({ quantity, name, lit, ticked, onToggle }: { quantit
 }
 
 /** The step itself: kicker (with an optional action such as the Done toggle beside it), then the text at 40px on an iPad (28px on a phone). */
-export function CookStepText({ label, action, children }: { label: string; action?: ReactNode; children: ReactNode }) {
+export function CookStepText({ label, action, dish, children }: { label: string; action?: ReactNode; /** A `CookDishMark`, shown before the label when several dishes are cooked together. */ dish?: ReactNode; children: ReactNode }) {
+  const kicker = <p className="label text-accent">{label}</p>;
   return (
     <div className="my-auto select-none">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4">
-        <p className="label text-accent">{label}</p>
+        {dish ? (
+          <div className="flex min-w-0 items-center gap-4">
+            {dish}
+            {kicker}
+          </div>
+        ) : (
+          kicker
+        )}
         {action}
       </div>
       <p className="font-display text-[1.75rem] leading-[1.25] text-balance text-ink min-[700px]:text-[2.5rem] [overflow-wrap:anywhere]">{children}</p>
@@ -275,13 +283,35 @@ export function CookStepList({ children }: { children: ReactNode }) {
 
 /**
  * One step in the list, 24px text (28px from 700px) with its numeral and a tick on the right. The current step has an accent
- * bar on its left and scrolls into view when it becomes current; a done step is muted.
+ * bar on its left and scrolls into view when it becomes current; a done step is muted. Cooking several dishes together, `dish`
+ * (a `CookDishMark`) sits above the numeral and `controls` (`CookMoveButtons`) after the tick.
  */
-export function CookStepItem({ number, current, done, tick, children }: { number: number; current: boolean; done: boolean; tick: ReactNode; children: ReactNode }) {
+export function CookStepItem({
+  number,
+  current,
+  done,
+  tick,
+  dish,
+  controls,
+  children,
+}: {
+  number: number;
+  current: boolean;
+  done: boolean;
+  tick: ReactNode;
+  dish?: ReactNode;
+  controls?: ReactNode;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
     if (current) ref.current?.scrollIntoView?.({ block: "center" });
   }, [current]);
+  const numeral = (
+    <span aria-hidden="true" className="font-display text-numeral text-accent [font-variant-numeric:lining-nums_tabular-nums]">
+      {number}
+    </span>
+  );
   return (
     <li
       ref={ref}
@@ -292,17 +322,304 @@ export function CookStepItem({ number, current, done, tick, children }: { number
         done ? "text-ink-muted" : "text-ink",
       )}
     >
-      <span aria-hidden="true" className="font-display text-numeral text-accent [font-variant-numeric:lining-nums_tabular-nums]">
-        {number}
-      </span>
+      {dish ? (
+        <div className="flex flex-col items-start gap-2">
+          {dish}
+          {numeral}
+        </div>
+      ) : (
+        numeral
+      )}
       <div className="flex flex-col items-start gap-2">
         <p className="font-display text-[1.5rem] leading-[1.3] [overflow-wrap:anywhere] min-[700px]:text-[1.75rem]">
           <span className="sr-only">Step {number}: </span>
           {children}
         </p>
-        {tick}
+        {controls ? (
+          <div className="flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-1">
+            {tick}
+            {controls}
+          </div>
+        ) : (
+          tick
+        )}
       </div>
     </li>
+  );
+}
+
+// ===== Cook together (#82): several dishes, one cook. =====
+
+/* One entry per dish colour. Fill and shape differ as well as colour, so two dishes are told apart without it; the
+   class strings are written out so Tailwind sees them. Tokens: --cook-dish-N, --cook-on-dish-N (components.css). */
+const DISH = [
+  { fill: "solid", shape: "round", tone: "border-(--cook-dish-1) bg-(--cook-dish-1) text-(--cook-on-dish-1)" },
+  { fill: "outline", shape: "round", tone: "border-(--cook-dish-2) text-(--cook-on-dish-2)" },
+  { fill: "solid", shape: "square", tone: "border-(--cook-dish-3) bg-(--cook-dish-3) text-(--cook-on-dish-3)" },
+  { fill: "outline", shape: "square", tone: "border-(--cook-dish-4) text-(--cook-on-dish-4)" },
+] as const;
+
+/**
+ * The mark of one dish: its initial in a chip whose colour, fill (solid or outline) and shape (round or square) are
+ * unique to it. The dish name is the accessible text: shown beside the chip as a label at "md", visually hidden at "sm".
+ * `dish` is 0 to 3.
+ */
+export function CookDishMark({ dish, initial, name, size = "md" }: { dish: number; initial: string; name: string; size?: "sm" | "md" }) {
+  const d = DISH[((dish % DISH.length) + DISH.length) % DISH.length];
+  return (
+    <span data-dish-fill={d.fill} data-dish-shape={d.shape} className="inline-flex min-w-0 items-center gap-2.5">
+      <span
+        aria-hidden="true"
+        className={cx(
+          "inline-grid shrink-0 place-items-center border-2 font-display leading-none uppercase",
+          d.shape === "round" ? "rounded-full" : "rounded-[3px]",
+          size === "sm" ? "size-7 text-[0.9375rem]" : "size-9 text-[1.125rem]",
+          d.tone,
+        )}
+      >
+        {initial}
+      </span>
+      <span className={size === "sm" ? "sr-only" : "label min-w-0 truncate text-ink"}>{name}</span>
+    </span>
+  );
+}
+
+/** The dishes being cooked, one `CookDishMark` each, in a row under the top bar. */
+export function CookDishLegend({ children }: { children: ReactNode }) {
+  return (
+    <ul role="list" aria-label="Dishes" className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-1">
+      {Children.map(children, (child) => (
+        <li className="min-w-0">{child}</li>
+      ))}
+    </ul>
+  );
+}
+
+const chevron = { earlier: "M6 15l6-6 6 6", later: "M6 9l6 6 6-6" };
+const moveButton =
+  "inline-flex size-control shrink-0 items-center justify-center rounded-control border border-rule-strong text-ink transition-[border-color,color] duration-150 hover:border-accent hover:text-accent aria-disabled:cursor-not-allowed aria-disabled:border-dotted aria-disabled:border-rule aria-disabled:text-ink-muted aria-disabled:hover:border-rule aria-disabled:hover:text-ink-muted";
+
+/**
+ * Earlier / Later for one step: two 44px icon buttons. A step that cannot move that way keeps its button (dotted, muted,
+ * `aria-disabled`, a tap does nothing) rather than disabling it, so keyboard focus is not lost when a step reaches an end.
+ */
+export function CookMoveButtons({ stepLabel, canEarlier, canLater, onEarlier, onLater }: { stepLabel: string; canEarlier: boolean; canLater: boolean; onEarlier: () => void; onLater: () => void }) {
+  const button = (way: keyof typeof chevron, can: boolean, onClick: () => void) => (
+    <button
+      type="button"
+      aria-label={`Move ${stepLabel} ${way}`}
+      title={`Move ${stepLabel} ${way}`}
+      aria-disabled={can ? undefined : true}
+      onClick={() => can && onClick()}
+      className={moveButton}
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d={chevron[way]} />
+      </svg>
+    </button>
+  );
+  return (
+    <div className="flex gap-2">
+      {button("earlier", canEarlier, onEarlier)}
+      {button("later", canLater, onLater)}
+    </div>
+  );
+}
+
+const GLIDE_MS = 220;
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+/**
+ * The all-steps list for several dishes: children are `CookStepItem`s with stable keys. When their order changes the steps
+ * glide to their new places (FLIP: each item starts from where it was and slides home, transform only, 220ms on the
+ * motion curve) unless the person asks for reduced motion. (React puts keyboard focus back on a button whose step was moved.)
+ */
+export function CookReorderList({ children }: { children: ReactNode }) {
+  const list = useRef<HTMLOListElement>(null);
+  const placed = useRef(new Map<HTMLElement, number>());
+  const snapshot = (ol: HTMLOListElement) => new Map(Array.from(ol.children, (el) => [el as HTMLElement, (el as HTMLElement).offsetTop]));
+
+  useLayoutEffect(() => {
+    const ol = list.current;
+    if (!ol) return;
+    const before = placed.current;
+    placed.current = snapshot(ol);
+    if (before.size === 0 || reducedMotion()) return;
+    const top = ol.getBoundingClientRect().top;
+    for (const [el, now] of placed.current) {
+      const was = before.get(el);
+      if (was === undefined) continue;
+      // An item still gliding is somewhere between its old and new place: start from where it is drawn.
+      const running = el.getAnimations?.() ?? [];
+      const drawn = running.length ? el.getBoundingClientRect().top - top - now : 0;
+      running.forEach((a) => a.cancel());
+      const dy = was - now + drawn;
+      if (Math.abs(dy) < 1) continue;
+      el.animate?.([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: GLIDE_MS, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" });
+    }
+  });
+  // A resize re-wraps text; that is not a reorder, so it must not glide next time.
+  useEffect(() => {
+    const resnap = () => list.current && (placed.current = snapshot(list.current));
+    window.addEventListener("resize", resnap);
+    return () => window.removeEventListener("resize", resnap);
+  }, []);
+
+  return (
+    <ol ref={list} className="relative flex flex-col">
+      {children}
+    </ol>
+  );
+}
+
+/** "One step / All steps / By dish": a radio group set like `CookViewToggle`, the filled pill sliding to the chosen option. Arrow keys, Home and End move and choose. */
+export function CookViewChoice<T extends string>({ label, options, value, onChange }: { label: string; options: readonly { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  const group = useRef<HTMLDivElement>(null);
+  const at = Math.max(0, options.findIndex((o) => o.id === value));
+
+  function onKeyDown(e: KeyboardEvent) {
+    const last = options.length - 1;
+    const next = { ArrowRight: at + 1, ArrowDown: at + 1, ArrowLeft: at - 1, ArrowUp: at - 1, Home: 0, End: last }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const to = (next + options.length) % options.length;
+    onChange(options[to].id);
+    group.current?.querySelectorAll<HTMLElement>('[role="radio"]')[to]?.focus();
+  }
+
+  return (
+    <div ref={group} role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className="relative grid auto-cols-fr grid-flow-col overflow-hidden rounded-full border border-(--button-secondary-border)">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 bg-(--button-primary-bg) transition-transform duration-300 ease-out motion-reduce:transition-none"
+        style={{ width: `${100 / options.length}%`, transform: `translateX(${at * 100}%)` }}
+      />
+      {options.map((o) => {
+        const on = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onChange(o.id)}
+            className={cx(
+              "label relative inline-flex min-h-control min-w-28 items-center justify-center px-4 whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-4px]",
+              on ? "text-(--button-primary-fg)" : "text-ink hover:text-accent",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** By dish: one column per dish from 1024px (iPad landscape), stacked under a hairline below that. Put a `CookDishColumn` per dish inside. */
+export function CookDishColumns({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 lg:auto-cols-fr lg:grid-flow-col">{children}</div>;
+}
+
+/** One dish's steps: its heading (a `CookDishMark` and the dish's title), then `CookStepItem`s styled as in `CookStepList`. */
+export function CookDishColumn({ heading, children }: { heading: ReactNode; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section
+      aria-labelledby={id}
+      className="min-w-0 border-t border-rule pt-8 pb-6 first:border-t-0 first:pt-0 lg:border-t-0 lg:border-l lg:px-8 lg:pt-0 lg:first:border-l-0 lg:first:pl-0 lg:last:pr-0"
+    >
+      <h2 id={id} className="mb-2 flex min-w-0 items-center gap-3 font-display text-title-sm text-ink">
+        {heading}
+      </h2>
+      <ol className="flex flex-col">{children}</ol>
+    </section>
+  );
+}
+
+/**
+ * Tabs for the ingredients rail, set for the stage: each tab is the dish's mark (a `CookDishMark`, hidden from screen readers
+ * since the tab has its own name) and, when there is room, its name. In the narrow landscape rail only the chosen tab shows
+ * its name. Same keys and wiring as `ui/Tabs`: the panel is `${idPrefix}-panel`, named by the chosen `${idPrefix}-tab-${id}`.
+ */
+export function CookDishTabs<T extends string>({
+  label,
+  idPrefix,
+  tabs,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  idPrefix: string;
+  tabs: readonly { id: T; label: string; mark: ReactNode }[];
+  value: T;
+  onChange: (v: T) => void;
+  children: ReactNode;
+}) {
+  const list = useRef<HTMLDivElement>(null);
+
+  function onKeyDown(e: KeyboardEvent) {
+    const at = tabs.findIndex((t) => t.id === value);
+    const next = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const to = tabs[(next + tabs.length) % tabs.length];
+    onChange(to.id);
+    list.current?.querySelector<HTMLElement>(`#${idPrefix}-tab-${to.id}`)?.focus();
+  }
+
+  return (
+    <div>
+      <div ref={list} role="tablist" aria-label={label} onKeyDown={onKeyDown} className="flex gap-1 overflow-x-auto border-b border-(--rule-hair)">
+        {tabs.map((t) => {
+          const selected = t.id === value;
+          return (
+            <button
+              key={t.id}
+              id={`${idPrefix}-tab-${t.id}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={`${idPrefix}-panel`}
+              tabIndex={selected ? 0 : -1}
+              title={t.label}
+              onClick={() => onChange(t.id)}
+              className={cx(
+                "-mb-px inline-flex min-h-control min-w-control items-center justify-center gap-2 border-b-2 px-2 transition-[border-color,color] duration-150 ease-out",
+                selected
+                  ? "min-w-0 border-(--chip-underline-selected) text-(--chip-fg-selected)"
+                  : "shrink-0 border-transparent text-(--chip-fg) hover:border-(--chip-underline-hover) hover:text-(--chip-fg-hover)",
+              )}
+            >
+              <span aria-hidden="true" className="inline-flex shrink-0">
+                {t.mark}
+              </span>
+              <span className={cx("label min-w-0 truncate", !selected && "sr-only max-lg:not-sr-only")}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div role="tabpanel" id={`${idPrefix}-panel`} aria-labelledby={`${idPrefix}-tab-${value}`} className="pt-3">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** "Bring <dish>'s next step here": a quiet text button led by the dish's mark, 44px tall. */
+export function CookNudge({ children, onClick, mark }: { children: ReactNode; onClick: () => void; mark: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="label inline-flex min-h-control items-center gap-3 rounded-control px-2 text-left text-ink-muted transition-colors duration-150 hover:text-ink"
+    >
+      <span aria-hidden="true" className="inline-flex shrink-0">
+        {mark}
+      </span>
+      <span className="underline decoration-1 underline-offset-4">{children}</span>
+    </button>
   );
 }
 
