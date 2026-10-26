@@ -9,9 +9,9 @@ use uuid::Uuid;
 
 /// Long edge of a rendition; smaller photos are not scaled up.
 pub const MAX_EDGE: u32 = 1600;
-/// Paper colour `--cream-50` (#fbf8f1, frontend/src/styles/primitives.css) the whites are warmed toward.
-const PAPER: [f32; 3] = [251.0, 248.0, 241.0];
-/// How far the photo moves toward the paper tint: a hint of warmth, not a colour cast.
+/// Paper colour `--chalk-50` (#f4f4f1, frontend/src/styles/primitives.css) the whites are lifted toward.
+const PAPER: [f32; 3] = [244.0, 244.0, 241.0];
+/// How far the photo moves toward the paper tint: a barely-there warm lift, not a colour cast.
 const WARMTH: f32 = 0.5;
 /// Grain amplitude in levels (plus or minus).
 const GRAIN: i32 = 3;
@@ -24,8 +24,9 @@ pub fn seed_for(id: Uuid) -> u64 {
     (n as u64) ^ ((n >> 64) as u64)
 }
 
-/// Centred crop (4:3 landscape or 1:1), long edge at most [`MAX_EDGE`], gentle S tone curve, warm paper tint and
-/// light monochrome grain from `seed`. Same input and seed give the same bytes.
+/// Centred crop (4:3 landscape or 1:1), long edge at most [`MAX_EDGE`], gentle S tone curve, a slight tint toward
+/// the chalk paper (`--chalk-50`, a cool off-white) and light monochrome grain from `seed`. Same input and seed give
+/// the same bytes.
 pub fn render_plate(src: &RgbImage, seed: u64) -> RgbImage {
     let (w, h) = src.dimensions();
     let (num, den) = if w as f32 > LANDSCAPE_RATIO * h as f32 {
@@ -82,7 +83,7 @@ struct HouseLook {
     /// Tone curve per level: smoothstep blended with the identity (gentle S), then squeezed into 8..247 so a print
     /// never has pure black or white.
     curve: [f32; 256],
-    /// Warm paper tint per channel.
+    /// Chalk paper tint per channel.
     tint: [f32; 3],
 }
 
@@ -260,8 +261,30 @@ mod tests {
         let black = render_plate(&RgbImage::from_pixel(64, 64, Rgb([0; 3])), 3);
         assert!(white.pixels().all(|p| p.0.iter().all(|&c| c < 252)));
         assert!(black.pixels().all(|p| p.0.iter().any(|&c| c > 0)));
-        // Warm: red is at least as strong as blue on white.
-        assert!(white.pixels().all(|p| p.0[0] > p.0[2]));
+        // Chalk tint: red equals green (grain is monochrome) and sits a few levels above blue.
+        assert!(white.pixels().all(|p| {
+            let [r, g, b] = p.0;
+            r.abs_diff(g) <= 1 && r >= b && r - b <= 4
+        }));
+    }
+
+    #[test]
+    fn paper_matches_the_frontend_chalk() {
+        let css = include_str!("../../frontend/src/styles/primitives.css");
+        let value = css
+            .split("--chalk-50:")
+            .nth(1)
+            .expect("--chalk-50 not found in primitives.css")
+            .trim_start();
+        assert!(
+            value.starts_with('#') && value.len() >= 7,
+            "--chalk-50 is not a #rrggbb value"
+        );
+        let hex = &value[1..7];
+        let rgb: [f32; 3] = std::array::from_fn(|i| {
+            f32::from(u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).unwrap())
+        });
+        assert_eq!(rgb, PAPER);
     }
 
     fn mean_luma(img: &RgbImage) -> f32 {
@@ -350,6 +373,8 @@ mod tests {
                 x += t.width() + gap;
             }
         }
-        sheet.save(format!("{dir}/../contact43-after.png")).unwrap();
+        let sheet_path =
+            std::env::var("PLATE_SHEET").unwrap_or(format!("{dir}/../contact43-after.png"));
+        sheet.save(sheet_path).unwrap();
     }
 }
