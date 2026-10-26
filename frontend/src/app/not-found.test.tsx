@@ -32,7 +32,7 @@ describe("unknown address (root not-found)", () => {
     ]);
 
     // The page itself, in the one main landmark after the header.
-    const main = container.querySelector("main#main")!;
+    const main = container.querySelector<HTMLElement>("main#main")!;
     expect(header.nextElementSibling).toBe(main);
     expect(within(main).getByRole("heading", { level: 1, name: "Page not found" })).toBeTruthy();
     expect(within(main).getByRole("link", { name: "Back to recipes" }).getAttribute("href")).toBe("/");
