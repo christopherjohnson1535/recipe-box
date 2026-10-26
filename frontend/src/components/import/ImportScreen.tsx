@@ -6,6 +6,7 @@ import { RecipeForm, type RecipeFormInitial } from "@/components/recipe-form/Rec
 import { Alert } from "@/components/ui/Alert";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { WithAside, WithStage } from "@/components/ui/Columns";
 import { Heading } from "@/components/ui/Heading";
 import { Pending } from "@/components/ui/Pending";
 import { PhotoGallery } from "@/components/ui/PhotoPicker";
@@ -15,6 +16,7 @@ import { Text } from "@/components/ui/Text";
 import { showSaveStamp } from "@/components/ui/save-stamp-store";
 import { ApiError, api as browserApi, type Api, type Capabilities, type Image, type RecipeDraft } from "@/lib/api";
 import { DraftReveal } from "./DraftReveal";
+import { ImportHelp } from "./ImportHelp";
 import { hostCard, readConfidence, readRegions, type Confidence, type Region } from "./darkroom";
 import { LinkPanel, MAX_PHOTOS, PhotoPanel, TextPanel, type PhotoKind } from "./ImportPanels";
 import { explainImportError, type ImportMode, type ImportProblem } from "./import-errors";
@@ -467,19 +469,18 @@ export function ImportScreen({
       )}
     </>
   );
-  return (
-    <div className="flex flex-col gap-8">
-      <Tabs label="Import from" idPrefix="import" tabs={TABS} value={mode} onChange={pick} />
-      <div role="tabpanel" id="import-panel" aria-labelledby={`import-tab-${mode}`} className="flex flex-col gap-6">
-        {stage ? (
-          <div className="grid items-start gap-10 lg:grid-cols-2">
-            {stage}
-            <div className="flex flex-col gap-6">{inner}</div>
-          </div>
-        ) : (
-          inner
-        )}
-      </div>
+  const tabs = <Tabs label="Import from" idPrefix="import" tabs={TABS} value={mode} onChange={pick} />;
+  // One tree whether or not a request is running, so the tabs and the form keep their place (and focus) when it starts and
+  // ends. While a request is in flight the stage already fills the width, so the help beside the form steps aside.
+  const panel = (
+    <div role="tabpanel" id="import-panel" aria-labelledby={`import-tab-${mode}`} className="flex flex-col gap-6">
+      <WithStage stage={stage}>{inner}</WithStage>
     </div>
+  );
+  return (
+    <WithAside sticky aside={stage ? null : <ImportHelp aiOff={aiOff} />}>
+      {tabs}
+      {panel}
+    </WithAside>
   );
 }

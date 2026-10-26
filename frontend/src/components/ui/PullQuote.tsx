@@ -1,18 +1,20 @@
 import type { ReactNode } from "react";
 import { typographic } from "@/lib/recipe";
 import { cx } from "./cx";
+import { Rule } from "./Rule";
 
 const text = (children: ReactNode) => (typeof children === "string" ? typographic(children) : children);
 // A long note keeps its line breaks as paragraphs.
 const paragraphs = (children: ReactNode) => (typeof children === "string" ? typographic(children).split(/\n+/).filter(Boolean) : [children]);
 
 /**
- * The recipe's note, set between a thick and a thin rule. A short note is a display-type quotation; a longer one keeps
+ * The recipe's note, set between a thin double rule and a hairline. A short note is a display-type quotation; a longer one keeps
  * the same frame at body size, one paragraph per line break.
  */
 export function PullQuote({ caption, short, children }: { caption: string; short: boolean; children: ReactNode }) {
   return (
-    <figure className="flex flex-col gap-2 border-t-[3px] border-b border-(--rule-double) py-5">
+    <figure className="flex flex-col gap-5">
+      <Rule variant="double" />
       <blockquote
         className={cx(
           "text-ink [overflow-wrap:anywhere]",
@@ -22,6 +24,7 @@ export function PullQuote({ caption, short, children }: { caption: string; short
         {short ? <>&ldquo;{text(children)}&rdquo;</> : paragraphs(children).map((p, i) => <p key={i}>{p}</p>)}
       </blockquote>
       <figcaption className="label text-ink-muted">{caption}</figcaption>
+      <Rule />
     </figure>
   );
 }

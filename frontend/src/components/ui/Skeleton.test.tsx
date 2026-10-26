@@ -11,7 +11,7 @@ describe("skeletons", () => {
     nav.path = "/";
   });
 
-  it("home: one Loading status, boxes hidden, entries shaped like the contents", () => {
+  it("home: one Loading status, boxes hidden, six ruled tiles after the featured recipe", () => {
     const { container } = render(<HomeSkeleton />);
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.getByRole("status").textContent).toBe("Loading…");
@@ -30,8 +30,8 @@ describe("skeletons", () => {
     rememberPhoto("r1", true);
     const withPhoto = render(<RecipeSkeleton />);
     expect(withPhoto.container.querySelector(".aspect-\\[3\\/2\\]")).toBeTruthy();
+    expect(withPhoto.container.querySelectorAll("aside, [class*='md:grid-cols']").length).toBeGreaterThan(0);
     rememberPhoto("r1", false);
-    expect(container.querySelectorAll("aside, [class*='md:grid-cols']")).toBeTruthy();
   });
 
   it("falls back to the plain note on routes it is not shaped for", () => {

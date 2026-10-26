@@ -175,4 +175,12 @@ describe("MoreList", () => {
     expect(panel.className).toContain("border-(--feature-edge)"); // drawn in evening, where the band and paper are close
     expect(screen.getByRole("heading", { name: "Haven’t cooked in a while" }).className).toContain("text-band-accent");
   });
+
+  it("sets the focus ring on the panel so it shows on charcoal in both appearances", () => {
+    render(<FeaturePanel label="Haven’t cooked in a while" title="Stew" href="/recipes/s" note="Not touched since May 2026" />);
+    const panel = screen.getByRole("complementary", { name: "Haven’t cooked in a while" });
+    // :focus-visible in globals.css is unlayered, so a focus-visible:outline-* utility cannot recolour the ring; the variable can.
+    expect(panel.className).toContain("[--focus-ring:var(--color-band-accent)]");
+    expect(panel.innerHTML).not.toMatch(/focus-visible:outline/);
+  });
 });

@@ -138,6 +138,7 @@ const UI: [string, string][] = [
   ["--chip-underline-hover", "--color-paper"],
   ["--alert-rule", "--alert-bg"],
   ["--toast-focus", "--toast-bg"],
+  ["--button-primary-fg", "--button-primary-bg"], // the focus ring inside the checked ½× / 1× / 2× segment is drawn in this colour
   ["--button-ghost-underline", "--color-paper"],
   ["--button-secondary-border", "--color-paper"],
   ["--chip-underline-selected", "--color-paper"],

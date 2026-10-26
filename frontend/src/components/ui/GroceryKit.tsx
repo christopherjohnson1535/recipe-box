@@ -145,7 +145,7 @@ export function GrocerySection({ title, count, children }: { title: string; coun
   const id = useId();
   return (
     <section aria-labelledby={id}>
-      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b-2 border-(--rule-double) bg-paper pt-3 pb-1.5">
+      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b border-(--rule-double) bg-paper pt-3 pb-1.5">
         <h2 id={id} className="label text-ink">
           {title}
         </h2>
@@ -414,20 +414,20 @@ export function SelectCard({
 export function SelectionBar({ status, action, onAction, actionDisabled, cancel, onCancel }: { status: string; action: string; onAction: () => void; actionDisabled?: boolean; cancel: string; onCancel: () => void }) {
   return (
     <div className="selection-bar pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
-      <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) sm:gap-3 sm:pl-6">
+      <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) [--focus-ring:var(--bar-focus)] sm:gap-3 sm:pl-6">
         <p className="label hidden whitespace-nowrap sm:block">{status}</p>
         <button
           type="button"
           onClick={onAction}
           disabled={actionDisabled}
-          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center rounded-full bg-(--bar-action-bg) px-5 whitespace-nowrap text-(--bar-action-fg) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--bar-focus) disabled:cursor-not-allowed disabled:bg-transparent disabled:text-(--bar-fg) disabled:opacity-60 disabled:ring-1 disabled:ring-(--bar-fg)/40 disabled:ring-inset"
+          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center rounded-full bg-(--bar-action-bg) px-5 whitespace-nowrap text-(--bar-action-fg) disabled:cursor-not-allowed disabled:bg-transparent disabled:text-(--bar-fg) disabled:opacity-60 disabled:ring-1 disabled:ring-(--bar-fg)/40 disabled:ring-inset"
         >
           {action}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center px-3 whitespace-nowrap text-(--bar-fg) underline decoration-1 underline-offset-[0.3em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--bar-focus)"
+          className="label inline-flex min-h-control shrink-0 cursor-pointer items-center px-3 whitespace-nowrap text-(--bar-fg) underline decoration-1 underline-offset-[0.3em]"
         >
           {cancel}
         </button>

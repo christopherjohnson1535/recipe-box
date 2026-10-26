@@ -45,11 +45,11 @@
   --alert-rule-error: var(--color-danger);
   --alert-title-error: var(--color-danger);
 
-  /* Toast: inverse of the page, so it reads as a separate layer */
-  --toast-bg: var(--color-ink);
-  --toast-fg: var(--color-paper);
-  --toast-action-fg: var(--color-paper);
-  --toast-focus: var(--color-paper);
+  /* Toast: a small piece of the charcoal band, so it reads as a separate layer in both appearances */
+  --toast-bg: var(--color-band);
+  --toast-fg: var(--color-on-band);
+  --toast-action-fg: var(--color-band-accent);
+  --toast-focus: var(--color-band-accent); /* the ring is set on the toast box: :focus-visible is unlayered, so a utility cannot recolour it */
 
   /* Progress bar of a request in flight */
   --progress-fg: var(--color-accent);

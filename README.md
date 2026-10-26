@@ -17,12 +17,14 @@ screen-stays-on cooking mode that also works offline.
 | Run | Docker Compose: `db`, `api`, `web` (+ optional `caddy` for HTTPS) |
 | Docs | [Docs index](#documentation) · [Wiki](../../wiki) |
 
-### Proposed design (not built yet)
-These are mockups from the [October 2026 redesign proposals](docs/design/redesign-2026-10/README.md), tracked in
-issues #38 to #43. The app today looks like the editorial Phase 1 UI described in [docs/UI.md](docs/UI.md).
+### How it looks
+A calm household tool: a charcoal top band, a Marcellus wordmark, ruled recipe tiles, saffron as the one
+accent, in a light day look and a dark evening look. Choose between them in Settings, or let the clock decide. The
+decision and screenshots are in [docs/design/restyle-2026-10-riviera/](docs/design/restyle-2026-10-riviera/README.md);
+how it is built is in [docs/UI.md](docs/UI.md).
 
-![Proposed redesign: homepage as a magazine cover](docs/design/redesign-2026-10/1-cover-homepage.jpg)
-![Proposed redesign: iPad cook mode, Evening Edition](docs/design/redesign-2026-10/3-ipad-cook-mode.jpg)
+![A recipe page in the day look](docs/design/restyle-2026-10-riviera/desktop-recipe-day.jpg)
+![A recipe page in the evening look](docs/design/restyle-2026-10-riviera/desktop-recipe-evening.jpg)
 
 ## Quick start
 Needs Docker (Docker Desktop on Windows/macOS).

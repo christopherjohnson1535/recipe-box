@@ -91,7 +91,7 @@ export function ScaleControl({ value, options, onChange }: { value: number; opti
       {options.map((o) => (
         <label key={o.value} className="relative cursor-pointer">
           <input type="radio" name="scale" checked={value === o.value} onChange={() => onChange(o.value)} className="peer sr-only" />
-          <span className="label flex min-h-control min-w-12 items-center justify-center px-3 text-ink peer-checked:bg-(--button-primary-bg) peer-checked:text-(--button-primary-fg) peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-(--focus-ring) peer-checked:peer-focus-visible:outline-(--toast-focus)">
+          <span className="label flex min-h-control min-w-12 items-center justify-center px-3 text-ink peer-checked:bg-(--button-primary-bg) peer-checked:text-(--button-primary-fg) peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-4 peer-focus-visible:outline-(--focus-ring) peer-checked:peer-focus-visible:outline-(--button-primary-fg)">
             {o.label}
           </span>
         </label>

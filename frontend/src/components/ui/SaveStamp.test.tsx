@@ -13,7 +13,7 @@ describe("SaveStamp", () => {
     act(() => showSaveStamp());
     expect(screen.getByRole("status").textContent).toBe("Recipe saved.");
     const stamp = container.querySelector(".stamp-run")!;
-    expect(stamp.textContent).toContain("Filed");
+    expect(stamp.textContent).toContain("In the box");
     expect(stamp.textContent).toContain("Saved");
     expect(stamp.closest("[aria-hidden='true']")).toBeTruthy();
     expect(stamp.closest(".pointer-events-none")).toBeTruthy();

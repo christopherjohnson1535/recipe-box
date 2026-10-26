@@ -7,7 +7,7 @@ import { hideSaveStamp, useSaveStamp } from "./save-stamp-store";
 const GONE_MS = 3400;
 
 /**
- * The "Filed · Saved" rubber stamp shown once when a new recipe is saved. Mounted once in the app layout. The stamp is
+ * The "In the box · Saved" rubber stamp shown once when a new recipe is saved. Mounted once in the app layout. The stamp is
  * decorative and ignores the pointer; a hidden live region says "Recipe saved." instead (this replaces the toast
  * notice for new recipes, so it is announced once). Fixed to the bottom corner, clear of the page head and actions.
  */
@@ -31,12 +31,12 @@ export function SaveStamp() {
           className="pointer-events-none fixed right-[max(1rem,env(safe-area-inset-right))] bottom-24 z-40 print:hidden sm:right-[max(2rem,env(safe-area-inset-right))] sm:bottom-28"
         >
           <div className="stamp-run -rotate-[8deg] text-(--stamp-fg)">
-            <div className="grid size-36 place-items-center rounded-full border-[3px] border-(--stamp-fg) sm:size-44">
+            <div className="grid size-40 place-items-center rounded-full border-[3px] border-(--stamp-fg) sm:size-48">
               <div className="grid size-[calc(100%-0.75rem)] place-items-center rounded-full border border-(--stamp-fg) text-center">
                 <div className="flex flex-col items-center gap-0.5">
-                  <span className="label text-[0.7rem] font-semibold">Filed</span>
-                  <span className="font-display text-title leading-none italic">Saved</span>
-                  <span className="label text-[0.65rem] font-semibold tracking-[0.1em] whitespace-nowrap">{stamp.date}</span>
+                  <span className="label whitespace-nowrap">In the box</span>
+                  <span className="font-display text-title leading-none">Saved</span>
+                  <span className="label tracking-[0.08em] whitespace-nowrap">{stamp.date}</span>
                 </div>
               </div>
             </div>

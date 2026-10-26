@@ -8,7 +8,7 @@ imported draft.
   are optional.
 - **Photo**: choose an image to upload it; a preview appears. Choose another to replace it, or **Remove photo**.
   Every photo is also given a print-style version (a tidy crop, evened-out brightness and colour, softer tones, a warm paper tint and a little grain) so
-  snapshots, scans and blog photos look like one magazine. Your original is kept untouched and can still be opened
+  snapshots, scans and blog photos look like one set. Your original is kept untouched and can still be opened
   full size. Photos added before this existed are converted in the background the next time the app starts.
   An admin can switch the print style off for the household under **Settings**.
 - **Tags**: type a tag and press comma or Enter. Tags you have used before are suggested. Use the cross to remove one.
@@ -41,11 +41,11 @@ imported draft.
   and a short message says so.
 
 ## Reading a recipe
-A recipe opens like a magazine feature: the title, a one-line summary and who added it on the left, the photo on the right (on an iPad held upright or a phone the photo comes below the title). Under it, large numbers show how many it **serves** and the **prep**, **cook** and **total** times (only the ones the recipe has).
+A recipe opens with the title, a one-line summary and who added it on the left and the photo on the right (on an iPad held upright or a phone the photo comes below the title). Under it, large numbers show how many it **serves** and the **prep**, **cook** and **total** times (only the ones the recipe has).
 - **Ingredients**: tap a row to cross it off (a red line is drawn through it); tap again to undo. Ticks stay while the tab is open, even if you reload, and are separate for each recipe. The bar at the bottom counts them and has **Start cooking**. Fractions are shown as ½, 1½ and so on; a line with a second amount ("2 cups plus 2 tbsp", "1 cup/240 ml") is not scaled.
 - **Scale**: **½×**, **1×** and **2×** above the ingredients change the amounts (and the number served). A line that doesn't start with a number ("salt to taste") stays as written. Scaling is only for reading: it never changes the saved recipe.
 - **Method**: an ingredient named in a step has a dotted underline that jumps to its row, and a time in the text ("12 minutes") is shown in a small pill with a clock. The pills are only for show; they don't start a timer yet.
-- A recipe's **notes** appear under the method as a quotation.
+- A recipe's **notes** appear as a quotation: in a column beside the method on a wide screen (about 1440 pixels and up), under the method on a smaller one.
 - If your device is set to reduce motion, nothing slides, turns or draws; colours still change.
 
 ## Printing
