@@ -333,17 +333,26 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   action in the home grid's select bar and a secondary button on the recipe page. Under the top bar a `CookDishLegend` lists the
   dishes, and every step carries a `CookDishMark` (the dish's first letter or digit in a chip, "S2" when two dishes share one;
   `size="sm"` hides the name visually but keeps it for screen readers). A dish is never told apart by colour alone. The four
-  marks, in the order the dishes were chosen: 1 solid round (accent), 2 outlined round (danger), 3 solid square (attention),
-  4 outlined square (ink), from the `--cook-dish-N` and `--cook-on-dish-N` tokens (`data-dish-fill`, `data-dish-shape`).
+  marks, in the order the dishes were chosen: 1 solid round (accent), 2 outlined round (attention), 3 solid square (ink-muted,
+  paper initial), 4 outlined square (ink), from the `--cook-dish-N` and `--cook-on-dish-N` tokens (`data-dish-fill`,
+  `data-dish-shape`); no dish uses the danger colour, which means something else.
   The toolbar's `CookViewChoice` (radio group: One step / All steps / By dish, remembered as `cook-together-view`) sits beside
   "Reset order" (only when the order differs from alternating) and "Clear ticks". The all-steps list is a `CookReorderList`:
   each `CookStepItem` has a `CookMoveButtons` pair ("Move <dish> step 2 earlier" / "later", 44px; a step that cannot move that way
   is `aria-disabled`, dotted and muted, and keeps focus) and the items glide to their new places (transform only, 220 ms;
   none under reduced motion). A step can only swap with a step of another dish, so each dish keeps its own order. In One step,
   a `CookNudge` per other dish ("Bring <dish>'s next step here") sits under the step. By dish is `CookDishColumns`: a column per
-  dish from 1024px, stacked below. The ingredients rail is `CookDishTabs` (one tab per dish, following the current step's
+  dish from 1024px, stacked below; there `CookColumns` is set `wide`, so By dish spans the whole width (no side columns) and
+  the timers become a strip above the footer. Each step in it says its place in the combined order ("3rd of 5"). The ingredients rail is `CookDishTabs` (one tab per dish, following the current step's
   dish). Ticks are each recipe's own `cook-ticks:<id>`, shared with single-recipe cook mode; the order is
   `cook-together:<ids>` (`{ v: 1, at, order }`, 12 hours; an order that no longer fits the recipes falls back to alternating).
+  Finish and Close go to the recipes home (`/`), not to one dish. The picker has a search field (it asks the API, so a recipe
+  past the first 200 can be found; chosen dishes stay on screen while the list is filtered). `GroceryKit` additions: `SelectionBar`
+  takes a `hint` (a line above the buttons, "Choose two dishes", read out politely; the bar is then a rounded rectangle whose
+  corner is the new `--bar-radius` token in `components.css`, 1.75rem) and `SelectCard` takes `disabled` (`aria-disabled`, so it
+  keeps focus; at four dishes the unchosen cards dim and `describedBy` says why). The home grid's "Cook together" is
+  `aria-disabled` rather than `disabled` for the same reason, and follows the order the recipes were tapped. A session is kept
+  offline like a recipe page, one copy per `/cook?recipes=` query (`pageKey` in `components/offline/rules.ts`); the picker is not kept.
 - **Offline, error and not found**: plain `EmptyState` pages in the page width; the offline page lists the recipes kept
   on the device. An address no route matches is rendered by `app/not-found.tsx`, outside `(app)/layout.tsx`, so it brings its
   own shell: the same one `<header>` with the top band (`ui/DayBand`: date and season, no recipe count, no Sign out), then the
