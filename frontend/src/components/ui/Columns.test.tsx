@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SidebarLayout } from "./Article";
 import { AsidePanel, TwoColumns, WithAside } from "./Columns";
@@ -13,15 +13,20 @@ describe("wide-screen layouts", () => {
     expect(screen.getByText("main").compareDocumentPosition(screen.getByText("side")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("WithAside is sticky only when asked", () => {
-    const { container, rerender } = render(<WithAside aside={<p>side</p>}>x</WithAside>);
-    expect(container.innerHTML).not.toContain("sticky");
-    rerender(
-      <WithAside sticky aside={<p>side</p>}>
-        x
-      </WithAside>,
+  it("WithAside's side column holds the aside and nothing else, and sticky changes neither what is rendered nor its order", () => {
+    const tree = (sticky: boolean) => (
+      <WithAside sticky={sticky} aside={<p>side</p>}>
+        <p>main</p>
+      </WithAside>
     );
-    expect(container.innerHTML).toContain("xl:sticky");
+    const { container, rerender } = render(tree(false));
+    const side = screen.getByText("side");
+    const [mainColumn, sideColumn] = [...container.firstElementChild!.children];
+    expect(mainColumn).toBe(screen.getByText("main").parentElement);
+    expect(sideColumn).toBe(side.parentElement);
+    rerender(tree(true)); // how it sticks is CSS, checked in e2e/tests/web/layout.spec.ts
+    expect(screen.getByText("side")).toBe(side);
+    expect([...container.firstElementChild!.children]).toEqual([mainColumn, sideColumn]);
   });
 
   it("WithAside leaves no empty side column when there is no aside", () => {
@@ -43,7 +48,7 @@ describe("wide-screen layouts", () => {
     expect(screen.getByText("left").compareDocumentPosition(screen.getByText("right")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("AsidePanel is a named landmark; a tip can drop out below 768px or below 1280px", () => {
+  it("AsidePanel is a named landmark that holds its content, whatever hideBelow says", () => {
     render(
       <>
         <AsidePanel label="Always">a</AsidePanel>
@@ -55,9 +60,11 @@ describe("wide-screen layouts", () => {
         </AsidePanel>
       </>,
     );
-    expect(screen.getByRole("complementary", { name: "Always" }).className).not.toMatch(/max-(md|xl):hidden/);
-    expect(screen.getByRole("complementary", { name: "Tips" }).className).toContain("max-md:hidden");
-    expect(screen.getByRole("complementary", { name: "Wide tips" }).className).toContain("max-xl:hidden");
+    // jsdom has no CSS, so when a tip is hidden is checked in e2e/tests/web/layout.spec.ts
+    for (const [label, text] of [["Always", "a"], ["Tips", "b"], ["Wide tips", "c"]]) {
+      expect(within(screen.getByRole("complementary", { name: label })).getByText(text)).toBeTruthy();
+    }
+    expect(screen.getAllByRole("complementary")).toHaveLength(3);
   });
 
   it("SidebarLayout puts the rail after the method, and adds nothing when there is no rail", () => {

@@ -15,6 +15,10 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   test.skip(test.info().project.name !== "web-desktop", "the household has one grocery list; only the desktop project edits it");
   const c = member.client;
   const word = unique("gro");
+  // Moving the beef stores a household override for its name (docs/API.md, GRO-4) that outlives the run, so the beef
+  // is this run's own: "ground beef <word>" still classifies as Meat (the dictionary phrase "ground beef" matches
+  // whatever follows it) and still ends the tick button's name. The phone and iPad test's plain "ground beef" is untouched.
+  const beef = `ground beef ${word}`;
   // The household list is shared by everyone; start from an empty one.
   expect((await c.request.delete("/api/grocery")).status()).toBe(204);
 
@@ -23,7 +27,7 @@ test("two recipes make one list in store order that can be ticked, moved, added 
     servings: "4",
     ingredients: [
       { text: "2 onions, diced", section: null },
-      { text: "1 lb ground beef", section: null },
+      { text: `1 lb ${beef}`, section: null },
     ],
     steps: [{ text: "Brown the beef.", section: null }],
   });
@@ -66,7 +70,7 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   // 4 (2 onions at 2×) + 1 = 5; a count with no unit is plural over 1 (docs/API.md, "How items are made").
   const onions = produce.getByRole("button", { name: /^5 onions$/ });
   await expect(onions).toBeVisible();
-  await expect(tick(page.getByRole("region", { name: "Meat" }), "ground beef")).toBeVisible();
+  await expect(tick(page.getByRole("region", { name: "Meat" }), beef)).toBeVisible();
 
   // Tick, untick, tick.
   await onions.click();
@@ -77,31 +81,33 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   await expect(onions).toHaveAttribute("aria-pressed", "true");
 
   // Move the beef to the freezer.
-  await page.getByRole("button", { name: "Options for ground beef" }).click();
+  await page.getByRole("button", { name: `Options for ${beef}` }).click();
   await page.getByRole("menuitemradio", { name: "Freezer" }).click();
   const freezer = page.getByRole("region", { name: "Freezer" });
-  await expect(tick(freezer, "ground beef")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Meat" })).toHaveCount(0);
+  await expect(tick(freezer, beef)).toBeVisible();
+  // Not "no Meat section": the phone and iPad test may have put its own beef there.
+  await expect(tick(page.getByRole("region", { name: "Meat" }), beef)).toHaveCount(0);
 
-  // Add a manual item and tick it.
-  await page.getByLabel("Add an item").fill("dish soap");
+  // Add a manual item and tick it. Its name is this run's own: the phone and iPad test seeds "dish soap" into the same list.
+  const soap = `soap ${word}`;
+  await page.getByLabel("Add an item").fill(soap);
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  const towels = tick(page, "dish soap");
-  await expect(towels).toBeVisible();
+  const soapRow = tick(page, soap);
+  await expect(soapRow).toBeVisible();
   await expect(page.getByLabel("Add an item")).toHaveValue("");
-  await towels.click();
-  await expect(towels).toHaveAttribute("aria-pressed", "true");
+  await soapRow.click();
+  await expect(soapRow).toHaveAttribute("aria-pressed", "true");
 
-  // Clear ticked: the onions and the towels go; the beef stays.
+  // Clear ticked: the onions and the soap go; the beef stays.
   await page.getByRole("button", { name: /^Clear ticked/ }).click();
   await expect(onions).toHaveCount(0);
-  await expect(towels).toHaveCount(0);
+  await expect(soapRow).toHaveCount(0);
 
   // Reload: the server has all of it.
   await page.reload();
-  await expect(tick(page.getByRole("region", { name: "Freezer" }), "ground beef")).toBeVisible();
+  await expect(tick(page.getByRole("region", { name: "Freezer" }), beef)).toBeVisible();
   await expect(tick(page, "onions")).toHaveCount(0);
-  await expect(tick(page, "dish soap")).toHaveCount(0);
+  await expect(soapRow).toHaveCount(0);
   await expect(tick(page, "olive oil")).toBeVisible();
   await expect(page.getByRole("link", { name: `Stew ${word}` })).toBeVisible();
   await expect(page.getByRole("link", { name: `Soup ${word}` })).toBeVisible();

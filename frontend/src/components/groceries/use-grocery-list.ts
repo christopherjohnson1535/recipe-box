@@ -41,6 +41,8 @@ export function useGroceryList() {
   const newest = useRef(new Map<string, number>());
   const requests = useRef(0);
   const scaling = useRef(new Set<string>());
+  /** The requests of writes on their way, so a whole-list write can wait for them (see `replaceList`). */
+  const inFlight = useRef(new Set<Promise<unknown>>());
 
   const adopt = useCallback((next: GroceryList) => {
     appliedAt.current = Date.parse(next.updatedAt);
@@ -85,11 +87,14 @@ export function useGroceryList() {
     writes.current++;
     epoch.current++;
     setBusy(true);
+    const sent = (async () => op())();
+    inFlight.current.add(sent);
     try {
-      const result = await op();
+      const result = await sent;
       dirty.current = true; // the server's list is newer than the one we hold
       return result;
     } finally {
+      inFlight.current.delete(sent);
       writes.current--;
       epoch.current++;
       setBusy(writes.current > 0);
@@ -190,11 +195,19 @@ export function useGroceryList() {
     [track, fail],
   );
 
+  /**
+   * Whole-list writes (clear ticked, scale, remove a recipe) first wait for the writes already on their way to settle: a tick
+   * shows at once while its PATCH is still in flight, and if the server handled "clear ticked" first the item would survive
+   * and then be ticked on the list that came back. Still tracked while waiting, so the screen is busy and refreshes are dropped.
+   */
   const replaceList = useCallback(
     async (op: () => Promise<GroceryList>, announce: (next: GroceryList) => string) => {
       setProblem(null);
       try {
-        const next = await track(op);
+        const next = await track(async () => {
+          await Promise.allSettled(inFlight.current);
+          return op();
+        });
         adopt(next);
         setAnnouncement(announce(next));
       } catch (e) {
@@ -224,6 +237,7 @@ export function useGroceryList() {
     [replaceList],
   );
 
+  // No wait here: emptying drops every item, so a tick that lands later finds none (or a 404, which `fail` ignores).
   const empty = useCallback(async () => {
     setProblem(null);
     try {
