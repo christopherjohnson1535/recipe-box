@@ -154,6 +154,7 @@ impl State {
             title: i.title.clone(),
             description: i.description.clone(),
             total_minutes: i.total_minutes,
+            servings: i.servings.clone(),
             tags: Self::tags(r),
             image_file: self.file(i.image_id).map(|f| f.file_name.clone()),
             image_display_file: self

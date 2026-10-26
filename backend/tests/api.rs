@@ -229,13 +229,19 @@ async fn recipe_crud_list_delete_restore() {
         Method::POST,
         "/api/recipes",
         c,
-        Some(json!({ "title": "Soup", "tags": ["dinner"] })),
+        Some(json!({ "title": "Soup", "tags": ["dinner"], "servings": "4-6" })),
     )
     .await;
 
     let list = ctx.call(Method::GET, "/api/recipes", c, None).await;
     assert_eq!(list.json["total"], 2);
     assert_eq!(list.json["items"][0]["title"], "Soup", "newest first");
+    assert_eq!(list.json["items"][0]["servings"], "4-6");
+    assert_eq!(
+        list.json["items"][1]["servings"],
+        Value::Null,
+        "always present"
+    );
     let list = ctx
         .call(Method::GET, "/api/recipes?tag=Breakfast", c, None)
         .await;

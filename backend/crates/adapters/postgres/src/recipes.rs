@@ -71,7 +71,7 @@ fn source_type_name(t: SourceType) -> &'static str {
 // The household `plate_treatment` setting is not applied here (the port leaves that to the service), so there is
 // no join on `household_settings` and `image_display_file` is the rendition whenever one exists.
 const SUMMARY_SELECT: &str = "
-    select r.id, r.title, r.description, r.total_minutes, r.source_type, r.updated_at,
+    select r.id, r.title, r.description, r.total_minutes, r.servings, r.source_type, r.updated_at,
            i.file_name as image_file,
            i.display_file_name as image_display_file,
            coalesce((select array_agg(t.name::text order by t.name)
@@ -130,6 +130,7 @@ struct SummaryRow {
     title: String,
     description: String,
     total_minutes: Option<i32>,
+    servings: Option<String>,
     tags: Vec<String>,
     image_file: Option<String>,
     image_display_file: Option<String>,
@@ -144,6 +145,7 @@ impl From<SummaryRow> for RecipeSummary {
             title: r.title,
             description: r.description,
             total_minutes: r.total_minutes,
+            servings: r.servings,
             tags: r.tags,
             image_file: r.image_file,
             image_display_file: r.image_display_file,

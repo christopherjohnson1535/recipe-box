@@ -119,6 +119,9 @@ pub struct RecipeSummary {
     pub description: String,
     #[schema(required = true)]
     pub total_minutes: Option<i32>,
+    /// Free text, as on `Recipe`.
+    #[schema(required = true)]
+    pub servings: Option<String>,
     pub tags: Vec<String>,
     #[schema(required = true)]
     pub image_url: Option<String>,
@@ -454,6 +457,7 @@ impl From<domain::RecipeSummary> for RecipeSummary {
             title: r.title,
             description: r.description,
             total_minutes: r.total_minutes,
+            servings: r.servings,
             tags: r.tags,
             image_url: r.image_file.as_deref().map(media_url),
             image_display_url: r.image_display_file.as_deref().map(media_url),

@@ -26,6 +26,7 @@ pub async fn recipe_repo<F: Fn(Arc<dyn Clock>) -> Stack>(make: F, caps: Capabili
     tag_and_query_combine(&make).await;
     tag_names_are_searched(&make).await;
     sorts_and_total(&make).await;
+    list_rows_carry_servings(&make).await;
     relevance_prefers_title_hits(&make).await;
     soft_deleted_are_excluded(&make).await;
     special_characters_are_literal_and_safe(&make).await;
@@ -668,6 +669,37 @@ async fn tag_names_are_searched<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
         .1,
         2
     );
+}
+
+async fn list_rows_carry_servings<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    for (title, servings) in [("Cookies", Some("makes 12 cookies")), ("Plain", None)] {
+        c.s.recipes
+            .create(
+                c.user,
+                RecipeInput {
+                    servings: servings.map(Into::into),
+                    ..Ctx::input(title)
+                },
+            )
+            .await
+            .unwrap();
+    }
+    let rows =
+        c.s.recipes
+            .search(SearchQuery::default())
+            .await
+            .unwrap()
+            .items;
+    let servings = |title: &str| {
+        rows.iter()
+            .find(|r| r.title == title)
+            .unwrap()
+            .servings
+            .clone()
+    };
+    assert_eq!(servings("Cookies").as_deref(), Some("makes 12 cookies"));
+    assert_eq!(servings("Plain"), None);
 }
 
 async fn sorts_and_total<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
