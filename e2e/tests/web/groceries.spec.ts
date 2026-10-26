@@ -83,25 +83,26 @@ test("two recipes make one list in store order that can be ticked, moved, added 
   await expect(tick(freezer, "ground beef")).toBeVisible();
   await expect(page.getByRole("region", { name: "Meat" })).toHaveCount(0);
 
-  // Add a manual item and tick it.
-  await page.getByLabel("Add an item").fill("dish soap");
+  // Add a manual item and tick it. Its name is this run's own: the phone and iPad test seeds "dish soap" into the same list.
+  const soap = `soap ${word}`;
+  await page.getByLabel("Add an item").fill(soap);
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  const towels = tick(page, "dish soap");
-  await expect(towels).toBeVisible();
+  const soapRow = tick(page, soap);
+  await expect(soapRow).toBeVisible();
   await expect(page.getByLabel("Add an item")).toHaveValue("");
-  await towels.click();
-  await expect(towels).toHaveAttribute("aria-pressed", "true");
+  await soapRow.click();
+  await expect(soapRow).toHaveAttribute("aria-pressed", "true");
 
-  // Clear ticked: the onions and the towels go; the beef stays.
+  // Clear ticked: the onions and the soap go; the beef stays.
   await page.getByRole("button", { name: /^Clear ticked/ }).click();
   await expect(onions).toHaveCount(0);
-  await expect(towels).toHaveCount(0);
+  await expect(soapRow).toHaveCount(0);
 
   // Reload: the server has all of it.
   await page.reload();
   await expect(tick(page.getByRole("region", { name: "Freezer" }), "ground beef")).toBeVisible();
   await expect(tick(page, "onions")).toHaveCount(0);
-  await expect(tick(page, "dish soap")).toHaveCount(0);
+  await expect(soapRow).toHaveCount(0);
   await expect(tick(page, "olive oil")).toBeVisible();
   await expect(page.getByRole("link", { name: `Stew ${word}` })).toBeVisible();
   await expect(page.getByRole("link", { name: `Soup ${word}` })).toBeVisible();
