@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Text } from "@/components/ui/Text";
+import { Hint } from "@/components/ui/Hint";
 import { copyText } from "@/lib/copy-text";
 
 /** Copies `value`. Says so in words (announced politely); if the browser refuses, says that instead. */
@@ -17,9 +17,7 @@ export function CopyButton({ value, label, disabled }: { value: string; label: s
         {label}
       </Button>
       <span role="status">
-        <Text as="span" variant="aside">
-          {state === "done" ? "Copied." : state === "failed" ? "Couldn’t copy here. Select the text above and copy it." : ""}
-        </Text>
+        <Hint as="span">{state === "done" ? "Copied." : state === "failed" ? "Couldn’t copy here. Select the text above and copy it." : ""}</Hint>
       </span>
     </span>
   );

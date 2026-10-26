@@ -9,6 +9,7 @@ import { ExternalLink } from "@/components/ui/ExternalLink";
 import { Step, Steps } from "@/components/ui/Steps";
 import { TextLink } from "@/components/ui/TextLink";
 import { Heading } from "@/components/ui/Heading";
+import { Hint } from "@/components/ui/Hint";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Text } from "@/components/ui/Text";
 import { bookmarkletFor, shortcutAddress } from "./bookmarklet";
@@ -81,12 +82,12 @@ export function ShareView() {
                 </p>
               </Step>
             </Steps>
-            <Text variant="small">
+            <Hint>
               The shortcut opens Recipe Box in Safari, not in the Home Screen app, and signs in separately the first time. Full steps and fixes
               are on the{" "}
               <ExternalLink href="https://github.com/christopherjohnson1535/recipe-box/wiki/Save-from-Safari">Save from Safari</ExternalLink>{" "}
               wiki page.
-            </Text>
+            </Hint>
           </section>
         }
         right={
@@ -103,14 +104,12 @@ export function ShareView() {
             ) : (
               <Text variant="note">Getting the bookmark ready…</Text>
             )}
-            <Text variant="small">
-              The bookmark only sends the address of the page you are on. It does not read the page or take anything from it.
-            </Text>
+            <Hint>The bookmark only sends the address of the page you are on. It does not read the page or take anything from it.</Hint>
             <Disclosure summary="Can’t drag it?">
-              <p>
+              <Text>
                 Copy the bookmark, add any bookmark in your browser, then edit it: name it <b>Save to Recipe Box</b> and paste this into the
                 address (URL) box.
-              </p>
+              </Text>
               <CodeBlock>{bookmarklet || "…"}</CodeBlock>
               <CopyButton value={bookmarklet} label="Copy the bookmark" disabled={!bookmarklet} />
             </Disclosure>
