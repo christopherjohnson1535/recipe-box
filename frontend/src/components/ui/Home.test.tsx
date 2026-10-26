@@ -93,6 +93,15 @@ describe("HomeLayout", () => {
     rerender(<HomeLayout>grid</HomeLayout>);
     expect(container.firstElementChild!.className).toBe("");
   });
+
+  it("keeps the sidebar after the grid, and sticks it near the top of the window from 1024px", () => {
+    const { container } = render(<HomeLayout aside={<p>side</p>}>grid</HomeLayout>);
+    const [grid, aside] = Array.from(container.firstElementChild!.children);
+    expect(grid.textContent).toBe("grid");
+    expect(aside.textContent).toBe("side");
+    for (const c of ["lg:sticky", "lg:top-8", "lg:self-start"]) expect(aside.className).toContain(c);
+    expect(aside.className).not.toMatch(/(^|\s)(sticky|top-\d)/); // below 1024px it is an ordinary block under the grid
+  });
 });
 
 describe("FeaturedRecipe", () => {
@@ -117,6 +126,21 @@ describe("FeaturedRecipe", () => {
     expect(read.className).toContain("min-h-control");
     expect(container.querySelector("img")!.className).toContain("aspect-[3/2]");
     expect(container.querySelector("img")!.className).toContain("outline-offset-8");
+    expect(container.querySelector("img")!.className).toContain("outline-(--photo-outline)");
+  });
+
+  it("puts the text before the photo, so a phone and an iPad held upright show the headline first", () => {
+    const { container } = render_();
+    const [text, photo] = Array.from(container.querySelector("article")!.children);
+    expect(text.querySelector("h2")).toBeTruthy();
+    expect(photo.querySelector("img")).toBeTruthy();
+    expect(photo.className).not.toMatch(/order-/);
+    expect(text.className).not.toMatch(/order-/);
+  });
+
+  it("sizes the headline with its own clamp from 1024px so a few words keep to three lines beside the photo", () => {
+    render_({ title: "Roast chicken with lemon, garlic and thyme" });
+    expect(screen.getByRole("heading", { level: 2 }).className).toContain("lg:text-[length:clamp(");
   });
 });
 
@@ -148,6 +172,7 @@ describe("MoreList", () => {
     const panel = screen.getByRole("complementary", { name: "Haven’t cooked in a while" });
     expect(panel.className).toContain("bg-band");
     expect(panel.className).toContain("text-on-band");
+    expect(panel.className).toContain("border-(--feature-edge)"); // drawn in evening, where the band and paper are close
     expect(screen.getByRole("heading", { name: "Haven’t cooked in a while" }).className).toContain("text-band-accent");
   });
 });

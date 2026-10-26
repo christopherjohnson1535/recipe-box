@@ -59,6 +59,8 @@
   --card-border: var(--color-rule);
   --rule-hair: var(--color-rule);
   --rule-double: var(--color-ink);
+  --photo-outline: var(--color-rule); /* the featured photo's 1px outline; evening raises it a step */
+  --feature-edge: var(--color-band); /* the "Haven't cooked" panel's 1px edge: invisible by day, drawn in evening */
   --entry-title-hover: var(--color-accent);
   --entry-kicker-fg: var(--color-ink-muted);
   --editor-heading-rule: var(--color-rule-strong);
@@ -99,7 +101,7 @@
 
 /*
  * Per-edition overrides that are set here rather than in a theme file: photos sit a touch dimmer in the evening, the
- * full-ink double rule was the brightest object on the page, so evening uses the muted ink, and the ink-filled
+ * full-ink double rule was the brightest object on the page, so evening uses the muted ink, the featured photo's outline and the "Haven't cooked" panel's edge (hairline and band tones nearly vanish on the evening paper) step up to the strong rule, and the ink-filled
  * timer chips and floating bar (near-white in the evening) become paper-deep panels instead.
  * Same selectors as themes/evening.css; tokens.test.ts checks the two blocks set identical values.
  */
@@ -109,6 +111,8 @@
 :root[data-theme="evening"] {
   --photo-filter: brightness(0.9) contrast(1.02);
   --rule-double: var(--color-ink-muted);
+  --photo-outline: var(--color-rule-strong);
+  --feature-edge: var(--color-rule-strong);
   --timer-bg: var(--color-paper-deep);
   --timer-fg: var(--color-ink);
   --bar-bg: var(--color-paper-deep);
@@ -119,6 +123,8 @@
   :root:not([data-theme]) {
     --photo-filter: brightness(0.9) contrast(1.02);
     --rule-double: var(--color-ink-muted);
+    --photo-outline: var(--color-rule-strong);
+    --feature-edge: var(--color-rule-strong);
     --timer-bg: var(--color-paper-deep);
     --timer-fg: var(--color-ink);
     --bar-bg: var(--color-paper-deep);

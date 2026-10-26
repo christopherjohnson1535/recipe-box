@@ -6,8 +6,8 @@ import { FadeImage } from "./FadeImage";
 /**
  * The home page's featured recipe: a kicker, a large headline (an h2: the page's h1 is a visually hidden "Recipes"
  * beside it), an italic deck, a meta strip between two hairlines (total time, servings where known) and the actions on
- * the left (Start cooking in ink, Read the recipe as an accent link; each is named with the recipe, "Start cooking: Short Ribs"); the photo, 3:2 with a hairline outline set 8px off it, on the right (above the headline on a phone). The
- * headline's words rise in on a first visit.
+ * the left (Start cooking in ink, Read the recipe as an accent link; each is named with the recipe, "Start cooking: Short Ribs"); the photo, 3:2 with a hairline outline set 8px off it, on the right (under the text on a phone and an iPad held upright, so the headline is
+ * in the first screen). The headline's words rise in on a first visit.
  */
 export function FeaturedRecipe({
   title,
@@ -33,7 +33,7 @@ export function FeaturedRecipe({
     <article className="grid gap-y-8 lg:grid-cols-[1fr_1.4fr] lg:items-center lg:gap-x-14">
       <div className="flex min-w-0 flex-col gap-5 lg:py-4">
         <p className="label text-(--kicker-fg)">{kicker}</p>
-        <h2 className="font-display text-headline text-balance text-ink [overflow-wrap:anywhere]">
+        <h2 className="font-display text-headline lg:text-[length:clamp(2.5rem,0.25rem+3.9vw,4.25rem)] text-balance text-ink [overflow-wrap:anywhere]">
           {title.split(" ").map((word, i) => (
             <Fragment key={i}>
               {i > 0 && " "}
@@ -56,14 +56,14 @@ export function FeaturedRecipe({
       </div>
       {/* The 9px of padding hold the outline (1px, set 8px off the photo) inside the column. */}
       {/* Plain <img>: /media needs the session cookie, which next/image's optimizer wouldn't send. */}
-      <div className="order-first p-[9px] lg:order-last">
+      <div className="p-[9px]">
         <FadeImage
           src={imageSrc}
           alt=""
           width={1200}
           height={800}
           fetchPriority="high"
-          className="aspect-[3/2] h-auto w-full bg-(--panel-bg) object-cover outline-1 outline-offset-8 outline-(--rule-hair) [filter:var(--photo-filter)]"
+          className="aspect-[3/2] h-auto w-full bg-(--panel-bg) object-cover outline-1 outline-offset-8 outline-(--photo-outline) [filter:var(--photo-filter)]"
         />
       </div>
     </article>

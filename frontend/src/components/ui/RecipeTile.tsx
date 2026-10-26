@@ -19,12 +19,16 @@ export function TileGrid({ label, children }: { label?: string; children: ReactN
   );
 }
 
-/** The grid beside its sidebar: side by side from 1024px, the sidebar below the grid on an iPad held upright and on a phone. */
+/**
+ * The grid beside its sidebar: side by side from 1024px, the sidebar below the grid on an iPad held upright and on a
+ * phone. From 1024px the sidebar sticks 2rem from the top of the window (nothing is fixed above it: the band and
+ * masthead scroll away) and keeps its own height, so "More to cook" stays in view beside a long grid.
+ */
 export function HomeLayout({ aside, children }: { aside?: ReactNode; children: ReactNode }) {
   return (
     <div className={aside ? "grid gap-12 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-12" : undefined}>
       <div className="min-w-0">{children}</div>
-      {aside && <div className="flex flex-col gap-10">{aside}</div>}
+      {aside && <div className="flex flex-col gap-10 lg:sticky lg:top-8 lg:self-start">{aside}</div>}
     </div>
   );
 }

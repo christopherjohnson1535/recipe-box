@@ -41,7 +41,7 @@ export function FeaturePanel({ label, title, href, note }: { label: string; titl
   return (
     <aside
       aria-label={label}
-      className="group relative flex flex-col gap-2 bg-band p-6 text-on-band [--focus-ring:var(--color-band-accent)]"
+      className="group relative flex flex-col gap-2 border border-(--feature-edge) bg-band p-6 text-on-band [--focus-ring:var(--color-band-accent)]"
     >
       <h2 className="label text-band-accent">{label}</h2>
       <p className="font-display text-title-sm">

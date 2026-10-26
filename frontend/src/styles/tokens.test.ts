@@ -201,7 +201,7 @@ describe("design tokens", () => {
     const comp = eveningBlocks(read("components.css"));
     expect(comp.found).toBe(true);
     expect(comp.device).toEqual(comp.attr);
-    expect(Object.keys(comp.attr).sort()).toEqual(["--bar-bg", "--bar-fg", "--bar-focus", "--photo-filter", "--rule-double", "--timer-bg", "--timer-fg"]);
+    expect(Object.keys(comp.attr).sort()).toEqual(["--bar-bg", "--bar-fg", "--bar-focus", "--feature-edge", "--photo-filter", "--photo-outline", "--rule-double", "--timer-bg", "--timer-fg"]);
     // The device block only matches when no attribute is set, so data-theme="day" is never overridden.
     for (const css of [read("themes/evening.css"), read("components.css")]) {
       expect(css).not.toMatch(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{/);

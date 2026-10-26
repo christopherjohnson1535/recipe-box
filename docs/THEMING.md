@@ -45,7 +45,7 @@ decisions worth knowing before you change a colour:
 
 ## Editions: how day and evening are chosen
 Day is the default token set (`:root`, from `day.css`). Evening is the same names redefined in `evening.css` (and the
-two non-colour tokens `--photo-filter` and `--rule-double` in `components.css`) under two selectors with identical
+component tokens that evening re-points, such as `--photo-filter`, `--rule-double`, `--photo-outline` and `--feature-edge`, in `components.css`) under two selectors with identical
 values:
 
 - `:root[data-theme="evening"]`: set by script, wins over everything.
@@ -104,7 +104,7 @@ primitive, under a selector. Example, a high-contrast "large print" theme:
     exceptions and set per scheme in `components.css`);
   - every theme file has its scope: `day.css` is `@theme static` with no media query, `evening.css` has the
     `[data-theme="evening"]` block and the dark-device `:root:not([data-theme])` block, both with `color-scheme: dark`
-    and identical values (the same check covers `--photo-filter` and `--rule-double` in `components.css`);
+    and identical values (the same check covers the evening overrides in `components.css`, among them `--photo-filter`, `--rule-double`, `--photo-outline` and `--feature-edge`);
   - `PAPER` in `lib/edition.ts` equals each theme's `--color-paper`;
   - print inks: each ink's contrast on day and evening paper is recorded (text-safe, graphic or decorative only);
   - decorative component tokens (`--skeleton-bg`, `--skeleton-shine`) are listed with a reason instead of a pairing;
