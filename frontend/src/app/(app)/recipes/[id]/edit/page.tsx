@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { FormHelp } from "@/components/recipe-form/FormHelp";
 import { RecipeEditor } from "@/components/recipe-form/RecipeEditor";
+import { WithAside } from "@/components/ui/Columns";
 import { ServerError } from "@/components/ServerError";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ApiError } from "@/lib/api";
@@ -20,7 +22,9 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
   return (
     <div className="flex flex-col gap-10">
       <PageHeader kicker="Editing" title={recipe.title} description="Change anything, then save. Nothing changes until you do." />
-      <RecipeEditor recipe={recipe} />
+      <WithAside sticky aside={<FormHelp editing />}>
+        <RecipeEditor recipe={recipe} />
+      </WithAside>
     </div>
   );
 }

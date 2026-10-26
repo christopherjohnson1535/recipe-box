@@ -144,6 +144,19 @@ describe("the list", () => {
     expect(await screen.findByRole("heading", { name: "Nothing on the list yet" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Choose recipes" }).getAttribute("href")).toBe("/");
     expect(screen.getByLabelText("Add an item")).toBeTruthy(); // typing an item works on an empty list too
+    expect(screen.queryByRole("complementary", { name: "This list" })).toBeNull(); // nothing to send or tidy yet
+  });
+
+  it("keeps the recipes on the list, sending and tidying in a side column that follows the list", async () => {
+    serve();
+    await open();
+    const side = screen.getByRole("complementary", { name: "This list" });
+    expect(within(side).getByText("On this list · 1 recipe")).toBeTruthy();
+    expect(within(side).getByRole("button", { name: /Clear ticked/ })).toBeTruthy();
+    expect(within(side).getByRole("button", { name: "Empty list" })).toBeTruthy();
+    expect(within(side).queryByLabelText("Add an item")).toBeNull();
+    const add = screen.getByLabelText("Add an item");
+    expect(add.compareDocumentPosition(side) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows a loading note first, then an error with a retry that loads the list", async () => {

@@ -147,6 +147,13 @@ export default async function RecipePage({ params }: Params) {
 
         <SidebarLayout
           sidebar={<IngredientChecklist groups={ingredientGroups} footer={<AddToGroceries recipeId={id} />} />}
+          rail={
+            notes ? (
+              <PullQuote caption={recipe.createdBy ? `${recipe.createdBy.displayName}’s note on this recipe` : "Note on this recipe"} short={notes.length <= 140 && !notes.includes("\n")}>
+                {notes}
+              </PullQuote>
+            ) : undefined
+          }
         >
           <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-8">
             <MethodHeader steps={recipe.steps.length} />
@@ -168,11 +175,6 @@ export default async function RecipePage({ params }: Params) {
               </div>
             ))}
 
-            {notes && (
-              <PullQuote caption={recipe.createdBy ? `${recipe.createdBy.displayName}’s note on this recipe` : "Note on this recipe"} short={notes.length <= 140 && !notes.includes("\n")}>
-                {notes}
-              </PullQuote>
-            )}
           </section>
         </SidebarLayout>
 

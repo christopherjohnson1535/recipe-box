@@ -11,7 +11,7 @@ describe("skeletons", () => {
     nav.path = "/";
   });
 
-  it("home: one Loading status, boxes hidden, entries shaped like the contents", () => {
+  it("home: one Loading status, boxes hidden, six ruled tiles after the featured recipe", () => {
     const { container } = render(<HomeSkeleton />);
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.getByRole("status").textContent).toBe("Loading…");

@@ -14,7 +14,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const sharedUrl = parseSharedUrl(rawUrl);
   return (
     <div className="flex flex-col gap-10">
-      <PageHeader kicker="The collection" title="Import a recipe" description="From a link, a photo or pasted text. You check the result before anything is saved." />
+      <PageHeader kicker="Recipes" title="Import a recipe" description="From a link, a photo or pasted text. You check the result before anything is saved." />
       <ImportScreen initialMode={mode === "photo" || mode === "text" ? mode : "link"} initialUrl={sharedUrl ?? ""} sharedRejected={rawUrl !== "" && sharedUrl === null} />
     </div>
   );

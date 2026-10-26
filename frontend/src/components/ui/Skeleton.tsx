@@ -3,10 +3,10 @@
 import { useParams, usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { SidebarLayout } from "./Article";
-import { Contents } from "./Contents";
 import { cx } from "./cx";
 import { hasPhotoFor, Morph, photoName, titleFor, titleName } from "./morph";
 import { Pending } from "./Pending";
+import { Rule } from "./Rule";
 
 /** One placeholder box: the static skeleton tint with a soft highlight in the middle. Nothing moves. Size it with className. */
 export function Skeleton({ className }: { className?: string }) {
@@ -42,38 +42,46 @@ function Loading({ children }: { children: ReactNode }) {
   );
 }
 
-function EntrySkeleton() {
+/** One recipe tile: a ruled card with its plate, kicker, title and deck. */
+function TileSkeleton() {
   return (
-    <li>
-      <div className="flex gap-5 border-t border-(--rule-hair) py-6 sm:gap-6">
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <TextBar type="label" className="w-24" />
-          <TextBar type="font-display text-title-sm" className="w-4/5" />
-          <TextBar type="text-body" className="w-full" />
-          <TextBar type="label mt-1" className="w-16" />
-        </div>
-        <Skeleton className="aspect-[4/3] w-24 shrink-0 self-start sm:w-36" />
-      </div>
+    <li className="flex flex-col gap-3 border-t border-(--rule-hair) pt-4">
+      <Skeleton className="aspect-[3/2] w-full" />
+      <TextBar type="label" className="w-24" />
+      <TextBar type="font-display text-title-sm" className="w-4/5" />
+      <TextBar type="text-body" className="w-full" />
     </li>
   );
 }
 
-/** The home page's shape: head, search row, tag index, contents entries. Other (app) routes get the plain note. */
+/**
+ * The home page's shape: the featured recipe (text left, 3:2 photo right, above the text on a phone), the ticker, the
+ * search row and tag index, then ruled tiles (3 columns from 1180px, 2 from 640px, 1 below) beside a 22rem sidebar
+ * from 1024px. Other (app) routes get the plain note.
+ */
 export function HomeSkeleton() {
   const path = usePathname();
   if (path !== "/") return <Pending>Loading…</Pending>;
   return (
     <Loading>
       <div className="flex flex-col gap-10">
-        <div className="flex flex-col gap-4 border-b border-(--rule-hair) pb-8">
-          <TextBar type="label" className="w-32" />
-          <TextBar type="font-display text-headline" className="w-2/3 max-w-md" />
-          <TextBar type="text-deck" className="w-64" />
-          <div className="mt-2 flex flex-wrap gap-3">
-            <Skeleton className="h-11 w-36" />
-            <Skeleton className="h-11 w-24" />
+        <div className="grid gap-y-8 lg:grid-cols-[1fr_1.4fr] lg:items-center lg:gap-x-14">
+          <div className="flex min-w-0 flex-col gap-5 lg:py-4">
+            <TextBar type="label" className="w-40" />
+            <TextBar type="font-display text-headline" className="w-5/6" />
+            <TextBar type="font-display text-headline" className="w-2/3" />
+            <TextBar type="text-deck" className="w-full max-w-md" />
+            <Skeleton className="h-12 w-full" />
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Skeleton className="h-11 w-full sm:w-40" />
+              <Skeleton className="h-11 w-32 max-sm:hidden" />
+            </div>
+          </div>
+          <div className="order-first p-[9px] lg:order-last">
+            <Skeleton className="aspect-[3/2] w-full" />
           </div>
         </div>
+        <Skeleton className="h-11 w-full" />
         {/* The search form (input, then sort on a phone), the tag index (a block from 640px, a summary row below). */}
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
@@ -83,11 +91,17 @@ export function HomeSkeleton() {
           <Skeleton className="hidden h-22 w-full sm:block" />
           <Skeleton className="h-11 w-full sm:hidden" />
         </div>
-        <Contents>
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <EntrySkeleton key={i} />
-          ))}
-        </Contents>
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-12">
+          <ul className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-12 min-[640px]:grid-cols-2 min-[1180px]:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <TileSkeleton key={i} />
+            ))}
+          </ul>
+          <div className="flex flex-col gap-10 max-lg:hidden">
+            <Skeleton className="h-72 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        </div>
       </div>
     </Loading>
   );
@@ -137,8 +151,10 @@ export function RecipeSkeleton() {
             </Morph>
           )}
         </div>
-        <div className="border-t-[3px] border-b border-(--rule-double) py-4">
+        <div className="flex flex-col gap-4">
+          <Rule variant="double" />
           <Skeleton className="h-16 w-full" />
+          <Rule />
         </div>
         <SidebarLayout
           sidebar={

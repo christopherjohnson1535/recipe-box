@@ -145,7 +145,7 @@ export function GrocerySection({ title, count, children }: { title: string; coun
   const id = useId();
   return (
     <section aria-labelledby={id}>
-      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b-2 border-(--rule-double) bg-paper pt-3 pb-1.5">
+      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b border-(--rule-double) bg-paper pt-3 pb-1.5">
         <h2 id={id} className="label text-ink">
           {title}
         </h2>

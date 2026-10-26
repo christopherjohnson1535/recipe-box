@@ -60,6 +60,15 @@ const importLink = (address = "https://example.com/pancakes") => {
 const fail = (status: number, code: string, message = "m", details = {}) => new ApiError(status, code, message, details);
 
 describe("ImportScreen", () => {
+  it("explains what happens next beside the form, and not while a request is in flight", async () => {
+    const api = mockApi({ importUrl: vi.fn().mockReturnValue(new Promise(() => {})) });
+    render(<ImportScreen api={api} />);
+    expect(screen.getByRole("complementary", { name: "How importing works" })).toBeTruthy();
+    importLink();
+    await waitFor(() => expect(api.importUrl).toHaveBeenCalled());
+    expect(screen.queryByRole("complementary", { name: "How importing works" })).toBeNull();
+  });
+
   it("turns Import off while offline, says why, and sends nothing", async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     const api = mockApi();

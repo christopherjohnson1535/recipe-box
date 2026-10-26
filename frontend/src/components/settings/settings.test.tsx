@@ -250,6 +250,13 @@ describe("AppearanceSection", () => {
     render(<SettingsView me={chris} users={[chris]} capabilities={null} />);
     expect(screen.getByRole("heading", { name: "Appearance" })).toBeTruthy();
   });
+
+  it("speaks of day and evening colours, never of editions", () => {
+    const { container } = render(<AppearanceSection />);
+    expect(container.textContent).not.toMatch(/edition/i);
+    expect(screen.getByLabelText(/By the clock: evening colours after 7 pm/)).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Colours" })).toBeTruthy();
+  });
 });
 
 describe("PhotosSection", () => {
