@@ -278,7 +278,7 @@ export function RecipeForm({ initial, submitLabel, onSubmit, cancelHref, draftKe
             <Button variant="secondary" onClick={restore}>
               Restore
             </Button>
-            <Button variant="ghost" onClick={discardStash}>
+            <Button variant="danger-text" onClick={discardStash}>
               Discard
             </Button>
           </div>

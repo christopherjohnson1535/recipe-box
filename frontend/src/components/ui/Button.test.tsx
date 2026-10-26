@@ -34,8 +34,28 @@ describe("danger-text variant", () => {
       expect(el.className).toContain("min-h-control");
       expect(el.className).toContain("underline");
       expect(el.className).toContain("text-(--button-danger-text-fg)");
-      expect(el.className).toContain("hover:text-(--button-danger-text-hover)");
+      expect(el.className).toContain("not-disabled:not-aria-disabled:hover:text-(--button-danger-text-hover)");
       expect(el.className).not.toContain("bg-");
+    }
+  });
+
+  it("reads in the quiet ghost colours and does not recolour on hover when disabled or pending", () => {
+    render(
+      <>
+        <Button variant="danger-text" disabled>
+          Clear ticked
+        </Button>
+        <Button variant="danger-text" pending>
+          Deleting…
+        </Button>
+      </>,
+    );
+    for (const el of [screen.getByRole("button", { name: "Clear ticked" }), screen.getByRole("button", { name: "Deleting…" })]) {
+      expect(el).toHaveProperty("disabled", true);
+      expect(el.className).toContain("disabled:text-(--button-ghost-fg)");
+      expect(el.className).toContain("disabled:decoration-(--button-ghost-underline)");
+      expect(el.className).toContain("aria-disabled:text-(--button-ghost-fg)");
+      expect(el.className).not.toMatch(/(^| )hover:/);
     }
   });
 
