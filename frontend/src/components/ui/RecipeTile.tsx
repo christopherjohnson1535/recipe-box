@@ -3,22 +3,17 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { markArrived } from "./Arrive";
-import { cx } from "./cx";
 import { Morph, photoName, rememberPhoto, rememberTitle, recipeArrivalKey, titleName } from "./morph";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
 /**
- * The home grid: one column on a phone, two from 640px, three from 1180px (written as pixel breakpoints: Tailwind sorts `sm:` after an arbitrary `min-[…px]:`, which would cancel the third column). A grid of exactly two or four recipes keeps
- * two columns at that width (three would leave one tile alone on the last row). Children are `<RecipeTile>`s.
+ * The home grid: one column on a phone, two from 640px, three from 1280px. The steps are pixel breakpoints because
+ * Tailwind sorts `sm:` after an arbitrary `min-[…px]:` and would cancel the third column. Children are `<RecipeTile>`s.
  */
-export function TileGrid({ label, count, children }: { label?: string; count?: number; children: ReactNode }) {
-  const two = count === 2 || count === 4;
+export function TileGrid({ label, children }: { label?: string; children: ReactNode }) {
   return (
-    <ul
-      aria-label={label}
-      className={cx("grid grid-cols-1 gap-x-6 gap-y-12 min-[640px]:grid-cols-2", !two && "min-[1180px]:grid-cols-3")}
-    >
+    <ul aria-label={label} className="grid grid-cols-1 gap-x-6 gap-y-12 min-[640px]:grid-cols-2 min-[1280px]:grid-cols-3">
       {children}
     </ul>
   );
@@ -55,8 +50,9 @@ type CardProps = {
 /**
  * One recipe in the home grid: a 1px ink rule, a kicker line with tags and time, a 3:2 photo (or a paper plate with a
  * spot icon), a display title and a two-line deck. A tile narrower than 17rem keeps only the first tag so the kicker stays
- * on one line and the photos in a row stay level. On hover and on keyboard focus the plate scales and turns and the title draws a
- * accent underline (motion.css); under reduced motion only the underline and colour change. The whole card is the link.
+ * on one line and the photos in a row stay level. On hover and on keyboard focus the plate scales and turns and the
+ * title draws an accent underline (motion.css); under reduced motion only the underline and colour change. The whole
+ * card is the link.
  */
 export function RecipeTile({ href, title, kicker, time, deck, imageSrc, fallbackIcon, index = 0, morphId }: CardProps) {
   return (

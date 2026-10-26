@@ -77,19 +77,12 @@ describe("RecipeTile", () => {
 });
 
 describe("TileGrid columns", () => {
-  const classes = (count?: number) => {
-    const { container } = render(<TileGrid count={count}>{[]}</TileGrid>);
-    return container.querySelector("ul")!.className;
-  };
-  it("is one column on a phone, two from 640px and three from 1180px", () => {
-    const c = classes(9);
+  it("is one column on a phone, two from 640px and three from 1280px", () => {
+    const { container } = render(<TileGrid>{[]}</TileGrid>);
+    const c = container.querySelector("ul")!.className;
     expect(c).toContain("grid-cols-1");
     expect(c).toContain("min-[640px]:grid-cols-2");
-    expect(c).toContain("min-[1180px]:grid-cols-3");
-  });
-  it("keeps two columns for two or four recipes, so the last row is never one tile", () => {
-    for (const n of [2, 4]) expect(classes(n)).not.toContain("grid-cols-3");
-    for (const n of [1, 3, 5, 6, 13]) expect(classes(n)).toContain("min-[1180px]:grid-cols-3");
+    expect(c).toContain("min-[1280px]:grid-cols-3");
   });
 });
 
@@ -117,13 +110,21 @@ describe("FeaturedRecipe", () => {
   it("shows the meta strip between two hairlines, Start cooking as a button and Read the recipe as an accent link", () => {
     const { container } = render_({ meta: "3 hr 20 min", deck: "Slow." });
     expect(screen.getByText("3 hr 20 min").className).toContain("border-y");
-    expect(screen.getByRole("link", { name: "Start cooking" }).getAttribute("href")).toBe("/recipes/a/cook");
-    const read = screen.getByRole("link", { name: "Read the recipe" });
+    expect(screen.getByRole("link", { name: "Start cooking: Short Ribs" }).getAttribute("href")).toBe("/recipes/a/cook");
+    const read = screen.getByRole("link", { name: "Read the recipe: Short Ribs" });
     expect(read.getAttribute("href")).toBe("/recipes/a");
     expect(read.className).toContain("link");
     expect(read.className).toContain("min-h-control");
     expect(container.querySelector("img")!.className).toContain("aspect-[3/2]");
     expect(container.querySelector("img")!.className).toContain("outline-offset-8");
+  });
+});
+
+describe("FeaturedRecipe action names", () => {
+  it("names each action with the recipe, so a list of links says what they open", () => {
+    render(<FeaturedRecipe title="Short Ribs Slow and Low" kicker="Featured" imageSrc="/media/a.jpg" cookHref="/recipes/a/cook" readHref="/recipes/a" />);
+    expect(screen.getByRole("link", { name: "Start cooking: Short Ribs Slow and Low" }).textContent).toBe("Start cooking");
+    expect(screen.getByRole("link", { name: "Read the recipe: Short Ribs Slow and Low" }).textContent).toBe("Read the recipe");
   });
 });
 

@@ -6,7 +6,7 @@ import { FadeImage } from "./FadeImage";
 /**
  * The home page's featured recipe: a kicker, a large headline (an h2: the page's h1 is a visually hidden "Recipes"
  * beside it), an italic deck, a meta strip between two hairlines (total time, servings where known) and the actions on
- * the left (Start cooking in ink, Read the recipe as an accent link); the photo, 3:2 with a hairline outline set 8px off it, on the right (above the headline on a phone). The
+ * the left (Start cooking in ink, Read the recipe as an accent link; each is named with the recipe, "Start cooking: Short Ribs"); the photo, 3:2 with a hairline outline set 8px off it, on the right (above the headline on a phone). The
  * headline's words rise in on a first visit.
  */
 export function FeaturedRecipe({
@@ -46,10 +46,10 @@ export function FeaturedRecipe({
         {deck && <p className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{deck}</p>}
         {meta && <p className="label border-y border-(--rule-hair) py-3 text-ink-muted">{meta}</p>}
         <div className="mt-1 flex flex-wrap items-center gap-x-6 gap-y-3 print:hidden">
-          <ButtonLink href={cookHref} className="max-sm:w-full">
+          <ButtonLink href={cookHref} aria-label={`Start cooking: ${title}`} className="max-sm:w-full">
             Start cooking
           </ButtonLink>
-          <Link href={readHref} className="link label inline-flex min-h-control items-center max-sm:w-full max-sm:justify-center">
+          <Link href={readHref} aria-label={`Read the recipe: ${title}`} className="link label inline-flex min-h-control items-center max-sm:w-full max-sm:justify-center">
             Read the recipe
           </Link>
         </div>

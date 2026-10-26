@@ -46,8 +46,8 @@ describe("home page", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Short Ribs Slow and Low" })).toBeTruthy();
     expect(screen.getByText("Featured · braise · sunday")).toBeTruthy();
     expect(screen.getByText("Three hours in the oven.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Start cooking" }).getAttribute("href")).toBe("/recipes/featured/cook");
-    expect(screen.getByRole("link", { name: "Read the recipe" }).getAttribute("href")).toBe("/recipes/featured");
+    expect(screen.getByRole("link", { name: "Start cooking: Short Ribs Slow and Low" }).getAttribute("href")).toBe("/recipes/featured/cook");
+    expect(screen.getByRole("link", { name: "Read the recipe: Short Ribs Slow and Low" }).getAttribute("href")).toBe("/recipes/featured");
 
     const ticker = screen.getByRole("region", { name: "In season" });
     expect(within(ticker).getAllByText("Delicata squash")).toHaveLength(2);
@@ -77,13 +77,27 @@ describe("home page", () => {
     expect(screen.queryByRole("complementary")).toBeNull(); // too few recipes for panels
   });
 
-  it("sets the grid in three columns from 1180px, two from 640px, one below", async () => {
+  it("sets the grid in three columns from 1280px, two from 640px, one below", async () => {
     serve([...others, withPhoto]);
     await home();
     const list = screen.getByRole("region", { name: "All recipes" }).querySelector("ul")!;
     expect(list.className).toContain("grid-cols-1");
     expect(list.className).toContain("min-[640px]:grid-cols-2");
-    expect(list.className).toContain("min-[1180px]:grid-cols-3");
+    expect(list.className).toContain("min-[1280px]:grid-cols-3");
+  });
+
+  it("keeps the normal responsive columns on a filtered result, with no sidebar", async () => {
+    for (const n of [2, 4]) {
+      const found = others.slice(0, n);
+      serve([...others, withPhoto], [{ name: "soups", count: 1 }], found);
+      const { unmount } = await home({ q: "soup" });
+      expect(screen.queryByRole("complementary")).toBeNull();
+      const list = screen.getByRole("region", { name: `${n} matching recipes` }).querySelector("ul")!;
+      expect(list.children).toHaveLength(n);
+      expect(list.className).toContain("min-[640px]:grid-cols-2");
+      expect(list.className).toContain("min-[1280px]:grid-cols-3");
+      unmount();
+    }
   });
 
   it("uses lasting copy: Featured and More to cook, no issue, cover or collection wording", async () => {

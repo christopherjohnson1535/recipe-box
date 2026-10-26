@@ -9,7 +9,7 @@ Recipe Box name and the section links, with a thin double line below.
 The top of the home page shows a **Featured** recipe: one with a photo that you haven't touched in a while, with its time and the buttons **Start
 cooking** and **Read the recipe**. Under it a slow **In season** ticker lists produce for the time of year (hover over it,
 tab onto it or press **Pause** to stop it; on a touch screen tap it). Below are your recipes as cards, three across on a wide
-screen, two on an iPad and one on a phone, with a numbered **More to cook** list and a **Haven't cooked in a while** panel beside
+screen (1280 pixels and up), two on an iPad and one on a phone, with a numbered **More to cook** list and a **Haven't cooked in a while** panel beside
 them (under them on an iPad held upright or a phone). While you search or pick a tag, the featured recipe, ticker and side panels
 step aside and only the matching recipes show. If your device is set to reduce motion, the ticker stands still and cards don't move.
 

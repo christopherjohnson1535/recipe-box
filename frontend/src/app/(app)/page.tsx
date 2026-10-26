@@ -140,7 +140,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
             title={featured.title}
             kicker={`Featured${featured.tags.length > 0 ? ` · ${featured.tags.slice(0, 2).join(" · ")}` : ""}`}
             deck={featured.description || undefined}
-            // shortcut: the list summary has no servings, so the strip shows the time only until it does.
+            // shortcut: the strip shows the time only; servings need `servings` on RecipeSummary (an API change).
             meta={formatMinutes(featured.totalMinutes)}
             imageSrc={plateSrc(featured) as string}
             cookHref={`/recipes/${featured.id}/cook`}

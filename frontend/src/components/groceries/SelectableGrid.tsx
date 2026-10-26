@@ -80,7 +80,7 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
         <OfflineNote id="select-offline">You’re offline. Adding to the grocery list needs the server.</OfflineNote>
       </div>
 
-      <TileGrid count={recipes.length}>
+      <TileGrid>
         {recipes.map((r, i) =>
           selecting ? (
             <SelectCard
