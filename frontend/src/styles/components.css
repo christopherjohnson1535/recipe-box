@@ -59,7 +59,6 @@
 
   /* Panels, rules, entries */
   --panel-bg: var(--color-paper-deep);
-  --card-border: var(--color-rule);
   --rule-hair: var(--color-rule);
   --rule-double: var(--color-ink);
   --photo-outline: var(--color-rule); /* the featured photo's 1px outline; evening raises it a step */
