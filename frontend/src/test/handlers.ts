@@ -6,7 +6,7 @@ import type { Capabilities, GoogleExport, GoogleStatus, Health, Image, Recipe, R
 // "*/api/..." matches both the browser's relative URLs and server-side absolute ones.
 export const user: User = { id: "u1", username: "chris", displayName: "Chris", role: "admin", email: null, createdAt: "2026-01-01T00:00:00Z" };
 export const summary: RecipeSummary = {
-  id: "r1", title: "Soup", description: "", totalMinutes: 30, tags: [], imageUrl: null, imageDisplayUrl: null, sourceType: "manual", updatedAt: "2026-01-01T00:00:00Z",
+  id: "r1", title: "Soup", description: "", totalMinutes: 30, tags: [], imageUrl: null, imageDisplayUrl: null, servings: null, sourceType: "manual", updatedAt: "2026-01-01T00:00:00Z",
 };
 export const recipe: Recipe = {
   id: "r1", title: "Soup", description: "", ingredients: [], steps: [], servings: null, prepMinutes: null, cookMinutes: null,

@@ -11,7 +11,7 @@ import { SpotIcon } from "@/components/ui/SpotIcon";
 import { iconForTag } from "@/components/ui/spot-icons";
 import { monthYear, planHome } from "@/components/home/home-plan";
 import { LocalTicker } from "@/components/home/LocalTicker";
-import { formatMinutes, plateSrc } from "@/lib/recipe";
+import { formatMinutes, plateSrc, servingsLabel } from "@/lib/recipe";
 import { SelectableGrid } from "@/components/groceries/SelectableGrid";
 import { NoMatches } from "@/components/search/ResultSummary";
 import { SearchControls } from "@/components/search/SearchControls";
@@ -140,8 +140,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
             title={featured.title}
             kicker={`Featured${featured.tags.length > 0 ? ` · ${featured.tags.slice(0, 2).join(" · ")}` : ""}`}
             deck={featured.description || undefined}
-            // shortcut: the strip shows the time only; servings need `servings` on RecipeSummary (an API change).
-            meta={formatMinutes(featured.totalMinutes)}
+            meta={[formatMinutes(featured.totalMinutes), servingsLabel(featured.servings)].filter(Boolean).join(" · ") || undefined}
             imageSrc={plateSrc(featured) as string}
             cookHref={`/recipes/${featured.id}/cook`}
             readHref={`/recipes/${featured.id}`}

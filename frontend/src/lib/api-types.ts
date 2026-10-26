@@ -1063,6 +1063,8 @@ export interface components {
             /** @description As on `Recipe`. */
             imageDisplayUrl: string | null;
             imageUrl: string | null;
+            /** @description Free text, as on `Recipe`. */
+            servings: string | null;
             sourceType: components["schemas"]["SourceType"];
             tags: string[];
             title: string;

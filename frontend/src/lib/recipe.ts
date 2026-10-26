@@ -1,4 +1,4 @@
-import { NUMBER, parseNumber } from "./scale";
+import { NUMBER, parseNumber, splitIngredient } from "./scale";
 
 /** The picture to show on cards, the cover and the recipe page: the print-treated rendition when there is one, else the original. */
 export function plateSrc(r: { imageUrl: string | null; imageDisplayUrl?: string | null }): string | null {
@@ -11,6 +11,16 @@ export function formatMinutes(minutes: number | null | undefined): string | null
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return [h && `${h} hr`, m && `${m} min`].filter(Boolean).join(" ");
+}
+
+// A bare number or range with no words: "4", "4-6", "4–6", "4 to 6", "1/2", "1½". "4 cups" and "12 bars" are not.
+const BARE_SERVINGS = new RegExp(`^(?:${NUMBER})(?:(?:\\s*[-–]\\s*|\\s+to\\s+)(?:${NUMBER}))?$`, "i");
+
+/** "Serves 4" for a bare number or range only; anything with words ("4 cups", "makes 12 cookies") as written, trimmed; null when empty. */
+export function servingsLabel(servings: string | null | undefined): string | null {
+  const s = servings?.trim();
+  if (!s) return null;
+  return BARE_SERVINGS.test(s.replace("\u2044", "/")) ? `Serves ${s}` : s;
 }
 
 /** Consecutive items with the same `section` become one group (REC-3 headings). */

@@ -89,7 +89,8 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   `sourceUrl` is http(s) only. `PUT` is a full replace. `DELETE` is a soft delete; `restore` answers 409 `conflict`
   when the recipe was deleted more than 10 minutes ago.
 - **Recipe list**: excludes soft-deleted; `limit` 1..200 (default 50); `total` counts all matches, ignoring
-  `limit`/`offset`.
+  `limit`/`offset`. Each item carries `servings`, the recipe's free-text servings (`"4"`, `"makes 12 cookies"`) or
+  `null`; the key is always present.
   - `q` (blank = no filter): a recipe matches when the `websearch_to_tsquery('simple', q)` hits its title,
     description, notes or ingredients (`"exact phrase"`, `-exclude`, `or` work), **or** its title starts with `q`
     (`%`/`_` literal), **or** every word of `q` is a word prefix (`weeknight lasag` finds "Weeknight lasagne"; skipped

@@ -4440,6 +4440,7 @@
           "title",
           "description",
           "totalMinutes",
+          "servings",
           "tags",
           "imageUrl",
           "imageDisplayUrl",
@@ -4466,6 +4467,13 @@
               "string",
               "null"
             ]
+          },
+          "servings": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Free text, as on `Recipe`."
           },
           "sourceType": {
             "$ref": "#/components/schemas/SourceType"

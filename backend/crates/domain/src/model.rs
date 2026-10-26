@@ -138,6 +138,8 @@ pub struct RecipeSummary {
     pub title: String,
     pub description: String,
     pub total_minutes: Option<i32>,
+    /// Free text, as on `Recipe`.
+    pub servings: Option<String>,
     /// Sorted by name.
     pub tags: Vec<String>,
     pub image_file: Option<String>,

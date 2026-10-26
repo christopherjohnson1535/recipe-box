@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
 import { Toast, ToastDismiss, ToastRegion } from "@/components/ui/Toast";
 import { TextLink } from "@/components/ui/TextLink";
-import { splitIngredient } from "@/lib/scale";
+import { servingsLabel } from "@/lib/recipe";
 import { SendList } from "./SendList";
 import { amountsText, groupItems, SECTIONS, toBuy } from "./list-model";
 import { scaleLabel, stepScale } from "./scale-steps";
@@ -25,13 +25,6 @@ import { useGoogleStatus } from "./use-google-status";
 import { useGroceryList } from "./use-grocery-list";
 
 const OFFLINE = "groceries-offline";
-
-/** "Serves 4" for a bare number or range; a phrase ("makes about 4 bowls") as written. */
-const servingsMeta = (servings: string | null) => {
-  const s = servings?.trim();
-  if (!s) return null;
-  return splitIngredient(s).quantity === s ? `Serves ${s}` : s;
-};
 
 function LoadingList() {
   return (
@@ -173,7 +166,7 @@ export function GroceryView() {
       <RecipeRow
         key={r.recipeId}
         title={<TextLink href={`/recipes/${r.recipeId}`}>{r.title}</TextLink>}
-        meta={servingsMeta(r.servings)}
+        meta={servingsLabel(r.servings)}
         stepper={
           <ScaleStepper
             label={`Servings of ${r.title}`}

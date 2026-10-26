@@ -44,7 +44,7 @@ export function FeaturedRecipe({
           ))}
         </h2>
         {deck && <p className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{deck}</p>}
-        {meta && <p className="label border-y border-(--rule-hair) py-3 text-ink-muted">{meta}</p>}
+        {meta && <p className="label border-y border-(--rule-hair) py-3 text-ink-muted [overflow-wrap:anywhere]">{meta}</p>}
         <div className="mt-1 flex flex-wrap items-center gap-x-6 gap-y-3 print:hidden">
           <ButtonLink href={cookHref} aria-label={`Start cooking: ${title}`} className="max-sm:w-full">
             Start cooking

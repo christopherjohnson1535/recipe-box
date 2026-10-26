@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMinutes, groupBySection, minuteNumeral, splitDurations, typographic } from "./recipe";
+import { formatMinutes, groupBySection, servingsLabel, minuteNumeral, splitDurations, typographic } from "./recipe";
 
 describe("recipe helpers", () => {
   it("formats minutes", () => {
@@ -8,6 +8,25 @@ describe("recipe helpers", () => {
     expect(formatMinutes(75)).toBe("1 hr 15 min");
     expect(formatMinutes(null)).toBeNull();
     expect(formatMinutes(0)).toBeNull();
+  });
+
+  it("labels servings", () => {
+    for (const s of ["4", "4-6", "4–6", "4 to 6", "1/2", "1½"]) expect(servingsLabel(s)).toBe(`Serves ${s}`);
+    expect(servingsLabel(" 4-6 ")).toBe("Serves 4-6");
+  });
+
+  it("shows servings with words as written", () => {
+    for (const s of ["4 cups", "6 cloves", "12 bars", "Serves 4", "makes 12 cookies", "makes about 4 bowls"]) {
+      expect(servingsLabel(s)).toBe(s);
+    }
+    expect(servingsLabel("  makes 12 cookies ")).toBe("makes 12 cookies");
+  });
+
+  it("gives no label for nothing", () => {
+    expect(servingsLabel("")).toBeNull();
+    expect(servingsLabel("   ")).toBeNull();
+    expect(servingsLabel(null)).toBeNull();
+    expect(servingsLabel(undefined)).toBeNull();
   });
 
   it("groups consecutive sections", () => {
