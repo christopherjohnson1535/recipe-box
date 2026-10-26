@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 // Service worker (KIT-5): recipes opened before stay readable offline. Bundled by esbuild through
 // src/app/serwist/[path]/route.ts and registered by components/offline/OfflineSupport.
-// Precache: the app shell (.next/static, public/, the /offline page). Runtime: recipe pages, GET /api/recipes/:id
+// Precache: the app shell (.next/static, public/, the /offline page). Runtime: recipe pages, cook-together sessions (one copy per
+// `/cook?recipes=` query, see pageKey), GET /api/recipes/:id
 // and /media/* only, network first so online always shows the server's copy. Everything else goes to the network.
 import type { PrecacheEntry, RouteHandler, SerwistGlobalConfig } from "serwist";
 import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
