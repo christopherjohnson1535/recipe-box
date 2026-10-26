@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Children, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from "react";
+import { Children, createContext, isValidElement, useContext, useId, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { pinEdition, unpinEdition } from "@/lib/edition";
 import { cx } from "./cx";
 
@@ -192,14 +192,28 @@ export function CookTick({ pressed, children, ...rest }: { pressed: boolean } & 
   );
 }
 
-/** Portrait: chips, step (scrolls), timers, between the top bar and the footer. Landscape: three columns that scroll on their own. */
-export function CookColumns({ rail, step, timers }: { rail: ReactNode; step: ReactNode; timers: ReactNode }) {
+/** True inside a `CookColumns` with `wide`: the timers are a strip, not a column. */
+const WideContext = createContext(false);
+
+/**
+ * Portrait: chips, step (scrolls), timers, between the top bar and the footer. Landscape: three columns that scroll on their own.
+ * `wide` (the by-dish view) gives the step area the width of the step and the timers together: the rail stays on the left, the
+ * timers become a strip above the step area, and the step area has the room for a column per dish. Portrait is the same either way.
+ */
+export function CookColumns({ rail, step, timers, wide = false }: { rail: ReactNode; step: ReactNode; timers: ReactNode; wide?: boolean }) {
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-4 py-4 lg:grid-cols-[26fr_44fr_26fr] lg:grid-rows-1 lg:gap-12 lg:py-8">
-      <div className="min-h-0 overflow-y-auto max-lg:max-h-[35dvh] lg:order-1">{rail}</div>
-      <div className="flex min-h-0 flex-col overflow-y-auto lg:order-2">{step}</div>
-      <div className="min-h-0 lg:order-3 lg:overflow-y-auto">{timers}</div>
-    </div>
+    <WideContext.Provider value={wide}>
+      <div
+        className={cx(
+          "grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-4 py-4 lg:py-8",
+          wide ? "lg:grid-cols-[22fr_78fr] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-4" : "lg:grid-cols-[26fr_44fr_26fr] lg:grid-rows-1 lg:gap-12",
+        )}
+      >
+        <div className={cx("min-h-0 overflow-y-auto max-lg:max-h-[35dvh] lg:order-1", wide && "lg:col-start-1 lg:row-span-2 lg:row-start-1")}>{rail}</div>
+        <div className={cx("flex min-h-0 flex-col overflow-y-auto lg:order-2", wide && "lg:col-start-2 lg:row-start-2")}>{step}</div>
+        <div className={cx("min-h-0 lg:order-3 lg:overflow-y-auto", wide && "lg:col-start-2 lg:row-start-1 lg:overflow-visible")}>{timers}</div>
+      </div>
+    </WideContext.Provider>
   );
 }
 
@@ -207,12 +221,12 @@ export function CookColumns({ rail, step, timers }: { rail: ReactNode; step: Rea
  * "For this step": ingredients as rows (landscape) or chips (portrait). Lit ones are bright; in portrait only the lit
  * ones show until "+N more" is tapped.
  */
-export function CookRail({ children, hiddenCount, anyLit }: { children: ReactNode; hiddenCount: number; anyLit: boolean }) {
+export function CookRail({ children, hiddenCount, anyLit, heading = "For this step" }: { children: ReactNode; hiddenCount: number; anyLit: boolean; /** "Ingredients" when nothing is lit because the tab is not the step's dish. */ heading?: string }) {
   const [all, setAll] = useState(false);
   return (
     <section aria-labelledby="cook-rail">
       <h2 id="cook-rail" className="label mb-3 text-ink-muted">
-        For this step
+        {heading}
       </h2>
       <ul data-all={all} className="group/rail flex gap-2 max-lg:overflow-x-auto data-[all=true]:max-lg:flex-wrap lg:flex-col lg:gap-0">
         {children}
@@ -256,9 +270,10 @@ export function CookRailRow({ quantity, name, lit, ticked, onToggle }: { quantit
 }
 
 /** The step itself: kicker (with an optional action such as the Done toggle beside it), then the text at 40px on an iPad (28px on a phone). */
-export function CookStepText({ label, action, children }: { label: string; action?: ReactNode; children: ReactNode }) {
+export function CookStepText({ label, action, dish, children }: { label: string; action?: ReactNode; /** A `CookDishMark` (with `wrap`), shown on its own row above the kicker when several dishes are cooked together. */ dish?: ReactNode; children: ReactNode }) {
   return (
     <div className="my-auto select-none">
+      {dish && <div className="mb-3">{dish}</div>}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4">
         <p className="label text-accent">{label}</p>
         {action}
@@ -275,13 +290,35 @@ export function CookStepList({ children }: { children: ReactNode }) {
 
 /**
  * One step in the list, 24px text (28px from 700px) with its numeral and a tick on the right. The current step has an accent
- * bar on its left and scrolls into view when it becomes current; a done step is muted.
+ * bar on its left and scrolls into view when it becomes current; a done step is muted. Cooking several dishes together, `dish`
+ * (a `CookDishMark`) sits above the numeral and `controls` (`CookMoveButtons`) after the tick.
  */
-export function CookStepItem({ number, current, done, tick, children }: { number: number; current: boolean; done: boolean; tick: ReactNode; children: ReactNode }) {
+export function CookStepItem({
+  number,
+  current,
+  done,
+  tick,
+  dish,
+  controls,
+  children,
+}: {
+  number: number;
+  current: boolean;
+  done: boolean;
+  tick: ReactNode;
+  dish?: ReactNode;
+  controls?: ReactNode;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
     if (current) ref.current?.scrollIntoView?.({ block: "center" });
   }, [current]);
+  const numeral = (
+    <span aria-hidden="true" className="font-display text-numeral text-accent [font-variant-numeric:lining-nums_tabular-nums]">
+      {number}
+    </span>
+  );
   return (
     <li
       ref={ref}
@@ -292,17 +329,327 @@ export function CookStepItem({ number, current, done, tick, children }: { number
         done ? "text-ink-muted" : "text-ink",
       )}
     >
-      <span aria-hidden="true" className="font-display text-numeral text-accent [font-variant-numeric:lining-nums_tabular-nums]">
-        {number}
-      </span>
+      {dish ? (
+        <div className="flex flex-col items-start gap-2">
+          {dish}
+          {numeral}
+        </div>
+      ) : (
+        numeral
+      )}
       <div className="flex flex-col items-start gap-2">
         <p className="font-display text-[1.5rem] leading-[1.3] [overflow-wrap:anywhere] min-[700px]:text-[1.75rem]">
           <span className="sr-only">Step {number}: </span>
           {children}
         </p>
-        {tick}
+        {controls ? (
+          <div className="flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-1">
+            {tick}
+            {controls}
+          </div>
+        ) : (
+          tick
+        )}
       </div>
     </li>
+  );
+}
+
+// ===== Cook together (#82): several dishes, one cook. =====
+
+/* One entry per dish colour. Fill and shape differ as well as colour, so two dishes are told apart without it; the
+   class strings are written out so Tailwind sees them. Tokens: --cook-dish-N, --cook-on-dish-N (components.css). */
+/** True inside a column heading: the mark's name is then the heading text, not a small label. */
+const HeadingContext = createContext(false);
+
+const DISH = [
+  { fill: "solid", shape: "round", tone: "border-(--cook-dish-1) bg-(--cook-dish-1) text-(--cook-on-dish-1)" },
+  { fill: "outline", shape: "round", tone: "border-(--cook-dish-2) text-(--cook-on-dish-2)" },
+  { fill: "solid", shape: "square", tone: "border-(--cook-dish-3) bg-(--cook-dish-3) text-(--cook-on-dish-3)" },
+  { fill: "outline", shape: "square", tone: "border-(--cook-dish-4) text-(--cook-on-dish-4)" },
+] as const;
+
+/**
+ * The mark of one dish: its initial in a chip whose colour, fill (solid or outline) and shape (round or square) are
+ * unique to it. The dish name is the accessible text: shown beside the chip as a label at "md", visually hidden at "sm".
+ * Inside a `CookDishColumn` heading the name is set as the heading itself (title size, wrapping) instead. `dish` is 0 to 3.
+ */
+export function CookDishMark({ dish, initial, name, size = "md", wrap = false }: { dish: number; initial: string; name: string; size?: "sm" | "md"; /** Let the name wrap onto more lines instead of truncating; for a mark with a row to itself. */ wrap?: boolean }) {
+  const d = DISH[((dish % DISH.length) + DISH.length) % DISH.length];
+  const heading = useContext(HeadingContext);
+  return (
+    <span data-dish-fill={d.fill} data-dish-shape={d.shape} className="inline-flex min-w-0 items-center gap-2.5">
+      <span
+        aria-hidden="true"
+        className={cx(
+          "inline-grid shrink-0 place-items-center border-2 font-display leading-none uppercase",
+          d.shape === "round" ? "rounded-full" : "rounded-control",
+          size === "sm" ? "size-7 text-[0.9375rem]" : "size-9 text-[1.125rem]",
+          d.tone,
+        )}
+      >
+        {initial}
+      </span>
+      <span className={size === "sm" ? "sr-only" : heading ? "min-w-0 font-display text-title-sm text-ink [overflow-wrap:anywhere]" : cx("label min-w-0 text-ink", wrap ? "[overflow-wrap:anywhere]" : "truncate")}>{name}</span>
+    </span>
+  );
+}
+
+/** The dishes being cooked, one `CookDishMark` each, in a row under the top bar. */
+export function CookDishLegend({ children }: { children: ReactNode }) {
+  return (
+    <ul role="list" aria-label="Dishes" className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-1">
+      {Children.map(children, (child) => (
+        <li className="min-w-0">{child}</li>
+      ))}
+    </ul>
+  );
+}
+
+const chevron = { earlier: "M6 15l6-6 6 6", later: "M6 9l6 6 6-6" };
+const moveButton =
+  "inline-flex size-control shrink-0 items-center justify-center rounded-control border border-rule-strong text-ink transition-[border-color,color] duration-150 hover:border-accent hover:text-accent aria-disabled:cursor-not-allowed aria-disabled:border-dotted aria-disabled:border-rule aria-disabled:text-ink-muted aria-disabled:hover:border-rule aria-disabled:hover:text-ink-muted";
+
+/**
+ * Earlier / Later for one step: two 44px icon buttons. A step that cannot move that way keeps its button (dotted, muted,
+ * `aria-disabled`, a tap does nothing) rather than disabling it, so keyboard focus is not lost when a step reaches an end.
+ */
+export function CookMoveButtons({ stepLabel, canEarlier, canLater, onEarlier, onLater }: { stepLabel: string; canEarlier: boolean; canLater: boolean; onEarlier: () => void; onLater: () => void }) {
+  const button = (way: keyof typeof chevron, can: boolean, onClick: () => void) => (
+    <button
+      type="button"
+      aria-label={`Move ${stepLabel} ${way}`}
+      title={`Move ${stepLabel} ${way}`}
+      aria-disabled={can ? undefined : true}
+      onClick={() => can && onClick()}
+      className={moveButton}
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d={chevron[way]} />
+      </svg>
+    </button>
+  );
+  return (
+    <div className="flex gap-2">
+      {button("earlier", canEarlier, onEarlier)}
+      {button("later", canLater, onLater)}
+    </div>
+  );
+}
+
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+/** The glide's duration and curve are the motion tokens (`--duration-base`, `--ease-out`); jsdom has no stylesheet, so keywords stand in there. */
+function glideTiming() {
+  const css = getComputedStyle(document.documentElement);
+  const ms = parseFloat(css.getPropertyValue("--duration-base"));
+  return { duration: ms > 0 ? ms : 300, easing: css.getPropertyValue("--ease-out").trim() || "ease-out" };
+}
+/**
+ * The all-steps list for several dishes: children are `CookStepItem`s with stable keys. When their order changes the steps
+ * glide to their new places (FLIP: each item starts from where it was and slides home, transform only, on the motion
+ * tokens) unless the person asks for reduced motion. A browser drops keyboard focus from a button whose step was moved, so
+ * the screen that moves steps puts it back.
+ */
+export function CookReorderList({ children }: { children: ReactNode }) {
+  const list = useRef<HTMLOListElement>(null);
+  const placed = useRef(new Map<HTMLElement, number>());
+  const snapshot = (ol: HTMLOListElement) => new Map(Array.from(ol.children, (el) => [el as HTMLElement, (el as HTMLElement).offsetTop]));
+  // Positions are read only when the order changes (and when the list's own size does), not on every render and timer tick.
+  const order = Children.toArray(children).map((child) => (isValidElement(child) ? child.key : "")).join("|");
+
+  useLayoutEffect(() => {
+    const ol = list.current;
+    if (!ol) return;
+    const before = placed.current;
+    placed.current = snapshot(ol);
+    if (before.size === 0 || reducedMotion()) return;
+    const top = ol.getBoundingClientRect().top;
+    const timing = glideTiming();
+    for (const [el, now] of placed.current) {
+      const was = before.get(el);
+      if (was === undefined) continue;
+      // An item still gliding is somewhere between its old and new place: start from where it is drawn.
+      const running = el.getAnimations?.() ?? [];
+      const drawn = running.length ? el.getBoundingClientRect().top - top - now : 0;
+      running.forEach((a) => a.cancel());
+      const dy = was - now + drawn;
+      if (Math.abs(dy) < 1) continue;
+      el.animate?.([{ transform: `translateY(${dy}px)` }, { transform: "none" }], timing);
+    }
+  }, [order]);
+  // A resize or a text re-wrap moves the steps without reordering them; that must not glide next time.
+  useEffect(() => {
+    const ol = list.current;
+    if (!ol) return;
+    const resnap = () => void (placed.current = snapshot(ol));
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", resnap);
+      return () => window.removeEventListener("resize", resnap);
+    }
+    const watch = new ResizeObserver(resnap);
+    watch.observe(ol);
+    return () => watch.disconnect();
+  }, []);
+
+  return (
+    <ol ref={list} className="relative flex flex-col">
+      {children}
+    </ol>
+  );
+}
+
+/** "One step / All steps / By dish": a radio group set like `CookViewToggle`, the filled pill sliding to the chosen option. Arrow keys, Home and End move and choose. */
+export function CookViewChoice<T extends string>({ label, options, value, onChange }: { label: string; options: readonly { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  const group = useRef<HTMLDivElement>(null);
+  const at = Math.max(0, options.findIndex((o) => o.id === value));
+
+  function onKeyDown(e: KeyboardEvent) {
+    const last = options.length - 1;
+    const next = { ArrowRight: at + 1, ArrowDown: at + 1, ArrowLeft: at - 1, ArrowUp: at - 1, Home: 0, End: last }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const to = (next + options.length) % options.length;
+    onChange(options[to].id);
+    group.current?.querySelectorAll<HTMLElement>('[role="radio"]')[to]?.focus();
+  }
+
+  return (
+    <div ref={group} role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className="relative grid max-w-full auto-cols-fr grid-flow-col overflow-hidden rounded-full border border-(--button-secondary-border)">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 bg-(--button-primary-bg) transition-transform duration-300 ease-out motion-reduce:transition-none"
+        style={{ width: `${100 / options.length}%`, transform: `translateX(${at * 100}%)` }}
+      />
+      {options.map((o) => {
+        const on = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onChange(o.id)}
+            className={cx(
+              "label relative inline-flex min-h-control min-w-28 items-center justify-center px-4 whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-4px] max-sm:min-w-0 max-sm:px-3",
+              on ? "text-(--button-primary-fg)" : "text-ink hover:text-accent",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * By dish: from 1024px (iPad landscape) two columns of dishes, so three or four wrap to a second row and every column keeps a
+ * readable measure (use it in a `wide` `CookColumns`); stacked under a hairline below that. Put a `CookDishColumn` per dish inside.
+ */
+export function CookDishColumns({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 lg:grid-cols-2">{children}</div>;
+}
+
+/** One dish's steps: its heading (a `CookDishMark` and the dish's title), then `CookStepItem`s styled as in `CookStepList`. */
+export function CookDishColumn({ heading, children }: { heading: ReactNode; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section
+      aria-labelledby={id}
+      className="min-w-0 border-t border-rule pt-8 pb-6 first:border-t-0 first:pt-0 lg:border-t-0 lg:px-8 lg:pt-0 lg:odd:pl-0 lg:even:border-l lg:even:pr-0 lg:nth-[n+3]:border-t lg:nth-[n+3]:pt-8"
+    >
+      <h2 id={id} className="mb-2 flex min-w-0 items-center gap-3 font-display text-title-sm text-ink">
+        <HeadingContext.Provider value>{heading}</HeadingContext.Provider>
+      </h2>
+      <ol className="flex flex-col">{children}</ol>
+    </section>
+  );
+}
+
+/**
+ * Tabs for the ingredients rail, set for the stage: each tab is the dish's mark (a `CookDishMark`, hidden from screen readers
+ * since the tab has its own name) and, when there is room, its name. On a phone and in the narrow landscape rail only the
+ * chosen tab shows its name (the others keep it as their title and accessible name). Same keys and wiring as `ui/Tabs`: the panel is `${idPrefix}-panel`, named by the chosen `${idPrefix}-tab-${id}`.
+ */
+export function CookDishTabs<T extends string>({
+  label,
+  idPrefix,
+  tabs,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  idPrefix: string;
+  tabs: readonly { id: T; label: string; mark: ReactNode }[];
+  value: T;
+  onChange: (v: T) => void;
+  children: ReactNode;
+}) {
+  const list = useRef<HTMLDivElement>(null);
+
+  function onKeyDown(e: KeyboardEvent) {
+    const at = tabs.findIndex((t) => t.id === value);
+    const next = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const to = tabs[(next + tabs.length) % tabs.length];
+    onChange(to.id);
+    list.current?.querySelector<HTMLElement>(`#${idPrefix}-tab-${to.id}`)?.focus();
+  }
+
+  return (
+    <div>
+      <div ref={list} role="tablist" aria-label={label} onKeyDown={onKeyDown} className="flex gap-1 overflow-x-auto border-b border-(--rule-hair)">
+        {tabs.map((t) => {
+          const selected = t.id === value;
+          return (
+            <button
+              key={t.id}
+              id={`${idPrefix}-tab-${t.id}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={`${idPrefix}-panel`}
+              tabIndex={selected ? 0 : -1}
+              title={t.label}
+              onClick={() => onChange(t.id)}
+              className={cx(
+                "-mb-px inline-flex min-h-control min-w-control items-center justify-center gap-2 border-b-2 px-2 transition-[border-color,color] duration-150 ease-out [--focus-offset:-3px]",
+                selected
+                  ? "min-w-0 border-(--chip-underline-selected) text-(--chip-fg-selected)"
+                  : "shrink-0 border-transparent text-(--chip-fg) hover:border-(--chip-underline-hover) hover:text-(--chip-fg-hover)",
+              )}
+            >
+              <span aria-hidden="true" className="inline-flex shrink-0">
+                {t.mark}
+              </span>
+              <span className={cx("label min-w-0 truncate", !selected && "sr-only sm:max-lg:not-sr-only")}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div role="tabpanel" id={`${idPrefix}-panel`} aria-labelledby={`${idPrefix}-tab-${value}`} className="pt-3">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** "Bring <dish>'s next step here": a quiet text button led by the dish's mark, 44px tall. */
+export function CookNudge({ children, onClick, mark }: { children: ReactNode; onClick: () => void; mark: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-control items-center gap-3 rounded-control px-2 text-left text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+    >
+      <span aria-hidden="true" className="inline-flex shrink-0">
+        {mark}
+      </span>
+      <span className="underline decoration-1 underline-offset-4">{children}</span>
+    </button>
   );
 }
 
@@ -332,13 +679,14 @@ export function CookTimerButton({ children, after = "", ...rest }: Omit<Componen
 }
 
 export function CookTimers({ children, empty }: { children: ReactNode; empty: string }) {
+  const wide = useContext(WideContext);
   return (
-    <section aria-labelledby="cook-timers" className={cx("flex-col gap-3 lg:gap-4", empty && Children.count(children) === 0 ? "hidden lg:flex" : "flex")}>
-      <h2 id="cook-timers" className="label text-ink-muted max-lg:sr-only">
+    <section aria-labelledby="cook-timers" className={cx("flex-col gap-3", wide ? "lg:flex-row lg:items-center lg:gap-6" : "lg:gap-4", empty && Children.count(children) === 0 ? "hidden lg:flex" : "flex")}>
+      <h2 id="cook-timers" className={cx("label text-ink-muted max-lg:sr-only", wide && "lg:shrink-0")}>
         Timers
       </h2>
       {Children.count(children) > 0 ? (
-        <div className="flex gap-4 overflow-x-auto max-lg:items-start lg:flex-col lg:overflow-visible">{children}</div>
+        <div className={cx("flex gap-4 overflow-x-auto max-lg:items-start", wide ? "min-w-0 lg:items-center" : "lg:flex-col lg:overflow-visible")}>{children}</div>
       ) : (
         <p className="text-small text-ink-muted italic">{empty}</p>
       )}
@@ -374,6 +722,7 @@ export function CookTimer({
   onDismiss: () => void;
 }) {
   const alert = done && flash;
+  const wide = useContext(WideContext); // a strip above the step area: small rings, the name beside Cancel
   const dismiss = (
     <button
       type="button"
@@ -395,8 +744,8 @@ export function CookTimer({
     );
   }
   return (
-    <div role="group" aria-label={label} className="flex shrink-0 flex-col items-center gap-1">
-      <div className={cx("relative grid place-items-center rounded-full transition-colors duration-150", small ? "size-24 lg:size-36" : "size-28 lg:size-56", tone)}>
+    <div role="group" aria-label={label} className={cx("flex shrink-0 flex-col items-center gap-1", wide && "lg:flex-row lg:gap-2")}>
+      <div className={cx("relative grid place-items-center rounded-full transition-colors duration-150", wide ? (small ? "size-24 lg:size-20" : "size-28 lg:size-20") : small ? "size-24 lg:size-36" : "size-28 lg:size-56", tone)}>
         <svg aria-hidden="true" viewBox="0 0 200 200" className="absolute inset-0 size-full -rotate-90" fill="none" strokeWidth="9">
           <circle cx="100" cy="100" r={R} className="stroke-rule-strong" />
           <circle
@@ -410,11 +759,20 @@ export function CookTimer({
           />
         </svg>
         <div className="text-center">
-          <p className={cx("font-display leading-none", small ? "text-[1.5rem] lg:text-[2.25rem]" : "text-[1.75rem] lg:text-[3.25rem]", "[font-variant-numeric:lining-nums_tabular-nums]")}>{done ? "Done" : digits}</p>
-          <p className={cx("label mt-1 truncate max-lg:hidden", small ? "max-w-20 lg:max-w-28" : "max-w-28 lg:max-w-44")}>{label}</p>
+          <p className={cx("font-display leading-none", wide ? (small ? "text-[1.5rem] lg:text-[1.25rem]" : "text-[1.75rem] lg:text-[1.25rem]") : small ? "text-[1.5rem] lg:text-[2.25rem]" : "text-[1.75rem] lg:text-[3.25rem]", "[font-variant-numeric:lining-nums_tabular-nums]")}>{done ? "Done" : digits}</p>
+          {!wide && <p className={cx("label mt-1 truncate max-lg:hidden", small ? "max-w-20 lg:max-w-28" : "max-w-28 lg:max-w-44")}>{label}</p>}
         </div>
       </div>
-      {dismiss}
+      {wide ? (
+        <div className="flex items-center gap-1">
+          <p className="label hidden max-w-32 min-w-0 truncate lg:block" title={label}>
+            {label}
+          </p>
+          {dismiss}
+        </div>
+      ) : (
+        dismiss
+      )}
     </div>
   );
 }

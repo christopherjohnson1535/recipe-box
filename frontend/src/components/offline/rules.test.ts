@@ -14,6 +14,19 @@ describe("what the worker keeps", () => {
     expect(RECIPE_READ_PAGE.test(`/recipes/${ID}/cook`)).toBe(false);
   });
 
+  it("keeps cook together by path, and keys each session by its recipes so two sessions never share a copy", () => {
+    expect(KEPT_PAGE.test("/cook")).toBe(true);
+    for (const p of ["/cook/", "/cook/x", "/cooking", `/recipes/${ID}/cooking`]) expect(KEPT_PAGE.test(p), p).toBe(false);
+    expect(RECIPE_READ_PAGE.test("/cook")).toBe(false); // a session is not a kept recipe
+    const key = (q: string) => pageKey(`https://box.example/cook${q}`);
+    expect(key("?recipes=a,b")).toBe("https://box.example/cook?recipes=a,b");
+    expect(key("?recipes=a,b")).not.toBe(key("?recipes=c,d"));
+    expect(key("?recipes=a,b")).not.toBe(key("?recipes=b,a")); // the order is the order of the dishes
+    expect(key("?recipes=a,b")).not.toBe(key("")); // the picker is not a session
+    // Other pages still share one copy across query strings.
+    expect(pageKey(`https://box.example/recipes/${ID}/cook?servings=2`)).toBe(`https://box.example/recipes/${ID}/cook`);
+  });
+
   it("keeps the grocery list page and GET /api/grocery, and none of its writes or neighbours", () => {
     expect(KEPT_PAGE.test("/groceries")).toBe(true);
     for (const p of ["/groceries/", "/groceries/x", "/grocery", "/api/grocery"]) expect(KEPT_PAGE.test(p), p).toBe(false);

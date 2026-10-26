@@ -25,6 +25,7 @@ import { serverApi } from "@/lib/server-api";
 import { bylines } from "@/components/recipe-page/byline";
 import { LocalDate } from "@/components/recipe-page/LocalDate";
 import { DeleteRecipeButton } from "@/components/recipe-page/DeleteRecipeButton";
+import { cookTogetherHref } from "@/components/cook/cook-together-logic";
 import { AddToGroceries } from "@/components/recipe-page/AddToGroceries";
 import { IngredientChecklist } from "@/components/recipe-page/IngredientChecklist";
 import { RecipeBar } from "@/components/recipe-page/RecipeBar";
@@ -131,6 +132,9 @@ export default async function RecipePage({ params }: Params) {
             <>
               <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">
                 Start cooking
+              </ButtonLink>
+              <ButtonLink href={cookTogetherHref([id])} variant="secondary" className="w-full sm:w-auto">
+                Cook together
               </ButtonLink>
               <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
                 Edit

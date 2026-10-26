@@ -179,6 +179,20 @@ describe("what is stored", () => {
   });
 });
 
+describe("pages: cook together", () => {
+  it("keeps one copy per session: the key carries the recipes, and a 404 drops only that session", async () => {
+    const one = "http://localhost:3000/cook?recipes=a,b";
+    const two = "http://localhost:3000/cook?recipes=c,d";
+    const { store, entries } = fakeStore({ "rb-pages": [one, two] });
+    const [key, keep] = createSession(store).pageStore("rb-pages");
+    expect(await call(key, "cacheKeyWillBeUsed", { request: new Request(one) })).toBe(one);
+    expect(await call(key, "cacheKeyWillBeUsed", { request: new Request(two) })).toBe(two);
+    expect(await call(keep, "cacheWillUpdate", { request: new Request(one), response: new Response("<p>picker</p>") })).toBeNull(); // the picker carries no marker
+    await call(keep, "cacheWillUpdate", { request: new Request(one), response: new Response("", { status: 404 }) });
+    expect(entries("rb-pages")).toEqual([two]);
+  });
+});
+
 describe("stale", () => {
   it("is false only for a fetch that began in the current generation", async () => {
     const s = createSession(fakeStore().store);

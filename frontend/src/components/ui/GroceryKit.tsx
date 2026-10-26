@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { cx } from "./cx";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
@@ -367,6 +368,8 @@ export function SelectCard({
   fallbackIcon,
   selected,
   onToggle,
+  disabled,
+  describedBy,
 }: {
   title: string;
   kicker?: string;
@@ -375,14 +378,20 @@ export function SelectCard({
   fallbackIcon: SpotName;
   selected: boolean;
   onToggle: () => void;
+  /** Cannot be chosen now (a limit is reached). `aria-disabled`, not `disabled`: it keeps focus, a tap does nothing, and `describedBy` can say why. */
+  disabled?: boolean;
+  /** The id of the text that explains the limit. */
+  describedBy?: string;
 }) {
   return (
     <li>
       <button
         type="button"
         aria-pressed={selected}
-        onClick={onToggle}
-        className="group flex w-full cursor-pointer flex-col gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--focus-ring)"
+        aria-disabled={disabled || undefined}
+        aria-describedby={disabled ? describedBy : undefined}
+        onClick={disabled ? undefined : onToggle}
+        className="group flex w-full cursor-pointer flex-col gap-3 text-left aria-disabled:cursor-not-allowed aria-disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--focus-ring)"
       >
         <span className="relative block aspect-[4/3] overflow-hidden border border-(--rule-hair) bg-(--panel-bg) group-aria-pressed:border-(--button-primary-bg) group-aria-pressed:outline-2 group-aria-pressed:-outline-offset-2 group-aria-pressed:outline-(--button-primary-bg)">
           {imageSrc ? (
@@ -410,11 +419,55 @@ export function SelectCard({
 }
 
 /** The bar pinned to the bottom while choosing recipes: a count (from 640px), the add action and a way out. Same inverse pill as the recipe page's floating bar. */
-export function SelectionBar({ status, action, onAction, actionDisabled, cancel, onCancel }: { status: string; action: string; onAction: () => void; actionDisabled?: boolean; cancel: string; onCancel: () => void }) {
+export function SelectionBar({
+  status,
+  action,
+  onAction,
+  actionDisabled,
+  secondary,
+  hint,
+  cancel,
+  onCancel,
+}: {
+  status: string;
+  action: string;
+  onAction: () => void;
+  actionDisabled?: boolean;
+  /** A second way forward, set as an outlined button before the main action ("Cook together"). */
+  secondary?: { label: string; onClick: () => void; disabled?: boolean };
+  /** Why an action is off ("Choose one more dish"), on its own row at every width and read out when it changes (a live region, but not `role="status"`, which the page's toasts already use). The disabled secondary action is described by it. */
+  hint?: string;
+  cancel: string;
+  onCancel: () => void;
+}) {
+  const hintId = useId();
+  const wraps = Boolean(secondary || hint);
   return (
     <div className="selection-bar pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1rem)] print:hidden">
-      <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) [--focus-ring:var(--bar-focus)] sm:gap-3 sm:pl-6">
+      <div
+        className={cx(
+          "pointer-events-auto flex max-w-full items-center gap-2 border border-(--rule-hair) bg-(--bar-bg) py-2 pr-2 pl-5 text-(--bar-fg) [--focus-ring:var(--bar-focus)] sm:gap-3 sm:pl-6",
+          wraps ? "flex-wrap justify-center rounded-(--bar-radius)" : "rounded-full",
+          // Two rows (a phone with a second action) is a rounded rectangle; from 640px a single row is a stadium again, unless a hint line keeps it two.
+          secondary && !hint && "sm:flex-nowrap sm:rounded-full",
+          !secondary && !hint && "sm:rounded-full",
+        )}
+      >
         <p className="label hidden whitespace-nowrap sm:block">{status}</p>
+        <p id={hintId} aria-live="polite" className={hint ? "label-quiet order-first w-full pb-1 text-center" : "sr-only"}>
+          {hint}
+        </p>
+        {secondary && (
+          <button
+            type="button"
+            onClick={secondary.disabled ? undefined : secondary.onClick}
+            aria-disabled={secondary.disabled || undefined}
+            aria-describedby={secondary.disabled && hint ? hintId : undefined}
+            className="label inline-flex min-h-control shrink-0 cursor-pointer items-center rounded-full border border-(--bar-fg) px-5 whitespace-nowrap text-(--bar-fg) transition-colors duration-150 hover:bg-(--bar-fg)/10 aria-disabled:cursor-not-allowed aria-disabled:border-(--bar-fg)/40 aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
+          >
+            {secondary.label}
+          </button>
+        )}
         <button
           type="button"
           onClick={onAction}

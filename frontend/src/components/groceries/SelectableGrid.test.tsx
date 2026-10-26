@@ -1,10 +1,14 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RecipeSummary } from "@/lib/api";
 import { groceryList, summary } from "@/test/handlers";
 import { server } from "@/test/server";
 import { SelectableGrid } from "./SelectableGrid";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+beforeEach(() => push.mockClear());
 
 const r = (id: string, title: string): RecipeSummary => ({ ...summary, id, title });
 const recipes = [r("a", "Apple pie"), r("b", "Beef stew"), r("c", "Carrot soup")];
@@ -101,5 +105,93 @@ describe("SelectableGrid", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(posted).toEqual([]);
     expect(screen.getByRole("link", { name: /Apple pie/ })).toBeTruthy();
+  });
+
+  const together = () => screen.getByRole("button", { name: "Cook together" });
+  const off = () => together().getAttribute("aria-disabled") === "true";
+
+  it("opens the chosen recipes in cook together, for two to four only", () => {
+    const five = [...recipes, r("d", "Dal"), r("e", "Egg salad")];
+    render(<SelectableGrid recipes={five} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    expect(screen.getByText("Tap recipes to shop for or cook together.")).toBeTruthy();
+    expect(off()).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Apple pie/ }));
+    expect(off()).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Carrot soup/ }));
+    expect(off()).toBe(false);
+    fireEvent.click(together());
+    expect(push).toHaveBeenCalledWith("/cook?recipes=a,c");
+    fireEvent.click(screen.getByRole("button", { name: /Beef stew/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Dal/ }));
+    expect(off()).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /Egg salad/ }));
+    expect(off()).toBe(true); // five is too many
+    push.mockClear();
+    fireEvent.click(together());
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("takes the dishes in the order they were tapped, not the grid's", () => {
+    render(<SelectableGrid recipes={recipes} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    for (const name of [/Carrot soup/, /Apple pie/, /Beef stew/]) fireEvent.click(screen.getByRole("button", { name }));
+    fireEvent.click(together());
+    expect(push).toHaveBeenCalledWith("/cook?recipes=c,a,b");
+    push.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Carrot soup/ })); // untap and tap again: now last
+    fireEvent.click(screen.getByRole("button", { name: /Carrot soup/ }));
+    fireEvent.click(together());
+    expect(push).toHaveBeenCalledWith("/cook?recipes=a,b,c");
+  });
+
+  it("says why Cook together is off, with one chosen and with too many", () => {
+    const five = [...recipes, r("d", "Dal"), r("e", "Egg salad")];
+    render(<SelectableGrid recipes={five} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    expect(screen.queryByText(/to cook together$/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Apple pie/ }));
+    expect(screen.getByText("Choose one more to cook together")).toBeTruthy();
+    expect(together().getAttribute("aria-describedby")).toBe(screen.getByText("Choose one more to cook together").id);
+    for (const name of [/Beef stew/, /Carrot soup/, /Dal/, /Egg salad/]) fireEvent.click(screen.getByRole("button", { name }));
+    expect(screen.getByText("Cook together takes up to four dishes")).toBeTruthy();
+    expect(off()).toBe(true);
+    expect(together().hasAttribute("disabled")).toBe(false); // focusable, so it can explain itself
+  });
+
+  it("cannot be opened while the chosen recipes are being added to the list", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.post("*/api/grocery/recipes", async () => {
+        await gate;
+        return HttpResponse.json(groceryList);
+      }),
+    );
+    render(<SelectableGrid recipes={recipes} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    fireEvent.click(screen.getByRole("button", { name: /Apple pie/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Beef stew/ }));
+    expect(off()).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Add 2 to groceries" }));
+    await screen.findByRole("button", { name: "Adding…" });
+    expect(off()).toBe(true);
+    fireEvent.click(together());
+    expect(push).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Select recipes" })).toBeTruthy());
+  });
+
+  it("goes off, with the reason, when the network goes while choosing", () => {
+    render(<SelectableGrid recipes={recipes} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select recipes" }));
+    fireEvent.click(screen.getByRole("button", { name: /Apple pie/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Beef stew/ }));
+    expect(off()).toBe(false);
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    act(() => void window.dispatchEvent(new Event("offline")));
+    expect(off()).toBe(true);
+    expect(screen.getByText("You’re offline: cook together needs the server")).toBeTruthy();
+    vi.restoreAllMocks();
   });
 });

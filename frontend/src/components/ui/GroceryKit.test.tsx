@@ -189,6 +189,66 @@ describe("SelectCard and SelectionBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onAction).toHaveBeenCalled();
     expect(onCancel).toHaveBeenCalled();
+    // Without a second action, the bar holds exactly the main action and the way out.
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Add 2 to groceries", "Cancel"]);
+  });
+
+  it("sets a secondary action before the main one", () => {
+    const onSecondary = vi.fn();
+    const onAction = vi.fn();
+    render(<SelectionBar status="2 chosen" action="Add 2 to groceries" onAction={onAction} secondary={{ label: "Cook together", onClick: onSecondary }} cancel="Cancel" onCancel={() => {}} />);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Cook together", "Add 2 to groceries", "Cancel"]);
+    fireEvent.click(screen.getByRole("button", { name: "Cook together" }));
+    expect(onSecondary).toHaveBeenCalledTimes(1);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("can disable the secondary action without touching the main one, and the disabled one keeps focus", () => {
+    const onSecondary = vi.fn();
+    render(<SelectionBar status="1 chosen" action="Add 1 to groceries" onAction={() => {}} secondary={{ label: "Cook together", onClick: onSecondary, disabled: true }} cancel="Cancel" onCancel={() => {}} />);
+    const secondary = screen.getByRole("button", { name: "Cook together" }) as HTMLButtonElement;
+    expect(secondary.getAttribute("aria-disabled")).toBe("true");
+    expect(secondary.disabled).toBe(false); // a disabled button would drop focus and cannot say why
+    expect((screen.getByRole("button", { name: "Add 1 to groceries" }) as HTMLButtonElement).disabled).toBe(false);
+    secondary.focus();
+    fireEvent.click(secondary);
+    expect(onSecondary).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(secondary);
+  });
+
+  it("says why the secondary action is off, on its own line, and ties the button to it", () => {
+    const { rerender } = render(
+      <SelectionBar status="1 chosen" action="Add 1" onAction={() => {}} secondary={{ label: "Cook together", onClick: () => {}, disabled: true }} hint="Choose one more to cook together" cancel="Cancel" onCancel={() => {}} />,
+    );
+    const hint = screen.getByText("Choose one more to cook together");
+    expect(hint.getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByRole("button", { name: "Cook together" }).getAttribute("aria-describedby")).toBe(hint.id);
+    // Enabled again: no description, the hint line is empty.
+    rerender(<SelectionBar status="2 chosen" action="Add 2" onAction={() => {}} secondary={{ label: "Cook together", onClick: () => {} }} cancel="Cancel" onCancel={() => {}} />);
+    expect(screen.getByRole("button", { name: "Cook together" }).getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("is a stadium from 640px with one row, a rounded rectangle when it wraps (a hint keeps it two rows)", () => {
+    const bar = () => screen.getByRole("button", { name: "Cancel" }).parentElement as HTMLElement;
+    const { rerender } = render(<SelectionBar status="2 chosen" action="Add 2" onAction={() => {}} secondary={{ label: "Cook together", onClick: () => {} }} cancel="Cancel" onCancel={() => {}} />);
+    expect(bar().className).toContain("rounded-(--bar-radius)");
+    expect(bar().className).toContain("sm:flex-nowrap");
+    rerender(<SelectionBar status="2 chosen" action="Add 2" onAction={() => {}} secondary={{ label: "Cook together", onClick: () => {} }} hint="Up to four" cancel="Cancel" onCancel={() => {}} />);
+    expect(bar().className).not.toContain("sm:flex-nowrap");
+    expect(bar().className).not.toContain("sm:rounded-full");
+  });
+
+  it("a card at a limit is aria-disabled: focusable, ignores a tap, points at the note that says why", () => {
+    const onToggle = vi.fn();
+    render(<SelectCard title="Chili" fallbackIcon="soups" selected={false} onToggle={onToggle} disabled describedBy="why" />);
+    const card = screen.getByRole("button", { name: /Chili/ }) as HTMLButtonElement;
+    expect(card.getAttribute("aria-disabled")).toBe("true");
+    expect(card.getAttribute("aria-describedby")).toBe("why");
+    expect(card.disabled).toBe(false);
+    card.focus();
+    fireEvent.click(card);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(card);
   });
 });
 

@@ -83,6 +83,7 @@ Priority: **Must** = first usable version, **Should** = next, **Could** = nice t
 | KIT-4 | Installable to the Home Screen with icon and full-screen launch (PWA manifest) | Must |
 | KIT-5 | Works offline: recipes opened before (and favourites) are readable without internet; edits made offline are clearly blocked or queued | Should |
 | KIT-6 | Step timers detected from text ("bake 25 minutes") with a tap-to-start timer | Could |
+| KIT-7 | Cook mode can combine two or more recipes into one session; their steps are interleaved in an order the cook controls, each step labelled with its dish, and ingredients ticked per dish | Should |
 
 ### 6. Household and access (ACC)
 | ID | Requirement | Priority |
@@ -140,7 +141,7 @@ Priority: **Must** = first usable version, **Should** = next, **Could** = nice t
 4. **Phase 4 — Deploy.** OPS-3/4/7, ACC-4/5, LNK-6. Done when the stack runs on a chosen host over HTTPS with
    CI-built images and a tested backup/restore.
 
-After that: the remaining Should / Could items (favourites, made-it log, timers, sort).
+After that: the remaining Should / Could items (favourites, made-it log, timers, sort, cooking two dishes at once → KIT-7).
 
 ## Decisions taken (from the owner, 2026-10-21)
 - Users: the owner plus household members, one shared box → ACC-1/2.

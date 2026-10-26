@@ -19,10 +19,11 @@ export const LIMITS = {
 
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 /**
- * The pages kept: a recipe page, its cooking mode, and the grocery list (GRO, the shopping list opens in the store with
- * no signal).
+ * The pages kept: a recipe page, its cooking mode, cook together (KIT-7: a session is a page of its own, `/cook?recipes=a,b`,
+ * and only a rendered session is marked for keeping, never the picker), and the grocery list (GRO, the shopping list opens
+ * in the store with no signal).
  */
-export const KEPT_PAGE = new RegExp(`^(?:/recipes/${ID}(?:/cook)?|/groceries)$`);
+export const KEPT_PAGE = new RegExp(`^(?:/recipes/${ID}(?:/cook)?|/cook|/groceries)$`);
 /** A recipe page (not cooking mode), for the list of kept recipes. */
 export const RECIPE_READ_PAGE = new RegExp(`^/recipes/${ID}$`);
 /** The API responses kept, network first: one recipe, and the grocery list (`GET /api/grocery`; writes are never cached). */
@@ -58,10 +59,10 @@ export function signedOut(res: { status: number; redirected: boolean; url: strin
   }
 }
 
-/** The cache key for a page: its path, so `?servings=6` and the bare page share one copy. */
+/** The cache key for a page: its path, so `?servings=6` and the bare page share one copy. Cook together is the exception: its recipes are in the query, so each session has its own copy. */
 export function pageKey(url: string): string {
   const u = new URL(url);
-  return u.origin + u.pathname;
+  return u.origin + u.pathname + (u.pathname === "/cook" ? u.search : "");
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", "#x27": "'", apos: "'" };

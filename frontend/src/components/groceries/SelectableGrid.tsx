@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { cookTogetherHref, MAX_DISHES } from "@/components/cook/cook-together-logic";
 import { OfflineNote } from "@/components/offline/OfflineNote";
 import { useOnline } from "@/components/offline/use-online";
 import { RecipeCard, cardIcon } from "@/components/RecipeCard";
@@ -14,10 +16,12 @@ import { api, type RecipeSummary } from "@/lib/api";
 
 /**
  * The home grid, with a "Select recipes" mode: tap cards to choose them, then "Add N to groceries" puts each on the list
- * at 1×, one request after another (a failure stops nothing: the rest still go, and the ones that failed stay chosen).
+ * at 1×, one request after another (a failure stops nothing: the rest still go, and the ones that failed stay chosen),
+ * or "Cook together" opens two to four of them in one cook mode.
  */
 export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
   const online = useOnline();
+  const router = useRouter();
   const [selecting, setSelecting] = useState(false);
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const [adding, setAdding] = useState(false);
@@ -36,6 +40,9 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
 
   // Only recipes still on screen count: a search or tag filter can drop chosen ones from the grid.
   const picked = recipes.filter((r) => chosen.has(r.id));
+  // Cook together takes the dishes in the order they were tapped (a Set keeps insertion order), as the picker does.
+  const tapped = [...chosen].filter((id) => picked.some((r) => r.id === id));
+  const together = !online ? "You’re offline: cook together needs the server" : tapped.length === 1 ? "Choose one more to cook together" : tapped.length > MAX_DISHES ? "Cook together takes up to four dishes" : undefined;
 
   const stop = () => {
     setSelecting(false);
@@ -71,7 +78,7 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
     <div ref={grid} className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
         {selecting ? (
-          <Text variant="note">Tap the recipes you want to shop for.</Text>
+          <Text variant="note">Tap recipes to shop for or cook together.</Text>
         ) : (
           <Button ref={selectButton} variant="ghost" disabled={!online} aria-describedby={online ? undefined : "select-offline"} onClick={() => setSelecting(true)}>
             Select recipes
@@ -122,6 +129,12 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
           action={adding ? "Adding…" : picked.length === 0 ? "Add to groceries" : `Add ${picked.length} to groceries`}
           onAction={() => void addAll()}
           actionDisabled={picked.length === 0 || adding || !online}
+          hint={together}
+          secondary={{
+            label: "Cook together",
+            onClick: () => router.push(cookTogetherHref(tapped)),
+            disabled: tapped.length < 2 || tapped.length > MAX_DISHES || adding || !online,
+          }}
           cancel="Cancel"
           onCancel={stop}
         />
