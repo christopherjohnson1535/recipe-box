@@ -21,6 +21,7 @@ class RecipeSummary:
         id (UUID):
         image_display_url (None | str): As on `Recipe`.
         image_url (None | str):
+        servings (None | str): Free text, as on `Recipe`.
         source_type (SourceType):
         tags (list[str]):
         title (str):
@@ -32,6 +33,7 @@ class RecipeSummary:
     id: UUID
     image_display_url: None | str
     image_url: None | str
+    servings: None | str
     source_type: SourceType
     tags: list[str]
     title: str
@@ -49,6 +51,9 @@ class RecipeSummary:
 
         image_url: None | str
         image_url = self.image_url
+
+        servings: None | str
+        servings = self.servings
 
         source_type = self.source_type.value
 
@@ -69,6 +74,7 @@ class RecipeSummary:
                 "id": id,
                 "imageDisplayUrl": image_display_url,
                 "imageUrl": image_url,
+                "servings": servings,
                 "sourceType": source_type,
                 "tags": tags,
                 "title": title,
@@ -100,6 +106,13 @@ class RecipeSummary:
 
         image_url = _parse_image_url(d.pop("imageUrl"))
 
+        def _parse_servings(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        servings = _parse_servings(d.pop("servings"))
+
         source_type = SourceType(d.pop("sourceType"))
 
         tags = cast(list[str], d.pop("tags"))
@@ -120,6 +133,7 @@ class RecipeSummary:
             id=id,
             image_display_url=image_display_url,
             image_url=image_url,
+            servings=servings,
             source_type=source_type,
             tags=tags,
             title=title,
