@@ -49,10 +49,12 @@ test("start from the home grid: both dishes open in one session, the first step 
   await hydrated(select);
   await select.click();
   const together = page.getByRole("button", { name: "Cook together" });
-  await expect(together).toBeDisabled(); // needs two
+  // "Cook together" needs two: until then it is aria-disabled (it keeps focus), and a hint says why.
+  await expect(together).toHaveAttribute("aria-disabled", "true");
   await page.getByRole("button", { name: new RegExp(`^Ragu ${word}`) }).click();
-  await expect(together).toBeDisabled();
+  await expect(together).toHaveAttribute("aria-disabled", "true");
   await page.getByRole("button", { name: new RegExp(`^Tart ${word}`) }).click();
+  await expect(together).not.toHaveAttribute("aria-disabled", "true");
   await together.click();
 
   await expect(page).toHaveURL(/\/cook\?recipes=/);
@@ -151,8 +153,9 @@ test("reorder, tick, reload: the order and the tick are still there; then finish
     await expect(stage(page).getByText(text, { exact: true })).toBeVisible();
   }
   await stage(page).getByRole("link", { name: "Finish" }).click();
-  await expect(page).toHaveURL(new RegExp(`/recipes/${a.id}$`));
-  await expect(page.getByRole("heading", { level: 1, name: a.title })).toBeVisible();
+  // Several dishes finish at the recipes home, not at one of them.
+  await expect(page).toHaveURL(/^[^?#]*\/$/);
+  await expect(page.getByRole("button", { name: "Select recipes" })).toBeVisible();
 });
 
 test("bring a dish's next step here, and reset order, put the steps back round-robin", async ({ memberPage: page, member }) => {
@@ -165,8 +168,10 @@ test("bring a dish's next step here, and reset order, put the steps back round-r
   await expect(combined(page)).toHaveText([/Chop the onions/, /Slice the onions/, /Roll out the pastry/, /Brown the mince/, /Simmer the sauce/]);
   await expect(stage(page).getByRole("button", { name: "Reset order" })).toBeVisible();
 
-  // On B's first step, A's next step is two places on: pull it here. That is round-robin again, so there is nothing to reset.
+  // Back on the first step (A1) B's next step is already next, so there is nothing to bring.
   await view(page, "One step").click();
+  await expect(stage(page).getByRole("button", { name: `Bring ${b.title}’s next step here` })).toHaveCount(0);
+  // On B's first step, A's next step is two places on: pull it here. That is round-robin again, so there is nothing to reset.
   await stage(page).getByRole("button", { name: "Next step →" }).click();
   await expect(stage(page).getByText("Slice the onions thinly.", { exact: true })).toBeVisible();
   await stage(page).getByRole("button", { name: `Bring ${a.title}’s next step here` }).click();
@@ -193,6 +198,11 @@ test("ingredients are ticked per dish, and the ticks are the recipe's own in sin
   await onions.click();
   await expect(onions).toHaveAttribute("aria-pressed", "true");
 
+  await expect(stage(page).getByText("For this step", { exact: true })).toBeVisible();
+  // Looking at B's tab while on A's step shows all of B's ingredients, not "for this step".
+  await stage(page).getByRole("tab", { name: b.title }).click();
+  await expect(stage(page).getByText("All ingredients", { exact: true })).toBeVisible();
+  await stage(page).getByRole("tab", { name: a.title }).click();
   // The next step is B's: the rail follows it, and B's onions are not ticked.
   await stage(page).getByRole("button", { name: "Next step →" }).click();
   await expect(stage(page).getByRole("tab", { name: b.title })).toHaveAttribute("aria-selected", "true");
@@ -233,6 +243,9 @@ test("an iPad held upright: no sideways scrolling, all three views, controls 44p
 
   // Upright (below 1024px) the dishes stack: B's column starts below A's.
   await view(page, "By dish").click();
+  // Each step says where it sits in the combined order: A1 B1 A2 B2 A3.
+  await expect(stage(page).getByText("5th of 5")).toBeVisible();
+  await expect(stage(page).getByText("2nd of 5")).toBeVisible();
   const colA = await stage(page).getByRole("region", { name: a.title }).boundingBox();
   const colB = await stage(page).getByRole("region", { name: b.title }).boundingBox();
   expect(colB!.y).toBeGreaterThan(colA!.y);
@@ -245,4 +258,85 @@ test("an iPad held upright: no sideways scrolling, all three views, controls 44p
   expect(landB!.x).toBeGreaterThan(landA!.x);
   expect(Math.abs(landB!.y - landA!.y)).toBeLessThan(2);
   expect(await noSidewaysScroll()).toBe(true);
+});
+
+test("moving a step keeps keyboard focus on the same button", async ({ memberPage: page, member }) => {
+  const { a } = await twoDishes(member.client);
+  const b = await member.client.createRecipe({ title: `Tart ${unique("kb")}`, ingredients: [], steps: [{ text: "Roll out the pastry.", section: null }, { text: "Bake the tart.", section: null }] });
+
+  await page.goto(`/cook?recipes=${a.id},${b.id}`);
+  await hydrated(stage(page));
+  await view(page, "All steps").click();
+  // Order: A1 B1 A2 B2 A3. Enter on "later" moves A2 past B2; the button for A2 is the one still focused.
+  const later = stage(page).getByRole("button", { name: `Move ${a.title} step 2 later` });
+  await later.focus();
+  await expect(later).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(combined(page)).toHaveText([/Chop the onions/, /Roll out the pastry/, /Bake the tart/, /Brown the mince/, /Simmer the sauce/]);
+  await expect(stage(page).getByRole("button", { name: `Move ${a.title} step 2 later` })).toBeFocused();
+  // And the other way: "earlier" puts it back, focus on its "earlier" button.
+  const earlier = stage(page).getByRole("button", { name: `Move ${a.title} step 2 earlier` });
+  await earlier.focus();
+  await page.keyboard.press("Enter");
+  await expect(combined(page)).toHaveText([/Chop the onions/, /Roll out the pastry/, /Brown the mince/, /Bake the tart/, /Simmer the sauce/]);
+  await expect(stage(page).getByRole("button", { name: `Move ${a.title} step 2 earlier` })).toBeFocused();
+});
+
+test("the picker searches the box and keeps the dish you came from", async ({ memberPage: page, member }) => {
+  const { word, a, b } = await twoDishes(member.client);
+  const other = await member.client.createRecipe({ title: `Zzz ${unique("other")}`, ingredients: [], steps: [{ text: "Stir.", section: null }] });
+
+  await page.goto(`/cook?recipes=${a.id}`);
+  const search = page.getByRole("searchbox", { name: "Search recipes" });
+  await hydrated(search);
+  const card = (title: string) => page.getByRole("button", { name: new RegExp(`^${title}`) });
+  await expect(page.getByText("Tap the dishes you want to cook together.")).toBeVisible();
+  await expect(card(other.title)).toBeVisible();
+
+  await search.fill(`Tart ${word}`);
+  await expect(card(b.title)).toBeVisible();
+  await expect(card(other.title)).toHaveCount(0);
+  // The dish you came from stays on screen, chosen, though it does not match.
+  await expect(card(a.title)).toHaveAttribute("aria-pressed", "true");
+
+  await card(b.title).click();
+  await page.getByRole("button", { name: "Start cooking" }).click();
+  await expect(page).toHaveURL(new RegExp(`/cook\\?recipes=${a.id},${b.id}$`));
+  await expect(stage(page).getByRole("list", { name: "Dishes" })).toContainText(b.title);
+});
+
+test("a session opened before loads offline, and another combination does not", async ({ memberPage: page, member, context }) => {
+  const { a, b } = await twoDishes(member.client);
+  const url = `/cook?recipes=${a.id},${b.id}`;
+
+  await page.goto(url);
+  await hydrated(stage(page));
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  // One kept copy per session: the key carries the query. The first visit is not kept (OfflineSupport asks the worker to
+  // keep the bare path, "/cook", which is the picker: a bug filed for #82), so load it again, now through the worker.
+  await page.reload();
+  await hydrated(stage(page));
+  await expect
+    .poll(() =>
+      page.evaluate(async (suffix) => (await (await caches.open("rb-pages")).keys()).some((r) => r.url.endsWith(suffix)), url),
+    )
+    .toBe(true);
+
+  await context.setOffline(true);
+  await context.route(
+    (u) => u.hostname === "127.0.0.1" || u.hostname === "localhost",
+    (route) => route.abort("internetdisconnected"),
+  );
+  await expect
+    .poll(() => page.evaluate(() => fetch("/api/health", { cache: "no-store" }).then(() => "reached", () => "offline")))
+    .toBe("offline");
+
+  await page.goto(url);
+  await expect(stage(page).getByRole("list", { name: "Dishes" })).toContainText(a.title);
+  await expect(stage(page).getByRole("list", { name: "Dishes" })).toContainText(b.title);
+  await expect(stage(page).getByText("Chop the onions.", { exact: true })).toBeVisible();
+
+  // The same dishes in another order are another session, never kept: the offline page.
+  await page.goto(`/cook?recipes=${b.id},${a.id}`);
+  await expect(page.getByRole("heading", { name: "You’re offline", level: 1 })).toBeVisible();
 });
