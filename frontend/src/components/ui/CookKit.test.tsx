@@ -77,14 +77,17 @@ describe("CookStepText and CookStepItem", () => {
     expect(container.textContent).toBe("Step 2 of 5Chop the onion.");
   });
 
-  it("step text puts the dish mark before the label", () => {
+  it("step text puts the dish mark on a row of its own before the kicker and the action", () => {
     render(
-      <CookStepText label="Step 2 of 5" dish={<CookDishMark dish={0} initial="S" name="Salad" />}>
+      <CookStepText label="Step 2 of 5" action={<button type="button">Done</button>} dish={<CookDishMark dish={0} initial="S" name="Salad" wrap />}>
         Chop the onion.
       </CookStepText>,
     );
     const label = screen.getByText("Step 2 of 5");
-    expect(label.parentElement?.firstElementChild?.textContent).toBe("SSalad");
+    const row = label.parentElement as HTMLElement;
+    expect(row.textContent).toBe("Step 2 of 5Done"); // the kicker and the tick share a row, the mark is not in it
+    expect(row.previousElementSibling?.textContent).toBe("SSalad");
+    expect(screen.getByText("Salad").className).not.toContain("truncate"); // the name wraps, never cut short
   });
 
   it("an item without the new props renders as it always did", () => {

@@ -71,14 +71,30 @@ export function firstOpen(order: readonly DishStep[], doneSteps: readonly Readon
   return open === -1 ? Math.max(order.length - 1, 0) : open;
 }
 
-/** The dish's mark: the first letter or digit of the title, upper-cased ("?" when none); later dishes sharing one get a number suffix ("S", "S2"). */
+/**
+ * The dish's mark, one character where it can be: the first letter or digit of the title, upper-cased ("?" when none). When an
+ * earlier dish has the mark, the first letter of each later word is tried ("Saffron rice" after "Shaved fennel salad" → "R"), then
+ * any other letter or digit of the title; only when all are taken does it get a number suffix ("S2"). A title an earlier dish
+ * has exactly always gets the suffix, as its name does ("Salad", "Salad 2"), so the two read as twins.
+ */
 export function dishInitials(titles: readonly string[]): string[] {
-  const seen = new Map<string, number>();
+  const taken = new Set<string>();
+  const counts = new Map<string, number>();
+  const seenTitles = new Set<string>();
   return titles.map((title) => {
-    const mark = /[\p{L}\p{N}]/u.exec(title)?.[0].toUpperCase() ?? "?";
-    const n = (seen.get(mark) ?? 0) + 1;
-    seen.set(mark, n);
-    return n === 1 ? mark : `${mark}${n}`;
+    const chars = [...title].filter((c) => /[\p{L}\p{N}]/u.test(c)).map((c) => c.toUpperCase());
+    const first = chars[0] ?? "?";
+    const twin = seenTitles.has(title);
+    seenTitles.add(title);
+    const wordStarts = title.split(/[^\p{L}\p{N}]+/u).flatMap((w) => (w ? [[...w][0].toUpperCase()] : []));
+    const pick = twin ? undefined : [first, ...wordStarts.slice(1), ...chars].find((c) => !taken.has(c));
+    if (pick) {
+      taken.add(pick);
+      return pick;
+    }
+    const n = (counts.get(first) ?? 1) + 1;
+    counts.set(first, n);
+    return `${first}${n}`;
   });
 }
 

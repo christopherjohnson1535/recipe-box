@@ -132,8 +132,17 @@ describe("dishInitials", () => {
   it("uses the first letter or digit, upper-cased", () => {
     expect(dishInitials(["salad", "  Pasta", "3-bean chili", "Éclair"])).toEqual(["S", "P", "3", "É"]);
   });
-  it("numbers later dishes that share a mark", () => {
-    expect(dishInitials(["Soup", "Salad", "Stew", "Pie"])).toEqual(["S", "S2", "S3", "P"]);
+  it("tries a later word's first letter when the first letter is taken", () => {
+    expect(dishInitials(["Lemon roast chicken", "Shaved fennel salad", "Saffron rice"])).toEqual(["L", "S", "R"]);
+    expect(dishInitials(["Sa", "Sa x", "Sa y"])).toEqual(["S", "X", "Y"]);
+    expect(dishInitials(["Soup", "Spring Salad"])).toEqual(["S", "P"]); // the later word starts with the taken S: next letter
+  });
+  it("then tries any other letter of the title, and only then numbers the mark", () => {
+    expect(dishInitials(["Soup", "Salad", "Stew", "Pie"])).toEqual(["S", "A", "T", "P"]);
+    expect(dishInitials(["Sa", "Sas", "Sasa"])).toEqual(["S", "A", "S2"]);
+  });
+  it("numbers a dish whose title an earlier dish has exactly, as its name is", () => {
+    expect(dishInitials(["Salad", "Soup", "Salad", "Salad"])).toEqual(["S", "O", "S2", "S3"]);
   });
   it("falls back to a question mark for emoji or blank titles", () => {
     expect(dishInitials(["🍝 ", "", "  "])).toEqual(["?", "?2", "?3"]);

@@ -74,7 +74,7 @@ test("start from the home grid: both dishes open in one session, the first step 
   expect(found).toBeDefined();
   const first = found as (typeof firsts)[number];
   await expect(stage(page).getByText(first.text, { exact: true })).toBeVisible();
-  await expect(stage(page).getByText(`Step 1 of ${first.dish.steps.length} · 1 of 5 overall`)).toBeVisible();
+  await expect(stage(page).getByText(`Step 1 of ${first.dish.steps.length} · 1st of 5`)).toBeVisible();
   await expect(stage(page).getByText(first.dish.title, { exact: true }).first()).toBeVisible();
   await expect(stepTick(page, first.dish.title, 1)).toBeVisible();
 
@@ -108,7 +108,7 @@ test("start from a recipe page: the picker has that dish chosen, add a second an
   await expect(stage(page).getByText("Chop the onions.", { exact: true })).toBeVisible();
   await stage(page).getByRole("button", { name: "Next step →" }).click();
   await expect(stage(page).getByText("Slice the onions thinly.", { exact: true })).toBeVisible();
-  await expect(stage(page).getByText(`Step 1 of ${b.steps.length} · 2 of 5 overall`)).toBeVisible();
+  await expect(stage(page).getByText(`Step 1 of ${b.steps.length} · 2nd of 5`)).toBeVisible();
 });
 
 test("reorder, tick, reload: the order and the tick are still there; then finish", async ({ memberPage: page, member }) => {

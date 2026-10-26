@@ -35,8 +35,8 @@ describe("CookTogether: one step", () => {
   it("opens on the first step of the round-robin order, with its dish named, and previews the next", () => {
     view();
     expect(document.documentElement.dataset.theme).toBe("evening");
-    const kicker = label("Step 1 of 3 · 1 of 5 overall");
-    expect(kicker.parentElement?.textContent).toContain("Salad");
+    const kicker = label("Step 1 of 3 · 1st of 5");
+    expect(kicker.parentElement?.parentElement?.textContent).toContain("Salad");
     expect(screen.getByText(/Wash the/)).toBeTruthy();
     expect(screen.getByRole("list", { name: "Dishes" }).textContent).toContain("Roast");
     expect(screen.getByText(/Roast: Season the beef/)).toBeTruthy();
@@ -46,17 +46,17 @@ describe("CookTogether: one step", () => {
   it("moves through the combined order with the buttons and the arrow keys, ending on Finish at the recipes", () => {
     view();
     next();
-    const kicker = label("Step 1 of 2 · 2 of 5 overall");
-    expect(kicker.parentElement?.textContent).toContain("Roast");
+    const kicker = label("Step 1 of 2 · 2nd of 5");
+    expect(kicker.parentElement?.parentElement?.textContent).toContain("Roast");
     expect(screen.getByRole("status").textContent).toContain("Roast, step 1 of 2: Season the beef.");
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(label("Step 2 of 3 · 3 of 5 overall")).toBeTruthy();
+    expect(label("Step 2 of 3 · 3rd of 5")).toBeTruthy();
     fireEvent.keyDown(window, { key: "ArrowLeft" });
-    expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 2 · 2nd of 5")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Back/ }));
-    expect(label("Step 1 of 3 · 1 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 3 · 1st of 5")).toBeTruthy();
     for (let i = 0; i < 4; i++) next();
-    expect(label("Step 3 of 3 · 5 of 5 overall")).toBeTruthy();
+    expect(label("Step 3 of 3 · 5th of 5")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Finish" }).getAttribute("href")).toBe("/"); // not one of the dishes' pages
     expect(screen.getByText("Last step")).toBeTruthy();
     expect(screen.getByRole("link", { name: /Close/ }).getAttribute("href")).toBe("/");
@@ -64,24 +64,24 @@ describe("CookTogether: one step", () => {
 
   it("moves on a swipe", () => {
     view();
-    const step = label("Step 1 of 3 · 1 of 5 overall").parentElement as HTMLElement;
+    const step = label("Step 1 of 3 · 1st of 5").parentElement as HTMLElement;
     fireEvent.touchStart(step, { touches: [{ clientX: 300, clientY: 100 }] });
     fireEvent.touchEnd(step, { touches: [], changedTouches: [{ clientX: 200, clientY: 105 }] });
-    expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 2 · 2nd of 5")).toBeTruthy();
   });
 
   it("brings another dish's next step here, keeps the order and a tick through a re-mount, and opens on the first step not done", () => {
     stored("cook-together:a,b", { order: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]] });
     const { unmount } = view();
-    expect(label("Step 1 of 3 · 1 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 3 · 1st of 5")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Bring Roast’s next step here" }));
     expect(JSON.parse(localStorage.getItem("cook-together:a,b")!).order).toEqual([[0, 0], [1, 0], [0, 1], [0, 2], [1, 1]]);
     expect(screen.getByRole("status").textContent).toContain("Roast step 1 is next");
-    expect(label("Step 1 of 3 · 1 of 5 overall")).toBeTruthy(); // the current step stays
+    expect(label("Step 1 of 3 · 1st of 5")).toBeTruthy(); // the current step stays
     fireEvent.click(screen.getByRole("button", { name: "Salad step 1 done" }));
     unmount();
     view();
-    expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy(); // Salad 1 is done: opens on Roast 1, the next in the stored order
+    expect(label("Step 1 of 2 · 2nd of 5")).toBeTruthy(); // Salad 1 is done: opens on Roast 1, the next in the stored order
   });
 
   it("offers a nudge only for a dish whose next step is not already next, and none once a dish has run out", () => {
@@ -117,20 +117,20 @@ describe("CookTogether: one step", () => {
     stored("cook-ticks:a", { ingredients: [], steps: [0] });
     stored("cook-ticks:b", { ingredients: [], steps: [0] });
     const { unmount } = view();
-    expect(label("Step 2 of 3 · 3 of 5 overall")).toBeTruthy();
+    expect(label("Step 2 of 3 · 3rd of 5")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Salad step 2 done" })); // ticking never moves the step
-    expect(label("Step 2 of 3 · 3 of 5 overall")).toBeTruthy();
+    expect(label("Step 2 of 3 · 3rd of 5")).toBeTruthy();
     unmount();
     stored("cook-ticks:a", { ingredients: [], steps: [0, 1, 2] });
     stored("cook-ticks:b", { ingredients: [], steps: [0, 1] });
     view();
-    expect(label("Step 3 of 3 · 5 of 5 overall")).toBeTruthy();
+    expect(label("Step 3 of 3 · 5th of 5")).toBeTruthy();
   });
 
   it("ignores a stored order that no longer fits the recipes", () => {
     stored("cook-together:a,b", { order: [[1, 0], [0, 0]] });
     view();
-    expect(label("Step 1 of 3 · 1 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 3 · 1st of 5")).toBeTruthy();
   });
 });
 
@@ -286,7 +286,7 @@ describe("CookTogether: timers", () => {
 describe("CookTogether: dishes without steps", () => {
   it("keeps a dish with no steps in the legend and the rail but skips it in the order", () => {
     view([SALAD, { ...ROAST, steps: [] }]);
-    expect(label("Step 1 of 3 · 1 of 3 overall")).toBeTruthy();
+    expect(label("Step 1 of 3 · 1st of 3")).toBeTruthy();
     expect(screen.getByRole("list", { name: "Dishes" }).textContent).toContain("Roast");
     expect(screen.getAllByRole("tab")).toHaveLength(2);
     choose("By dish");
@@ -364,10 +364,10 @@ describe("CookTogether: the current step is a step, not a position", () => {
   it("stays on the same step when another tab reorders the steps", () => {
     view();
     next(); // Roast 1
-    expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 2 · 2nd of 5")).toBeTruthy();
     stored("cook-together:a,b", { order: [[0, 0], [0, 1], [1, 0], [1, 1], [0, 2]] }); // Roast 1 is now third
     dispatchStorage();
-    expect(label("Step 1 of 2 · 3 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 2 · 3rd of 5")).toBeTruthy();
     expect(screen.getByText("Roast: Roast for 90 minutes.", { exact: false })).toBeTruthy(); // the preview follows the new order
   });
 
@@ -377,18 +377,18 @@ describe("CookTogether: the current step is a step, not a position", () => {
     next();
     next();
     next(); // Roast 1, fourth in the stored order
-    expect(label("Step 1 of 2 · 4 of 5 overall")).toBeTruthy();
+    expect(label("Step 1 of 2 · 4th of 5")).toBeTruthy();
     localStorage.setItem("cook-together:a,b", JSON.stringify({ v: 1, at: FIXED_NOW.getTime() - 13 * 3600_000, order: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]] }));
     dispatchStorage();
-    expect(label("Step 1 of 2 · 2 of 5 overall")).toBeTruthy(); // Roast 1 is second in round-robin
+    expect(label("Step 1 of 2 · 2nd of 5")).toBeTruthy(); // Roast 1 is second in round-robin
   });
 
   it("falls back to the first step not done when the current one is gone (a recipe was edited)", () => {
     const { rerender } = view();
     for (let i = 0; i < 4; i++) next(); // Salad 3, the last
-    expect(label("Step 3 of 3 · 5 of 5 overall")).toBeTruthy();
+    expect(label("Step 3 of 3 · 5th of 5")).toBeTruthy();
     rerender(<CookTogether dishes={[{ ...SALAD, steps: SALAD.steps.slice(0, 2) }, ROAST]} />);
-    expect(label("Step 1 of 2 · 1 of 4 overall")).toBeTruthy();
+    expect(label("Step 1 of 2 · 1st of 4")).toBeTruthy();
   });
 });
 
@@ -423,7 +423,7 @@ describe("CookTogether: dishes with the same title", () => {
     view([SALAD, TWIN]);
     expect(screen.getAllByRole("tab").map((t) => t.getAttribute("title"))).toEqual(["Salad", "Salad 2"]);
     next();
-    expect(label("Step 1 of 3 · 2 of 6 overall").parentElement?.textContent).toContain("Salad 2");
+    expect(label("Step 1 of 3 · 2nd of 6").parentElement?.parentElement?.textContent).toContain("Salad 2");
     expect(screen.getByRole("button", { name: "Salad 2 step 1 done" })).toBeTruthy();
     choose("All steps");
     expect(screen.getByRole("button", { name: "Move Salad 2 step 1 later" })).toBeTruthy();

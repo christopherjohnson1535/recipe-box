@@ -270,19 +270,12 @@ export function CookRailRow({ quantity, name, lit, ticked, onToggle }: { quantit
 }
 
 /** The step itself: kicker (with an optional action such as the Done toggle beside it), then the text at 40px on an iPad (28px on a phone). */
-export function CookStepText({ label, action, dish, children }: { label: string; action?: ReactNode; /** A `CookDishMark`, shown before the label when several dishes are cooked together. */ dish?: ReactNode; children: ReactNode }) {
-  const kicker = <p className="label text-accent">{label}</p>;
+export function CookStepText({ label, action, dish, children }: { label: string; action?: ReactNode; /** A `CookDishMark` (with `wrap`), shown on its own row above the kicker when several dishes are cooked together. */ dish?: ReactNode; children: ReactNode }) {
   return (
     <div className="my-auto select-none">
+      {dish && <div className="mb-3">{dish}</div>}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4">
-        {dish ? (
-          <div className="flex min-w-0 items-center gap-4">
-            {dish}
-            {kicker}
-          </div>
-        ) : (
-          kicker
-        )}
+        <p className="label text-accent">{label}</p>
         {action}
       </div>
       <p className="font-display text-[1.75rem] leading-[1.25] text-balance text-ink min-[700px]:text-[2.5rem] [overflow-wrap:anywhere]">{children}</p>
@@ -381,7 +374,7 @@ const DISH = [
  * unique to it. The dish name is the accessible text: shown beside the chip as a label at "md", visually hidden at "sm".
  * Inside a `CookDishColumn` heading the name is set as the heading itself (title size, wrapping) instead. `dish` is 0 to 3.
  */
-export function CookDishMark({ dish, initial, name, size = "md" }: { dish: number; initial: string; name: string; size?: "sm" | "md" }) {
+export function CookDishMark({ dish, initial, name, size = "md", wrap = false }: { dish: number; initial: string; name: string; size?: "sm" | "md"; /** Let the name wrap onto more lines instead of truncating; for a mark with a row to itself. */ wrap?: boolean }) {
   const d = DISH[((dish % DISH.length) + DISH.length) % DISH.length];
   const heading = useContext(HeadingContext);
   return (
@@ -397,7 +390,7 @@ export function CookDishMark({ dish, initial, name, size = "md" }: { dish: numbe
       >
         {initial}
       </span>
-      <span className={size === "sm" ? "sr-only" : heading ? "min-w-0 font-display text-title-sm text-ink [overflow-wrap:anywhere]" : "label min-w-0 truncate text-ink"}>{name}</span>
+      <span className={size === "sm" ? "sr-only" : heading ? "min-w-0 font-display text-title-sm text-ink [overflow-wrap:anywhere]" : cx("label min-w-0 text-ink", wrap ? "[overflow-wrap:anywhere]" : "truncate")}>{name}</span>
     </span>
   );
 }

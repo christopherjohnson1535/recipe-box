@@ -78,7 +78,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const textOf = (e: DishStep) => dishes[e.dish].steps[e.step];
   const nameOf = (dish: number) => names[dish];
   const describe = (e: DishStep) => `${nameOf(e.dish)}, step ${e.step + 1} of ${dishes[e.dish].steps.length}: ${textOf(e)}`;
-  const mark = (dish: number, size: "sm" | "md") => <CookDishMark dish={dish} initial={marks[dish]} name={nameOf(dish)} size={size} />;
+  const mark = (dish: number, size: "sm" | "md", wrap = false) => <CookDishMark dish={dish} initial={marks[dish]} name={nameOf(dish)} size={size} wrap={wrap} />;
 
   // The rail's tab follows the current step's dish when that changes; the cook can still look at another dish meanwhile.
   const currentDish = here?.dish ?? 0;
@@ -191,8 +191,8 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const oneStep = (
     <>
       <CookStepText
-        dish={mark(current.dish, "md")}
-        label={`Step ${current.step + 1} of ${dishes[current.dish].steps.length} · ${at + 1} of ${total} overall`}
+        dish={mark(current.dish, "md", true)}
+        label={`Step ${current.step + 1} of ${dishes[current.dish].steps.length} · ${ordinal(at + 1)} of ${total}`}
         action={tick(current, () => toggleStep(current.dish, current.step))}
       >
         {renderStep(current)}
