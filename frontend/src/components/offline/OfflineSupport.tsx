@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef } from "react";
 import { KEPT_PAGE } from "./rules";
 
 export const SW_URL = "/serwist/sw.js";
@@ -12,7 +12,18 @@ export const SW_URL = "/serwist/sw.js";
  * controlled the page. Production builds only (`next dev` rebuilds every chunk, and a worker would serve stale ones).
  */
 export function OfflineSupport() {
+  // useSearchParams needs a Suspense boundary or every page under the layout loses static rendering.
+  return (
+    <Suspense fallback={null}>
+      <Keeper />
+    </Suspense>
+  );
+}
+
+function Keeper() {
   const pathname = usePathname();
+  // Cook together keeps one copy per session and its recipes are in the query (pageKey), so the query is part of the page.
+  const query = useSearchParams().toString();
   // The page this document loaded with already went through the worker when one controlled the load.
   const landed = useRef<string | null>(null);
 
@@ -25,15 +36,17 @@ export function OfflineSupport() {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    // The raw search string, not `query`: the worker's cache key is the URL as the browser sends it (commas unescaped).
+    const page = pathname === "/cook" ? pathname + window.location.search : pathname;
     const first = landed.current === null;
-    if (first) landed.current = pathname;
+    if (first) landed.current = page;
     if (!KEPT_PAGE.test(pathname) || (first && navigator.serviceWorker.controller)) return;
     navigator.serviceWorker.ready
       .then((reg) => {
-        if (navigator.onLine) reg.active?.postMessage({ type: "CACHE_URLS", payload: { urlsToCache: [pathname] } });
+        if (navigator.onLine) reg.active?.postMessage({ type: "CACHE_URLS", payload: { urlsToCache: [page] } });
       })
       .catch(() => {});
-  }, [pathname]);
+  }, [pathname, query]);
 
   return null;
 }

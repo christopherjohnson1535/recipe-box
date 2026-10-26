@@ -126,7 +126,10 @@ describe("OfflineSupport", () => {
   const ID = "0f8e2b4c-1a2b-4c3d-8e9f-0123456789ab";
   async function mount(pathname: string, controller: object | null = null) {
     vi.resetModules();
-    vi.doMock("next/navigation", () => ({ usePathname: () => pathname }));
+    vi.doMock("next/navigation", () => ({
+      usePathname: () => pathname,
+      useSearchParams: () => new URLSearchParams(window.location.search),
+    }));
     const postMessage = vi.fn();
     const register = vi.fn().mockResolvedValue({});
     Object.defineProperty(navigator, "serviceWorker", {
@@ -141,6 +144,7 @@ describe("OfflineSupport", () => {
   afterEach(() => {
     Reflect.deleteProperty(navigator, "serviceWorker");
     vi.doUnmock("next/navigation");
+    window.history.replaceState(null, "", "/");
   });
 
   it("does nothing outside production builds", async () => {
@@ -163,6 +167,20 @@ describe("OfflineSupport", () => {
     setOnline(true);
     const { postMessage } = await mount(`/recipes/${ID}`, {});
     expect(postMessage).not.toHaveBeenCalled();
+  });
+
+  it("keeps a cook together session by its query on the first visit, and only there", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    setOnline(true);
+    window.history.replaceState(null, "", `/cook?recipes=${ID},${ID}`);
+    const cook = await mount("/cook");
+    expect(cook.postMessage).toHaveBeenCalledWith({
+      type: "CACHE_URLS",
+      payload: { urlsToCache: [`/cook?recipes=${ID},${ID}`] },
+    });
+    window.history.replaceState(null, "", "/?servings=6");
+    const recipe = await mount(`/recipes/${ID}`);
+    expect(recipe.postMessage).toHaveBeenCalledWith({ type: "CACHE_URLS", payload: { urlsToCache: [`/recipes/${ID}`] } });
   });
 
   it("does not ask to keep other pages", async () => {

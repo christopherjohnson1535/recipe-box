@@ -312,10 +312,7 @@ test("a session opened before loads offline, and another combination does not", 
   await page.goto(url);
   await hydrated(stage(page));
   await page.evaluate(() => navigator.serviceWorker.ready);
-  // One kept copy per session: the key carries the query. The first visit is not kept (OfflineSupport asks the worker to
-  // keep the bare path, "/cook", which is the picker: a bug filed for #82), so load it again, now through the worker.
-  await page.reload();
-  await hydrated(stage(page));
+  // One kept copy per session: the key carries the query. The first visit is kept too (OfflineSupport sends the query).
   await expect
     .poll(() =>
       page.evaluate(async (suffix) => (await (await caches.open("rb-pages")).keys()).some((r) => r.url.endsWith(suffix)), url),
