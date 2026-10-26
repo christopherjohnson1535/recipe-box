@@ -5,7 +5,7 @@ import { cx } from "./cx";
 /**
  * Where toasts appear: a polite live region pinned to the bottom of the screen. It stays mounted (empty) so a toast
  * that arrives later is announced. Hidden when printing. `lifted` sits it above a bar pinned to the bottom (the grocery
- * selection bar).
+ * selection bar): clear of its two rows on a phone (the room `motion.css` keeps under the page), of its one row from 640px.
  */
 export function ToastRegion({ children, lifted }: { children?: ReactNode; lifted?: boolean }) {
   return (
@@ -14,7 +14,7 @@ export function ToastRegion({ children, lifted }: { children?: ReactNode; lifted
       aria-live="polite"
       className={cx(
         "pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 pl-[max(var(--gutter),env(safe-area-inset-left))] pr-[max(var(--gutter),env(safe-area-inset-right))] print:hidden",
-        lifted ? "pb-[calc(env(safe-area-inset-bottom)+5.5rem)]" : "pb-[max(1rem,env(safe-area-inset-bottom))]",
+        lifted ? "pb-[calc(env(safe-area-inset-bottom)+11rem)] sm:pb-[calc(env(safe-area-inset-bottom)+5.5rem)]" : "pb-[max(1rem,env(safe-area-inset-bottom))]",
       )}
     >
       {children}

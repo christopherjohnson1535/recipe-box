@@ -102,15 +102,22 @@
 
   /* Cook together (#82): one mark per dish on the cook stage, which is always the evening appearance. Dishes 1 and 3 are
      filled, 2 and 4 are outlines (and 1, 2 are round, 3, 4 square), so two dishes are told apart without colour. The
-     --cook-on-dish token is the initial inside the mark: dark ink on a fill, the dish colour itself on an outline. */
+     --cook-on-dish token is the initial inside the mark: paper on a fill, the dish colour itself on an outline. Colours are
+     existing semantic tokens only; danger is not borrowed (it means error, and attention means "check this" elsewhere, so
+     it is used here only as a plain outline). Dish 1 is the accent, which also marks the current step; the current step is
+     told by its bar and its "Step n of m" text as well, so the accent is never the only cue. A fourth hue, if ever wanted,
+     is a new primitive and token, never danger. */
   --cook-dish-1: var(--color-accent);
   --cook-on-dish-1: var(--color-on-accent);
-  --cook-dish-2: var(--color-danger);
-  --cook-on-dish-2: var(--color-danger);
-  --cook-dish-3: var(--color-attention);
-  --cook-on-dish-3: var(--color-on-attention);
+  --cook-dish-2: var(--color-attention);
+  --cook-on-dish-2: var(--color-attention);
+  --cook-dish-3: var(--color-ink-muted);
+  --cook-on-dish-3: var(--color-paper);
   --cook-dish-4: var(--color-ink);
   --cook-on-dish-4: var(--color-ink);
+
+  /* The selection bar's corner when it wraps to two rows (a phone, or a hint line): a stadium would swallow the corners. */
+  --bar-radius: 1.75rem;
 }
 
 /*

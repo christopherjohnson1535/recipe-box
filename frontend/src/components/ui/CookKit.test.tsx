@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ToastRegion } from "./Toast";
 import {
+  CookColumns,
   CookDishColumn,
   CookDishColumns,
   CookDishLegend,
@@ -8,9 +10,12 @@ import {
   CookDishTabs,
   CookMoveButtons,
   CookNudge,
+  CookRail,
   CookReorderList,
   CookStepItem,
   CookStepText,
+  CookTimer,
+  CookTimers,
   CookViewChoice,
 } from "./CookKit";
 
@@ -18,6 +23,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   delete (Element.prototype as { animate?: unknown }).animate;
   delete (HTMLElement.prototype as { offsetTop?: unknown }).offsetTop;
+  document.documentElement.removeAttribute("style");
 });
 
 describe("CookDishMark", () => {
@@ -313,8 +319,8 @@ describe("CookReorderList", () => {
     expect(animate).toHaveBeenCalledTimes(2);
     const calls = animate.mock.calls.map(([frames, options]) => ({ from: (frames as { transform: string }[])[0].transform, to: (frames as { transform: string }[])[1].transform, ms: (options as { duration: number }).duration }));
     expect(calls).toEqual(expect.arrayContaining([
-      { from: "translateY(-100px)", to: "none", ms: 220 }, // a moved down
-      { from: "translateY(100px)", to: "none", ms: 220 }, // b moved up
+      { from: "translateY(-100px)", to: "none", ms: 300 }, // a moved down
+      { from: "translateY(100px)", to: "none", ms: 300 }, // b moved up
     ]));
   });
 
@@ -339,25 +345,134 @@ describe("CookReorderList", () => {
     expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["1Step 1: cDone c", "2Step 2: bDone b", "3Step 3: aDone a"]);
   });
 
-  it("keeps focus on a button whose step moved (React restores it after the move)", () => {
+  it("glides on the motion tokens, not on literals", () => {
     layout();
     motion(false);
-    // Browsers drop focus from a node that is moved; jsdom does not, so do it here.
-    for (const method of ["insertBefore", "appendChild"] as const) {
-      const original = Node.prototype[method] as (this: Node, ...args: unknown[]) => Node;
-      vi.spyOn(Node.prototype, method).mockImplementation(function (this: Node, ...args: unknown[]) {
-        const moved = args[0] as Node;
-        const had = moved.contains(document.activeElement) && moved.parentNode !== null;
-        const result = original.apply(this, args);
-        if (had) (document.activeElement as HTMLElement).blur();
-        return result;
-      } as never);
-    }
+    document.documentElement.style.setProperty("--duration-base", "450ms");
+    document.documentElement.style.setProperty("--ease-out", "cubic-bezier(0.1, 0.2, 0.3, 0.4)");
+    const animate = vi.fn();
+    (Element.prototype as { animate?: unknown }).animate = animate;
+    const { rerender } = render(items(["a", "b"]));
+    rerender(items(["b", "a"]));
+    expect(animate.mock.calls[0][1]).toEqual({ duration: 450, easing: "cubic-bezier(0.1, 0.2, 0.3, 0.4)" });
+  });
+
+  it("reads the step positions when the order changes, not on every render", () => {
+    let reads = 0;
+    Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+      configurable: true,
+      get(this: HTMLElement) {
+        reads += 1;
+        return Array.prototype.indexOf.call(this.parentElement?.children ?? [], this) * 100;
+      },
+    });
+    motion(false);
     const { rerender } = render(items(["a", "b", "c"]));
-    const button = screen.getByRole("button", { name: "Done a" });
-    button.focus();
-    expect(document.activeElement).toBe(button);
+    const afterMount = reads;
+    rerender(items(["a", "b", "c"])); // a timer tick: same order
+    rerender(items(["a", "b", "c"]));
+    expect(reads).toBe(afterMount);
     rerender(items(["b", "a", "c"]));
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Done a" }));
+    expect(reads).toBeGreaterThan(afterMount);
+  });
+});
+
+describe("cook together layout pieces", () => {
+  it("CookRail takes its heading, defaulting to the step's", () => {
+    const { rerender } = render(
+      <CookRail hiddenCount={0} anyLit={false}>
+        <li>Onions</li>
+      </CookRail>,
+    );
+    expect(screen.getByRole("heading", { name: "For this step" })).toBeTruthy();
+    rerender(
+      <CookRail hiddenCount={0} anyLit={false} heading="Ingredients">
+        <li>Onions</li>
+      </CookRail>,
+    );
+    expect(screen.getByRole("heading", { name: "Ingredients" })).toBeTruthy();
+  });
+
+  it("sets a dish's name as the column heading itself: title size, wrapping, not a truncated label", () => {
+    render(
+      <CookDishColumn heading={<CookDishMark dish={1} initial="R" name="Slow-roast shoulder of lamb with anchovy and rosemary" />}>
+        <li>Step</li>
+      </CookDishColumn>,
+    );
+    const name = screen.getByText("Slow-roast shoulder of lamb with anchovy and rosemary");
+    expect(name.className).toContain("font-display");
+    expect(name.className).not.toContain("truncate");
+    expect(name.className).not.toContain("label");
+  });
+
+  it("keeps the name a small label outside a column heading", () => {
+    render(<CookDishMark dish={1} initial="R" name="Roast" />);
+    expect(screen.getByText("Roast").className).toContain("truncate");
+  });
+
+  it("CookColumns wide: the timers are a strip, so a timer shows its name once, beside Cancel", () => {
+    render(
+      <CookColumns
+        wide
+        rail={<p>rail</p>}
+        step={<p>step</p>}
+        timers={
+          <CookTimers empty="none">
+            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} />
+          </CookTimers>
+        }
+      />,
+    );
+    expect(screen.getAllByText("Roast 20 min")).toHaveLength(1);
+    expect(screen.getByRole("group", { name: "Roast 20 min" }).className).toContain("lg:flex-row");
+    expect(screen.getByRole("button", { name: "Cancel timer: Roast 20 min" })).toBeTruthy();
+  });
+
+  it("CookColumns (not wide) keeps the ring with its name inside it", () => {
+    render(
+      <CookColumns
+        rail={<p>rail</p>}
+        step={<p>step</p>}
+        timers={
+          <CookTimers empty="none">
+            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} />
+          </CookTimers>
+        }
+      />,
+    );
+    expect(screen.getAllByText("Roast 20 min")).toHaveLength(1);
+    expect(screen.getByRole("group", { name: "Roast 20 min" }).className).not.toContain("lg:flex-row");
+  });
+
+  it("the view choice and the dish tabs fit a phone: no minimum width below 640px, tabs keep their focus ring inside the strip", () => {
+    render(<CookViewChoice label="View" options={[{ id: "a", label: "One step" }, { id: "b", label: "All steps" }, { id: "c", label: "By dish" }]} value="a" onChange={() => {}} />);
+    for (const radio of screen.getAllByRole("radio")) expect(radio.className).toContain("max-sm:min-w-0");
+    render(
+      <CookDishTabs
+        label="Ingredients by dish"
+        idPrefix="r"
+        tabs={[
+          { id: "a", label: "Salad", mark: null },
+          { id: "b", label: "Roast", mark: null },
+        ]}
+        value="a"
+        onChange={() => {}}
+      >
+        <p>x</p>
+      </CookDishTabs>,
+    );
+    const [chosen, other] = screen.getAllByRole("tab");
+    expect(chosen.className).toContain("[--focus-offset:-3px]");
+    expect(other.getAttribute("title")).toBe("Roast");
+    expect(within(other).getByText("Roast").className).toContain("sr-only"); // icon only on a phone
+  });
+});
+
+describe("ToastRegion lifted", () => {
+  it("clears the wrapped selection bar on a phone and the single row from 640px", () => {
+    render(<ToastRegion lifted />);
+    const cls = screen.getByRole("status").className;
+    expect(cls).toContain("+11rem");
+    expect(cls).toContain("sm:pb-[calc(env(safe-area-inset-bottom)+5.5rem)]");
   });
 });

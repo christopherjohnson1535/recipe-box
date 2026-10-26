@@ -27,7 +27,7 @@ const components = Object.fromEntries(
 );
 const motion = decls(read("motion.css"));
 // Component tokens that are not colours, so they don't point at a semantic token.
-const NON_COLOUR = ["--photo-filter"];
+const NON_COLOUR = ["--photo-filter", "--bar-radius"];
 // Decorative tokens that sit behind or between content and carry no text or state, so they need no contrast pairing.
 const DECORATIVE: Record<string, string> = {
   "--skeleton-bg": "loading placeholder block behind content that has not arrived; aria-hidden, carries nothing",
@@ -328,6 +328,10 @@ describe("design tokens", () => {
 
     it.each(filled)("dish %i: the initial on the fill is at least 4.5:1 in both appearances", (n) => {
       for (const t of ["day", "evening"]) expect(contrast(hex(t, `--cook-on-dish-${n}`), hex(t, `--cook-dish-${n}`)), t).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it("no dish borrows the danger colour (it means an error)", () => {
+      for (const t of ["day", "evening"]) for (const n of dishes) expect(hex(t, `--cook-dish-${n}`), `${t} dish ${n}`).not.toBe(hex(t, "--color-danger"));
     });
 
     it("the four dish colours are apart from each other, and the two that share a fill are clearly apart", () => {

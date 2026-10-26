@@ -178,12 +178,12 @@ li:target > button {
 html:has(.floating-bar) {
   scroll-padding-bottom: 7rem;
 }
-/* The selection bar (grocery / cook together) can wrap to two rows on a phone, about 128px: leave room under the page for it, so the last row ends well above it, never behind it. */
+/* The selection bar (grocery / cook together) can wrap to two rows on a phone, plus a hint line, about 160px: leave room under the page for it, so the last row ends well above it, never behind it. */
 html:has(.selection-bar) {
-  scroll-padding-bottom: 9.5rem;
+  scroll-padding-bottom: 11rem;
 }
 html:has(.selection-bar) main {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 9.5rem);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 11rem);
 }
 
 /* Reduced motion removes all movement. Opacity changes (the stamp, the arrival fades) become instant or stay still. */
