@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "./Button";
 
 /**
- * The in-season ticker: a slow marquee of produce under the cover. A screen reader gets the list once (the looping
+ * The in-season ticker: a slow marquee of produce under the featured recipe. A screen reader gets the list once (the looping
  * copy is `aria-hidden`). It pauses under a hovering pointer or focus, and the Pause button (also a tap on the
  * ticker) stops it for good, which is the WCAG 2.2.2 mechanism. Reduced motion stops it, hides the button and wraps the list (motion.css).
  */

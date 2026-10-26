@@ -80,11 +80,8 @@
   --skeleton-bg: var(--color-paper-deep);
   --skeleton-shine: var(--color-rule);
 
-  /* Magazine home (#39): the drawn underline on card titles, and the inverse "haven't cooked in a while" panel */
+  /* Home (#121): the drawn underline on tile titles. The "haven't cooked in a while" panel uses the band colours directly. */
   --card-underline: var(--color-accent);
-  --feature-bg: var(--color-ink);
-  --feature-fg: var(--color-paper);
-  --feature-focus: var(--color-paper);
 
   /* Recipe spread (#40): ingredient quantities and the drawn strike, step links, timer chips, the floating bar */
   --qty-fg: var(--color-accent);

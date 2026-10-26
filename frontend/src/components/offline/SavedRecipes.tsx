@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { IssueIndex, IssueIndexItem } from "@/components/ui/IssueIndex";
+import { MoreList, MoreListItem } from "@/components/ui/MoreList";
 import { CACHES, RECIPE_READ_PAGE, recipeTitle } from "./rules";
 
 export type Kept = { href: string; title: string };
@@ -56,11 +56,11 @@ export function SavedRecipes({ load = keptRecipes }: { load?: () => Promise<Kept
         </p>
       </EmptyState>
       {kept && kept.length > 0 && (
-        <IssueIndex title="Kept on this device">
+        <MoreList title="Kept on this device">
           {kept.map((k, i) => (
-            <IssueIndexItem key={k.href} n={i + 1} href={k.href} title={k.title} />
+            <MoreListItem key={k.href} n={i + 1} href={k.href} title={k.title} />
           ))}
-        </IssueIndex>
+        </MoreList>
       )}
     </div>
   );

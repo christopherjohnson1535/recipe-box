@@ -114,7 +114,6 @@ const TEXT: [string, string][] = [
   ["--entry-kicker-fg", "--color-paper"],
   ["--selection-fg", "--selection-bg"],
   ["--stamp-fg", "--color-paper"], // the save stamp carries text
-  ["--feature-fg", "--feature-bg"], // the inverse home panel
   ["--qty-fg", "--panel-bg"], // ingredient quantities
   ["--timer-fg", "--timer-bg"], // timer chips in a step
   ["--bar-fg", "--bar-bg"], // the floating bar
@@ -151,7 +150,6 @@ const UI: [string, string][] = [
   ["--spot-line", "--color-paper"], // spot icons are graphics, 3:1
   ["--spot-detail", "--color-paper"],
   ["--card-underline", "--color-paper"], // the drawn title underline
-  ["--feature-focus", "--feature-bg"],
   ["--strike-fg", "--panel-bg"], // the drawn line through a ticked ingredient
   ["--mention-line", "--color-paper"], // dotted underline on an ingredient named in a step
   ["--bar-focus", "--bar-bg"],

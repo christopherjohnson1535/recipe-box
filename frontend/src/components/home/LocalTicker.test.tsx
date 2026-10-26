@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LocalTicker } from "./LocalIssue";
+import { LocalTicker } from "./LocalTicker";
 
 // The suite runs in UTC; switch the zone for this file only (Node re-reads TZ when it changes).
 const TZ = process.env.TZ;

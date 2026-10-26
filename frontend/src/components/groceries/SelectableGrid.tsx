@@ -6,7 +6,7 @@ import { useOnline } from "@/components/offline/use-online";
 import { RecipeCard, cardIcon } from "@/components/RecipeCard";
 import { Button } from "@/components/ui/Button";
 import { SelectCard, SelectionBar } from "@/components/ui/GroceryKit";
-import { CardGrid } from "@/components/ui/MagazineCard";
+import { TileGrid } from "@/components/ui/RecipeTile";
 import { Text } from "@/components/ui/Text";
 import { Toast, ToastDismiss, ToastLink, ToastRegion } from "@/components/ui/Toast";
 import { formatMinutes, plateSrc } from "@/lib/recipe";
@@ -80,7 +80,7 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
         <OfflineNote id="select-offline">You’re offline. Adding to the grocery list needs the server.</OfflineNote>
       </div>
 
-      <CardGrid>
+      <TileGrid count={recipes.length}>
         {recipes.map((r, i) =>
           selecting ? (
             <SelectCard
@@ -97,7 +97,7 @@ export function SelectableGrid({ recipes }: { recipes: RecipeSummary[] }) {
             <RecipeCard key={r.id} recipe={r} index={i} />
           ),
         )}
-      </CardGrid>
+      </TileGrid>
 
       <ToastRegion lifted={selecting}>
         {result && (

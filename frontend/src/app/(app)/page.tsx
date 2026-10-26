@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { Arrive } from "@/components/ui/Arrive";
 import { ButtonLink } from "@/components/ui/Button";
 import { Chip, ChipRow } from "@/components/ui/Chip";
-import { CoverStory } from "@/components/ui/CoverStory";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { FeaturePanel, IssueIndex, IssueIndexItem } from "@/components/ui/IssueIndex";
-import { IssueLayout } from "@/components/ui/MagazineCard";
+import { FeaturedRecipe } from "@/components/ui/FeaturedRecipe";
+import { FeaturePanel, MoreList, MoreListItem } from "@/components/ui/MoreList";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { HomeLayout } from "@/components/ui/RecipeTile";
 import { SpotIcon } from "@/components/ui/SpotIcon";
 import { iconForTag } from "@/components/ui/spot-icons";
-import { monthYear, planHome } from "@/components/home/issue";
-import { LocalTicker } from "@/components/home/LocalIssue";
+import { monthYear, planHome } from "@/components/home/home-plan";
+import { LocalTicker } from "@/components/home/LocalTicker";
 import { formatMinutes, plateSrc } from "@/lib/recipe";
 import { SelectableGrid } from "@/components/groceries/SelectableGrid";
 import { NoMatches } from "@/components/search/ResultSummary";
@@ -55,7 +55,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   // The deck is the household count, or, while filtering, the live result count (Q1-05: no separate summary line).
   const header = (description?: string, filtered = false) => (
     <PageHeader
-      kicker="The collection"
       title="Recipes"
       reserveDeck={!filtered}
       liveDescription={filtered}
@@ -106,16 +105,16 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     );
   }
 
-  const { cover, grid, index, stale } = filtered ? { cover: null, grid: items, index: [], stale: null } : planHome(items);
+  const { featured, grid, more, stale } = filtered ? { featured: null, grid: items, more: [], stale: null } : planHome(items);
   const sidebar =
-    index.length > 0 || stale ? (
+    more.length > 0 || stale ? (
       <>
-        {index.length > 0 && (
-          <IssueIndex title="Also in this issue">
-            {index.map((r, i) => (
-              <IssueIndexItem key={r.id} n={i + 1} href={`/recipes/${r.id}`} title={r.title} time={formatMinutes(r.totalMinutes)} />
+        {more.length > 0 && (
+          <MoreList title="More to cook">
+            {more.map((r, i) => (
+              <MoreListItem key={r.id} n={i + 1} href={`/recipes/${r.id}`} title={r.title} time={formatMinutes(r.totalMinutes)} />
             ))}
-          </IssueIndex>
+          </MoreList>
         )}
         {stale && (
           // shortcut: "last edited" stands in for "last cooked" until the Made-it log (#23) exists.
@@ -132,25 +131,20 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
 
   return (
     <Arrive arriveKey="home" className="flex flex-col gap-10">
-      {/* The one h1 whichever way the page is set: the cover headline below is an h2. */}
-      {cover && <h1 className="sr-only">Recipes</h1>}
+      {/* The one h1 whichever way the page is set: the featured recipe's title below is an h2. */}
+      {featured && <h1 className="sr-only">Recipes</h1>}
 
-      {cover ? (
+      {featured ? (
         <>
-          <CoverStory
-            title={cover.title}
-            kicker={`Cover story${cover.tags.length > 0 ? ` · ${cover.tags.slice(0, 2).join(" · ")}` : ""}`}
-            deck={cover.description || undefined}
-            meta={formatMinutes(cover.totalMinutes)}
-            imageSrc={plateSrc(cover) as string}
-            actions={
-              <>
-                <ButtonLink href={`/recipes/${cover.id}/cook`}>Start cooking</ButtonLink>
-                <ButtonLink href={`/recipes/${cover.id}`} variant="secondary">
-                  Read the recipe
-                </ButtonLink>
-              </>
-            }
+          <FeaturedRecipe
+            title={featured.title}
+            kicker={`Featured${featured.tags.length > 0 ? ` · ${featured.tags.slice(0, 2).join(" · ")}` : ""}`}
+            deck={featured.description || undefined}
+            // shortcut: the list summary has no servings, so the strip shows the time only until it does.
+            meta={formatMinutes(featured.totalMinutes)}
+            imageSrc={plateSrc(featured) as string}
+            cookHref={`/recipes/${featured.id}/cook`}
+            readHref={`/recipes/${featured.id}`}
           />
           <LocalTicker serverDay={serverDay} />
         </>
@@ -171,11 +165,11 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         <NoMatches q={q} tag={tag} />
       ) : (
         grid.length > 0 && (
-          <IssueLayout aside={sidebar}>
+          <HomeLayout aside={sidebar}>
             <section aria-label={filtered ? `${total} matching recipes` : "All recipes"}>
               <SelectableGrid recipes={grid} />
             </section>
-          </IssueLayout>
+          </HomeLayout>
         )
       )}
     </Arrive>

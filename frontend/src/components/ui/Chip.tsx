@@ -44,7 +44,7 @@ export function ChipRow({ label, current, children }: { label: string; current: 
   );
 }
 
-/** Filter link set like a section in a magazine index; `selected` underlines it in the accent. */
+/** Tag filter link, set as a quiet label; `selected` underlines it in the accent. */
 export function Chip({
   href,
   selected,

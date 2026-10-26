@@ -82,28 +82,28 @@
 }
 
 /*
- * Magazine card (ui/MagazineCard): on hover and on keyboard focus the plate scales and turns a touch and the title
+ * Recipe tile (ui/RecipeTile): on hover and on keyboard focus the plate scales and turns a touch and the title
  * draws its accent underline. Only scale, rotate and background-size move; colour changes are in the component.
  */
-.mag-card .plate-img {
+.recipe-tile .plate-img {
   transition:
     scale var(--duration-slow) var(--ease-out),
     rotate var(--duration-slow) var(--ease-out);
 }
-.mag-card:hover .plate-img,
-.mag-card:has(a:focus-visible) .plate-img {
+.recipe-tile:hover .plate-img,
+.recipe-tile:has(a:focus-visible) .plate-img {
   scale: 1.03;
   rotate: -1deg;
 }
-.mag-card .title-draw {
+.recipe-tile .title-draw {
   background: linear-gradient(var(--card-underline), var(--card-underline)) 0 100% / 0 2px no-repeat;
   padding-bottom: 2px;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
   transition: background-size var(--duration-morph) var(--ease-out);
 }
-.mag-card:hover .title-draw,
-.mag-card:has(a:focus-visible) .title-draw {
+.recipe-tile:hover .title-draw,
+.recipe-tile:has(a:focus-visible) .title-draw {
   background-size: 100% 2px;
 }
 
@@ -208,16 +208,16 @@ html:has(.selection-bar) main {
       stamp-land-still var(--duration-base) var(--ease-out) both,
       stamp-out var(--duration-base) var(--ease-out) calc(var(--duration-base) + 2s) forwards;
   }
-  .mag-card .plate-img {
+  .recipe-tile .plate-img {
     transition: none;
   }
-  .mag-card:hover .plate-img,
-  .mag-card:has(a:focus-visible) .plate-img {
+  .recipe-tile:hover .plate-img,
+  .recipe-tile:has(a:focus-visible) .plate-img {
     scale: none;
     rotate: none;
   }
   /* The underline just appears: no draw. */
-  .mag-card .title-draw {
+  .recipe-tile .title-draw {
     transition: none;
   }
   /* The ticker stands still: one copy, wrapped onto as many lines as it needs. */

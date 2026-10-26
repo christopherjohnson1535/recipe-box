@@ -12,12 +12,12 @@ const r = (id: string, over: Partial<RecipeSummary> = {}): RecipeSummary => ({
   imageDisplayUrl: null,
   id, title: `Recipe ${id}`, description: "", totalMinutes: 30, tags: [], imageUrl: null, sourceType: "manual", updatedAt: "2026-05-01T00:00:00Z", ...over,
 });
-const withPhoto = r("cover", {
+const withPhoto = r("featured", {
   title: "Short Ribs Slow and Low",
   description: "Three hours in the oven.",
   totalMinutes: 200,
   tags: ["braise", "sunday", "winter"],
-  imageUrl: "/media/cover.jpg",
+  imageUrl: "/media/featured.jpg",
   updatedAt: "2025-01-01T00:00:00Z",
 });
 const others = Array.from({ length: 9 }, (_, i) => r(`o${i}`, { updatedAt: `2026-0${i + 1}-01T00:00:00Z`, tags: i === 0 ? ["soups"] : [] }));
@@ -35,32 +35,32 @@ function serve(items: RecipeSummary[], tags: Tag[] = [{ name: "soups", count: 1 
 const home = async (sp: Record<string, string> = {}) => render(await HomePage({ searchParams: Promise.resolve(sp) }));
 
 describe("home page", () => {
-  it("shows the cover story, ticker, grid and sidebar", async () => {
+  it("shows the featured recipe, ticker, grid and sidebar", async () => {
     serve([...others, withPhoto]);
     await home();
 
-    // The date, season and count moved to the top band in the layout; the page itself carries no issue line.
+    // The date, season and count live in the top band in the layout; the page itself carries no issue line.
     expect(screen.queryByText(/Vol\.|No\.\s*\d|The \w+ Issue/)).toBeNull();
     expect(screen.queryByText("Thursday, October 22, 2026")).toBeNull();
 
     expect(screen.getByRole("heading", { level: 2, name: "Short Ribs Slow and Low" })).toBeTruthy();
-    expect(screen.getByText("Cover story · braise · sunday")).toBeTruthy();
+    expect(screen.getByText("Featured · braise · sunday")).toBeTruthy();
     expect(screen.getByText("Three hours in the oven.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Start cooking" }).getAttribute("href")).toBe("/recipes/cover/cook");
-    expect(screen.getByRole("link", { name: "Read the recipe" }).getAttribute("href")).toBe("/recipes/cover");
+    expect(screen.getByRole("link", { name: "Start cooking" }).getAttribute("href")).toBe("/recipes/featured/cook");
+    expect(screen.getByRole("link", { name: "Read the recipe" }).getAttribute("href")).toBe("/recipes/featured");
 
     const ticker = screen.getByRole("region", { name: "In season" });
     expect(within(ticker).getAllByText("Delicata squash")).toHaveLength(2);
     expect(ticker.querySelectorAll("ul[aria-hidden='true']")).toHaveLength(1);
 
-    // FND-1: every recipe but the cover is in the grid.
+    // FND-1: every recipe but the featured one is in the grid.
     const grid = screen.getByRole("region", { name: "All recipes" });
     expect(within(grid).getAllByRole("heading", { level: 2 })).toHaveLength(9);
     expect(within(grid).queryByText("Short Ribs Slow and Low")).toBeNull();
 
-    expect(screen.getByRole("complementary", { name: "Also in this issue" })).toBeTruthy();
+    expect(screen.getByRole("complementary", { name: "More to cook" })).toBeTruthy();
     expect(screen.getByRole("complementary", { name: "Haven’t cooked in a while" }).textContent).toContain("Not touched since");
-    // One h1 "Recipes" (visually hidden) even with a cover.
+    // One h1 "Recipes" (visually hidden) even with a featured recipe.
     expect(screen.getByRole("heading", { level: 1, name: "Recipes" }).className).toContain("sr-only");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
@@ -77,10 +77,42 @@ describe("home page", () => {
     expect(screen.queryByRole("complementary")).toBeNull(); // too few recipes for panels
   });
 
-  it("hides cover, ticker and sidebar while filtering", async () => {
+  it("sets the grid in three columns from 1180px, two from 640px, one below", async () => {
+    serve([...others, withPhoto]);
+    await home();
+    const list = screen.getByRole("region", { name: "All recipes" }).querySelector("ul")!;
+    expect(list.className).toContain("grid-cols-1");
+    expect(list.className).toContain("min-[640px]:grid-cols-2");
+    expect(list.className).toContain("min-[1180px]:grid-cols-3");
+  });
+
+  it("uses lasting copy: Featured and More to cook, no issue, cover or collection wording", async () => {
+    serve([...others, withPhoto]);
+    const { container } = await home();
+    expect(screen.getByText(/^Featured · /)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "More to cook" })).toBeTruthy();
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/issue|cover story|the collection|volume|edition/i);
+    expect(screen.queryByText("Start cooking")).toBeTruthy();
+    expect(screen.queryByText("Read the recipe")).toBeTruthy();
+  });
+
+  it("drops the collection kicker from the plain Recipes head too", async () => {
+    serve(others.slice(0, 3));
+    const { container } = await home();
+    expect(container.textContent).not.toMatch(/the collection/i);
+  });
+
+  it("shows the featured meta strip with the time only (the list carries no servings)", async () => {
+    serve([...others, withPhoto]);
+    await home();
+    expect(screen.getByText("3 hr 20 min").className).toContain("border-y");
+  });
+
+  it("hides the featured recipe, ticker and sidebar while filtering", async () => {
     serve([...others, withPhoto], [{ name: "soups", count: 1 }], [others[0]]);
     await home({ q: "soup" });
-    expect(screen.queryByText("Cover story · braise · sunday")).toBeNull();
+    expect(screen.queryByText("Featured · braise · sunday")).toBeNull();
     expect(screen.queryByRole("region", { name: "In season" })).toBeNull();
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(screen.getByRole("region", { name: "1 matching recipes" })).toBeTruthy();
