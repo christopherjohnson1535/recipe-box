@@ -1,4 +1,4 @@
-import { NUMBER, parseNumber } from "./scale";
+import { NUMBER, parseNumber, splitIngredient } from "./scale";
 
 /** The picture to show on cards, the cover and the recipe page: the print-treated rendition when there is one, else the original. */
 export function plateSrc(r: { imageUrl: string | null; imageDisplayUrl?: string | null }): string | null {
@@ -11,6 +11,13 @@ export function formatMinutes(minutes: number | null | undefined): string | null
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return [h && `${h} hr`, m && `${m} min`].filter(Boolean).join(" ");
+}
+
+/** "Serves 4" for a bare number or range; a phrase ("makes about 4 bowls") as written; null when empty. */
+export function servingsLabel(servings: string | null | undefined): string | null {
+  const s = servings?.trim();
+  if (!s) return null;
+  return splitIngredient(s).quantity === s ? `Serves ${s}` : s;
 }
 
 /** Consecutive items with the same `section` become one group (REC-3 headings). */

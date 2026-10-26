@@ -9,13 +9,14 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ toString: () => "" }) }
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 
 const r = (id: string, over: Partial<RecipeSummary> = {}): RecipeSummary => ({
-  imageDisplayUrl: null,
+  imageDisplayUrl: null, servings: null,
   id, title: `Recipe ${id}`, description: "", totalMinutes: 30, tags: [], imageUrl: null, sourceType: "manual", updatedAt: "2026-05-01T00:00:00Z", ...over,
 });
 const withPhoto = r("featured", {
   title: "Short Ribs Slow and Low",
   description: "Three hours in the oven.",
   totalMinutes: 200,
+  servings: "4",
   tags: ["braise", "sunday", "winter"],
   imageUrl: "/media/featured.jpg",
   updatedAt: "2025-01-01T00:00:00Z",
@@ -117,10 +118,31 @@ describe("home page", () => {
     expect(container.textContent).not.toMatch(/the collection/i);
   });
 
-  it("shows the featured meta strip with the time only (the list carries no servings)", async () => {
+  it("shows the time and servings in the featured meta strip", async () => {
     serve([...others, withPhoto]);
     await home();
-    expect(screen.getByText("3 hr 20 min").className).toContain("border-y");
+    expect(screen.getByText("3 hr 20 min · Serves 4")).toBeTruthy();
+  });
+
+  it("shows the time only when the featured recipe has no servings", async () => {
+    serve([...others, { ...withPhoto, servings: null }]);
+    await home();
+    expect(screen.getByText("3 hr 20 min")).toBeTruthy();
+    expect(screen.queryByText(/Serves/)).toBeNull();
+  });
+
+  it("shows servings alone, as written, when there is no time", async () => {
+    serve([...others, { ...withPhoto, totalMinutes: null, servings: "makes 12 cookies" }]);
+    await home();
+    expect(screen.getByText("makes 12 cookies")).toBeTruthy();
+  });
+
+  it("leaves the meta strip out when the featured recipe has neither time nor servings", async () => {
+    serve([...others, { ...withPhoto, totalMinutes: null, servings: null }]);
+    await home();
+    const featured = screen.getByRole("heading", { level: 2, name: "Short Ribs Slow and Low" }).closest("article")!;
+    expect(within(featured).getByText("Three hours in the oven.")).toBeTruthy();
+    expect(featured.textContent).not.toMatch(/ hr| min|Serves/);
   });
 
   it("hides the featured recipe, ticker and sidebar while filtering", async () => {

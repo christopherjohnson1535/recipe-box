@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMinutes, groupBySection, minuteNumeral, splitDurations, typographic } from "./recipe";
+import { formatMinutes, groupBySection, servingsLabel, minuteNumeral, splitDurations, typographic } from "./recipe";
 
 describe("recipe helpers", () => {
   it("formats minutes", () => {
@@ -8,6 +8,15 @@ describe("recipe helpers", () => {
     expect(formatMinutes(75)).toBe("1 hr 15 min");
     expect(formatMinutes(null)).toBeNull();
     expect(formatMinutes(0)).toBeNull();
+  });
+
+  it("labels servings", () => {
+    expect(servingsLabel("4")).toBe("Serves 4");
+    expect(servingsLabel(" 4-6 ")).toBe("Serves 4-6");
+    expect(servingsLabel("makes about 4 bowls")).toBe("makes about 4 bowls");
+    expect(servingsLabel("")).toBeNull();
+    expect(servingsLabel("   ")).toBeNull();
+    expect(servingsLabel(null)).toBeNull();
   });
 
   it("groups consecutive sections", () => {
