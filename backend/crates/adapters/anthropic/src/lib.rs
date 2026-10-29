@@ -358,9 +358,12 @@ impl RecipeExtractor for AnthropicProvider {
             "messages": [{ "role": "user", "content": [{ "type": "text", "text": plan::user_text(dishes) }] }],
         });
         let reply = self.send_with_retry(&body, self.plan_timeout).await?;
-        // A plan cut off by max_tokens is missing steps: it fails the caller's check and falls back, no special case.
-        let input = Self::tool_input(&reply, plan::TOOL)?;
-        Ok(plan::read(input, MAX_PLAN_STEPS))
+        // The service answered, so whatever it said is the model's output: a reply with no usable plan_cook block, or
+        // one cut off by max_tokens, is an empty or partial plan that fails the caller's check and falls back to
+        // round-robin. Only transport and provider failures (above) are errors.
+        Ok(Self::tool_input(&reply, plan::TOOL)
+            .map(|input| plan::read(input, MAX_PLAN_STEPS))
+            .unwrap_or_default())
     }
 }
 

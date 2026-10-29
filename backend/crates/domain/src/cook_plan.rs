@@ -177,9 +177,10 @@ pub fn clean_note(raw: &str) -> String {
     note
 }
 
-/// Unicode format characters that can reorder or hide text (Cf: bidi controls, zero-width joiners, BOM).
+/// Characters that can reorder or hide text: Unicode format characters (Cf: bidi controls, zero-width joiners, BOM),
+/// tag characters (U+E0000–E007F, invisible text) and variation selectors (U+FE00–FE0F, U+E0100–E01EF).
 fn is_format(c: char) -> bool {
-    matches!(c, '\u{00AD}' | '\u{061C}' | '\u{180E}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2064}' | '\u{2066}'..='\u{206F}' | '\u{FEFF}' | '\u{FFF9}'..='\u{FFFB}')
+    matches!(c, '\u{00AD}' | '\u{061C}' | '\u{180E}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2064}' | '\u{2066}'..='\u{206F}' | '\u{FE00}'..='\u{FE0F}' | '\u{FEFF}' | '\u{FFF9}'..='\u{FFFB}' | '\u{E0000}'..='\u{E007F}' | '\u{E0100}'..='\u{E01EF}')
 }
 
 /// The AI's plan when it is usable: every step of every dish exactly once, each recipe's steps in their own order,
@@ -411,6 +412,11 @@ mod tests {
     #[test]
     fn notes_are_one_line_of_plain_text_and_capped() {
         assert_eq!(clean_note(" a\t b\r\n\u{0007}c\u{200B}d "), "a b cd");
+        // Tag characters spell hidden text; variation selectors can carry data. Both go.
+        assert_eq!(
+            clean_note("hi\u{E0041}\u{E0042}\u{E007F} there\u{FE0F}\u{E0100}"),
+            "hi there"
+        );
         let long = clean_note(&"é".repeat(MAX_PLAN_NOTE_CHARS + 50));
         assert_eq!(long.chars().count(), MAX_PLAN_NOTE_CHARS);
         assert_eq!(

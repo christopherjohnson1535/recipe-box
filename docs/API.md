@@ -164,7 +164,9 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   the action; check `GET /api/import/capabilities`). Then, in order: fewer than two or more than four different ids (a repeat counts once),
   a malformed id or `serveAt`, or an unknown field is `400 validation`; a missing or soft-deleted recipe is `404`; more
   than 10 plans in 10 minutes by one member is `429 rate_limited` with `Retry-After` (counted in the API process, per
-  member); a provider failure or timeout (60 s, one retry as for imports) is `502 ai_error`.
+  member); a provider failure or timeout (60 s, one retry as for imports) is `502 ai_error`. A reply from the provider
+  that holds no usable plan (no `plan_cook` call, an unreadable one, too few steps) is not an error: it falls back as
+  below.
   - `CookPlan` = `{source: "ai" | "roundRobin", reason, totalMinutes, serveAt, steps: [{recipeId, stepIndex, startOffsetMin,
     startAt, note}]}`, `stepIndex` 0-based. `steps` always holds every step of every recipe exactly once, each recipe's
     steps in their own order.

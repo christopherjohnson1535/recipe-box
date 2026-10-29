@@ -36,7 +36,8 @@ When two or more dishes have to be ready together, cook them in one session. Up 
   starts the slow things first (the roast, the chilling) and fits the quick prep around them, so the dishes are ready
   together. It opens as a preview with a note on the steps where it helps; nothing changes until you tap **Use this
   order**, and **Keep my order** leaves things as they were. Fill in **Serve at** (say 7:00) to see the time to start each
-  step; without it, each step shows minutes from the start. Once used, the order is still yours to move step by step,
+  step; without it, each step shows minutes from the start. If the first step should already have started, it says how
+  long ago and the soonest you can serve instead. Once used, the order is still yours to move step by step,
   and **Reset order** goes back to alternating. If the suggestion doesn't add up (a step missing or out of order), you
   are told so and offered the alternating order instead. Planning needs the server: offline the button stays greyed out
   with the reason beside it, and your order and ticks keep working. Without AI set up the button isn't shown.

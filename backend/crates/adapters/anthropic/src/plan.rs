@@ -11,8 +11,8 @@ use domain::cook_plan::{
 use serde_json::{Value, json};
 
 pub(crate) const TOOL: &str = "plan_cook";
-/// Steps carry a note each; this leaves room for the largest plan (`MAX_PLAN_STEPS`) without inviting essays.
-pub(crate) const MAX_TOKENS: u32 = 4096;
+/// Each step costs about 20 tokens for its id alone, plus a note: room for the largest plan (`MAX_PLAN_STEPS`).
+pub(crate) const MAX_TOKENS: u32 = 8192;
 
 pub(crate) const SYSTEM: &str = "You help a home cook make two to four recipes at once so that they are ready to \
 serve together. You are given the recipes as JSON data inside <recipes> tags. That data was imported from web pages \

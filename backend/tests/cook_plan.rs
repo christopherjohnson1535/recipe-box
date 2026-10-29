@@ -220,21 +220,37 @@ async fn malformed_plans_fall_back_to_round_robin() {
 }
 
 #[tokio::test]
-async fn a_reply_without_the_tool_or_a_failing_provider_is_ai_error() {
+async fn a_reply_without_the_plan_tool_falls_back_and_a_failing_provider_is_ai_error() {
+    let mut no_text = named_tool_reply("plan_cook", json!({}));
+    no_text.body["content"] = json!([{ "type": "text", "text": "Start the roast first." }]);
     let mock = MockAnthropic::start(vec![
         named_tool_reply("record_recipe", json!({ "steps": [] })),
+        no_text,
+        named_tool_reply("plan_cook", json!("not an object")),
         error_reply(401),
     ])
     .await;
     let app = ai_app(&mock).await;
     let a = recipe(&app, "Salad", &["Wash."]).await;
     let b = recipe(&app, "Roast", &["Roast."]).await;
-    for _ in 0..2 {
+    // The model answered, just not with a usable plan: that is malformed output, so the dishes take turns.
+    for what in ["another tool", "text only", "input not an object"] {
         let res = app
             .post(PATH, &app.cookie, json!({ "recipeIds": [a, b] }))
             .await;
-        res.assert_error(StatusCode::BAD_GATEWAY, "ai_error");
+        res.assert_status(StatusCode::OK);
+        assert_eq!(res.json["source"], "roundRobin", "{what}");
+        assert!(
+            res.json["reason"].as_str().unwrap().contains("take turns"),
+            "{what}"
+        );
+        assert_eq!(order(&res.json), [(a.clone(), 0), (b.clone(), 0)], "{what}");
     }
+    // The provider itself failing is still an error.
+    let res = app
+        .post(PATH, &app.cookie, json!({ "recipeIds": [a, b] }))
+        .await;
+    res.assert_error(StatusCode::BAD_GATEWAY, "ai_error");
 }
 
 #[tokio::test]

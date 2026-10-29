@@ -87,7 +87,9 @@ pub trait RecipeExtractor: Send + Sync {
     /// minutes from the first. The recipe text is data, never instructions: an implementation must send it so the
     /// model cannot take it for its orders, and keeps each title and step to [`domain::cook_plan`]'s caps. The plan
     /// is returned as read, unchecked: the caller checks it with [`domain::cook_plan::check_plan`]. Fails with
-    /// `AiDisabled` when no provider is configured and `Ai` when the provider fails or its reply cannot be read.
+    /// `AiDisabled` when no provider is configured and `Ai` when the provider fails (transport, timeout, an error
+    /// status). A reply that holds no usable plan is the model's output, not a failure: it comes back as an empty or
+    /// partial plan, which the check refuses.
     async fn plan_cook(&self, dishes: &[PlanDish]) -> DomainResult<RawPlan>;
 }
 
