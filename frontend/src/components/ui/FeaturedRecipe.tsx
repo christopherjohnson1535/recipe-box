@@ -17,6 +17,7 @@ export function FeaturedRecipe({
   imageSrc,
   cookHref,
   readHref,
+  action,
 }: {
   title: string;
   kicker: ReactNode;
@@ -28,6 +29,8 @@ export function FeaturedRecipe({
   cookHref: string;
   /** "Read the recipe" (accent text link). */
   readHref: string;
+  /** After the two links: the reader's favourite star. */
+  action?: ReactNode;
 }) {
   return (
     <article className="grid gap-y-8 lg:grid-cols-[1fr_1.4fr] lg:items-center lg:gap-x-14">
@@ -52,6 +55,7 @@ export function FeaturedRecipe({
           <Link href={readHref} aria-label={`Read the recipe: ${title}`} className="link label inline-flex min-h-control items-center max-sm:w-full max-sm:justify-center">
             Read the recipe
           </Link>
+          {action}
         </div>
       </div>
       {/* The 9px of padding hold the outline (1px, set 8px off the photo) inside the column. */}

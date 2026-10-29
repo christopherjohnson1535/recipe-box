@@ -14,7 +14,7 @@ export const SEARCH_DEBOUNCE_MS = 250;
  * Search button and the sort menu push a history entry. The input is uncontrolled so focus and caret survive the
  * server re-render. Without JS the form is a plain GET.
  */
-export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?: RecipeSort }) {
+export function SearchControls({ q, tag, sort, favourite = false }: { q: string; tag: string; sort?: RecipeSort; favourite?: boolean }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const input = useRef<HTMLInputElement>(null);
@@ -31,7 +31,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
   const go = (state: { q?: string; sort?: RecipeSort }, mode: "push" | "replace") => {
     clearTimeout(timer.current);
     lastSent.current = (state.q ?? input.current?.value ?? q).trim();
-    const href = homeHref({ q: lastSent.current, tag, sort, ...state });
+    const href = homeHref({ q: lastSent.current, tag, sort, favourite, ...state });
     startTransition(() => (mode === "push" ? router.push(href) : router.replace(href, { scroll: false })));
   };
 
@@ -65,6 +65,7 @@ export function SearchControls({ q, tag, sort }: { q: string; tag: string; sort?
           }}
         />
         {tag && <input type="hidden" name="tag" value={tag} />}
+        {favourite && <input type="hidden" name="favourite" value="true" />}
         <Button type="submit" variant="ghost" className="shrink-0">
           Search
         </Button>

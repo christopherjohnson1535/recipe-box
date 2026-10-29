@@ -49,6 +49,8 @@ type CardProps = {
   index?: number;
   /** Recipe id: the photo and title morph into the recipe page. */
   morphId?: string;
+  /** A control at the right end of the kicker line, above the card's link (the favourite star). */
+  action?: ReactNode;
 };
 
 /**
@@ -56,15 +58,20 @@ type CardProps = {
  * spot icon), a display title and a two-line deck. A tile narrower than 17rem keeps only the first tag so the kicker stays
  * on one line and the photos in a row stay level. On hover and on keyboard focus the plate scales and turns and the
  * title draws an accent underline (motion.css); under reduced motion only the underline and colour change. The whole
- * card is the link.
+ * card is the link; `action` (the star) sits above it at the right of the kicker line, with its own 44px target.
  */
-export function RecipeTile({ href, title, kicker, time, deck, imageSrc, fallbackIcon, index = 0, morphId }: CardProps) {
+export function RecipeTile({ href, title, kicker, time, deck, imageSrc, fallbackIcon, index = 0, morphId, action }: CardProps) {
   return (
     <li className="stagger-item" style={{ "--i": Math.min(index, 8) } as CSSProperties}>
       <article className="recipe-tile @container group relative flex flex-col gap-3 border-t border-(--rule-double) pt-3 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-4 has-[a:focus-visible]:outline-(--focus-ring)">
         <div className="flex min-h-[1.1rem] items-baseline justify-between gap-4">
           <div className="label min-w-0 text-(--kicker-fg) @max-[17rem]:[&_li:first-child::after]:hidden @max-[17rem]:[&_li+li]:hidden">{kicker}</div>
-          {time && <p className="label shrink-0 text-ink-muted">{time}</p>}
+          {(time || action) && (
+            <div className="flex shrink-0 items-center gap-3">
+              {time && <p className="label text-ink-muted">{time}</p>}
+              {action}
+            </div>
+          )}
         </div>
         <div className="aspect-[3/2] overflow-hidden bg-(--panel-bg)">
           {imageSrc ? (

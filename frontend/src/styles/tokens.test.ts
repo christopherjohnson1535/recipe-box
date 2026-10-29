@@ -166,6 +166,8 @@ const UI: [string, string][] = [
   ["--spot-line", "--color-paper"], // spot icons are graphics, 3:1
   ["--spot-detail", "--color-paper"],
   ["--card-underline", "--color-paper"], // the drawn title underline
+  ["--star-fg", "--color-paper"], // a starred recipe's star (tile, recipe page, filter)
+  ["--star-line", "--color-paper"], // an unstarred one's outline
   ["--strike-fg", "--panel-bg"], // the drawn line through a ticked ingredient
   ["--mention-line", "--color-paper"], // dotted underline on an ingredient named in a step
   ["--bar-focus", "--bar-bg"],

@@ -25,6 +25,7 @@ import { serverApi } from "@/lib/server-api";
 import { bylines } from "@/components/recipe-page/byline";
 import { LocalDate } from "@/components/recipe-page/LocalDate";
 import { DeleteRecipeButton } from "@/components/recipe-page/DeleteRecipeButton";
+import { FavouriteStar } from "@/components/favourites/FavouriteStar";
 import { cookTogetherHref } from "@/components/cook/cook-together-logic";
 import { AddToGroceries } from "@/components/recipe-page/AddToGroceries";
 import { CookLog } from "@/components/cook-log/CookLog";
@@ -95,7 +96,7 @@ export default async function RecipePage({ params }: Params) {
 
   return (
     <Arrive as="article" arriveKey={recipeArrivalKey(id)} className="flex flex-col gap-10 pb-28">
-      <KeepOffline />
+      <KeepOffline isFavourite={recipe.isFavourite} />
       <RecipeStateProvider id={id}>
         <SpreadOpener
           morphId={id}
@@ -139,6 +140,7 @@ export default async function RecipePage({ params }: Params) {
               </ButtonLink>
               <ArrowLink href={cookTogetherHref([id])}>Cook together</ArrowLink>
               <ArrowLink href={`/recipes/${id}/edit`}>Edit</ArrowLink>
+              <FavouriteStar recipeId={id} title={recipe.title} initial={recipe.isFavourite} variant="page" />
               <DeleteRecipeButton id={id} title={recipe.title} />
             </>
           }

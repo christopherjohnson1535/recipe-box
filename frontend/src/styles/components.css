@@ -88,6 +88,10 @@
   /* Home (#121): the drawn underline on tile titles. The "haven't cooked in a while" panel uses the band colours directly. */
   --card-underline: var(--color-accent);
 
+  /* Favourites (#22): a starred recipe's star is filled in the accent; an unstarred one is a muted ink outline. */
+  --star-fg: var(--color-accent);
+  --star-line: var(--color-ink-muted);
+
   /* Recipe spread (#40): ingredient quantities and the drawn strike, step links, timer chips, the floating bar */
   --qty-fg: var(--color-accent);
   --strike-fg: var(--color-accent);

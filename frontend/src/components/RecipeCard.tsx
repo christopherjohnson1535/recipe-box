@@ -1,3 +1,4 @@
+import { FavouriteStar } from "@/components/favourites/FavouriteStar";
 import type { RecipeSummary } from "@/lib/api";
 import { formatMinutes, plateSrc } from "@/lib/recipe";
 import { Badge } from "./ui/Chip";
@@ -8,7 +9,7 @@ import { iconForTag } from "./ui/spot-icons";
 /** The first tag that has a spot icon draws the placeholder when there is no photo; a bowl otherwise. */
 export const cardIcon = (recipe: RecipeSummary) => recipe.tags.map(iconForTag).find((n) => n !== "default") ?? "mains";
 
-/** A recipe as one tile in the home grid: up to two tags (a third would wrap the kicker on a phone), total time, title, description, photo. */
+/** A recipe as one tile in the home grid: up to two tags (a third would wrap the kicker on a phone), total time, the reader's star, title, description, photo. */
 export function RecipeCard({ recipe, index }: { recipe: RecipeSummary; index?: number }) {
   return (
     <RecipeTile
@@ -31,6 +32,7 @@ export function RecipeCard({ recipe, index }: { recipe: RecipeSummary; index?: n
       fallbackIcon={cardIcon(recipe)}
       index={index}
       morphId={recipe.id}
+      action={<FavouriteStar recipeId={recipe.id} title={recipe.title} initial={recipe.isFavourite} variant="tile" />}
     />
   );
 }

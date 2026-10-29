@@ -15,20 +15,31 @@ import { formatMinutes, plateSrc, servingsLabel } from "@/lib/recipe";
 import { SelectableGrid } from "@/components/groceries/SelectableGrid";
 import { NoMatches } from "@/components/search/ResultSummary";
 import { SearchControls } from "@/components/search/SearchControls";
-import { homeHref, parseSort, resultSummary } from "@/components/search/url";
+import { homeHref, parseFavourite, parseSort, resultSummary } from "@/components/search/url";
+import { FavouritesChip } from "@/components/ui/FavouriteKit";
 import { ServerError } from "@/components/ServerError";
+import { FavouriteStar } from "@/components/favourites/FavouriteStar";
 import { dayKey } from "@/lib/local-day";
 import { firstParam, type SearchParams } from "@/lib/nav";
 import { serverApi } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Recipes" };
 
-/** The tag filter chips, each with its spot icon where the tag maps to one. */
-function tagChips(tags: { name: string; count: number }[], q: string, tag: string, sort: ReturnType<typeof parseSort>) {
+/**
+ * The filter row: "Favourites" (the reader's own; it combines with a tag and the search), then the tag chips, each with
+ * its spot icon where the tag maps to one. "All" clears the tag, not the favourites filter.
+ */
+function tagChips(tags: { name: string; count: number }[], q: string, tag: string, sort: ReturnType<typeof parseSort>, favourite: boolean) {
+  const current = [favourite ? "Favourites" : "", tag ? `${tag} ${tags.find((t) => t.name === tag)?.count ?? ""}`.trim() : ""].filter(Boolean).join(" · ");
   return (
-    <ChipRow key={tag} label="Filter by tag" current={tag ? `${tag} ${tags.find((t) => t.name === tag)?.count ?? ""}`.trim() : "All"}>
+    <ChipRow key={`${tag}:${favourite}`} label="Filter recipes" summary="Showing" current={current || "All"}>
       <li>
-        <Chip href={homeHref({ q, sort })} selected={!tag}>
+        <FavouritesChip href={homeHref({ q, tag, sort, favourite: !favourite })} selected={favourite}>
+          Favourites
+        </FavouritesChip>
+      </li>
+      <li>
+        <Chip href={homeHref({ q, sort, favourite })} selected={!tag}>
           All
         </Chip>
       </li>
@@ -36,7 +47,7 @@ function tagChips(tags: { name: string; count: number }[], q: string, tag: strin
         const icon = iconForTag(t.name);
         return (
           <li key={t.name}>
-            <Chip href={homeHref({ q, tag: t.name === tag ? undefined : t.name, sort })} selected={t.name === tag} count={t.count}>
+            <Chip href={homeHref({ q, tag: t.name === tag ? undefined : t.name, sort, favourite })} selected={t.name === tag} count={t.count}>
               {icon !== "default" && <SpotIcon name={icon} size={18} />}
               {t.name}
             </Chip>
@@ -52,6 +63,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const q = firstParam(sp.q)?.trim() ?? "";
   const tag = firstParam(sp.tag) ?? "";
   const sort = parseSort(firstParam(sp.sort));
+  const favourite = parseFavourite(firstParam(sp.favourite));
   // The deck is the household count, or, while filtering, the live result count (Q1-05: no separate summary line).
   const header = (description?: string, filtered = false) => (
     <PageHeader
@@ -66,21 +78,21 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   let result;
   try {
     // shortcut: first page only (limit 50), add paging when a household passes ~50 recipes (FND issues)
-    result = await Promise.all([api.listRecipes({ q, tag, sort }), api.listTags()]);
+    result = await Promise.all([api.listRecipes({ q, tag, sort, favourite }), api.listTags()]);
   } catch (e) {
     return (
       <Arrive arriveKey="home" className="flex flex-col gap-8">
-        {header(undefined, Boolean(q || tag))}
+        {header(undefined, Boolean(q || tag || favourite))}
         {/* Same position and shape as the success layout, so the input keeps its text and focus. */}
         <div className="flex flex-col gap-3">
-          <SearchControls q={q} tag={tag} sort={sort} />
+          <SearchControls q={q} tag={tag} sort={sort} favourite={favourite} />
         </div>
         <ServerError error={e} />
       </Arrive>
     );
   }
   const [{ items, total }, tags] = result;
-  const filtered = Boolean(q || tag);
+  const filtered = Boolean(q || tag || favourite);
   const serverDay = dayKey(new Date());
 
   if (total === 0 && !filtered) {
@@ -124,8 +136,8 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     ) : undefined;
   const search = (
     <div className="flex flex-col gap-3">
-      <SearchControls q={q} tag={tag} sort={sort} />
-      {tags.length > 0 && tagChips(tags, q, tag, sort)}
+      <SearchControls q={q} tag={tag} sort={sort} favourite={favourite} />
+      {tagChips(tags, q, tag, sort, favourite)}
     </div>
   );
 
@@ -144,6 +156,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
             imageSrc={plateSrc(featured) as string}
             cookHref={`/recipes/${featured.id}/cook`}
             readHref={`/recipes/${featured.id}`}
+            action={<FavouriteStar recipeId={featured.id} title={featured.title} initial={featured.isFavourite} variant="featured" />}
           />
           <LocalTicker serverDay={serverDay} />
         </>
@@ -151,7 +164,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         header(
           filtered
             ? total > 0
-              ? resultSummary(total, q, tag)
+              ? resultSummary(total, q, tag, favourite)
               : undefined
             : `${total} ${total === 1 ? "recipe" : "recipes"} in your household’s box.`,
           filtered,
@@ -161,7 +174,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       {search}
 
       {items.length === 0 ? (
-        <NoMatches q={q} tag={tag} />
+        <NoMatches q={q} tag={tag} favourite={favourite} />
       ) : (
         grid.length > 0 && (
           <HomeLayout aside={sidebar}>

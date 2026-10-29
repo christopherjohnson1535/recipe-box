@@ -6,10 +6,10 @@ import type { RecipeSummary, Tag } from "@/lib/api";
 import { server } from "@/test/server";
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ toString: () => "" }) }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }) }));
 
 const r = (id: string, over: Partial<RecipeSummary> = {}): RecipeSummary => ({
-  imageDisplayUrl: null, servings: null,
+  imageDisplayUrl: null, servings: null, isFavourite: false,
   id, title: `Recipe ${id}`, description: "", totalMinutes: 30, tags: [], imageUrl: null, sourceType: "manual", updatedAt: "2026-05-01T00:00:00Z", ...over,
 });
 const withPhoto = r("featured", {
@@ -169,9 +169,39 @@ describe("home page", () => {
   it("shows a spot icon on a tag chip only where the tag maps to one", async () => {
     serve([...others, withPhoto], [{ name: "soups", count: 1 }, { name: "party", count: 2 }]);
     await home();
-    const nav = screen.getAllByRole("navigation", { name: "Filter by tag" })[0];
+    const nav = screen.getAllByRole("navigation", { name: "Filter recipes" })[0];
     expect(within(nav).getByRole("link", { name: /soups/ }).querySelector("svg[data-spot='soups']")).toBeTruthy();
     expect(within(nav).getByRole("link", { name: /party/ }).querySelector("svg")).toBeNull();
+  });
+
+  it("filters to the reader's favourites with the search, and keeps the filter in every link", async () => {
+    let asked = "";
+    server.use(
+      http.get("*/api/recipes", ({ request }) => {
+        asked = new URL(request.url).search;
+        const fav = r("f1", { title: "Lentil soup", isFavourite: true, tags: ["soups"] });
+        return HttpResponse.json({ items: [fav], total: 1 });
+      }),
+      http.get("*/api/tags", () => HttpResponse.json([{ name: "soups", count: 1 }])),
+    );
+    await home({ favourite: "true", q: "lentil" });
+    expect(asked).toBe("?q=lentil&favourite=true");
+    // Filtered: no featured spread, the count says whose recipes these are.
+    expect(screen.getByRole("heading", { level: 1, name: "Recipes" })).toBeTruthy();
+    expect(screen.getByText("1 of your favourites matches “lentil”")).toBeTruthy();
+    const nav = screen.getAllByRole("navigation", { name: "Filter recipes" })[0];
+    const chip = within(nav).getByRole("link", { name: "Favourites" });
+    expect(chip.getAttribute("aria-current")).toBe("true");
+    expect(chip.getAttribute("href")).toBe("/?q=lentil"); // tapping it again turns the filter off
+    expect(within(nav).getByRole("link", { name: /soups/ }).getAttribute("href")).toBe("/?q=lentil&tag=soups&favourite=true");
+    expect(screen.getByRole("button", { name: "Favourite: Lentil soup" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("says how to star when the reader has no favourites", async () => {
+    serve([]);
+    server.use(http.get("*/api/recipes", () => HttpResponse.json({ items: [], total: 0 })));
+    await home({ favourite: "true" });
+    expect(screen.getByRole("heading", { name: "No favourites yet" })).toBeTruthy();
   });
 
   it("keeps the empty box state", async () => {

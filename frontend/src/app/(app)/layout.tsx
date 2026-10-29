@@ -6,6 +6,7 @@ import { SaveStamp } from "@/components/ui/SaveStamp";
 import { UndoToast } from "@/components/undo/UndoToast";
 import { ServerError } from "@/components/ServerError";
 import { OfflineBanner } from "@/components/offline/OfflineBanner";
+import { KeepFavourites } from "@/components/favourites/KeepFavourites";
 import { ApiError, type User } from "@/lib/api";
 import { dayKey } from "@/lib/local-day";
 import { redirectToLogin } from "@/lib/login-redirect";
@@ -42,6 +43,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <RouteFocus />
       <UndoToast />
       <SaveStamp />
+      {user && <KeepFavourites />}
     </>
   );
 }
