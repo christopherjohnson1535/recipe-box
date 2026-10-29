@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Button, ButtonLink, HardLink } from "./Button";
+import { ArrowLink, Button, ButtonLink, HardLink } from "./Button";
 
 describe("HardLink", () => {
   it("is a plain anchor (a full page load), as a button or as an inline link", () => {
@@ -62,5 +62,18 @@ describe("danger-text variant", () => {
   it("stays apart from the filled danger button used for the confirm step", () => {
     render(<Button variant="danger">Remove Sam</Button>);
     expect(screen.getByRole("button", { name: "Remove Sam" }).className).toContain("bg-(--button-danger-bg)");
+  });
+});
+
+describe("ArrowLink", () => {
+  it("is a 44px italic text link with a decorative arrow that only moves when motion is allowed", () => {
+    render(<ArrowLink href="/recipes/a/edit">Edit</ArrowLink>);
+    const link = screen.getByRole("link", { name: "Edit" });
+    expect(link.getAttribute("href")).toBe("/recipes/a/edit");
+    expect(link.className).toContain("min-h-control");
+    expect(link.className).toContain("italic");
+    const arrow = link.querySelector("[aria-hidden]")!;
+    expect(arrow.textContent).toBe("→");
+    expect(arrow.className).toContain("motion-safe:group-hover/arrow:translate-x-1");
   });
 });

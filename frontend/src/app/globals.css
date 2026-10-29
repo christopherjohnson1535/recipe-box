@@ -172,14 +172,21 @@ body {
     border-bottom: 1px solid var(--rule-double);
   }
 
+  /* A quiet 1px underline in the link's own colour at 40%, set a little lower than the browser's; on hover the line
+     comes up to full strength with the text. The text keeps full accent contrast, so the faint line is never the only cue. */
   .link {
     color: var(--link-fg);
     text-decoration-line: underline;
     text-decoration-thickness: 1px;
-    text-underline-offset: 0.18em;
+    text-underline-offset: 0.22em;
+    text-decoration-color: color-mix(in srgb, var(--link-fg) 40%, transparent);
+    transition-property: color, text-decoration-color;
+    transition-duration: var(--duration-quick);
+    transition-timing-function: var(--ease-out);
   }
   .link:hover {
     color: var(--link-fg-hover);
+    text-decoration-color: var(--link-fg-hover);
   }
 }
 

@@ -151,6 +151,7 @@ const UI: [string, string][] = [
   ["--button-secondary-border", "--color-paper"],
   ["--chip-underline-selected", "--color-paper"],
   ["--nav-underline-active", "--color-paper"],
+  ["--nav-underline-hover", "--color-paper"],
   ["--alert-rule-error", "--alert-bg"],
   ["--progress-fg", "--alert-bg"],
   ["--editor-heading-rule", "--color-paper"],

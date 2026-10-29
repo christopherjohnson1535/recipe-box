@@ -47,7 +47,7 @@ type IngredientRowProps = {
   children: ReactNode;
 };
 
-/** One ingredient: a button the cook taps to tick off. Ticked rows get a checked box and a drawn accent line. */
+/** One ingredient: a button the cook taps to tick off. Ticked rows get a checked box and a drawn accent line. Under a mouse the row takes a soft ink band. */
 export function IngredientRow({ index, quantity, checked, onToggle, fade, children }: IngredientRowProps) {
   return (
     <li id={`ingredient-${index}`} className="scroll-mt-24 border-b border-(--rule-hair) md:scroll-mt-4 print:break-inside-avoid">
@@ -55,7 +55,7 @@ export function IngredientRow({ index, quantity, checked, onToggle, fade, childr
         type="button"
         aria-pressed={checked}
         onClick={onToggle}
-        className="group grid min-h-control w-full cursor-pointer grid-cols-[1.25rem_5.25rem_minmax(0,1fr)] items-baseline gap-x-3 py-2.5 text-left text-body leading-snug sm:grid-cols-[1.25rem_6.25rem_minmax(0,1fr)] print:grid-cols-[5.5rem_minmax(0,1fr)]"
+        className="group -mx-2 grid min-h-control w-[calc(100%+1rem)] cursor-pointer grid-cols-[1.25rem_5.25rem_minmax(0,1fr)] items-baseline gap-x-3 px-2 py-2.5 transition-[background-color] duration-200 ease-out pointer-fine:hover:bg-ink/5 text-left text-body leading-snug sm:grid-cols-[1.25rem_6.25rem_minmax(0,1fr)] print:grid-cols-[5.5rem_minmax(0,1fr)]"
       >
         <span
           aria-hidden="true"
