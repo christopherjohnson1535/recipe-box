@@ -5,6 +5,7 @@
 //! the database's `now()`.
 
 mod accounts;
+mod cook_log;
 mod error;
 mod google;
 mod grocery;
@@ -13,6 +14,7 @@ mod images;
 mod recipes;
 
 pub use accounts::{PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo};
+pub use cook_log::PgCookLogRepo;
 pub use google::PgGoogleConnectionRepo;
 pub use grocery::PgGroceryRepo;
 pub use identities::PgIdentityRepo;

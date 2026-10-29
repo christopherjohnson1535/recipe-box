@@ -13,8 +13,8 @@ use utoipa::{
 };
 
 use super::{
-    auth, export, grocery, health, imports, integrations, media, recipes, settings, setup, signin,
-    tags, users,
+    auth, cook_log, export, grocery, health, imports, integrations, media, recipes, settings,
+    setup, signin, tags, users,
 };
 use crate::extract::COOKIE_NAME;
 
@@ -58,6 +58,9 @@ use crate::extract::COOKIE_NAME;
         recipes::update,
         recipes::remove,
         recipes::restore,
+        cook_log::list,
+        cook_log::add,
+        cook_log::remove,
         settings::get,
         settings::update,
         grocery::get,

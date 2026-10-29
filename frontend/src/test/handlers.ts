@@ -1,6 +1,6 @@
 import { http, HttpResponse } from "msw";
 import type { GroceryItem, GroceryList } from "@/components/groceries/types";
-import type { Capabilities, GoogleExport, GoogleStatus, Health, Image, Recipe, RecipeDraft, RecipeSummary, Tag, User } from "@/lib/api";
+import type { Capabilities, CookLogEntry, GoogleExport, GoogleStatus, Health, Image, Recipe, RecipeDraft, RecipeSummary, Tag, User } from "@/lib/api";
 
 // Typed against the types api.ts re-exports from the generated OpenAPI types (src/lib/api-types.ts).
 // "*/api/..." matches both the browser's relative URLs and server-side absolute ones.
@@ -17,6 +17,9 @@ export const draft: RecipeDraft = {
   title: "Pancakes", description: "", ingredients: [], steps: [], servings: null, prepMinutes: null, cookMinutes: null,
   totalMinutes: null, notes: "", sourceUrl: null, sourceName: null, sourceType: "manual", imageId: null, photoImageIds: [],
   tags: [], imageUrl: null, warnings: [], duplicateOf: null,
+};
+export const cookLogEntry: CookLogEntry = {
+  id: "c1", recipeId: "r1", cookedOn: "2026-10-20", note: "Less salt next time.", madeBy: { id: "u1", displayName: "Chris" }, createdAt: "2026-10-20T19:00:00Z",
 };
 export const image: Image = { id: "i1", url: "/media/i1.jpg", width: 1, height: 1, displayUrl: null };
 
@@ -36,6 +39,12 @@ export const handlers = [
   http.put("*/api/recipes/:id", () => HttpResponse.json(recipe)),
   http.delete("*/api/recipes/:id", () => new HttpResponse(null, { status: 204 })),
   http.post("*/api/recipes/:id/restore", () => HttpResponse.json(recipe)),
+  http.get("*/api/recipes/:id/cook-log", () => HttpResponse.json<CookLogEntry[]>([cookLogEntry])),
+  http.post("*/api/recipes/:id/cook-log", async ({ request }) => {
+    const body = (await request.json()) as { cookedOn: string; note?: string };
+    return HttpResponse.json<CookLogEntry>({ ...cookLogEntry, id: "c-new", cookedOn: body.cookedOn, note: body.note ?? "", createdAt: "2026-10-22T12:00:00Z" }, { status: 201 });
+  }),
+  http.delete("*/api/recipes/:id/cook-log/:entryId", () => new HttpResponse(null, { status: 204 })),
   http.get("*/api/tags", () => HttpResponse.json<Tag[]>([{ name: "dinner", count: 1 }])),
   http.post("*/api/media", () => HttpResponse.json(image, { status: 201 })),
   http.get("*/api/import/capabilities", () => HttpResponse.json<Capabilities>({ ai: false, provider: "none" })),

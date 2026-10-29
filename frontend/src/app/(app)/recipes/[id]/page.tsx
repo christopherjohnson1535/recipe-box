@@ -27,6 +27,7 @@ import { LocalDate } from "@/components/recipe-page/LocalDate";
 import { DeleteRecipeButton } from "@/components/recipe-page/DeleteRecipeButton";
 import { cookTogetherHref } from "@/components/cook/cook-together-logic";
 import { AddToGroceries } from "@/components/recipe-page/AddToGroceries";
+import { CookLog } from "@/components/cook-log/CookLog";
 import { IngredientChecklist } from "@/components/recipe-page/IngredientChecklist";
 import { RecipeBar } from "@/components/recipe-page/RecipeBar";
 import { RecipeStateProvider, ScaledServings } from "@/components/recipe-page/RecipeState";
@@ -53,6 +54,9 @@ export default async function RecipePage({ params }: Params) {
   const { id } = await params;
   const recipe = await loadRecipe(id);
   if ("error" in recipe) return <ServerError error={recipe.error} />;
+  // The made-it log only adds to the page: if it can't be read, the recipe still shows (and says so in the section).
+  const api = await serverApi();
+  const [cookLog, me] = await Promise.all([api.listCookLog(id).catch(() => null), api.me().catch(() => null)]);
 
   const times = [
     { label: "Prep", minutes: recipe.prepMinutes },
@@ -177,6 +181,8 @@ export default async function RecipePage({ params }: Params) {
 
           </section>
         </SidebarLayout>
+
+        <CookLog recipeId={id} initial={cookLog} me={me} />
 
         <RecipeBar id={id} total={recipe.ingredients.length} />
       </RecipeStateProvider>

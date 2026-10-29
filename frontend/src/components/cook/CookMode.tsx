@@ -6,6 +6,7 @@ import {
   CookStepItem, CookStepList, CookStepText, CookTextButton, CookTick, CookSoundToggle, CookToolbar, CookTopBar, CookViewToggle, CookVoiceToggle,
 } from "@/components/ui/CookKit";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { MadeIt } from "@/components/cook-log/MadeIt";
 import { ButtonLink } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { splitIngredient } from "@/lib/scale";
@@ -126,7 +127,8 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
           </CookRail>
         }
         step={
-          all ? (
+          <>
+            {all ? (
             <CookStepList>
               {steps.map((_, i) => (
                 <CookStepItem
@@ -163,7 +165,10 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
             >
               {renderStep(index)}
             </CookStepText>
-          )
+            )}
+            {/* Under the step, in the step column that scrolls; one place in both views, so a half-typed note survives a switch. */}
+            <MadeIt recipeId={id} show={all || next === undefined} />
+          </>
         }
         timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
       />

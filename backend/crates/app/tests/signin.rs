@@ -123,6 +123,7 @@ impl World {
             grocery: store.clone(),
             google_connections: store.clone(),
             identities,
+            cook_log: store.clone(),
             google_signin: port.clone(),
             flows: Arc::new(FakeFlowSealer::default()),
             health: store.clone(),

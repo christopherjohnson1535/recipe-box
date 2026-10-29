@@ -1,5 +1,7 @@
 //! Input rules from docs/API.md, applied at the trust boundary.
 
+use chrono::{DateTime, Days, NaiveDate, Utc};
+
 use crate::{
     error::{DomainError, DomainResult},
     model::{Ingredient, RecipeInput},
@@ -15,6 +17,8 @@ pub const MAX_TAGS: usize = 50;
 pub const MIN_PASSWORD: usize = 10;
 /// Upper bound so argon2 is not fed megabytes.
 pub const MAX_PASSWORD: usize = 1024;
+/// A "made it" note ("what I'd change").
+pub const MAX_COOK_NOTE: usize = 2_000;
 
 /// Postgres text cannot hold NUL bytes (they would 500); drop them from free text.
 fn clean(s: &str) -> String {
@@ -215,9 +219,57 @@ pub fn recipe(input: RecipeInput) -> DomainResult<RecipeInput> {
     })
 }
 
+/// A "made it" note: NUL bytes dropped, trimmed, at most [`MAX_COOK_NOTE`] characters; blank means none.
+pub fn cook_note(raw: &str) -> DomainResult<String> {
+    let note = clean(raw);
+    if note.chars().count() > MAX_COOK_NOTE {
+        return Err(DomainError::validation(format!(
+            "note: at most {MAX_COOK_NOTE} characters."
+        )));
+    }
+    Ok(note)
+}
+
+/// The day a recipe was cooked, as the cook's device sent it. The server's UTC day is only a rough guide to the
+/// cook's own (UTC+14 is a day ahead), so one day past it is allowed; anything later, or before 1900, is refused.
+pub fn cooked_on(day: NaiveDate, now: DateTime<Utc>) -> DomainResult<NaiveDate> {
+    let latest = now.date_naive() + Days::new(1);
+    if day > latest {
+        return Err(DomainError::validation("cookedOn: can't be in the future."));
+    }
+    if day < NaiveDate::from_ymd_opt(1900, 1, 1).expect("valid date") {
+        return Err(DomainError::validation("cookedOn: 1900 or later."));
+    }
+    Ok(day)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cook_notes_are_trimmed_and_capped() {
+        assert_eq!(cook_note("  less salt\0 ").unwrap(), "less salt");
+        assert_eq!(cook_note("   ").unwrap(), "");
+        assert!(cook_note(&"é".repeat(MAX_COOK_NOTE)).is_ok());
+        let err = cook_note(&"a".repeat(MAX_COOK_NOTE + 1)).unwrap_err();
+        assert!(err.to_string().starts_with("note:"), "{err}");
+    }
+
+    #[test]
+    fn a_cook_day_may_be_one_day_past_the_servers() {
+        let now = NaiveDate::from_ymd_opt(2026, 3, 10)
+            .unwrap()
+            .and_hms_opt(23, 30, 0)
+            .unwrap()
+            .and_utc();
+        let day = |d| NaiveDate::from_ymd_opt(2026, 3, d).unwrap();
+        assert_eq!(cooked_on(day(10), now).unwrap(), day(10));
+        assert_eq!(cooked_on(day(11), now).unwrap(), day(11)); // already the 11th in Auckland
+        assert!(cooked_on(day(12), now).is_err());
+        assert!(cooked_on(NaiveDate::from_ymd_opt(1899, 12, 31).unwrap(), now).is_err());
+        assert!(cooked_on(NaiveDate::from_ymd_opt(1900, 1, 1).unwrap(), now).is_ok());
+    }
 
     #[test]
     fn media_names_follow_the_stored_pattern() {

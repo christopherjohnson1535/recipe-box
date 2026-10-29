@@ -12,6 +12,7 @@
 //! [`Capabilities`] flag; the suite prints which case it skipped and why, it never skips silently.
 
 mod accounts;
+mod cook_log;
 mod google;
 mod grocery;
 mod identities;
@@ -27,11 +28,12 @@ use domain::{
 };
 
 use crate::{
-    Clock, GoogleConnectionRepo, GroceryRepo, IdentityRepo, ImageRepo, RecipeRepo, SessionRepo,
-    SettingsRepo, StorageHealth, TagRepo, UserRepo,
+    Clock, CookLogRepo, GoogleConnectionRepo, GroceryRepo, IdentityRepo, ImageRepo, RecipeRepo,
+    SessionRepo, SettingsRepo, StorageHealth, TagRepo, UserRepo,
 };
 
 pub use accounts::{image_repo, session_repo, settings_repo, tag_repo, user_repo};
+pub use cook_log::cook_log_repo;
 pub use google::google_connection_repo;
 pub use grocery::grocery_repo;
 pub use identities::identity_repo;
@@ -50,6 +52,7 @@ pub struct Stack {
     pub grocery: Arc<dyn GroceryRepo>,
     pub google: Arc<dyn GoogleConnectionRepo>,
     pub identities: Arc<dyn IdentityRepo>,
+    pub cook_log: Arc<dyn CookLogRepo>,
     pub health: Arc<dyn StorageHealth>,
 }
 

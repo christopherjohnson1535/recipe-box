@@ -5,6 +5,7 @@ from .add_grocery_recipe import AddGroceryRecipe
 from .ai_provider import AiProvider
 from .auth_providers import AuthProviders
 from .capabilities import Capabilities
+from .cook_log_entry import CookLogEntry
 from .create_user_body import CreateUserBody
 from .create_user_body_role import CreateUserBodyRole
 from .error_body import ErrorBody
@@ -27,6 +28,7 @@ from .import_text_body import ImportTextBody
 from .import_url_body import ImportUrlBody
 from .ingredient import Ingredient
 from .login_body import LoginBody
+from .new_cook_log_entry import NewCookLogEntry
 from .photo_form import PhotoForm
 from .photo_mode import PhotoMode
 from .recipe import Recipe
@@ -54,6 +56,7 @@ __all__ = (
     "AiProvider",
     "AuthProviders",
     "Capabilities",
+    "CookLogEntry",
     "CreateUserBody",
     "CreateUserBodyRole",
     "ErrorBody",
@@ -76,6 +79,7 @@ __all__ = (
     "ImportUrlBody",
     "Ingredient",
     "LoginBody",
+    "NewCookLogEntry",
     "PhotoForm",
     "PhotoMode",
     "Recipe",

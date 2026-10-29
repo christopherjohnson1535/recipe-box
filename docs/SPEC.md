@@ -155,6 +155,10 @@ Anything else needs a one-line reason in the agent's report.
   refresh_token bytea null (nonce ‖ ciphertext; null once Google refused it: the row then only remembers the list),
   tasklist_id text null, connected_at timestamptz, export_started_at timestamptz null (the lease of a running
   export: one per user at a time, taken by a conditional update, stale after 2 minutes))`. "Connected" = a token is stored.
+- Made-it log (`0006_cook_log.sql`, REC-6): `cook_log(id uuid pk, recipe_id fk recipes on delete cascade, user_id fk users
+  on delete set null, cooked_on date (the cook's own calendar day), note text default '', created_at timestamptz)` + index
+  `(recipe_id, cooked_on desc, created_at desc)`. Entries stay hidden with a soft-deleted recipe, return on restore and go
+  with the purge; a removed member's entries stay with `user_id` null.
 - Soft delete: `DELETE /api/recipes/:id` sets `deleted_at`; `POST /api/recipes/:id/restore` clears it within 10 min
   (REC-2); a periodic task purges rows deleted > 1 day.
 
@@ -169,6 +173,7 @@ Anything else needs a one-line reason in the agent's report.
 | GET `/api/auth/identities`, DELETE `/api/auth/identities/:id` | s | ACC-6 | #26 |
 | GET `/api/recipes?q=&tag=&sort=&limit=&offset=` | s | FND-1–4 | list + paging done; `q` full-text and `sort` → issue |
 | POST `/api/recipes`, GET/PUT/DELETE `/api/recipes/:id`, POST `/api/recipes/:id/restore` | s | REC-1/2 | done |
+| GET/POST `/api/recipes/:id/cook-log`, DELETE `/api/recipes/:id/cook-log/:entryId` | s | REC-6 | #23 |
 | GET `/api/tags` → `[{name, count}]` | s | FND-3 | done |
 | POST `/api/media` (multipart `file`) → image | s | PHO-1 | done (re-encode, resize) |
 | GET `/media/:file` | s | — | done |

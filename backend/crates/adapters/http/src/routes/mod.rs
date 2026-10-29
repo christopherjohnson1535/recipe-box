@@ -8,6 +8,7 @@ use tower_http::trace::TraceLayer;
 use crate::{HttpConfig, HttpState, error::AppError};
 
 pub mod auth;
+pub mod cook_log;
 pub mod export;
 pub mod grocery;
 pub mod health;
@@ -65,6 +66,14 @@ where
                 .delete(recipes::remove),
         )
         .route("/api/recipes/{id}/restore", post(recipes::restore))
+        .route(
+            "/api/recipes/{id}/cook-log",
+            get(cook_log::list).post(cook_log::add),
+        )
+        .route(
+            "/api/recipes/{id}/cook-log/{entryId}",
+            delete(cook_log::remove),
+        )
         .route("/api/settings", get(settings::get).put(settings::update))
         .route("/api/grocery", get(grocery::get).delete(grocery::clear))
         .route("/api/grocery/recipes", post(grocery::add_recipe))

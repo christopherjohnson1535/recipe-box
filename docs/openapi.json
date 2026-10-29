@@ -2408,6 +2408,274 @@
         ]
       }
     },
+    "/api/recipes/{id}/cook-log": {
+      "get": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "When the household cooked a recipe, newest first.",
+        "operationId": "listCookLog",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Recipe id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entries by cooking day, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CookLogEntry"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such recipe, or deleted (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Records that the signed-in member made the recipe.",
+        "operationId": "addCookLogEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Recipe id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCookLogEntry"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CookLogEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A day in the future, a note over 2,000 characters, or a malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such recipe, or deleted (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over the size limit (`too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/recipes/{id}/cook-log/{entryId}": {
+      "delete": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Deletes an entry: the member who made it, or an admin.",
+        "operationId": "deleteCookLogEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Recipe id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "path",
+            "description": "Entry id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entry deleted."
+          },
+          "400": {
+            "description": "Malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Someone else's entry, and not an admin (`forbidden`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such recipe or entry, or the recipe is deleted (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/recipes/{id}/restore": {
       "post": {
         "tags": [
@@ -3429,6 +3697,52 @@
           }
         }
       },
+      "CookLogEntry": {
+        "type": "object",
+        "description": "One \"made it\" entry: who cooked the recipe, on which day, and what they would change.",
+        "required": [
+          "id",
+          "recipeId",
+          "cookedOn",
+          "note",
+          "madeBy",
+          "createdAt"
+        ],
+        "properties": {
+          "cookedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "The cook's own calendar day (`YYYY-MM-DD`)."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "madeBy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserRef",
+                "description": "`null` once that member was removed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "What they would change next time; empty when they left no note."
+          },
+          "recipeId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateUserBody": {
         "type": "object",
         "required": [
@@ -3940,6 +4254,25 @@
           "password": "correct horse battery",
           "username": "sam"
         }
+      },
+      "NewCookLogEntry": {
+        "type": "object",
+        "required": [
+          "cookedOn"
+        ],
+        "properties": {
+          "cookedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "The cook's own calendar day (`YYYY-MM-DD`); not in the future."
+          },
+          "note": {
+            "type": "string",
+            "description": "What they would change next time; at most 2,000 characters once trimmed. Default empty.",
+            "maxLength": 2000
+          }
+        },
+        "additionalProperties": false
       },
       "PhotoForm": {
         "type": "object",
