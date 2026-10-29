@@ -84,6 +84,16 @@ async fn entries_are_newest_first_per_recipe<F: Fn(Arc<dyn Clock>) -> Stack>(mak
 async fn a_deleted_or_unknown_recipe_takes_no_entry<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
     let c = Ctx::new(make).await;
     let r = c.add("Soup", &[], None, &[]).await;
+    // A member removed after signing in: refused, nothing saved.
+    let gone =
+        c.s.cook_log
+            .add(entry(r, Uuid::new_v4(), day(3, 4), ""))
+            .await;
+    assert!(
+        matches!(gone, Err(DomainError::Unauthenticated(_))),
+        "{gone:?}"
+    );
+    assert!(c.s.cook_log.list(r).await.unwrap().is_empty());
     c.s.recipes.soft_delete(r).await.unwrap();
     for recipe in [r, Uuid::new_v4()] {
         let got = c.s.cook_log.add(entry(recipe, c.user, day(3, 4), "")).await;

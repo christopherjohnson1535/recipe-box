@@ -54,7 +54,9 @@ export function CookLog({ recipeId, initial, me }: Props) {
     try {
       await api.deleteCookLogEntry(recipeId, entry.id);
       setEntries((list) => list.filter((e) => e.id !== entry.id));
-      setStatus(`Removed the entry for ${dayLabel(entry.cookedOn)}.`);
+      // Cleared first, so a second delete with the same words is announced again.
+      setStatus("");
+      requestAnimationFrame(() => setStatus(`Removed the entry for ${dayLabel(entry.cookedOn)}.`));
       addButton.current?.focus();
     } catch (e) {
       setFailure(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
@@ -89,7 +91,8 @@ export function CookLog({ recipeId, initial, me }: Props) {
               onSaved={(entry) => {
                 setEntries((list) => newestFirst([entry, ...list]));
                 setFresh(entry.id);
-                setStatus(`Logged for ${dayLabel(entry.cookedOn)}.`);
+                setStatus("");
+                requestAnimationFrame(() => setStatus(`Logged for ${dayLabel(entry.cookedOn)}.`));
                 closeForm();
               }}
             />

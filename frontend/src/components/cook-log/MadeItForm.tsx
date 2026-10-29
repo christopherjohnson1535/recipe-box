@@ -25,7 +25,8 @@ export function MadeItForm({ recipeId, onSaved, onCancel }: { recipeId: string; 
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const max = today();
-  const tooLong = note.trim().length > MAX_NOTE;
+  // Code points, as the server counts them (an emoji is one, not two UTF-16 units).
+  const tooLong = [...note.trim()].length > MAX_NOTE;
   const badDay = !day || day > max;
 
   async function save(e: React.FormEvent) {

@@ -170,8 +170,8 @@ pub trait UserRepo: Send + Sync {
 #[async_trait]
 pub trait CookLogRepo: Send + Sync {
     /// Records an entry and returns it. `NotFound` when the recipe is missing or deleted (checked in the same step
-    /// as the insert, so an entry never lands on a deleted recipe); nothing is saved then. Inputs are already
-    /// validated.
+    /// as the insert, so an entry never lands on a deleted recipe); `Unauthenticated` when the member no longer
+    /// exists (removed after signing in). Nothing is saved in either case. Inputs are already validated.
     async fn add(&self, entry: NewCookLogEntry) -> DomainResult<CookLogEntry>;
 
     /// Every entry of a recipe, newest first: `cooked_on` descending, then `created_at` descending, then id. It

@@ -83,6 +83,42 @@ describe("MadeIt (cook mode)", () => {
     expect((screen.getByLabelText("What I’d change") as HTMLTextAreaElement).value).toBe("Rest it longer");
   });
 
+  it("never takes focus just because the strip reappears on the last step", async () => {
+    captured();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    const { rerender } = render(<MadeIt recipeId="r1" show />);
+    // Opened and closed once: focus went back to Made it then, and only then.
+    fireEvent.click(screen.getByRole("button", { name: "Made it" }));
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Made it" })));
+    outside.focus(); // the cook moves on to Back / Next
+    rerender(<MadeIt recipeId="r1" show={false} />);
+    rerender(<MadeIt recipeId="r1" show />);
+    expect(document.activeElement).toBe(outside);
+
+    // Saved: the confirmation takes focus once, not again on every return to the last step.
+    fireEvent.click(screen.getByRole("button", { name: "Made it" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save to the log" }));
+    expect(await screen.findByText("In the log.")).toBeTruthy();
+    expect(document.activeElement?.textContent).toBe("In the log.");
+    outside.focus();
+    rerender(<MadeIt recipeId="r1" show={false} />);
+    rerender(<MadeIt recipeId="r1" show />);
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
+  it("counts the note in characters as the server does, so emoji are not counted twice", () => {
+    render(<MadeIt recipeId="r1" show />);
+    fireEvent.click(screen.getByRole("button", { name: "Made it" }));
+    fireEvent.change(screen.getByLabelText("What I’d change"), { target: { value: "🌶".repeat(2000) } }); // 4,000 UTF-16 units
+    expect(screen.queryByText("Keep it to 2,000 characters.")).toBeNull();
+    expect((screen.getByRole("button", { name: "Save to the log" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText("What I’d change"), { target: { value: "🌶".repeat(2001) } });
+    expect(screen.getByText("Keep it to 2,000 characters.")).toBeTruthy();
+  });
+
   it("offline: the form opens and keeps the note, Save is off with the reason, and comes back online", () => {
     const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     render(<MadeIt recipeId="r1" show />);

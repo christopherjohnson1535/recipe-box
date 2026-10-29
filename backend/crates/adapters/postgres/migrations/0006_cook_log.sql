@@ -10,3 +10,5 @@ create table cook_log (
     created_at timestamptz not null
 );
 create index cook_log_recipe_idx on cook_log (recipe_id, cooked_on desc, created_at desc);
+-- Removing a member sets their entries' user_id to null: without this, every removal scans the table.
+create index cook_log_user_idx on cook_log (user_id);

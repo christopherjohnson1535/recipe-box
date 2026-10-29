@@ -9,9 +9,9 @@ use domain::{
     uuid::Uuid,
 };
 use ports::{Clock, CookLogRepo};
-use sqlx::PgPool;
+use sqlx::{PgPool, error::ErrorKind};
 
-use crate::error::db;
+use crate::error::{db, violation};
 
 #[derive(sqlx::FromRow)]
 struct Row {
@@ -75,7 +75,11 @@ impl CookLogRepo for PgCookLogRepo {
         .bind(self.clock.now())
         .execute(&self.pool)
         .await
-        .map_err(db)?;
+        .map_err(|e| match violation(&e) {
+            // The member was removed between signing in and saving.
+            Some(ErrorKind::ForeignKeyViolation) => DomainError::Unauthenticated("Please sign in."),
+            _ => db(e),
+        })?;
         if inserted.rows_affected() == 0 {
             return Err(DomainError::NotFound("Recipe not found.".into()));
         }

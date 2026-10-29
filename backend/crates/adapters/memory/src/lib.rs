@@ -1462,6 +1462,9 @@ impl CookLogRepo for MemoryStore {
         {
             return Err(not_found());
         }
+        if !s.users.contains_key(&entry.user_id) {
+            return Err(DomainError::Unauthenticated("Please sign in."));
+        }
         let stored = StoredCookLog {
             id: Uuid::new_v4(),
             recipe_id: entry.recipe_id,

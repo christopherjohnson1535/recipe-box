@@ -22,13 +22,19 @@ export function MadeIt({ recipeId, show }: { recipeId: string; show: boolean }) 
   const done = useRef<HTMLParagraphElement>(null);
   const reopen = useRef(false);
 
+  // Focus moves only in answer to the cook's own action (open, save, close), never because the strip reappears on
+  // the last step: stepping back and forward must leave focus on Back / Next. Focusing scrolls the step column so
+  // the form or the confirmation is in view on a small screen.
   useEffect(() => {
-    if (!show) return;
-    // Focus scrolls the step column so the form (or the confirmation) is in view on a small screen.
     if (logged) done.current?.focus();
-    else if (open) panel.current?.focus();
-    else if (reopen.current) opener.current?.focus({ preventScroll: true });
-  }, [show, open, logged]);
+  }, [logged]);
+  useEffect(() => {
+    if (open) panel.current?.focus();
+    else if (reopen.current) {
+      reopen.current = false;
+      opener.current?.focus({ preventScroll: true });
+    }
+  }, [open]);
 
   const close = () => {
     reopen.current = true;

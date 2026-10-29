@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -70,6 +70,22 @@ describe("CookLog (recipe page)", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Delete your entry for Tue, Oct 20" }).at(-1)!);
     expect((await screen.findByRole("alert")).textContent).toContain("Only the member who made an entry");
     unmount();
+  });
+
+  it("announces a second delete with the same words again (the status is cleared in between)", async () => {
+    const two = [entry({ id: "a", cookedOn: "2026-10-20" }), entry({ id: "b", cookedOn: "2026-10-20", createdAt: "2026-10-20T20:00:00Z" })];
+    render(<CookLog recipeId="r1" initial={two} me={member} />);
+    const status = () => screen.getByText((_, el) => el?.getAttribute("role") === "status" && el.classList.contains("sr-only"));
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete your entry for Tue, Oct 20" })[0]);
+    await waitFor(() => expect(status().textContent).toBe("Removed the entry for Tue, Oct 20."));
+    const seen: string[] = [];
+    const watch = new MutationObserver(() => seen.push(status().textContent ?? ""));
+    watch.observe(status(), { childList: true, characterData: true, subtree: true });
+    fireEvent.click(screen.getByRole("button", { name: "Delete your entry for Tue, Oct 20" }));
+    await screen.findByText(/Nobody has logged this one yet/);
+    await waitFor(() => expect(seen.at(-1)).toBe("Removed the entry for Tue, Oct 20."));
+    expect(seen).toContain("");
+    watch.disconnect();
   });
 
   it("has an empty state, and a quiet note when the log could not be read", () => {
