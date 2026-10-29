@@ -186,3 +186,28 @@ test("a second member signing in on the same browser sees none of the first one'
   await expect(page.getByText(recipe.title)).toHaveCount(0);
   await goOnline(context);
 });
+
+test("a favourite is kept without being opened, lists first offline, and starring waits for the server", async ({ memberPage: page, member, context }) => {
+  const starred = await recipeWithPhoto(member);
+  expect((await member.client.request.put(`/api/recipes/${starred.id}/favourite`)).status()).toBe(204);
+
+  // Only the home page is opened: the app keeps the favourite in the background.
+  await page.goto("/");
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await expect
+    .poll(async () => (await keptUrls(page, "rb-pages")).includes(`/recipes/${starred.id}`), { message: "the favourite was not kept" })
+    .toBe(true);
+
+  await goOffline(context, page);
+  await page.goto("/settings");
+  const favourites = page.getByRole("complementary", { name: "Your favourites" });
+  await expect(favourites.getByRole("link", { name: new RegExp(starred.title) }), await where(page)).toBeVisible();
+  await favourites.getByRole("link", { name: new RegExp(starred.title) }).click();
+  await expect(page.getByRole("heading", { name: starred.title, level: 1 })).toBeVisible();
+  const star = page.getByRole("button", { name: "Favourite" });
+  await expect(star).toHaveAttribute("aria-pressed", "true");
+  await expect(star).toBeDisabled();
+  await expect(star).toHaveAccessibleDescription("You’re offline. Starring needs the server.");
+  await goOnline(context);
+  await expect(star).toBeEnabled();
+});

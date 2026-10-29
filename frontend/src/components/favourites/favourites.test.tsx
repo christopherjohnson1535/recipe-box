@@ -36,6 +36,23 @@ describe("FavouriteStar", () => {
     expect(refresh).not.toHaveBeenCalled(); // the card stays put, focus with it
   });
 
+  it("keeps focus while the request runs and ignores a second tap", async () => {
+    let finish: () => void = () => undefined;
+    const calls = api({ addFavourite: vi.fn(() => new Promise<void>((r) => (finish = r))) });
+    render(<FavouriteStar recipeId="r1" title="Soup" initial={false} variant="tile" api={calls} />);
+    const star = screen.getByRole("button");
+    star.focus();
+    fireEvent.click(star);
+    expect(star.getAttribute("aria-disabled")).toBe("true");
+    expect(star).toHaveProperty("disabled", false);
+    expect(document.activeElement).toBe(star);
+    fireEvent.click(star);
+    expect(calls.addFavourite).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+    expect(star.getAttribute("aria-disabled")).toBeNull();
+    expect(star.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("does not play the press for a star that is on when the page loads", () => {
     render(<FavouriteStar recipeId="r1" title="Soup" initial variant="tile" api={api()} />);
     const svg = screen.getByRole("button").querySelector("svg");
@@ -107,7 +124,7 @@ describe("keepFavourites", () => {
     vi.stubEnv("NODE_ENV", "production");
     const asked = fakeWorker();
     const kept = new Set(["/recipes/b"]);
-    vi.stubGlobal("caches", { open: async () => ({ match: async (path: string) => (kept.has(path) ? {} : undefined) }) });
+    vi.stubGlobal("caches", { match: async (path: string, o: { cacheName: string }) => (o.cacheName === "rb-pages" && kept.has(path) ? {} : undefined) });
     const listRecipes = vi.fn(async () => page(["a", "b", "c", "d", "e", "f"]));
     await keepFavourites({ listRecipes });
     expect(listRecipes).toHaveBeenCalledWith({ favourite: true, limit: 30 });
@@ -138,7 +155,7 @@ describe("keepFavourites", () => {
     vi.stubEnv("NODE_ENV", "production");
     const asked = fakeWorker();
     const kept = new Set(["/recipes/old"]);
-    vi.stubGlobal("caches", { open: async () => ({ match: async (path: string) => (kept.has(path) ? {} : undefined) }) });
+    vi.stubGlobal("caches", { match: async (path: string, o: { cacheName: string }) => (o.cacheName === "rb-pages" && kept.has(path) ? {} : undefined) });
     await rekeep("new", true);
     await rekeep("old", false);
     await rekeep("never", false);
@@ -152,7 +169,7 @@ describe("keepFavourites", () => {
   it("runs once when the signed-in layout mounts", async () => {
     vi.stubEnv("NODE_ENV", "production");
     fakeWorker();
-    vi.stubGlobal("caches", { open: async () => ({ match: async () => undefined }) });
+    vi.stubGlobal("caches", { match: async () => undefined });
     const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ items: [], total: 0 }), { headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchSpy);
     await act(async () => void render(<KeepFavourites />));

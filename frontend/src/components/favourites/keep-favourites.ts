@@ -33,12 +33,15 @@ function keep(sw: ServiceWorker, paths: string[]): Promise<void> {
   });
 }
 
-/** The recipe paths among `paths` that the device has not kept yet. */
-export async function notKept(paths: string[], cacheStorage: Pick<CacheStorage, "open"> | undefined = globalThis.caches): Promise<string[]> {
+/**
+ * The recipe paths among `paths` that the device has not kept yet. Looks pages up with `caches.match`, never
+ * `caches.open`: opening would create the cache, and the page must not make caches of its own (after a sign-out wipe,
+ * an empty one would look like something kept).
+ */
+export async function notKept(paths: string[], cacheStorage: Pick<CacheStorage, "match"> | undefined = globalThis.caches): Promise<string[]> {
   if (!cacheStorage) return paths;
-  const cache = await cacheStorage.open(CACHES.pages);
   const missing: string[] = [];
-  for (const path of paths) if (!(await cache.match(path, { ignoreVary: true }))) missing.push(path);
+  for (const path of paths) if (!(await cacheStorage.match(path, { cacheName: CACHES.pages, ignoreVary: true }))) missing.push(path);
   return missing;
 }
 

@@ -37,6 +37,7 @@ export function FavouriteStar({ recipeId, title, initial, variant, api = browser
   const offlineId = useId();
 
   async function toggle() {
+    if (busy) return;
     const next = !on;
     setOn(next);
     setPop(next);
@@ -61,10 +62,12 @@ export function FavouriteStar({ recipeId, title, initial, variant, api = browser
     setBusy(false);
   }
 
+  // While a request runs the star is only aria-disabled: a disabled button would drop keyboard focus.
   const shared = {
     on,
     pop,
-    disabled: !online || busy,
+    disabled: !online,
+    "aria-disabled": busy || undefined,
     "aria-describedby": online ? undefined : offlineId,
     onClick: () => void toggle(),
   };
