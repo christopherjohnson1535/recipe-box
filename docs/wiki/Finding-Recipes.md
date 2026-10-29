@@ -28,9 +28,19 @@ works too: "lasag" finds "Weeknight lasagne". The line under the box says how ma
 
 ## Tags
 Tap a tag under the search box to show only those recipes; the number is how many recipes carry it. On a phone the
-tags fold into one **Tag** row: tap it to open the list. Tags and search
+tags fold into one row: tap it to open the list. Tags and search
 combine: search "pie" with the tag *dessert* to see dessert pies. Tap **All** to drop the tag, or **Clear search** on
 the empty-results page to start over.
+
+## Favourites
+Tap the star on a recipe card, or **Favourite** on the recipe page, to star it. Stars are yours alone: everyone in the
+household has their own favourites, and nobody else sees yours. Tap the star again to take it off.
+
+**Favourites** at the start of the tag row shows only the recipes you starred. It combines with the search and a tag:
+search "soup" with Favourites on to see your favourite soups. Tap **Favourites** again to see every recipe. Your favourites
+also stay readable on the iPad without internet (see [[Using-on-iPad]]).
+
+If a starred recipe is deleted, its star comes back with it when you press **Undo**.
 
 ## Sorting
 The menu next to the box offers **Best match** (only while searching), **Newest**, **A–Z** and **Quickest** (shortest
