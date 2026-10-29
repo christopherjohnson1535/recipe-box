@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Children, createContext, isValidElement, useContext, useId, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { Children, createContext, isValidElement, useContext, useId, useLayoutEffect, useEffect, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { pinEdition, unpinEdition } from "@/lib/edition";
 import { cx } from "./cx";
 
@@ -879,11 +879,111 @@ const pillVariant = {
   secondary: "border border-(--button-secondary-border) text-(--button-secondary-fg) hover:border-(--button-secondary-hover) hover:text-(--button-secondary-hover)",
 };
 
-/** Back / Next step pill, 60px tall. */
-export function CookPill({ variant = "primary", className, ...rest }: { variant?: keyof typeof pillVariant } & Omit<ComponentProps<"button">, "type">) {
-  return <button type="button" className={cx(pill, pillVariant[variant], className)} {...rest} />;
+/** Back / Next step pill, 60px tall. With `short`, a phone shows that instead of `children` (a string, which stays the name). */
+export function CookPill({ variant = "primary", className, short, children, ...rest }: { variant?: keyof typeof pillVariant; short?: string } & Omit<ComponentProps<"button">, "type">) {
+  return (
+    <button type="button" className={cx(pill, pillVariant[variant], className)} aria-label={short && typeof children === "string" ? children : undefined} {...rest}>
+      {short ? (
+        <>
+          <span aria-hidden="true" className="sm:hidden">
+            {short}
+          </span>
+          <span aria-hidden="true" className="max-sm:hidden">
+            {children}
+          </span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
+  );
 }
 
 export function CookPillLink({ variant = "primary", className, ...rest }: { variant?: keyof typeof pillVariant } & ComponentProps<typeof Link>) {
   return <Link className={cx(pill, pillVariant[variant], className)} {...rest} />;
+}
+
+// ===== Plan the evening (#83): an AI-suggested order, previewed before it replaces the cook's. =====
+
+/**
+ * The suggested-order panel, in the step area while it is open: kicker, title (focused when the panel opens), the serve-time
+ * control, then the status or the plan. Plain text throughout: the notes come from the AI.
+ */
+export function CookPlanPanel({ headingRef, controls, children }: { headingRef?: Ref<HTMLHeadingElement>; controls?: ReactNode; children: ReactNode }) {
+  return (
+    <section aria-labelledby="cook-plan-title" className="flex flex-col gap-5 pb-4">
+      <div>
+        <p className="label text-accent">Suggested order</p>
+        <h2 id="cook-plan-title" ref={headingRef} tabIndex={-1} className="font-display text-title-sm text-ink outline-none min-[700px]:text-title">
+          Plan the evening
+        </h2>
+      </div>
+      {controls}
+      {children}
+    </section>
+  );
+}
+
+/** "Serve at": a 44px time field with its label and hint. */
+export function CookServeAt({ value, onChange, hint }: { value: string; onChange: (value: string) => void; hint: string }) {
+  const id = useId();
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+      <label htmlFor={id} className="label text-ink">
+        Serve at
+      </label>
+      <input
+        id={id}
+        type="time"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-describedby={`${id}-hint`}
+        className="min-h-control w-36 rounded-control border border-(--input-border) bg-(--input-bg) px-3 text-body text-(--input-fg) transition-[border-color] duration-150 ease-out hover:border-(--input-border-hover)"
+      />
+      <p id={`${id}-hint`} className="w-full text-small text-ink-muted italic">
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The plan's one-line summary ("Ready to serve in 1 hr 40 min."), or why the dishes take turns. A polite live region, so a
+ * new serve time's answer is read out; `warn` (a start time already past) sets it in the accent.
+ */
+export function CookPlanSummary({ warn = false, children }: { warn?: boolean; children: ReactNode }) {
+  return (
+    <p role="status" data-warn={warn || undefined} className={cx("font-text text-deck italic [overflow-wrap:anywhere]", warn ? "text-accent" : "text-ink")}>
+      {children}
+    </p>
+  );
+}
+
+/** The suggested order: one `CookPlanRow` per step. */
+export function CookPlanList({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <ol aria-label={label} className="flex flex-col">
+      {children}
+    </ol>
+  );
+}
+
+/**
+ * One step of the suggested order: when to start it (a clock time, "+25 min", or its place), the dish's mark, the step and the
+ * AI's note. Rows arrive one after another (motion.css `.plan-row`; still under reduced motion).
+ */
+export function CookPlanRow({ index, time, mark, note, children }: { index: number; time: string; mark: ReactNode; note?: string; children: ReactNode }) {
+  return (
+    <li
+      className="plan-row grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-4 border-b border-rule py-4 min-[700px]:grid-cols-[7rem_minmax(0,1fr)]"
+      style={{ "--i": index } as CSSProperties}
+    >
+      <p className="label pt-1 text-accent [font-variant-numeric:lining-nums_tabular-nums]">{time}</p>
+      <div className="flex min-w-0 flex-col items-start gap-2">
+        {mark}
+        <p className="font-display text-[1.25rem] leading-[1.35] text-ink [overflow-wrap:anywhere] min-[700px]:text-[1.375rem]">{children}</p>
+        {note && <p className="text-small text-ink-muted italic [overflow-wrap:anywhere]">{note}</p>}
+      </div>
+    </li>
+  );
 }

@@ -505,6 +505,122 @@
         ]
       }
     },
+    "/api/cook/plan": {
+      "post": {
+        "tags": [
+          "cook"
+        ],
+        "summary": "Suggests the order to cook the recipes' steps in so they are ready together. Needs an AI provider. A suggestion\nthat does not add up comes back as the round-robin order (`source: roundRobin`) with a `reason`, never as an error.",
+        "operationId": "planCook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CookPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The plan: every step of every recipe exactly once, in order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CookPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Fewer than two or more than four different recipes, or a malformed body (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A recipe is missing or deleted (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over the size limit (`too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No AI provider is configured (`ai_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many plans in ten minutes for this member (`rate_limited`, with `Retry-After`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The AI provider failed or timed out (`ai_error`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/export": {
       "get": {
         "tags": [
@@ -3892,6 +4008,130 @@
           }
         }
       },
+      "CookPlan": {
+        "type": "object",
+        "description": "A suggested order for a cook-together session: every step of every recipe exactly once.",
+        "required": [
+          "source",
+          "reason",
+          "totalMinutes",
+          "serveAt",
+          "steps"
+        ],
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the order is round-robin; `null` for an AI plan."
+          },
+          "serveAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The requested `serveAt`, or `null`."
+          },
+          "source": {
+            "$ref": "#/components/schemas/CookPlanSource"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CookPlanStep"
+            }
+          },
+          "totalMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Minutes from the first step until serving; `null` in a round-robin plan."
+          }
+        }
+      },
+      "CookPlanRequest": {
+        "type": "object",
+        "description": "What to plan: the recipes of a cook-together session and, optionally, when to serve.",
+        "required": [
+          "recipeIds"
+        ],
+        "properties": {
+          "recipeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Two to four different recipe ids (a repeated id counts once).",
+            "maxItems": 4,
+            "minItems": 2
+          },
+          "serveAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When everything should be on the table; RFC 3339 with an offset. Gives each step of a timed plan its `startAt`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CookPlanSource": {
+        "type": "string",
+        "description": "Where a plan's order came from.",
+        "enum": [
+          "ai",
+          "roundRobin"
+        ]
+      },
+      "CookPlanStep": {
+        "type": "object",
+        "description": "One step of a plan, in the order to do it.",
+        "required": [
+          "recipeId",
+          "stepIndex",
+          "startOffsetMin",
+          "startAt",
+          "note"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "A short tip from the AI (at most 200 characters, one line of plain text), or empty. Untrusted: show as text."
+          },
+          "recipeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The clock time to start, when `serveAt` was given and the plan is timed."
+          },
+          "startOffsetMin": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Minutes after the start; `null` in a round-robin plan."
+          },
+          "stepIndex": {
+            "type": "integer",
+            "format": "int32",
+            "description": "0-based index into the recipe's `steps`.",
+            "minimum": 0
+          }
+        }
+      },
       "CreateUserBody": {
         "type": "object",
         "required": [
@@ -5215,6 +5455,10 @@
     {
       "name": "auth",
       "description": "Sign in (password or Google), sign out, the current user and linked Google accounts."
+    },
+    {
+      "name": "cook",
+      "description": "Cook together: an AI-suggested order for several recipes. Needs an AI provider."
     },
     {
       "name": "export",

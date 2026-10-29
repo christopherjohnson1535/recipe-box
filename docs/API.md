@@ -24,7 +24,7 @@ Every non-2xx response:
 | 404 | `not_found` | |
 | 409 | `conflict` | username or email taken; restore window passed; a backup import is already running; a send to Google Tasks is already running for this member |
 | 405 | `method_not_allowed` | known path, wrong method |
-| 429 | `rate_limited` | too many wrong passwords on `POST /api/auth/login` or on `PUT /api/users/:id/password` with a `currentPassword`; see "Password throttling". Has a `Retry-After` header (seconds) and a message that says how long to wait |
+| 429 | `rate_limited` | too many wrong passwords on `POST /api/auth/login` or on `PUT /api/users/:id/password` with a `currentPassword`, see "Password throttling"; or too many `POST /api/cook/plan` by one member. Has a `Retry-After` header (seconds) and a message that says how long to wait |
 | 413 | `too_large` | upload over `MAX_UPLOAD_MB` (multipart routes: `/api/media`, `/api/import/photo`), a backup over `MAX_BACKUP_MB` (`/api/import/export`), or any other request body over 1 MB |
 | 415 | `unsupported_media` | not an image we can decode, or over 10,000 px a side / 40 megapixels |
 | 422 | `no_recipe_found` | page/photo had no recipe |
@@ -158,6 +158,33 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   `warnings` entry. One retry on 429/5xx/connect errors (not after
   a timeout, nor when `retry-after` asks for more than 10 s); otherwise 502 `ai_error`. A reply cut off at the token
   limit is kept when usable, with a warning. The API key is never logged or returned.
+- **Cook together: plan the evening (KIT-7).** `POST /api/cook/plan` `{recipeIds, serveAt?}` → `200 CookPlan`: the order to
+  cook two to four recipes' steps in so they are ready together, suggested by the AI provider. Needs AI: with
+  `AI_PROVIDER=none` it is `422 ai_disabled` for any well-formed body, whatever recipes it names (the web app hides
+  the action; check `GET /api/import/capabilities`). Then, in order: fewer than two or more than four different ids (a repeat counts once),
+  a malformed id or `serveAt`, or an unknown field is `400 validation`; a missing or soft-deleted recipe is `404`; more
+  than 10 plans in 10 minutes by one member is `429 rate_limited` with `Retry-After` (counted in the API process, per
+  member); a provider failure or timeout (60 s, one retry as for imports) is `502 ai_error`. A reply from the provider
+  that holds no usable plan (no `plan_cook` call, an unreadable one, too few steps) is not an error: it falls back as
+  below.
+  - `CookPlan` = `{source: "ai" | "roundRobin", reason, totalMinutes, serveAt, steps: [{recipeId, stepIndex, startOffsetMin,
+    startAt, note}]}`, `stepIndex` 0-based. `steps` always holds every step of every recipe exactly once, each recipe's
+    steps in their own order.
+  - The AI's plan is never trusted. It is used (`source: "ai"`) only when every step appears exactly once, ids are the
+    request's, each recipe's steps keep their order, and every `startOffsetMin` is a whole number of minutes from 0 to
+    1,440, never below the one before it. Otherwise the answer is still `200`, with the round-robin order (each dish's
+    first step in request order, then each second step, and so on), `source: "roundRobin"`, a `reason` to show the cook,
+    and `totalMinutes`, `startOffsetMin`, `startAt` all `null` and empty notes. More than 80 steps in all are taken in
+    turn without asking the AI (with a reason); recipes with no steps at all give an empty round-robin plan, also
+    without asking.
+  - `totalMinutes` is the AI's minutes until serving, raised to the last start when it is less. With `serveAt` (RFC 3339
+    with an offset) each step of an AI plan gets `startAt` = `serveAt` − `totalMinutes` + `startOffsetMin`; `serveAt` is
+    echoed back (as UTC).
+  - `note` is the AI's short tip, or empty: untrusted text, made one line (control and bidi/zero-width characters
+    dropped, whitespace collapsed) and cut to 200 characters. Clients show it as plain text.
+  - Prompt: the recipes go to the model as a JSON document in a `<recipes>` block after the instructions, and the system
+    prompt says nothing in it is an instruction (`<` and `>` are escaped so a title cannot close the block). Titles are cut
+    to 120 characters and steps to 400 before sending. Nothing is stored.
 - **Made-it log (REC-6).** Every signed-in member reads a recipe's log and adds to it.
   - `GET /api/recipes/{id}/cook-log` → `200 [CookLogEntry]`, ordered by `cookedOn` descending, then `createdAt`
     descending. `CookLogEntry` = `{id, recipeId, cookedOn: "YYYY-MM-DD", note, madeBy: {id, displayName} | null, createdAt}`.

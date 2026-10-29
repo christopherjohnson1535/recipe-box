@@ -16,11 +16,15 @@ Dependencies point inward: adapters → `app` → `ports` → `domain`; the serv
 - Never let `sqlx`, `axum` or `reqwest` into `domain`, `ports` or `app`; CI fails on it. Details: `CLAUDE.md`.
 
 ## Checks
-`just check-backend` / `just check-frontend` (or `just check` for both) run the checks CI runs; raw commands are in
-`CLAUDE.md`. Toolchains are pinned by `rust-toolchain.toml` and `.nvmrc`.
+While building or fixing, run scoped checks: `cargo clippy -p <crate> --all-targets -- -D warnings`,
+`cargo test -p <crate>`, `npx vitest run <touched files>`, `npx tsc --noEmit`. Release builds (`cargo build --release`,
+`npm run build`) and the full `just check` / `just e2e` belong to the tester; run them only if your brief says so.
+Agents on one issue share one clone and one `backend/target/`. Raw commands are in `CLAUDE.md`; toolchains are
+pinned by `rust-toolchain.toml` and `.nvmrc`.
 
 ## Read first
-- `docs/SPEC.md` (plan + file ownership), `docs/API.md` (exact contract), `docs/REQUIREMENTS.md` (IDs).
+- The issue's Context pack files first. Open `docs/SPEC.md` (plan + file ownership), `docs/API.md` (exact
+  contract) and `docs/REQUIREMENTS.md` (IDs) only for the sections, endpoints and IDs it names.
 - Existing code in the tree you own — reuse helpers; never duplicate one.
 
 ## Skills (read with your Read tool)

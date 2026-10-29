@@ -257,3 +257,9 @@ html:has(.selection-bar) main {
     animation: star-pop var(--duration-base) var(--ease-out) both;
   }
 }
+
+/* Cook together, suggested order (ui/CookKit CookPlanRow): the rows arrive one after another, half the list stagger. */
+.plan-row {
+  animation: arrive var(--duration-base) var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 12) * var(--stagger-step) / 2);
+}

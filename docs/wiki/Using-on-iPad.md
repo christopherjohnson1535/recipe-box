@@ -32,6 +32,15 @@ When two or more dishes have to be ready together, cook them in one session. Up 
 - **Every step shows its dish.** Each dish has its own mark, a letter in a coloured circle or square, solid or outlined, with the name beside it at the top of the screen and above each step, so you can tell them apart even without the colours. The ingredients column has a tab for each dish; it follows the step you are on, and you can open another dish's tab to look ahead.
 - **Three views**, switched at the top: *One step* (the same big step with Back and Next, plus a button to bring another dish's next step here), *All steps* (the whole combined list), and *By dish* (a column for each dish on an iPad held sideways, stacked when held upright). The iPad remembers the one you picked.
 - **The order is yours.** It starts by alternating between the dishes (first step of each, then second of each, and so on). In *All steps*, tap the up or down arrow beside a step to move it earlier or later past a step of another dish; a dish's own steps always stay in their own order. In *One step*, **Bring [dish]'s next step here** pulls that dish's next step to come right after this one. **Reset order** puts it back to alternating. The order is kept on that iPad for 12 hours, so a reload mid-cook picks up where you were.
+- **Plan the evening** (when AI is set up, see [[AI-Photo-Import]]): tap it at the top and the AI suggests an order that
+  starts the slow things first (the roast, the chilling) and fits the quick prep around them, so the dishes are ready
+  together. It opens as a preview with a note on the steps where it helps; nothing changes until you tap **Use this
+  order**, and **Keep my order** leaves things as they were. Fill in **Serve at** (say 7:00) to see the time to start each
+  step; without it, each step shows minutes from the start. If the first step should already have started, it says how
+  long ago and the soonest you can serve instead. Once used, the order is still yours to move step by step,
+  and **Reset order** goes back to alternating. If the suggestion doesn't add up (a step missing or out of order), you
+  are told so and offered the alternating order instead. Planning needs the server: offline the button stays greyed out
+  with the reason beside it, and your order and ticks keep working. Without AI set up the button isn't shown.
 - **Ticks are kept per dish.** Tap **Done** beside a step, or an ingredient, and it is ticked for that dish only, the same ticks as when you cook the recipe on its own, so starting one of them alone later shows what you already did. **Clear ticks** clears them for all the dishes in the session.
 - **Finish** (or **Close**) takes you back to the recipes home. A dish whose next step is already next has no "Bring…" button.
 - **Offline**: a session you have opened on the iPad is kept like a recipe, so it opens again without internet (the same dishes in the same order; a different combination is a different session and is not kept until you open it). Open the session while you are online before you rely on it.

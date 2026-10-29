@@ -6,14 +6,23 @@ description: Stage 3 of the software factory — build from docs/SPEC.md with a 
 # Build with an agent team
 
 You orchestrate; agents write the code. Agent model: Sonnet (the owner wants stage agents on a cheaper model) unless the owner says otherwise.
-For a small issue, one builder agent (or you, if the owner prefers) is enough — the rules below still apply.
+The rules below apply at every size.
+
+## By size (see `factory`)
+- **S:** one builder.
+- **M:** one builder per tree, in parallel (disjoint owned paths).
+- **L:** the waves below.
+
+Builders run scoped checks only: `cargo clippy -p <crate> --all-targets -- -D warnings`, `cargo test -p <crate>`,
+`npx vitest run <touched files>`, `npx tsc --noEmit`. Release builds belong to the tester. All builders in an issue
+share one clone and one `backend/target/`.
 
 ## Waves
 
 1. **Scaffold (done; see the example run in `docs/FACTORY.md`).** Backend and frontend skeletons, containers, CI.
 2. **Design system (one agent, sequential).** Uses tastemaker (`.factory/vendor/tastemaker/skills/tastemaker/SKILL.md`,
    build mode) with the existing `.tastemaker/style-lock.md`; writes tokens, the app shell, `src/components/ui/*`,
-   and `docs/UI.md`. Self-hosted fonts only. Runs every frontend check.
+   and `docs/UI.md`. Self-hosted fonts only. Runs scoped frontend checks.
 3. **Features (N agents in parallel, one per issue/area with disjoint owned paths).** Each brief:
    - "Read `docs/agents/agent-preamble.md` and follow it exactly."
    - The issue number, requirement IDs and spec section to follow.

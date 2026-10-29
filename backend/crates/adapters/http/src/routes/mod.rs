@@ -8,6 +8,7 @@ use tower_http::trace::TraceLayer;
 use crate::{HttpConfig, HttpState, error::AppError};
 
 pub mod auth;
+pub mod cook;
 pub mod cook_log;
 pub mod export;
 pub mod favourites;
@@ -79,6 +80,7 @@ where
             "/api/recipes/{id}/favourite",
             put(favourites::add).delete(favourites::remove),
         )
+        .route("/api/cook/plan", post(cook::plan))
         .route("/api/settings", get(settings::get).put(settings::update))
         .route("/api/grocery", get(grocery::get).delete(grocery::clear))
         .route("/api/grocery/recipes", post(grocery::add_recipe))

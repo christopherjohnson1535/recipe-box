@@ -7,6 +7,11 @@ description: Stage 2 of the software factory — turn confirmed requirements int
 
 Goal: a spec precise enough that several agents can build at once without touching each other's files.
 
+## By size (see `factory`)
+- **S / M:** no plan agent. You write a five-line plan in the PR description from the issue's Context pack:
+  approach, owned paths, tests, risky surface (if any), tier. Skip §1–§4; run §0 only if it is a fresh sandbox.
+- **L:** everything below.
+
 ## 0. Environment check (do this first)
 - Where will agents run? Check there: `npm view next version`, `cargo search axum --limit 1`, a throwaway install,
   `git` access, a local Postgres for backend tests. If a registry is blocked, stop and ask the owner to allow it
@@ -30,7 +35,7 @@ Must contain:
 - **Feature notes:** the algorithm/edge-case decisions per area (JSON-LD mapping, duplicate key, retry rules).
 - **Definition of done:** the checks for each tree pass; docs and wiki updated.
 
-For a single issue, the plan can be a short section in the PR description: approach, owned paths, tests.
+For an S or M issue the plan is the five-line section above, not a SPEC change.
 
 ## 2. UI architecture (when there is UI)
 - Follow `docs/UI.md` (editorial magazine direction). Three token layers: primitives → semantic → component.

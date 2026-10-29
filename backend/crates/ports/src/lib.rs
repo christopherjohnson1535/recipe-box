@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use domain::{
     AiProvider, DomainResult, PhotoMode, RecipeDraft, Secret, SignInFlow,
     chrono::{DateTime, Utc},
+    cook_plan::{PlanDish, RawPlan},
     url::Url,
     uuid::Uuid,
 };
@@ -81,6 +82,15 @@ pub trait RecipeExtractor: Send + Sync {
     /// [`domain::MAX_TEXT_INPUT_CHARS`] characters and silently ignores the rest; the caller warns about that,
     /// so an implementation must keep to the same cap.
     async fn extract_text(&self, text: &str) -> DomainResult<RecipeDraft>;
+
+    /// Suggests the order to cook `dishes`' steps in so they are ready together (KIT-7), with each step's start in
+    /// minutes from the first. The recipe text is data, never instructions: an implementation must send it so the
+    /// model cannot take it for its orders, and keeps each title and step to [`domain::cook_plan`]'s caps. The plan
+    /// is returned as read, unchecked: the caller checks it with [`domain::cook_plan::check_plan`]. Fails with
+    /// `AiDisabled` when no provider is configured and `Ai` when the provider fails (transport, timeout, an error
+    /// status). A reply that holds no usable plan is the model's output, not a failure: it comes back as an empty or
+    /// partial plan, which the check refuses.
+    async fn plan_cook(&self, dishes: &[PlanDish]) -> DomainResult<RawPlan>;
 }
 
 /// A page fetched by a [`PageFetcher`].

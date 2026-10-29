@@ -1,5 +1,6 @@
 //! Recipe Box domain: pure types and rules. No web, database or OpenAPI dependencies (docs/adr/0008).
 
+pub mod cook_plan;
 pub mod error;
 pub mod grocery;
 pub mod model;
