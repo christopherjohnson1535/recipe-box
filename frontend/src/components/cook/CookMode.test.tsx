@@ -110,16 +110,12 @@ describe("CookMode", () => {
     const Ctor = vi.fn(function () { return ctx; });
     vi.stubGlobal("AudioContext", Ctor);
     const { unmount } = view();
-    expect(Ctor).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
-    act(() => void vi.advanceTimersByTime(10 * 60_000));
-    expect(start).not.toHaveBeenCalled(); // no gesture yet, so no sound
+    expect(Ctor).not.toHaveBeenCalled(); // nothing before a gesture
 
-    fireEvent.pointerDown(window);
-    expect(Ctor).toHaveBeenCalledTimes(1);
-    expect(ctx.resume).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: /Dismiss timer/ }));
+    // The tap on the chip is the gesture (its click; on an iPad a touch's pointerdown alone does not count).
     fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
+    expect(Ctor).toHaveBeenCalledTimes(1);
+    expect(ctx.resume).toHaveBeenCalled();
     act(() => void vi.advanceTimersByTime(10 * 60_000));
     expect(start).toHaveBeenCalled();
     expect(Ctor).toHaveBeenCalledTimes(1);

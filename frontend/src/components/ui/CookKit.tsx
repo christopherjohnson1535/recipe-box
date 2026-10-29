@@ -785,12 +785,12 @@ export function CookTimer({
         </svg>
         <div className="text-center">
           <p className={cx("font-display leading-none", wide ? (small ? "text-[1.5rem] lg:text-[1.25rem]" : "text-[1.75rem] lg:text-[1.25rem]") : small ? "text-[1.5rem] lg:text-[2.25rem]" : "text-[1.75rem] lg:text-[3.25rem]", "[font-variant-numeric:lining-nums_tabular-nums]")}>{done ? "Done" : digits}</p>
-          {!wide && <p className={cx("label mt-1 truncate max-lg:hidden", small ? "max-w-20 lg:max-w-28" : "max-w-28 lg:max-w-44")}>{label}</p>}
+          {!wide && <p className={cx("label mt-1 line-clamp-2 max-lg:hidden", small ? "max-w-20 lg:max-w-28" : "max-w-28 lg:max-w-44")}>{label}</p>}
         </div>
       </div>
       {wide ? (
         <div className="flex items-center gap-1">
-          <p className="label hidden max-w-32 min-w-0 truncate lg:block" title={label}>
+          <p className="label hidden max-w-32 min-w-0 lg:line-clamp-2" title={label}>
             {label}
           </p>
           {dismiss}
@@ -798,7 +798,7 @@ export function CookTimer({
       ) : (
         <>
           {/* Upright the ring has no room for its name: it goes under the ring, so several timers can be told apart. */}
-          <p aria-hidden="true" className="label line-clamp-2 max-w-32 text-center text-ink-muted lg:hidden">
+          <p aria-hidden="true" className={cx("label line-clamp-3 text-center text-ink-muted lg:hidden", small ? "max-w-24" : "max-w-28")}>
             {label}
           </p>
           {dismiss}

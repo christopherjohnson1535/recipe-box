@@ -26,12 +26,25 @@ function chime(ctx: AudioContext, out: AudioNode, at: number, notes = [880, 660,
   }
 }
 
+/**
+ * Events that may start sound. A touch's pointerdown is not a user activation in the HTML spec (its pointerup, touchend
+ * and click are), so on an iPad only the later ones unlock the context; pointerdown and keydown cover mouse and keyboard.
+ */
+export const UNLOCK_EVENTS = ["pointerdown", "pointerup", "touchend", "click", "keydown"] as const;
+
+/** Resume a context that is suspended or interrupted; a refusal (no gesture yet) is fine, the next event tries again. */
+function wake(ctx: AudioContext | null) {
+  try {
+    if (ctx && ctx.state !== "running") void ctx.resume?.()?.catch?.(() => {});
+  } catch {
+    // no sound is fine
+  }
+}
+
 const noSubscribe = () => () => {};
-/** What this device can do, read after hydration (the server says neither). */
+/** Whether this browser can play sound, read after hydration (the server says no). */
 function useAbilities() {
-  const sound = useSyncExternalStore(noSubscribe, () => Boolean(AudioCtor()), () => false);
-  const vibrate = useSyncExternalStore(noSubscribe, () => typeof navigator.vibrate === "function", () => false);
-  return { sound, vibrate };
+  return { sound: useSyncExternalStore(noSubscribe, () => Boolean(AudioCtor()), () => false) };
 }
 
 export type TimerAlert = {
@@ -42,7 +55,7 @@ export type TimerAlert = {
   /** Sound on (the default) or muted, remembered on this device (`cook-sound`). */
   muted: boolean;
   setMuted: (muted: boolean) => void;
-  /** False when this browser can neither play sound nor vibrate: the mute switch is not worth showing. */
+  /** False when this browser cannot play sound: the mute switch is not worth showing (vibration has no switch). */
   supported: boolean;
 };
 
@@ -64,16 +77,18 @@ export function useTimerAlert(): TimerAlert {
       try {
         const AC = AudioCtor();
         if (!audio.current && AC) audio.current = new AC();
-        if (audio.current && audio.current.state !== "running") void audio.current.resume?.();
+        wake(audio.current);
       } catch {
         // no sound is fine
       }
     };
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
+    // iOS Safari leaves the context "interrupted" after the screen locks or the app goes to the background.
+    const visible = () => document.visibilityState === "visible" && wake(audio.current);
+    for (const type of UNLOCK_EVENTS) window.addEventListener(type, unlock);
+    document.addEventListener("visibilitychange", visible);
     return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
+      for (const type of UNLOCK_EVENTS) window.removeEventListener(type, unlock);
+      document.removeEventListener("visibilitychange", visible);
       void audio.current?.close();
       audio.current = null;
       try {
@@ -103,6 +118,7 @@ export function useTimerAlert(): TimerAlert {
     }
     const ctx = audio.current;
     if (muted || !ctx) return;
+    wake(ctx); // scheduled notes play once a suspended context resumes
     try {
       const out = ctx.createGain();
       out.connect(ctx.destination);
@@ -129,5 +145,5 @@ export function useTimerAlert(): TimerAlert {
     [store, stop],
   );
 
-  return { ring, stop, muted, setMuted, supported: can.sound || can.vibrate };
+  return { ring, stop, muted, setMuted, supported: can.sound };
 }

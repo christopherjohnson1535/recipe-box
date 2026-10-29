@@ -23,7 +23,7 @@ const DURATION = new RegExp(
   [
     "half\\s+an?\\s+(?<half>hour|minute)(?![\\w-])", // "half an hour"
     `${PART("h", HOURS)}(?<hHalf>\\s+and\\s+a\\s+half(?![\\w-]))?${TAIL("hm", MINUTES)}`, // "an hour and a half"
-    `${PART("m", MINUTES)}${TAIL("ms", SECONDS)}`,
+    `${PART("m", MINUTES)}(?<mHalf>\\s+and\\s+a\\s+half(?![\\w-]))?${TAIL("ms", SECONDS)}`, // "a minute and a half"
     PART("s", SECONDS),
   ]
     .map((alt) => `(?<![\\w.])(?:${alt})`)
@@ -71,11 +71,15 @@ export function splitDurations(text: string): DurationSegment[] {
 
 function durationOf(m: RegExpMatchArray): number | null {
   const g = m.groups ?? {};
-  if (g.half) return g.half.toLowerCase() === "hour" ? 1800 : 30;
-  if (g.hUnit) return Math.round(amount(g.h) * 3600 + (g.hHalf ? 1800 : 0) + (g.hm ? amount(g.hm) * 60 : 0));
-  if (g.mUnit) return Math.round(amount(g.m) * 60 + (g.ms ? amount(g.ms) : 0));
+  let seconds: number;
+  if (g.half) seconds = g.half.toLowerCase() === "hour" ? 1800 : 30;
+  else if (g.hUnit) seconds = amount(g.h) * 3600 + (g.hHalf ? 1800 : 0) + (g.hm ? amount(g.hm) * 60 : 0);
+  else if (g.mUnit) seconds = amount(g.m) * 60 + (g.mHalf ? 30 : 0) + (g.ms ? amount(g.ms) : 0);
   // "a second" is an ordinal ("add a second egg"), never a duration.
-  return /^an?$/i.test(g.s) ? null : Math.max(1, Math.round(amount(g.s)));
+  else if (/^an?$/i.test(g.s)) return null;
+  else seconds = amount(g.s);
+  // "0 minutes" (or a figure that rounds to nothing) is no timer.
+  return Math.round(seconds) >= 1 ? Math.round(seconds) : null;
 }
 
 /** The durations written in a step, as timers that could be started from it. */
@@ -84,17 +88,22 @@ export const stepDurations = (step: string): { label: string; seconds: number }[
 
 /**
  * "Step 2 · 12 min": short enough for the ring. Cooking together the dish goes first: "Salad · Step 2 · 12 min". A time
- * written in figures keeps its words, shortened ("10-12 min"); one written in words is set from its length ("half an
- * hour" is "30 min").
+ * written in figures keeps its numbers, shortened ("10–12 min", "4–5 min"); one written in words is set from its length
+ * ("half an hour" is "30 min"). `nth` ("2nd") tells apart two chips with the same time in one step.
  */
-export function timerLabel(step: number, text: string, seconds: number, dish?: string): string {
+export function timerLabel(step: number, text: string, seconds: number, dish?: string, nth?: string): string {
   const short = /^\d/.test(text)
-    ? text.replace(/\s*hours?\b/gi, " hr").replace(/\s*minutes?\b/gi, " min").replace(/\s*seconds?\b/gi, " sec")
+    ? text
+        .replace(/(?<=[\d½¼¾⅓⅔⅛⅜⅝⅞])\s*(?:[-–]|\bto\b|\bor\b)\s*(?=\d)/gi, "–")
+        .replace(/\s*-?\s*hours?\b|\s*-?\s*hrs?\b/gi, " hr")
+        .replace(/\s*-?\s*minutes?\b|\s*-?\s*mins?\b/gi, " min")
+        .replace(/\s*-?\s*seconds?\b|\s*-?\s*secs?\b/gi, " sec")
+        .replace(/\s+and\s+/gi, " ")
     : [[Math.floor(seconds / 3600), "hr"], [Math.floor((seconds % 3600) / 60), "min"], [seconds % 60, "sec"]]
         .filter(([n]) => n)
         .map(([n, unit]) => `${n} ${unit}`)
         .join(" ");
-  return `${dish ? `${dish} · ` : ""}Step ${step} · ${short}`;
+  return `${dish ? `${dish} · ` : ""}Step ${step} · ${short}${nth ? ` (${nth})` : ""}`;
 }
 
 /** A running or finished timer. `key` names the chip it came from (dish, step and place in the step), so a chip has one timer. */

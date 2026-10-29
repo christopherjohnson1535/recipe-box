@@ -82,7 +82,7 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
   }
 
   const renderStep = (at: number) =>
-    renderCookStep(steps[at], ingredients, String(at), { timers, now, start: (key, text, seconds) => start(key, timerLabel(at + 1, text, seconds), seconds) });
+    renderCookStep(steps[at], ingredients, String(at), { timers, now, start: (key, text, seconds, nth) => start(key, timerLabel(at + 1, text, seconds, undefined, nth), seconds) });
 
   const lit = litIngredients(stepText, ingredients);
   const next = steps[index + 1];

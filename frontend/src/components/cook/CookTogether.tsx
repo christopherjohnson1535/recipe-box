@@ -147,7 +147,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
     renderCookStep(textOf(e), dishes[e.dish].ingredients, `${e.dish}:${e.step}`, {
       timers,
       now,
-      start: (key, text, seconds) => start(key, timerLabel(e.step + 1, text, seconds, nameOf(e.dish)), seconds),
+      start: (key, text, seconds, nth) => start(key, timerLabel(e.step + 1, text, seconds, nameOf(e.dish), nth), seconds),
     });
   const tick = (e: DishStep, onClick: () => void) => (
     <CookTick pressed={isDone(e)} aria-label={`${nameOf(e.dish)} step ${e.step + 1} done`} onClick={onClick}>

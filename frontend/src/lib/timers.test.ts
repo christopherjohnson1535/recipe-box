@@ -27,6 +27,8 @@ describe("splitDurations: what counts as a time", () => {
     ["Braise an hour and a half", "an hour and a half", 5400],
     ["Cook 1 and a half hours", "1 and a half hours", 5400],
     ["Stir for a minute", "a minute", 60],
+    ["Whisk a minute and a half", "a minute and a half", 90],
+    ["Whisk 2 minutes and a half", "2 minutes and a half", 150],
     ["Give it a 10-minute rest", "10-minute", 600],
   ])("finds %j", (text, label, seconds) => {
     expect(found(text)).toEqual([[label, seconds]]);
@@ -64,6 +66,8 @@ describe("splitDurations: what counts as a time", () => {
     "4 hot dogs, 2 hamburgers",
     "Stir in the minced garlic.",
     "Serve within the hour.",
+    "Cook 0 minutes more.",
+    "Rest 0.001 seconds",
     "",
   ])("finds no time in %j", (text) => {
     expect(found(text)).toEqual([]);
@@ -83,7 +87,14 @@ describe("timerLabel", () => {
     expect(timerLabel(2, "12 minutes", 720)).toBe("Step 2 · 12 min");
     expect(timerLabel(1, "1 hour 30 minutes", 5400, "Ragu")).toBe("Ragu · Step 1 · 1 hr 30 min");
     expect(timerLabel(3, "45 seconds", 45)).toBe("Step 3 · 45 sec");
-    expect(timerLabel(1, "10-12 minutes", 600)).toBe("Step 1 · 10-12 min");
+    expect(timerLabel(1, "10-12 minutes", 600)).toBe("Step 1 · 10–12 min");
+    expect(timerLabel(1, "4 to 5 minutes", 240)).toBe("Step 1 · 4–5 min");
+    expect(timerLabel(1, "1 hour and 15 minutes", 4500)).toBe("Step 1 · 1 hr 15 min");
+    expect(timerLabel(1, "10-minute", 600)).toBe("Step 1 · 10 min");
+    expect(timerLabel(1, "1½ hours", 5400)).toBe("Step 1 · 1½ hr");
+  });
+  it("tells apart two chips with the same time in one step", () => {
+    expect(timerLabel(1, "3 minutes", 180, undefined, "2nd")).toBe("Step 1 · 3 min (2nd)");
   });
   it("sets a time written in words from its length", () => {
     expect(timerLabel(2, "half an hour", 1800)).toBe("Step 2 · 30 min");
