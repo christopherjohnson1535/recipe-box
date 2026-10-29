@@ -385,6 +385,16 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   keeps focus; at four dishes the unchosen cards dim and `describedBy` says why). The home grid's "Cook together" is
   `aria-disabled` rather than `disabled` for the same reason, and follows the order the recipes were tapped. A session is kept
   offline like a recipe page, one copy per `/cook?recipes=` query (`pageKey` in `components/offline/rules.ts`); the picker is not kept.
+  **Plan the evening** (#83): when `GET /api/import/capabilities` says AI is on, the toolbar has an `ArrowButton` (the
+  `ArrowLink` look on a button; dimmed when disabled). It opens a `CookPlanPanel` in the step area ("Suggested order" kicker,
+  title that takes focus, an optional `CookServeAt` time field, a `CookPlanSummary` deck line (a polite status; accent
+  `warn` when the first start is already past, with the soonest serve time), then a `CookPlanList` of
+  `CookPlanRow`s: the start time (the device's own clock style, `timeStyle: "short"`, so it matches the time field) or
+  "+25 min" in an accent label column, the dish mark, the step in display type and the AI's
+  note in small italics, as plain text). Rows arrive in a half-stagger (`.plan-row` in `motion.css`; still under reduced
+  motion). While it is open the footer's pills are "Keep my order" and "Use this order" (`CookPill short`: "Keep mine" / "Use
+  this" on a phone), and arrows, swipes and voice do not move the step underneath. Loading is `Pending`, a failure an error
+  `Alert` with "Try again". Offline the button is disabled with the reason on a line under the toolbar.
 - **Offline, error and not found**: plain `EmptyState` pages in the page width; the offline page lists the recipes kept
   on the device. An address no route matches is rendered by `app/not-found.tsx`, outside `(app)/layout.tsx`, so it brings its
   own shell: the same one `<header>` with the top band (`ui/DayBand`: date and season, no recipe count, no Sign out), then the

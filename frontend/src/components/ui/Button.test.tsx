@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { ArrowLink, Button, ButtonLink, HardLink } from "./Button";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { ArrowButton, ArrowLink, Button, ButtonLink, HardLink } from "./Button";
 
 describe("HardLink", () => {
   it("is a plain anchor (a full page load), as a button or as an inline link", () => {
@@ -79,5 +79,29 @@ describe("ArrowLink", () => {
     const arrow = link.querySelector("[aria-hidden]")!;
     expect(arrow.textContent).toBe("→");
     expect(arrow.className).toContain("pointer-fine:motion-safe:group-hover/arrow:translate-x-1");
+  });
+});
+
+describe("ArrowButton", () => {
+  it("looks like ArrowLink, is a 44px button, and dims when disabled", () => {
+    const onClick = vi.fn();
+    render(
+      <>
+        <ArrowButton onClick={onClick}>Plan</ArrowButton>
+        <ArrowButton disabled aria-describedby="why">
+          Later
+        </ArrowButton>
+      </>,
+    );
+    const plan = screen.getByRole("button", { name: "Plan" });
+    expect(plan.getAttribute("type")).toBe("button");
+    expect(plan.className).toContain("min-h-control");
+    expect(plan.className).toContain("italic");
+    fireEvent.click(plan);
+    expect(onClick).toHaveBeenCalledOnce();
+    const later = screen.getByRole("button", { name: "Later" }) as HTMLButtonElement;
+    expect(later.disabled).toBe(true);
+    expect(later.className).toContain("disabled:opacity-55");
+    expect(later.getAttribute("aria-describedby")).toBe("why");
   });
 });

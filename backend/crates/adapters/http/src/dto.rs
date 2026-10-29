@@ -743,3 +743,85 @@ mod tests {
         assert_eq!(dom.tags, api.tags);
     }
 }
+
+/// What to plan: the recipes of a cook-together session and, optionally, when to serve.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CookPlanRequest {
+    /// Two to four different recipe ids (a repeated id counts once).
+    #[schema(min_items = 2, max_items = 4)]
+    pub recipe_ids: Vec<Uuid>,
+    /// When everything should be on the table; RFC 3339 with an offset. Gives each step of a timed plan its `startAt`.
+    #[serde(default)]
+    pub serve_at: Option<DateTime<Utc>>,
+}
+
+/// Where a plan's order came from.
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum CookPlanSource {
+    /// The AI's suggestion, checked: every step once, each recipe in its own order, start times that never go back.
+    Ai,
+    /// Each dish in turn, one step at a time (the AI's plan did not add up, or there were too many steps to ask).
+    RoundRobin,
+}
+
+/// One step of a plan, in the order to do it.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CookPlanStep {
+    pub recipe_id: Uuid,
+    /// 0-based index into the recipe's `steps`.
+    pub step_index: u32,
+    /// Minutes after the start; `null` in a round-robin plan.
+    #[schema(required = true)]
+    pub start_offset_min: Option<i32>,
+    /// The clock time to start, when `serveAt` was given and the plan is timed.
+    #[schema(required = true)]
+    pub start_at: Option<DateTime<Utc>>,
+    /// A short tip from the AI (at most 200 characters, one line of plain text), or empty. Untrusted: show as text.
+    pub note: String,
+}
+
+/// A suggested order for a cook-together session: every step of every recipe exactly once.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CookPlan {
+    pub source: CookPlanSource,
+    /// Why the order is round-robin; `null` for an AI plan.
+    #[schema(required = true)]
+    pub reason: Option<String>,
+    /// Minutes from the first step until serving; `null` in a round-robin plan.
+    #[schema(required = true)]
+    pub total_minutes: Option<i32>,
+    /// The requested `serveAt`, or `null`.
+    #[schema(required = true)]
+    pub serve_at: Option<DateTime<Utc>>,
+    pub steps: Vec<CookPlanStep>,
+}
+
+impl From<domain::cook_plan::CookPlan> for CookPlan {
+    fn from(p: domain::cook_plan::CookPlan) -> Self {
+        Self {
+            source: match p.source {
+                domain::cook_plan::PlanSource::Ai => CookPlanSource::Ai,
+                domain::cook_plan::PlanSource::RoundRobin => CookPlanSource::RoundRobin,
+            },
+            reason: p.reason,
+            total_minutes: p.total_minutes,
+            serve_at: p.serve_at,
+            steps: p
+                .steps
+                .into_iter()
+                .map(|s| CookPlanStep {
+                    recipe_id: s.recipe_id,
+                    // At most MAX_PLAN_STEPS steps per recipe in an AI plan; MAX_LINES in a round-robin one.
+                    step_index: u32::try_from(s.step_index).unwrap_or(u32::MAX),
+                    start_offset_min: s.start_offset_min,
+                    start_at: s.start_at,
+                    note: s.note,
+                })
+                .collect(),
+        }
+    }
+}

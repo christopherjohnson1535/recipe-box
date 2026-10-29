@@ -56,11 +56,16 @@ impl Canned {
 
 /// A 200 reply whose only content is a `tool_use` block named `record_recipe` with `input`.
 pub fn tool_reply(input: Value) -> Canned {
+    named_tool_reply("record_recipe", input)
+}
+
+/// A 200 reply whose only content is a `tool_use` block named `tool` with `input`.
+pub fn named_tool_reply(tool: &str, input: Value) -> Canned {
     Canned {
         status: 200,
         body: json!({
             "id": "msg_test", "type": "message", "role": "assistant", "model": "test", "stop_reason": "tool_use",
-            "content": [{ "type": "tool_use", "id": "toolu_test", "name": "record_recipe", "input": input }],
+            "content": [{ "type": "tool_use", "id": "toolu_test", "name": tool, "input": input }],
         }),
         headers: vec![("request-id".into(), "req_test".into())],
         delay: Default::default(),

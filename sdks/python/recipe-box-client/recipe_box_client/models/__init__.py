@@ -6,6 +6,10 @@ from .ai_provider import AiProvider
 from .auth_providers import AuthProviders
 from .capabilities import Capabilities
 from .cook_log_entry import CookLogEntry
+from .cook_plan import CookPlan
+from .cook_plan_request import CookPlanRequest
+from .cook_plan_source import CookPlanSource
+from .cook_plan_step import CookPlanStep
 from .create_user_body import CreateUserBody
 from .create_user_body_role import CreateUserBodyRole
 from .error_body import ErrorBody
@@ -57,6 +61,10 @@ __all__ = (
     "AuthProviders",
     "Capabilities",
     "CookLogEntry",
+    "CookPlan",
+    "CookPlanRequest",
+    "CookPlanSource",
+    "CookPlanStep",
     "CreateUserBody",
     "CreateUserBodyRole",
     "ErrorBody",

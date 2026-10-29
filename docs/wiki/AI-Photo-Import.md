@@ -18,10 +18,14 @@ the API key" and your photos are kept so you can type the recipe in.
 - Everything comes back as a draft to check; nothing is saved until you press Save. The original photos stay with
   the recipe.
 - If the AI service is busy, Recipe Box tries once more, then tells you to try again in a minute.
+- **Plan the evening:** when you cook two to four dishes together, Claude can suggest an order so they are ready at
+  the same time (see [[Using-on-iPad]]). The suggestion is checked before you see it: if a step is missing or out of
+  order you get the alternating order instead, with a note saying so. Each member can ask for 10 plans in 10 minutes.
 
 ## Cost and privacy
 Photos are resized to at most 1568 px on the long edge before sending; a typical page costs roughly a cent or less. Photos and text go to the AI
-provider only when you import with AI. The key stays on the server and never reaches the browser.
+provider only when you import with AI, and the titles and steps of the dishes only when you tap **Plan the evening**
+(a plan is text only, well under a cent). The key stays on the server and never reaches the browser.
 See the [Claude vision docs](https://platform.claude.com/docs/en/build-with-claude/vision).
 
 ## iPhone and iPad photos (HEIC)

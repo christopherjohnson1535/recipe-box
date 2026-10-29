@@ -6,12 +6,15 @@ import {
   CookPill, CookPillLink, CookProgress, CookRail, CookRailRow, CookReorderList, CookStage, CookStepItem, CookStepText, CookTextButton, CookTick,
   CookSoundToggle, CookToolbar, CookTopBar, CookViewChoice, CookVoiceToggle,
 } from "@/components/ui/CookKit";
-import { ButtonLink } from "@/components/ui/Button";
+import { useOnline } from "@/components/offline/use-online";
+import { ArrowButton, ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Text } from "@/components/ui/Text";
 import { splitIngredient } from "@/lib/scale";
 import { timerLabel } from "@/lib/timers";
 import { clampStep, litIngredients, railOrder } from "./cook-logic";
+import { CookPlanner } from "./CookPlanner";
+import { planOrder } from "./cook-plan-logic";
 import { renderCookStep } from "./cook-step";
 import { bringNext, canMove, dishInitials, dishNames, firstOpen, interleave, move, nextOfDish, ordinal, type DishStep } from "./cook-together-logic";
 import { readCookTicks, readCookTogetherOrder, useCookTogetherOrder, useCookTogetherView, useDishTicks, type CookTogetherView } from "./cook-store";
@@ -19,6 +22,7 @@ import { useCookWake } from "./CookWake";
 import { useAnnounce, useStepKeys, useSwipe } from "./use-cook-controls";
 import { CookTimerRack } from "./timers/CookTimerRack";
 import { useCookTimers } from "./timers/use-cook-timers";
+import { useCookPlan } from "./use-cook-plan";
 import { useVoice } from "./use-voice";
 
 export type Dish = { id: string; title: string; ingredients: string[]; steps: string[] };
@@ -38,8 +42,12 @@ const sameStep = (a: DishStep, b: DishStep) => a.dish === b.dish && a.step === b
  * so they are shared with single-recipe cook mode. The current step is a (dish, step), not a position, so it stays the same
  * step when the order changes under it (a move here, another tab's move, an expired order). Render it with a `key` of the
  * dishes' ids: two sessions are two components.
+ *
+ * With `planning` (the server has an AI provider), "Plan the evening" asks for a suggested order (#83). It opens as a preview in
+ * the step area; "Use this order" replaces the order (still movable step by step, and "Reset order" still goes back to taking
+ * turns), "Keep my order" closes it. Offline the action stays, disabled, with the reason beside it.
  */
-export function CookTogether({ dishes }: { dishes: Dish[] }) {
+export function CookTogether({ dishes, planning = false }: { dishes: Dish[]; planning?: boolean }) {
   const ids = dishes.map((d) => d.id);
   const stepCounts = dishes.map((d) => d.steps.length);
   const marks = dishInitials(dishes.map((d) => d.title));
@@ -54,6 +62,11 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   );
   const wake = useCookWake();
   const toolbar = useRef<HTMLDivElement>(null);
+  const online = useOnline();
+  const planner = useCookPlan(ids);
+  const [serveAt, setServeAt] = useState("");
+  const planOpen = planner.state.status !== "closed";
+  const planAction = useRef<HTMLButtonElement>(null);
 
   // Once, after mount: open on the first step of the order not yet done (a reloaded Home Screen app picks up where the cook was).
   // Reads the store directly, so a later tick or another tab's write never moves the step.
@@ -90,7 +103,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
 
   const go = useCallback(
     (by: number) => {
-      if (view !== "one") return; // arrows, swipes and voice move through the one-step view only
+      if (view !== "one" || planOpen) return; // arrows, swipes and voice move through the one-step view only, not under the plan
       const to = clampStep(at + by, total);
       if (to === at) return;
       setCursor(order[to]);
@@ -98,7 +111,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
     },
     // describe only reads props
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, at, total, order, announce],
+    [view, planOpen, at, total, order, announce],
   );
   useStepKeys(go);
   const swipe = useSwipe(go);
@@ -183,6 +196,26 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const anyTicked = ticks.some((t) => t.ingredients.size > 0 || t.steps.size > 0);
   const roundRobin = interleave(stepCounts);
   const reordered = order.some((e, pos) => e.dish !== roundRobin[pos].dish || e.step !== roundRobin[pos].step);
+
+  // The suggested order, when it fits these dishes as they are now (a recipe edited since the page opened does not).
+  const suggested = planner.state.status === "ready" ? planOrder(planner.state.plan, ids, stepCounts) : null;
+  const planState =
+    planner.state.status === "ready" && !suggested
+      ? { status: "error" as const, message: "These recipes changed since this page opened. Close cooking mode and open it again to plan." }
+      : planner.state;
+  const closePlan = (why: string) => {
+    planner.close();
+    announce(why);
+    // The panel goes away; focus goes back to the action that opened it (or the toolbar while it is disabled).
+    requestAnimationFrame(() => (planAction.current && !planAction.current.disabled ? planAction.current : toolbar.current)?.focus());
+  };
+  const acceptPlan = () => {
+    if (!suggested) return;
+    setOrder(suggested);
+    const first = suggested[firstOpen(suggested, ticks.map((t) => t.steps))];
+    setCursor(first);
+    closePlan(`Using the suggested order. ${describe(first)}`);
+  };
 
   const current = order[at];
   const next = order[at + 1];
@@ -289,6 +322,18 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
       <CookProgress count={total} current={at} done={doneAt} />
       <CookToolbar ref={toolbar}>
         <CookViewChoice label="View" options={VIEWS} value={view} onChange={setView} />
+        {planning && (
+          <ArrowButton
+            ref={planAction}
+            disabled={!online || planOpen}
+            aria-describedby={online ? undefined : "cook-plan-offline"}
+            aria-expanded={planOpen}
+            aria-controls={planOpen ? "cook-plan" : undefined}
+            onClick={planner.request}
+          >
+            Plan the evening
+          </ArrowButton>
+        )}
         <div className="flex flex-wrap items-center gap-x-2">
           {reordered && (
             <CookTextButton
@@ -315,6 +360,13 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
           {wake.status}
         </div>
         {wake.note}
+        {planning && !online && (
+          <div className="order-last w-full">
+            <Text variant="small" id="cook-plan-offline">
+              You’re offline. Planning the evening needs the server; your order and ticks still work.
+            </Text>
+          </div>
+        )}
       </CookToolbar>
       <CookColumns
         wide={view === "dishes"}
@@ -344,12 +396,47 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
             </CookRail>
           </CookDishTabs>
         }
-        step={view === "one" ? oneStep : view === "all" ? allSteps : byDish}
+        step={
+          planState.status !== "closed" ? (
+            <div id="cook-plan">
+              <CookPlanner
+                state={planState}
+                ids={ids}
+                names={names}
+                mark={(dish) => mark(dish, "md")}
+                stepText={(dish, step) => dishes[dish].steps[step]}
+                onRetry={planner.request}
+                serveAt={serveAt}
+                onServeAt={setServeAt}
+              />
+            </div>
+          ) : view === "one" ? (
+            oneStep
+          ) : view === "all" ? (
+            allSteps
+          ) : (
+            byDish
+          )
+        }
         timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
       />
       <CookLive>{live.text}</CookLive>
-      <CookFooter next={next ? `${nameOf(next.dish)}: ${textOf(next)}` : undefined} summary={view === "one" ? undefined : `${doneCount} of ${total} steps done`}>
-        {view !== "one" ? (
+      <CookFooter
+        next={next ? `${nameOf(next.dish)}: ${textOf(next)}` : undefined}
+        summary={planOpen ? "Your order stays until you choose this one." : view === "one" ? undefined : `${doneCount} of ${total} steps done`}
+      >
+        {planOpen ? (
+          <>
+            <CookPill variant="secondary" short="Keep mine" onClick={() => closePlan("Kept your order")}>
+              Keep my order
+            </CookPill>
+            {suggested && (
+              <CookPill short="Use this" onClick={acceptPlan}>
+                Use this order
+              </CookPill>
+            )}
+          </>
+        ) : view !== "one" ? (
           <CookPillLink href={finishHref}>Finish</CookPillLink>
         ) : (
           <>

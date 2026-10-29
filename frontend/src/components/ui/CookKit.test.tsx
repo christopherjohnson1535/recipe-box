@@ -17,6 +17,7 @@ import {
   CookTimer,
   CookTimers,
   CookViewChoice,
+  CookPill,
 } from "./CookKit";
 
 afterEach(() => {
@@ -480,5 +481,16 @@ describe("ToastRegion lifted", () => {
     const cls = screen.getByRole("status").className;
     expect(cls).toContain("+11rem");
     expect(cls).toContain("sm:pb-[calc(env(safe-area-inset-bottom)+5.5rem)]");
+  });
+});
+
+describe("CookPill short", () => {
+  it("shows the short label on a phone and keeps the full one as the name", () => {
+    render(<CookPill short="Use this">Use this order</CookPill>);
+    const pill = screen.getByRole("button", { name: "Use this order" });
+    const [phone, wide] = Array.from(pill.children);
+    expect(phone.textContent).toBe("Use this");
+    expect(phone.className).toBe("sm:hidden");
+    expect(wide.className).toBe("max-sm:hidden");
   });
 });

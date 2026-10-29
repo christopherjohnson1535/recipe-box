@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use domain::{
     AiProvider, DomainError, DomainResult, Image, MAX_PHOTOS, MAX_TEXT_INPUT_CHARS, MIN_PAGE_CHARS,
     PAGE_MAX_BYTES, PhotoMode, RecipeDraft, SourceType,
+    cook_plan::{PlanDish, RawPlan},
     source::{cleaned, normalize_url, shown_url},
     url::Url,
     uuid::Uuid,
@@ -386,6 +387,10 @@ impl RecipeExtractor for NoneExtractor {
     async fn extract_text(&self, _: &str) -> DomainResult<RecipeDraft> {
         Err(DomainError::AiDisabled)
     }
+
+    async fn plan_cook(&self, _: &[PlanDish]) -> DomainResult<RawPlan> {
+        Err(DomainError::AiDisabled)
+    }
 }
 
 #[cfg(test)]
@@ -436,6 +441,10 @@ mod tests {
         ));
         assert!(matches!(
             x.extract_images(&[], PhotoMode::Dish).await,
+            Err(DomainError::AiDisabled)
+        ));
+        assert!(matches!(
+            x.plan_cook(&[]).await,
             Err(DomainError::AiDisabled)
         ));
     }

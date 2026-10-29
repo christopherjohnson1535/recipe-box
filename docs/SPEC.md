@@ -179,6 +179,7 @@ Anything else needs a one-line reason in the agent's report.
 | POST `/api/recipes`, GET/PUT/DELETE `/api/recipes/:id`, POST `/api/recipes/:id/restore` | s | REC-1/2 | done |
 | GET/POST `/api/recipes/:id/cook-log`, DELETE `/api/recipes/:id/cook-log/:entryId` | s | REC-6 | #23 |
 | PUT/DELETE `/api/recipes/:id/favourite` | s | REC-5 | #22 |
+| POST `/api/cook/plan` `{recipeIds, serveAt?}` → `CookPlan` | s | KIT-7 | #83 (needs AI; round-robin fallback) |
 | GET `/api/tags` → `[{name, count}]` | s | FND-3 | done |
 | POST `/api/media` (multipart `file`) → image | s | PHO-1 | done (re-encode, resize) |
 | GET `/media/:file` | s | — | done |

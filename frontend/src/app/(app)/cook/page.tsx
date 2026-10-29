@@ -17,7 +17,7 @@ import type { SearchParams } from "@/lib/nav";
 import { serverApi } from "@/lib/server-api";
 
 // cache(): generateMetadata and the page share one load per request. The key is the ids, comma-joined.
-const load = cache(async (key: string): Promise<{ recipes: Recipe[]; others: RecipeSummary[]; missing: number } | { error: unknown }> => {
+const load = cache(async (key: string): Promise<{ recipes: Recipe[]; others: RecipeSummary[]; missing: number; planning: boolean } | { error: unknown }> => {
   const ids = key ? key.split(",") : [];
   try {
     const api = await serverApi();
@@ -34,7 +34,9 @@ const load = cache(async (key: string): Promise<{ recipes: Recipe[]; others: Rec
     ).filter((r) => r !== null);
     // Only the picker needs the list: the first 200 recipes (the API's page limit); the picker's search reaches the rest.
     const others = found.length < 2 ? (await api.listRecipes({ sort: "title", limit: 200 })).items : [];
-    return { recipes: found, others, missing: ids.length - found.length };
+    // "Plan the evening" needs an AI provider (#83); without one, or if the server can't say, the action is not offered.
+    const planning = found.length >= 2 && (await api.importCapabilities().catch(() => null))?.ai === true;
+    return { recipes: found, others, missing: ids.length - found.length, planning };
   } catch (e) {
     return { error: e };
   }
@@ -50,7 +52,7 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
 export default async function CookTogetherPage({ searchParams }: { searchParams: SearchParams }) {
   const loaded = await load(await keyOf(searchParams));
   if ("error" in loaded) return <ServerError error={loaded.error} />;
-  const { recipes, others, missing } = loaded;
+  const { recipes, others, missing, planning } = loaded;
 
   if (recipes.length >= 2) {
     return (
@@ -61,6 +63,7 @@ export default async function CookTogetherPage({ searchParams }: { searchParams:
         {/* Keyed by the session: a different set of recipes is a different cook, with nothing carried over (step, rail tab, timers). */}
         <CookTogether
           key={recipes.map((r) => r.id).join(",")}
+          planning={planning}
           dishes={recipes.map((r) => ({ id: r.id, title: r.title, ingredients: r.ingredients.map((i) => i.text), steps: r.steps.map((s) => s.text) }))}
         />
       </>
