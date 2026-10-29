@@ -16,7 +16,7 @@ import { SelectableGrid } from "@/components/groceries/SelectableGrid";
 import { NoMatches } from "@/components/search/ResultSummary";
 import { SearchControls } from "@/components/search/SearchControls";
 import { homeHref, parseFavourite, parseSort, resultSummary } from "@/components/search/url";
-import { FavouritesChip } from "@/components/ui/FavouriteKit";
+import { FavouritesChip, FilterGroups } from "@/components/ui/FavouriteKit";
 import { ServerError } from "@/components/ServerError";
 import { FavouriteStar } from "@/components/favourites/FavouriteStar";
 import { dayKey } from "@/lib/local-day";
@@ -26,35 +26,40 @@ import { serverApi } from "@/lib/server-api";
 export const metadata: Metadata = { title: "Recipes" };
 
 /**
- * The filter row: "Favourites" (the reader's own; it combines with a tag and the search), then the tag chips, each with
- * its spot icon where the tag maps to one. "All" clears the tag, not the favourites filter.
+ * The filters: the "Favourites" toggle (the reader's own; it combines with a tag and the search), set apart, then the tag
+ * chips, each with its spot icon where the tag maps to one. "All" means all tags; it leaves the favourites toggle as it
+ * is. The counts are household-wide, so they are left out while the toggle is on rather than overstate.
  */
 function tagChips(tags: { name: string; count: number }[], q: string, tag: string, sort: ReturnType<typeof parseSort>, favourite: boolean) {
-  const current = [favourite ? "Favourites" : "", tag ? `${tag} ${tags.find((t) => t.name === tag)?.count ?? ""}`.trim() : ""].filter(Boolean).join(" · ");
+  const count = (name: string) => (favourite ? undefined : tags.find((t) => t.name === name)?.count);
+  const current = tag ? `${tag} ${count(tag) ?? ""}`.trim() : "All";
+  const toggle = (
+    <FavouritesChip href={homeHref({ q, tag, sort, favourite: !favourite })} selected={favourite}>
+      Favourites
+    </FavouritesChip>
+  );
+  if (tags.length === 0) return toggle;
   return (
-    <ChipRow key={`${tag}:${favourite}`} label="Filter recipes" summary="Showing" current={current || "All"}>
-      <li>
-        <FavouritesChip href={homeHref({ q, tag, sort, favourite: !favourite })} selected={favourite}>
-          Favourites
-        </FavouritesChip>
-      </li>
-      <li>
-        <Chip href={homeHref({ q, sort, favourite })} selected={!tag}>
-          All
-        </Chip>
-      </li>
-      {tags.map((t) => {
-        const icon = iconForTag(t.name);
-        return (
-          <li key={t.name}>
-            <Chip href={homeHref({ q, tag: t.name === tag ? undefined : t.name, sort, favourite })} selected={t.name === tag} count={t.count}>
-              {icon !== "default" && <SpotIcon name={icon} size={18} />}
-              {t.name}
-            </Chip>
-          </li>
-        );
-      })}
-    </ChipRow>
+    <FilterGroups favourites={toggle}>
+      <ChipRow key={tag} label="Filter by tag" current={current}>
+        <li>
+          <Chip href={homeHref({ q, sort, favourite })} selected={!tag}>
+            All
+          </Chip>
+        </li>
+        {tags.map((t) => {
+          const icon = iconForTag(t.name);
+          return (
+            <li key={t.name}>
+              <Chip href={homeHref({ q, tag: t.name === tag ? undefined : t.name, sort, favourite })} selected={t.name === tag} count={count(t.name)}>
+                {icon !== "default" && <SpotIcon name={icon} size={18} />}
+                {t.name}
+              </Chip>
+            </li>
+          );
+        })}
+      </ChipRow>
+    </FilterGroups>
   );
 }
 

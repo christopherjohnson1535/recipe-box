@@ -12,7 +12,7 @@ export const OFFLINE_URL = "/offline";
 export const LIMITS = {
   pages: 100, // a recipe page and its cooking mode count separately; favourites (up to FAVOURITES_KEPT) are kept as well
   api: 30,
-  media: 300, // a recipe has its photos plus their display renditions
+  media: 400, // a recipe has its photos plus their display renditions; 30 favourites of up to 6 photos each fit
   maxAgeSeconds: 30 * 24 * 60 * 60,
   networkTimeoutSeconds: 5,
 } as const;

@@ -2,7 +2,7 @@
 // opened first. The service worker keeps a page it is asked to fetch with CACHE_URLS (and, with it, the page's photos and
 // cooking mode), so this only decides which pages to ask for and when. Production builds only, like the worker.
 import { api as browserApi } from "@/lib/api";
-import { CACHES, FAVOURITES_KEPT } from "@/components/offline/rules";
+import { CACHES, FAVOURITE_MARKER, FAVOURITES_KEPT, RECIPE_READ_PAGE } from "@/components/offline/rules";
 
 /** How many pages the worker is asked for at once: more would starve the page the reader is looking at. */
 const BATCH = 4;
@@ -46,17 +46,78 @@ export async function notKept(paths: string[], cacheStorage: Pick<CacheStorage, 
 }
 
 /**
+ * The kept recipe pages whose favourite mark no longer matches `favourites` (the star changed on another device), so
+ * `/offline` would list them under the wrong heading. Only reads an `rb-pages` cache that already exists (never creates
+ * one: see `notKept`). Favourites beyond the newest FAVOURITES_KEPT are not in `favourites`, so a marked page is only
+ * stale when the list was complete (`complete`).
+ */
+export async function staleMarks(
+  favourites: Set<string>,
+  complete: boolean,
+  cacheStorage: Pick<CacheStorage, "has" | "open"> | undefined = globalThis.caches,
+): Promise<string[]> {
+  if (!cacheStorage || !(await cacheStorage.has(CACHES.pages))) return [];
+  const cache = await cacheStorage.open(CACHES.pages);
+  const stale: string[] = [];
+  for (const req of await cache.keys()) {
+    const path = new URL(req.url).pathname;
+    if (!RECIPE_READ_PAGE.test(path)) continue;
+    const marked = ((await (await cache.match(req, { ignoreVary: true }))?.text()) ?? "").includes(FAVOURITE_MARKER);
+    if (favourites.has(path) ? !marked : marked && complete) stale.push(path);
+  }
+  return stale;
+}
+
+/** Set for the rest of the session once the device ran out of room, so later page loads don't try again. */
+const QUOTA_KEY = "rb-keep-favourites-full";
+
+function storageFull(): boolean {
+  try {
+    return sessionStorage.getItem(QUOTA_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberFull() {
+  try {
+    sessionStorage.setItem(QUOTA_KEY, "1");
+  } catch {
+    // storage blocked: the next page load tries again
+  }
+}
+
+/** Whether the origin has used nearly all the storage the browser allows it (unknown counts as not). */
+async function nearlyFull(): Promise<boolean> {
+  try {
+    const { usage, quota } = (await navigator.storage?.estimate?.()) ?? {};
+    return usage !== undefined && quota !== undefined && quota > 0 && usage / quota > 0.9;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Keeps the reader's newest favourites (up to FAVOURITES_KEPT) on this device, a few pages at a time, skipping the ones
- * already kept. Best effort: offline, signed out or without a worker it does nothing and never throws.
+ * already kept with the right mark, and re-keeps kept pages whose star changed on another device. Best effort: offline,
+ * signed out or without a worker it does nothing and never throws. A device out of room is not asked again this session:
+ * the worker's write fails out of the page's sight, so "out of room" is storage nearly full, or a whole batch that did not
+ * land while online.
  */
 export async function keepFavourites(api: Api = browserApi): Promise<void> {
   try {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || storageFull()) return;
     const sw = await worker();
     if (!sw) return;
-    const { items } = await api.listRecipes({ favourite: true, limit: FAVOURITES_KEPT });
-    const missing = await notKept(items.map((r) => `/recipes/${r.id}`));
-    for (let i = 0; i < missing.length; i += BATCH) await keep(sw, missing.slice(i, i + BATCH));
+    if (await nearlyFull()) return rememberFull();
+    const { items, total } = await api.listRecipes({ favourite: true, limit: FAVOURITES_KEPT });
+    const paths = items.map((r) => `/recipes/${r.id}`);
+    const todo = [...new Set([...(await notKept(paths)), ...(await staleMarks(new Set(paths), total <= items.length))])];
+    for (let i = 0; i < todo.length; i += BATCH) {
+      const batch = todo.slice(i, i + BATCH);
+      await keep(sw, batch);
+      if (navigator.onLine && (await notKept(batch)).length === batch.length) return rememberFull();
+    }
   } catch {
     // offline in the meantime, storage blocked, signed out: the next visit tries again
   }

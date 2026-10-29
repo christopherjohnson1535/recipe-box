@@ -15,15 +15,15 @@ export async function hydrated(locator: Locator) {
     .toBe(true);
 }
 
-/** Below 640 px (Tailwind `sm`) the filter row (Favourites and tags) sits in a collapsed "Showing:" disclosure; from there up it is already showing. */
+/** Below 640 px (Tailwind `sm`) the tag filter sits in a collapsed "Tag:" disclosure; from there up it is already showing. */
 export async function openTagFilter(page: Page) {
   const width = page.viewportSize()?.width ?? Number.POSITIVE_INFINITY;
   if (width < 640) {
-    const summary = page.locator("summary", { hasText: "Showing:" });
+    const summary = page.locator("summary", { hasText: "Tag:" });
     await expect(summary).toBeVisible();
     await summary.click();
   }
-  await expect(page.getByRole("navigation", { name: "Filter recipes" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Filter by tag" })).toBeVisible();
 }
 
 export const fixtureUrl = (name: string) => `${FIXTURE_ORIGIN}/${name}`;

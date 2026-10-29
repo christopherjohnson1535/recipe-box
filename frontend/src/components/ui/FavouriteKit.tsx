@@ -70,8 +70,10 @@ export function FavouriteToggle({ on, pop, ...rest }: ToggleProps) {
 }
 
 /**
- * The "Favourites" filter in the tag row: a chip-like link with a star, selected (accent underline, filled star) while
- * the list shows only the reader's favourites. A link, so it works before scripts load and keeps the search in the URL.
+ * The "Favourites" filter: a toggle set apart from the tag chips (a pill with a hairline outline, then a hairline
+ * divider before the tags), so it never reads as one of them. On, it fills with the panel colour, its outline turns
+ * ink and the star fills; the tag row beside it keeps its own single selection ("All" means all tags). A link (with
+ * `aria-current` while on), so it works before scripts load and keeps the search in the URL.
  */
 export function FavouritesChip({ href, selected, children }: { href: string; selected: boolean; children: ReactNode }) {
   return (
@@ -80,12 +82,22 @@ export function FavouritesChip({ href, selected, children }: { href: string; sel
       aria-current={selected ? "true" : undefined}
       className={
         selected
-          ? "label-quiet inline-flex min-h-control items-center gap-1.5 border-b-2 border-(--chip-underline-selected) px-1 font-semibold text-(--chip-fg-selected) transition-[border-color,color] duration-150 ease-out"
-          : "label-quiet inline-flex min-h-control items-center gap-1.5 border-b-2 border-transparent px-1 text-(--chip-fg) transition-[border-color,color] duration-150 ease-out hover:border-(--chip-underline-hover) hover:text-(--chip-fg-hover)"
+          ? "label-quiet inline-flex min-h-control items-center gap-2 rounded-full border border-(--color-ink) bg-(--panel-bg) px-4 font-semibold text-(--chip-fg-selected) transition-[border-color,background-color,color] duration-150 ease-out"
+          : "label-quiet inline-flex min-h-control items-center gap-2 rounded-full border border-(--color-rule-strong) px-4 text-(--chip-fg) transition-[border-color,background-color,color] duration-150 ease-out pointer-fine:hover:border-(--color-ink) pointer-fine:hover:text-(--chip-fg-hover)"
       }
     >
       <Star on={selected} />
       {children}
     </Link>
+  );
+}
+
+/** The Favourites toggle and the tag chips side by side, with a hairline between them (stacked on a phone). */
+export function FilterGroups({ favourites, children }: { favourites: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+      <div className="shrink-0 sm:border-r sm:border-(--rule-hair) sm:pr-5">{favourites}</div>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
   );
 }

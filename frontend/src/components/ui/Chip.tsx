@@ -20,18 +20,7 @@ export function Badge({ children, icon }: { children: ReactNode; /** A `SpotIcon
  * the chips sit behind a disclosure whose summary names the current choice (`current`, e.g. "Baking 2"), so a long
  * tag list does not push the recipes off the first screen; the rest of the time they are always shown.
  */
-export function ChipRow({
-  label,
-  current,
-  summary = "Tag",
-  children,
-}: {
-  label: string;
-  current: string;
-  /** The word before the current choice in the phone summary ("Tag: Baking 2"). */
-  summary?: string;
-  children: ReactNode;
-}) {
+export function ChipRow({ label, current, children }: { label: string; current: string; children: ReactNode }) {
   return (
     <>
       <nav aria-label={label} className="max-sm:hidden">
@@ -40,7 +29,7 @@ export function ChipRow({
       <details className="group sm:hidden">
         <summary className="label-quiet flex min-h-control cursor-pointer list-none items-center justify-between border-b border-(--rule-hair) [&::-webkit-details-marker]:hidden">
           <span>
-            {summary}: <span className="font-semibold text-(--chip-fg-selected)">{current}</span>
+            Tag: <span className="font-semibold text-(--chip-fg-selected)">{current}</span>
           </span>
           <span aria-hidden="true" className="px-1 text-body">
             <span className="group-open:hidden">+</span>

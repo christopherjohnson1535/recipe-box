@@ -1,4 +1,4 @@
-import { expect, hydrated, openTagFilter, test, unique } from "../../support/fixtures.ts";
+import { expect, hydrated, test, unique } from "../../support/fixtures.ts";
 
 // REC-5: each member stars recipes for themselves, and the Favourites filter works with search.
 
@@ -30,8 +30,7 @@ test("stars are per member and the Favourites filter combines with search", asyn
 
   // Favourites + "lentil": only this member's lentil favourite.
   await page.goto(`/?q=lentil+${word}`);
-  await openTagFilter(page);
-  await page.getByRole("navigation", { name: "Filter recipes" }).getByRole("link", { name: "Favourites" }).click();
+  await page.getByRole("link", { name: "Favourites" }).click();
   await expect(page).toHaveURL(/favourite=true/);
   const results = page.getByRole("region", { name: /matching recipes/ });
   await expect(results.getByRole("heading", { level: 2 })).toHaveText([soup.title]);

@@ -26,7 +26,7 @@ test("search, tag filter and sort", async ({ memberPage: page, member }) => {
   // tag filter (shared household: filter by this test's own tag)
   await page.goto(`/?q=${word}`);
   await openTagFilter(page);
-  await page.getByRole("navigation", { name: "Filter recipes" }).getByRole("link", { name: new RegExp(`^${tag}`) }).click();
+  await page.getByRole("navigation", { name: "Filter by tag" }).getByRole("link", { name: new RegExp(`^${tag}`) }).click();
   await expect(page).toHaveURL(new RegExp(`tag=${tag}`));
   await expect(titles).toHaveCount(3);
   await expect(page.getByText(`Delta ${word}`)).toHaveCount(0);

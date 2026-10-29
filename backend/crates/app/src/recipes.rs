@@ -108,13 +108,18 @@ impl RecipeService {
             })
             .await?;
         let plate = self.plate().await?;
-        let ids: Vec<Uuid> = page.items.iter().map(|r| r.id).collect();
-        let starred = self.starred(viewer, &ids).await?;
+        // Filtered to favourites, every row is starred: no need to ask.
+        let starred = if favourites {
+            HashSet::new()
+        } else {
+            let ids: Vec<Uuid> = page.items.iter().map(|r| r.id).collect();
+            self.starred(viewer, &ids).await?
+        };
         for r in &mut page.items {
             if !plate {
                 r.image_display_file = None;
             }
-            r.is_favourite = starred.contains(&r.id);
+            r.is_favourite = favourites || starred.contains(&r.id);
         }
         Ok(page)
     }

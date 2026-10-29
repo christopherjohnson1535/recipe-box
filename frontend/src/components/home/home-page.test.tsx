@@ -169,7 +169,7 @@ describe("home page", () => {
   it("shows a spot icon on a tag chip only where the tag maps to one", async () => {
     serve([...others, withPhoto], [{ name: "soups", count: 1 }, { name: "party", count: 2 }]);
     await home();
-    const nav = screen.getAllByRole("navigation", { name: "Filter recipes" })[0];
+    const nav = screen.getAllByRole("navigation", { name: "Filter by tag" })[0];
     expect(within(nav).getByRole("link", { name: /soups/ }).querySelector("svg[data-spot='soups']")).toBeTruthy();
     expect(within(nav).getByRole("link", { name: /party/ }).querySelector("svg")).toBeNull();
   });
@@ -189,11 +189,17 @@ describe("home page", () => {
     // Filtered: no featured spread, the count says whose recipes these are.
     expect(screen.getByRole("heading", { level: 1, name: "Recipes" })).toBeTruthy();
     expect(screen.getByText("1 of your favourites matches “lentil”")).toBeTruthy();
-    const nav = screen.getAllByRole("navigation", { name: "Filter recipes" })[0];
-    const chip = within(nav).getByRole("link", { name: "Favourites" });
-    expect(chip.getAttribute("aria-current")).toBe("true");
-    expect(chip.getAttribute("href")).toBe("/?q=lentil"); // tapping it again turns the filter off
-    expect(within(nav).getByRole("link", { name: /soups/ }).getAttribute("href")).toBe("/?q=lentil&tag=soups&favourite=true");
+    const toggle = screen.getByRole("link", { name: "Favourites" });
+    expect(toggle.getAttribute("aria-current")).toBe("true");
+    expect(toggle.getAttribute("href")).toBe("/?q=lentil"); // tapping it again turns the filter off
+    const nav = screen.getAllByRole("navigation", { name: "Filter by tag" })[0];
+    expect(within(nav).queryByRole("link", { name: "Favourites" })).toBeNull();
+    // Only "All" is selected among the tags: the toggle is not one of them.
+    expect(within(nav).getAllByRole("link").filter((l) => l.getAttribute("aria-current") === "true").map((l) => l.textContent)).toEqual(["All"]);
+    // Household-wide counts would overstate while only favourites show, so they are left out.
+    const soups = within(nav).getByRole("link", { name: /soups/ });
+    expect(soups.getAttribute("href")).toBe("/?q=lentil&tag=soups&favourite=true");
+    expect(soups.textContent).toBe("soups");
     expect(screen.getByRole("button", { name: "Favourite: Lentil soup" }).getAttribute("aria-pressed")).toBe("true");
   });
 

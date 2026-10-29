@@ -104,27 +104,48 @@ describe("FavouriteStar", () => {
   });
 });
 
-/** A fake service worker that answers CACHE_URLS on the message port, recording what it was asked to keep. */
-function fakeWorker() {
+const ORIGIN = "http://localhost:3000";
+const STAR = '<meta name="rb-favourite" content="1">';
+
+/**
+ * A fake `rb-pages` cache (path -> page HTML) behind `caches`, and a fake service worker that answers CACHE_URLS on the
+ * message port: it records what it was asked for and, unless `full`, keeps each page with the star mark `starred` says.
+ */
+function fakeDevice({ kept = {} as Record<string, string>, starred = new Set<string>(), full = false } = {}) {
+  const pages = new Map(Object.entries(kept));
+  let exists = pages.size > 0;
+  vi.stubGlobal("caches", {
+    has: async (name: string) => name === "rb-pages" && exists,
+    match: async (path: string, o: { cacheName: string }) => (o.cacheName === "rb-pages" && pages.has(path) ? new Response(pages.get(path)) : undefined),
+    open: async () => ({
+      keys: async () => [...pages.keys()].map((p) => ({ url: ORIGIN + p })),
+      match: async (req: { url: string }) => new Response(pages.get(new URL(req.url).pathname)),
+    }),
+  });
   const asked: string[][] = [];
   const active = {
     postMessage: (msg: { payload: { urlsToCache: string[] } }, ports: MessagePort[]) => {
       asked.push(msg.payload.urlsToCache);
+      if (!full) {
+        exists = true;
+        for (const p of msg.payload.urlsToCache) pages.set(p, `<title>x</title>${starred.has(p) ? STAR : ""}`);
+      }
       ports[0].postMessage(true);
     },
   };
   Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { ready: Promise.resolve({ active }) } });
   return asked;
 }
+const fakeWorker = () => fakeDevice();
 
+/** Recipe ids as the kept-page pattern wants them (uuids). */
+const U = { a: "0f8e2b4c-1a2b-4c3d-8e9f-0000000000a1", b: "0f8e2b4c-1a2b-4c3d-8e9f-0000000000b2", c: "0f8e2b4c-1a2b-4c3d-8e9f-0000000000c3", old: "0f8e2b4c-1a2b-4c3d-8e9f-000000000001" };
 const page = (ids: string[]) => ({ items: ids.map((id) => ({ id })), total: ids.length }) as never;
 
 describe("keepFavourites", () => {
   it("asks the worker for the favourites the device has not kept, four at a time", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    const asked = fakeWorker();
-    const kept = new Set(["/recipes/b"]);
-    vi.stubGlobal("caches", { match: async (path: string, o: { cacheName: string }) => (o.cacheName === "rb-pages" && kept.has(path) ? {} : undefined) });
+    const asked = fakeDevice({ kept: { "/recipes/b": STAR } });
     const listRecipes = vi.fn(async () => page(["a", "b", "c", "d", "e", "f"]));
     await keepFavourites({ listRecipes });
     expect(listRecipes).toHaveBeenCalledWith({ favourite: true, limit: 30 });
@@ -153,13 +174,48 @@ describe("keepFavourites", () => {
   it("after a change keeps a newly starred page, and re-keeps an unstarred one only if it was kept", async () => {
     const { rekeep } = await import("./keep-favourites");
     vi.stubEnv("NODE_ENV", "production");
-    const asked = fakeWorker();
-    const kept = new Set(["/recipes/old"]);
-    vi.stubGlobal("caches", { match: async (path: string, o: { cacheName: string }) => (o.cacheName === "rb-pages" && kept.has(path) ? {} : undefined) });
+    const asked = fakeDevice({ kept: { "/recipes/old": STAR } });
     await rekeep("new", true);
     await rekeep("old", false);
     await rekeep("never", false);
     expect(asked).toEqual([["/recipes/new"], ["/recipes/old"]]);
+  });
+
+  it("re-keeps kept pages whose star changed on another device", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const asked = fakeDevice({
+      kept: { [`/recipes/${U.a}`]: "<title>a</title>", [`/recipes/${U.b}`]: `<title>b</title>${STAR}`, [`/recipes/${U.c}`]: `<title>c</title>${STAR}` },
+      starred: new Set([`/recipes/${U.a}`, `/recipes/${U.c}`]),
+    });
+    // a was starred elsewhere (kept without the mark), b unstarred elsewhere (kept with it), c is right as it is.
+    await keepFavourites({ listRecipes: async () => page([U.a, U.c]) });
+    expect(asked).toEqual([[`/recipes/${U.a}`, `/recipes/${U.b}`]]);
+  });
+
+  it("leaves a marked page alone when the favourites list was cut at the limit", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const asked = fakeDevice({ kept: { [`/recipes/${U.old}`]: `<title>o</title>${STAR}`, [`/recipes/${U.a}`]: `<title>a</title>${STAR}` } });
+    await keepFavourites({ listRecipes: async () => ({ items: [{ id: U.a }], total: 31 }) as never });
+    expect(asked).toEqual([]);
+  });
+
+  it("stops for the session once the device is out of room", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    sessionStorage.clear();
+    const asked = fakeDevice({ full: true });
+    const listRecipes = vi.fn(async () => page(["a", "b", "c", "d", "e", "f"]));
+    await keepFavourites({ listRecipes });
+    expect(asked).toEqual([["/recipes/a", "/recipes/b", "/recipes/c", "/recipes/d"]]); // the first batch didn't land
+    await keepFavourites({ listRecipes });
+    expect(listRecipes).toHaveBeenCalledTimes(1);
+    sessionStorage.clear();
+
+    // Storage that the browser says is nearly used up: nothing is asked for at all.
+    Object.defineProperty(navigator, "storage", { configurable: true, value: { estimate: async () => ({ usage: 95, quota: 100 }) } });
+    await keepFavourites({ listRecipes });
+    expect(listRecipes).toHaveBeenCalledTimes(1);
+    delete (navigator as { storage?: unknown }).storage;
+    sessionStorage.clear();
   });
 
   it("treats every page as missing without Cache Storage", async () => {
@@ -169,7 +225,6 @@ describe("keepFavourites", () => {
   it("runs once when the signed-in layout mounts", async () => {
     vi.stubEnv("NODE_ENV", "production");
     fakeWorker();
-    vi.stubGlobal("caches", { match: async () => undefined });
     const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ items: [], total: 0 }), { headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchSpy);
     await act(async () => void render(<KeepFavourites />));

@@ -273,9 +273,11 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
   - Favourites (#22): after the app loads, the reader's 30 newest favourites are asked for with `CACHE_URLS` (four at a
     time, skipping pages already kept), so they read offline without being opened first, with their photos and cooking
     mode; a page whose star changes is fetched again so its kept copy shows the star as it is. A starred page carries a
-    second marker (`rb-favourite`) and `/offline` lists those first. Starring needs the server: offline the star is off,
+    second marker (`rb-favourite`) and `/offline` lists those first; a kept page whose mark no longer matches (starred or
+    unstarred on another device) is fetched again. A device out of room (storage over 90% used, or a batch that did not
+    land) is not asked again for the rest of the session. Starring needs the server: offline the star is off,
     with the reason, and nothing is queued.
-  - Caps: 100 pages, 30 API responses, 300 photos, 30 days since last use, purge on quota error.
+  - Caps: 100 pages, 30 API responses, 400 photos, 30 days since last use, purge on quota error.
   - Signed out never comes from cache: a GET answered 401, a page navigation answered with a redirect (the sign-in
     gate, `/setup`) or a redirect to `/login` wipes the `rb-*` caches (the worker does not see POSTs, so a wrong
     password does not); Sign out and a successful sign-in wipe them too; `/login`, `/setup`, lists, search and

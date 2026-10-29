@@ -269,8 +269,10 @@ Controls and states:
   link; named "Favourite: <title>", state in `aria-pressed`; mouse-only hover outlines it in the accent), `FavouriteToggle`
   ("Favourite" as a quiet label with the star before it, 44px, in the recipe opener's actions after Edit and on the
   featured recipe after Read the recipe; the word never changes, the star and `aria-pressed` carry the state) and
-  `FavouritesChip` (the first chip of the filter row, "Favourites" with a star, the chip's accent underline when on; the row
-  is now labelled "Filter recipes" and its phone summary names both, "Favourites · soups 3"). The app side is
+  `FavouritesChip` + `FilterGroups` ("Favourites" as a toggle set apart from the tag chips: a pill with a `rule-strong`
+  outline and a hairline divider before the tags (above them on a phone, outside the folded Tag row); on, it fills with
+  `--panel-bg`, the outline turns ink and the star fills; the tag row keeps its own single selection, "All" meaning all
+  tags, and drops its household-wide counts while the toggle is on). The app side is
   `components/favourites/` (`FavouriteStar`: turns at once and rolls back with a spoken reason on failure; offline it is
   dimmed and off, with the reason tied by `aria-describedby` (read, not shown: the offline banner already says it); `keep-favourites.ts` + `KeepFavourites` keep favourites for offline).
 - Made-it log (#23), `ui/CookLogKit.tsx`: `CookLogHeader` ("Made it" in `text-title` over a thin double rule, the count as a quiet label and the **Made it** button on the right), `CookLogList` + `CookLogItem` (a ledger between hairlines: the day as an accent label in an 11rem column, the cook in `.label-quiet`, the note in italic body text; one column on a phone; a row added on the page rises in with `arrive`), `CookLogEmpty` (italic deck line), `MadeItPanel` (the form's paper-deep block under a thin ink rule, at most half the screen tall and scrolling inside), `MadeItFields` (day 12rem beside the note, stacked on a phone), `MadeItPrompt` (cook mode's one-line "Cooked it?" strip above the footer, hairline on top) and `MadeItDone` (the saved line in display type, focusable). Reduced motion drops the rise.
