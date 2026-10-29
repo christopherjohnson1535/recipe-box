@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cx } from "./cx";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "danger-text";
@@ -52,20 +52,39 @@ export function ButtonLink({ variant, className, ...rest }: ComponentProps<typeo
  */
 export function ArrowLink({ className, children, ...rest }: ComponentProps<typeof Link>) {
   return (
-    <Link
-      className={cx(
-        "group/arrow inline-flex min-h-control items-center self-center font-text text-deck leading-none text-(--button-ghost-fg) italic transition-[color] duration-150 ease-out pointer-fine:hover:text-(--button-ghost-hover)",
-        className,
-      )}
+    <Link className={cx(arrowOuter, className)} {...rest}>
+      <ArrowText>{children}</ArrowText>
+    </Link>
+  );
+}
+
+const arrowOuter =
+  "group/arrow inline-flex min-h-control items-center self-center font-text text-deck leading-none text-(--button-ghost-fg) italic transition-[color] duration-150 ease-out pointer-fine:hover:text-(--button-ghost-hover)";
+
+function ArrowText({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-baseline gap-2 border-b border-(--button-ghost-underline) pb-1 transition-[border-color] duration-150 ease-out pointer-fine:group-hover/arrow:border-(--button-ghost-hover)">
+      {children}
+      <span aria-hidden="true" className="not-italic transition-transform duration-150 ease-out pointer-fine:motion-safe:group-hover/arrow:translate-x-1">
+        →
+      </span>
+    </span>
+  );
+}
+
+/**
+ * `ArrowLink`'s look for an action that stays on the page ("Plan the evening"). Disabled it is dimmed, keeps no hover and the
+ * arrow stays put; give it `aria-describedby` pointing at the reason.
+ */
+export function ArrowButton({ className, children, type = "button", ...rest }: ComponentProps<"button">) {
+  return (
+    <button
+      type={type}
+      className={cx(arrowOuter, "disabled:pointer-events-none disabled:opacity-55", className)}
       {...rest}
     >
-      <span className="inline-flex items-baseline gap-2 border-b border-(--button-ghost-underline) pb-1 transition-[border-color] duration-150 ease-out pointer-fine:group-hover/arrow:border-(--button-ghost-hover)">
-        {children}
-        <span aria-hidden="true" className="not-italic transition-transform duration-150 ease-out pointer-fine:motion-safe:group-hover/arrow:translate-x-1">
-          →
-        </span>
-      </span>
-    </Link>
+      <ArrowText>{children}</ArrowText>
+    </button>
   );
 }
 

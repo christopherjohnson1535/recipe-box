@@ -29,6 +29,8 @@ export type GoogleStatus = Schemas["GoogleStatus"];
 export type CookLogEntry = Schemas["CookLogEntry"];
 export type NewCookLogEntry = Schemas["NewCookLogEntry"];
 export type GoogleExport = Schemas["GoogleExport"];
+export type CookPlan = Schemas["CookPlan"];
+export type CookPlanStep = Schemas["CookPlanStep"];
 /** Connecting is a full-page navigation (a link, not a fetch): Google's consent page, then back to /settings?google=connected|error. */
 export const GOOGLE_CONNECT_URL = "/api/integrations/google/connect";
 export type AuthProviders = Schemas["AuthProviders"];
@@ -135,6 +137,10 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, ini
     addFavourite: (recipeId: string) => request<void>("PUT", `/api/recipes/${id(recipeId)}/favourite`),
     removeFavourite: (recipeId: string) => request<void>("DELETE", `/api/recipes/${id(recipeId)}/favourite`),
     deleteCookLogEntry: (recipeId: string, entryId: string) => request<void>("DELETE", `/api/recipes/${id(recipeId)}/cook-log/${id(entryId)}`),
+
+    /** An AI-suggested order for a cook-together session (KIT-7); `ai_disabled` without an AI provider. */
+    planCook: (recipeIds: string[], serveAt?: string) =>
+      request<CookPlan>("POST", "/api/cook/plan", (serveAt ? { recipeIds, serveAt } : { recipeIds }) satisfies Schemas["CookPlanRequest"]),
 
     listTags: () => get<Tag[]>("/api/tags"),
 

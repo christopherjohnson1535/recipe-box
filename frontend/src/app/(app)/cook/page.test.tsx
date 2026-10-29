@@ -43,6 +43,26 @@ describe("cook together page", () => {
     expect(await title("b,a")).toBe("Cooking together");
   });
 
+  it("offers Plan the evening only when the server has an AI provider", async () => {
+    serve();
+    expectConsole("error", /Encountered a script tag/);
+    const { unmount } = await page("a,b");
+    expect(screen.queryByRole("button", { name: "Plan the evening" })).toBeNull(); // the default handler: ai false
+    unmount();
+    server.use(http.get("*/api/import/capabilities", () => HttpResponse.json({ ai: true, provider: "anthropic" })));
+    await page("a,b");
+    expect(screen.getByRole("button", { name: "Plan the evening" })).toBeTruthy();
+  });
+
+  it("leaves Plan the evening out when the server can't say whether AI is on", async () => {
+    serve();
+    expectConsole("error", /Encountered a script tag/);
+    server.use(http.get("*/api/import/capabilities", () => HttpResponse.json({ error: { code: "internal", message: "Oops." } }, { status: 500 })));
+    await page("a,b");
+    expect(screen.getByRole("dialog", { name: "Cooking mode" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Plan the evening" })).toBeNull();
+  });
+
   it("shows the picker with the one recipe from the link already chosen", async () => {
     serve();
     await page("c");
