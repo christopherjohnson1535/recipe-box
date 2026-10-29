@@ -16,7 +16,7 @@ Seven traits in `backend/crates/ports/src/repos.rs`, all `async-trait`, all retu
 
 | Trait | Holds |
 |---|---|
-| `RecipeRepo` | recipes with tags and photo links; soft delete, restore, purge; `search`; `live_source_urls` |
+| `RecipeRepo` | recipes with tags and photo links; `get_many` (a batch of ids in one read); soft delete, restore, purge; `search`; `live_source_urls` |
 | `ImageRepo` | image rows (`add`, `delete`, `set_display_file`, `without_display_file`) |
 | `UserRepo` | users and password hashes; `create_first_admin`; `set_password_hash`; `remove` |
 | `SessionRepo` | sessions by token digest |

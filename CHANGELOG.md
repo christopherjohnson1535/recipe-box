@@ -42,6 +42,8 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 - Coverage ratchet now covers the backend too (baseline 92.7% lines) and raises the frontend baseline to
   86.28% lines / 78.19% branches; CI shows the numbers as a notice on each PR (#52).
 - End-to-end tests use the API types generated from the spec instead of hand-written copies (#52).
+- Export reads recipes 200 at a time (one query per page instead of one per recipe), and import checks which archived
+  recipes already exist the same way; new `RecipeRepo::get_many` port method with contract cases (#112).
 
 ## Phase 1 — Recipe box (2026-10-21 to 2026-10-22)
 

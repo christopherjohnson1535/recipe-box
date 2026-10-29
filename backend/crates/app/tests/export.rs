@@ -1,6 +1,10 @@
 //! `ExportService` over the in-memory adapters: what is exported, and what an import keeps, skips or undoes.
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use adapter_memory::{
     FakeImageCodec, FakePasswordHasher, FakeSessionTokens, MemoryBackup, MemoryMedia, MemoryStore,
@@ -43,6 +47,9 @@ impl RecipeRepo for FailingCreate {
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>> {
         self.inner.get(id).await
     }
+    async fn get_many(&self, ids: &[Uuid]) -> DomainResult<Vec<Recipe>> {
+        self.inner.get_many(ids).await
+    }
     async fn update(&self, id: Uuid, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe> {
         self.inner.update(id, user_id, input).await
     }
@@ -57,6 +64,74 @@ impl RecipeRepo for FailingCreate {
     }
     async fn search(&self, query: SearchQuery) -> DomainResult<Page<RecipeSummary>> {
         self.inner.search(query).await
+    }
+    async fn live_source_urls(&self, hosts: &[String]) -> DomainResult<Vec<(Uuid, String)>> {
+        self.inner.live_source_urls(hosts).await
+    }
+}
+
+/// A recipe repository that counts the reads the export makes and passes everything to the store. With
+/// `delete_after_search` set, it soft-deletes that recipe right after the next list page is read.
+struct Counting {
+    inner: Arc<MemoryStore>,
+    gets: Mutex<usize>,
+    batches: Mutex<Vec<usize>>,
+    searches: Mutex<usize>,
+    delete_after_search: Mutex<Option<Uuid>>,
+}
+
+impl Counting {
+    fn new(inner: Arc<MemoryStore>) -> Self {
+        Self {
+            inner,
+            gets: Mutex::new(0),
+            batches: Mutex::new(Vec::new()),
+            searches: Mutex::new(0),
+            delete_after_search: Mutex::new(None),
+        }
+    }
+}
+
+#[async_trait]
+impl RecipeRepo for Counting {
+    async fn create(&self, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe> {
+        self.inner.create(user_id, input).await
+    }
+    async fn create_many(
+        &self,
+        user_id: Uuid,
+        inputs: Vec<RecipeInput>,
+    ) -> DomainResult<Vec<Uuid>> {
+        self.inner.create_many(user_id, inputs).await
+    }
+    async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>> {
+        *self.gets.lock().unwrap() += 1;
+        self.inner.get(id).await
+    }
+    async fn get_many(&self, ids: &[Uuid]) -> DomainResult<Vec<Recipe>> {
+        self.batches.lock().unwrap().push(ids.len());
+        self.inner.get_many(ids).await
+    }
+    async fn update(&self, id: Uuid, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe> {
+        self.inner.update(id, user_id, input).await
+    }
+    async fn soft_delete(&self, id: Uuid) -> DomainResult<()> {
+        self.inner.soft_delete(id).await
+    }
+    async fn restore(&self, id: Uuid) -> DomainResult<Recipe> {
+        self.inner.restore(id).await
+    }
+    async fn purge_deleted_before(&self, cutoff: DateTime<Utc>) -> DomainResult<u64> {
+        self.inner.purge_deleted_before(cutoff).await
+    }
+    async fn search(&self, query: SearchQuery) -> DomainResult<Page<RecipeSummary>> {
+        *self.searches.lock().unwrap() += 1;
+        let page = self.inner.search(query).await?;
+        let doomed = self.delete_after_search.lock().unwrap().take();
+        if let Some(id) = doomed {
+            self.inner.soft_delete(id).await?;
+        }
+        Ok(page)
     }
     async fn live_source_urls(&self, hosts: &[String]) -> DomainResult<Vec<(Uuid, String)>> {
         self.inner.live_source_urls(hosts).await
@@ -214,6 +289,72 @@ async fn export_sends_photos_then_the_manifest_of_live_recipes_only() {
     assert_eq!(written.recipes.len(), 1);
     assert_eq!(written.recipes[0].id, soup.id);
     assert_eq!(written.recipes[0].input.photo_image_ids, vec![a, b]);
+}
+
+/// A world whose recipe reads are counted, and the counter.
+fn counted() -> (World, Arc<Counting>) {
+    let mut counter = None;
+    let w = World::with(|store| {
+        let c = Arc::new(Counting::new(store));
+        counter = Some(c.clone());
+        c
+    });
+    (w, counter.unwrap())
+}
+
+#[tokio::test]
+async fn export_reads_recipes_one_batch_per_page_not_one_query_per_recipe() {
+    let (w, count) = counted();
+    // Two full pages of 200 and a part page.
+    let ids = w
+        .store
+        .create_many(w.user, (0..450).map(|i| input(&format!("R{i}"))).collect())
+        .await
+        .unwrap();
+
+    let mut job = w.services.export.export().await.unwrap();
+    drain(&mut job).await.unwrap();
+    assert_eq!(*count.gets.lock().unwrap(), 0, "no read per recipe");
+    assert_eq!(*count.batches.lock().unwrap(), [200, 200, 50]);
+    assert_eq!(*count.searches.lock().unwrap(), 3);
+    let mut written: Vec<Uuid> = w.backup.written().recipes.iter().map(|r| r.id).collect();
+    let mut want = ids;
+    written.sort();
+    want.sort();
+    assert_eq!(written, want, "every recipe once");
+}
+
+#[tokio::test]
+async fn export_leaves_out_a_recipe_deleted_after_its_page_was_listed() {
+    let (w, count) = counted();
+    let keep = w.store.create(w.user, input("Keep")).await.unwrap();
+    let gone = w.store.create(w.user, input("Gone")).await.unwrap();
+    *count.delete_after_search.lock().unwrap() = Some(gone.id);
+
+    let mut job = w.services.export.export().await.unwrap();
+    drain(&mut job).await.unwrap();
+    let written: Vec<Uuid> = w.backup.written().recipes.iter().map(|r| r.id).collect();
+    assert_eq!(written, [keep.id]);
+}
+
+#[tokio::test]
+async fn import_checks_which_ids_exist_in_batches() {
+    let (w, count) = counted();
+    let existing = w.store.create(w.user, input("Mine")).await.unwrap();
+    let mut archive: Vec<BackupRecipe> = (0..250)
+        .map(|i| archived(Uuid::new_v4(), input(&format!("R{i}")), &[]))
+        .collect();
+    archive.push(archived(existing.id, input("Theirs"), &[]));
+    w.backup.serve(archive, HashMap::new());
+
+    let report = w.import().await.unwrap();
+    assert_eq!((report.imported, report.skipped), (250, 1));
+    assert_eq!(
+        *count.gets.lock().unwrap(),
+        0,
+        "no read per archived recipe"
+    );
+    assert_eq!(*count.batches.lock().unwrap(), [200, 51]);
 }
 
 /// An archive writer that fails on the second photo.

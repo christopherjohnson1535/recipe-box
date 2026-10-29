@@ -87,14 +87,21 @@ impl ExportService {
                 break;
             }
             offset += page.items.len() as i64;
-            for item in page.items {
-                // A recipe deleted since the page was read is gone; one seen twice (the list moved) counts once.
-                if seen.insert(item.id)
-                    && let Some(r) = self.recipes.get(item.id).await?
-                {
-                    recipes.push(backup_recipe(r));
-                }
-            }
+            // One read per page. A recipe deleted since the page was read is left out by `get_many`; one seen
+            // twice (the list moved) counts once.
+            let fresh: Vec<Uuid> = page
+                .items
+                .iter()
+                .map(|item| item.id)
+                .filter(|id| seen.insert(*id))
+                .collect();
+            recipes.extend(
+                self.recipes
+                    .get_many(&fresh)
+                    .await?
+                    .into_iter()
+                    .map(backup_recipe),
+            );
             if offset >= page.total {
                 break;
             }
@@ -142,11 +149,13 @@ impl ExportService {
             .backup
             .open(path, BackupLimits::new(self.max_photo_bytes))
             .await?;
+        let archived = reader.recipes().await?;
+        let live = self.live_ids(archived.iter().map(|r| r.id)).await?;
         let mut report = ImportReport::default();
         let mut todo: Vec<(RecipeInput, Vec<Uuid>)> = Vec::new();
         let mut seen = HashSet::new();
-        for BackupRecipe { id, input } in reader.recipes().await? {
-            if !seen.insert(id) || self.recipes.get(id).await?.is_some() {
+        for BackupRecipe { id, input } in archived {
+            if !seen.insert(id) || live.contains(&id) {
                 report.skipped += 1;
                 continue;
             }
@@ -203,6 +212,23 @@ impl ExportService {
             }
         }
         Ok(report)
+    }
+
+    /// Which of `ids` are live recipes, read [`PAGE`] ids at a time.
+    async fn live_ids(&self, ids: impl Iterator<Item = Uuid>) -> DomainResult<HashSet<Uuid>> {
+        let mut once = HashSet::new();
+        let ids: Vec<Uuid> = ids.filter(|id| once.insert(*id)).collect();
+        let mut live = HashSet::new();
+        for chunk in ids.chunks(PAGE as usize) {
+            live.extend(
+                self.recipes
+                    .get_many(chunk)
+                    .await?
+                    .into_iter()
+                    .map(|r| r.id),
+            );
+        }
+        Ok(live)
     }
 
     async fn store_photos(
