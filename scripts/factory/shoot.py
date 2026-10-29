@@ -43,6 +43,9 @@ sel_schemes = pick(args.schemes, SCHEMES, "scheme")
 sel_sizes = pick(args.sizes, tuple(sizes), "size")
 login_sizes = [z for z in LOGIN_SIZES if z in sel_sizes] if "login" in sel_pages else []
 page_names = [n for n in PAGE_NAMES if n in sel_pages]
+if not (login_sizes or page_names):
+    print("WARN nothing to shoot: login is shot at ipad, desktop and phone only")
+    sys.exit(1)
 
 from playwright.sync_api import sync_playwright  # noqa: E402  (after validation: bad names fail before the browser)
 

@@ -44,6 +44,8 @@ COMMON = (
 def issue(title, milestone, labels, goal, reqs, scope, owned, acceptance, size=None, read=None):
     if size not in (None, "S", "M", "L"):
         raise ValueError(f"size must be S, M or L, got {size!r}")
+    if isinstance(read, str):
+        read = [read]
     pack = ""
     if size or read:
         pack = "\n\n## Context pack"

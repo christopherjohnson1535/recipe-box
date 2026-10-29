@@ -7,14 +7,16 @@ description: Stage 4 of the software factory — independent review agents (secu
 
 ## By size (see `factory`)
 - **S:** one reviewer (the one that fits the change); the builder fixes its findings in a second pass.
-- **M:** at most two reviewers: security (R1 or R2) if the surface is risky, plus one of backend core / UI. One
-  fixer per tree, a single wave.
+- **M:** at most two reviewers. Risky surface: the security reviewer (R1 auth/sessions, deletion/restore/backup; R2
+  uploads/media, outbound fetch; R3 AI providers) plus UI if a page changed, else backend core. Not risky: backend
+  core for backend-only, UI if a page changed, both if both trees. One fixer per tree, a single wave.
 - **L:** the full rounds below: R1–R5 and V1/V2, fix waves A and B.
 
 For S and M, R4 and V1/V2 merge into one UI reviewer working from a short checklist (states, focus and aria,
 iPad touch targets, tokens not hard-coded, copy voice). The full Vercel guideline pass is for L and design-system
 changes. R5 integration is L-only; at S and M the tester's `just e2e` covers it. The risky-surface override applies
-at every size: security reviewer and a separate fixer.
+at every size: security reviewer, and findings go to a separate fixer, never the builder. A risky surface is at
+least M.
 
 ## Round 1 — reviewers (parallel, read-only)
 Split by area so no two reviewers read the same code for the same purpose. Each brief: "Read
@@ -26,10 +28,10 @@ Split by area so no two reviewers read the same code for the same purpose. Each 
 | R2 imports and media | ponytail-review | SSRF (private IPs, redirects, DNS rebinding), size/time limits, image decoding safety, JSON-LD edge cases, no half-saved recipes |
 | R3 integrations | ponytail-review + vendor docs via WebFetch | AI provider request shapes, key handling, timeouts/retries, no retry of non-idempotent calls, behaviour with AI off |
 | R4 UI | tastemaker audit verb + `docs/UI.md` | editorial style consistency, states, focus, aria, copy voice, iPad touch targets, offline banners |
-| R5 integration | build + smoke | runs every check; boots the stack (compose or native) on seed data; hits every route incl. SSRF and auth-bypass attempts; frontend ↔ API contract consistency |
+| R5 integration | build + smoke | L only; its build counts as the test stage's build; runs every check; boots the stack (compose or native) on seed data; hits every route incl. SSRF and auth-bypass attempts; frontend ↔ API contract consistency |
 | V1/V2 standards (UI rounds) | `docs/standards/vercel-web-interface-guidelines.md` | interactions + forms / layout, content, design, perf — pass/fail per item |
 
-Only R5 builds (L). Every finding: ID, Must/Should/Nice, file:line, failing case, smallest fix.
+Only R5 builds (L); the test stage reuses that build. Every finding: ID, Must/Should/Nice, file:line, failing case, smallest fix.
 
 ## Round 2 — fixers (waves partitioned by ownership)
 - **Wave A (parallel, disjoint owners):** backend core (R1), imports/media (R2), integrations (R3). Each brief:

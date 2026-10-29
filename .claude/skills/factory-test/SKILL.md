@@ -1,6 +1,6 @@
 ---
 name: factory-test
-description: Stage 5 of the software factory — prove the build works - unit and integration tests, a smoke run on seeded data, and screenshots of every page in light and dark at iPad, phone and desktop size that the orchestrator actually looks at. Use before shipping, after any fix wave, and after any UI change.
+description: Stage 5 of the software factory — prove the build works - checks sized to the change (tests, e2e, a curl smoke run on L) and screenshots sized to the change that the orchestrator actually looks at. Use before shipping, after any fix wave, and after any UI change.
 ---
 
 # Test
@@ -10,10 +10,12 @@ One tester agent runs everything once, and release builds happen here only.
 - **S:** `just check-<tree>`; `just e2e` only if a page changed; screenshot the changed page at iPad, light.
 - **M:** `just check` + `just e2e`; changed pages at iPad + phone in light (dark too if colours or tokens
   changed), using `shoot.py --pages … --schemes … --sizes …`.
-- **L:** every check, the curl smoke table (§2) and the full screenshot matrix.
+- **L:** every check (`just check`, `just e2e`), the curl smoke table (§2) and the full screenshot matrix. R5's build
+  and smoke run (verify) count as this stage's build; after fix waves re-run the checks and rebuild only if code
+  changed since.
 
-The curl smoke table is for L and for issues that add endpoints; otherwise `just e2e` is the per-issue smoke test.
-The orchestrator opens every screenshot taken.
+An issue that adds an endpoint, at any size, adds an HTTP-level test for it (B3 per `docs/TESTING.md`, or an e2e
+spec); the tester checks it exists. The curl smoke table is L-only; otherwise `just e2e` is the per-issue smoke test.
 
 ## 1. Static and unit
 Backend: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (with
@@ -26,7 +28,7 @@ Required test kinds:
   retries only where safe, AI-off behaviour).
 - UI guard tests once the design system lands: token contract + contrast, no page-level styling.
 
-## 2. Smoke run on seeded data (L, or issues that add endpoints)
+## 2. Smoke run on seeded data (L only)
 Start Postgres, the API (`backend/target/release/recipe-box-api` or `cargo run`) and the built frontend
 (standalone: copy `public` and `.next/static` into `.next/standalone`, then `node server.js` with
 `API_INTERNAL_URL`), or `docker compose up -d --build` where Docker is available.
@@ -48,8 +50,8 @@ unknown name is an error listing the valid ones:
 - `--sizes` desktop, ipad, ipad-landscape, phone
 
 Example: `shoot.py … --pages recipe,edit --schemes light --sizes ipad,phone`. Then:
-- Open every screenshot taken. For the full matrix that means at least every page in light at iPad size, and the
-  busiest page (home, recipe) in dark and on the phone.
+- S and M: open every screenshot taken. L: shoot the full matrix and open at least every page in light at iPad size,
+  plus the busiest pages (home, recipe) in dark and on the phone.
 - Check: editorial style per `docs/UI.md`, nothing scrolled on load, nothing overflowing at 390 px, focus
   visible, headers not hidden behind sticky bars, empty/error/offline states present.
 

@@ -6,8 +6,7 @@ description: Stage 7 of the software factory — deliver the verified build to t
 # Ship
 
 ## By size (see `factory`)
-- **S / M / L:** the same steps; the PR carries the tier and the stage-timing line. Sections 2 and 4 apply only
-  when the owner asks for them.
+- **S / M / L:** the same steps; the PR carries the tier and the stage-timing line.
 
 ## 1. Final state
 - Working tree clean; last commit message is a short subject plus a 1-3 line body saying what the round did. Commits end with the attribution trailer the

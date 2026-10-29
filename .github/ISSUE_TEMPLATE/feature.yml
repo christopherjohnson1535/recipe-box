@@ -23,7 +23,7 @@ body:
     id: size
     attributes:
       label: Size
-      description: "Context pack. S: one tree, ≤ ~150 lines, no risky surface. M: both trees, a new endpoint, or a risky surface. L: architecture, design system, or ≥ 3 areas."
+      description: "Context pack. S: one tree, ≤ ~150 lines, no risky surface. M: anything that is neither S nor L (both trees, a new endpoint, a risky surface, > ~150 lines). L: architecture, design system, or ≥ 3 areas."
       options:
         - S
         - M

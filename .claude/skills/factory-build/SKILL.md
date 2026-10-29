@@ -22,7 +22,7 @@ share one clone and one `backend/target/`.
 1. **Scaffold (done; see the example run in `docs/FACTORY.md`).** Backend and frontend skeletons, containers, CI.
 2. **Design system (one agent, sequential).** Uses tastemaker (`.factory/vendor/tastemaker/skills/tastemaker/SKILL.md`,
    build mode) with the existing `.tastemaker/style-lock.md`; writes tokens, the app shell, `src/components/ui/*`,
-   and `docs/UI.md`. Self-hosted fonts only. Runs every frontend check.
+   and `docs/UI.md`. Self-hosted fonts only. Runs scoped frontend checks.
 3. **Features (N agents in parallel, one per issue/area with disjoint owned paths).** Each brief:
    - "Read `docs/agents/agent-preamble.md` and follow it exactly."
    - The issue number, requirement IDs and spec section to follow.

@@ -25,19 +25,10 @@ How this project is built, end to end, by an orchestrator and a team of agents. 
 | 7 Ship | `factory-ship` | PR / push to GitHub, owner's copy updated, owner report |
 
 ## Sizing the loop
-The orchestrator picks a size before starting and states it in its first message and the PR: **S** (small, one
-tree, no risky surface), **M** (a feature across both trees, a new endpoint, or any risky surface) or **L**
-(architecture, design system, or ≥ 3 areas). Auth/sessions, uploads, outbound fetch, AI provider calls and data
-deletion/restore/backup always get a security reviewer and a separate fixer. The size sets how many agents run and
-how much is tested, not which model they use. `.claude/skills/factory/SKILL.md` is the source of truth.
-
-| | S | M | L |
-|---|---|---|---|
-| Build | 1 builder | 1 per tree | Waves |
-| Verify | 1 reviewer | ≤ 2 reviewers, one fixer per tree | R1–R5 + V1/V2, fix waves |
-| Test | `just check-<tree>` | `just check` + `just e2e` | + curl smoke table |
-| Screenshots | Changed page, iPad light | Changed pages, iPad + phone | Full matrix |
-| Design QA | Skip | New page or shared component | Full |
+The orchestrator picks S, M or L before starting, states it in its first message and the PR, and runs only that
+tier's loop; the size sets how many agents run and how much is tested, not which model they use. Definitions, the
+per-tier loop and the risky-surface override (a security reviewer and a separate fixer, at least M) are in
+`.claude/skills/factory/SKILL.md`, the single source of truth.
 
 ## Setup
 1. `sh scripts/factory/fetch-skills.sh` — puts ponytail, tastemaker, impeccable and refactoring-ui-skill in

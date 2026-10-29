@@ -47,7 +47,8 @@ runtime (`API_INTERNAL_URL`). Session cookie `rb_session`.
 ## How to work on an issue (the software factory)
 This repo is built with the software factory skills in `.claude/skills/`.
 For an issue:
-1. Read the issue and its `## Context pack` (size, requirement IDs, SPEC sections, endpoints, files to read first).
+1. Read the issue and its Context pack (the `## Context pack` section, or the Size and Read first fields in issues filed
+   from the form: size, requirement IDs, SPEC sections, endpoints, files to read first).
    Open `docs/REQUIREMENTS.md`, `docs/SPEC.md` and `docs/API.md` only for the IDs, sections and endpoints it names.
 2. Work on a branch `issue-<number>-<slug>`. Stay inside the "Owned paths" the issue lists; if you must change
    something else, say why in the PR.
@@ -55,7 +56,7 @@ For an issue:
    skills once with `sh scripts/factory/fetch-skills.sh`.
 4. Pick the size, S, M or L, per `.claude/skills/factory` and state it in your first message and the PR. Run that
    tier's loop with **subagents on a cheaper model (Sonnet)** doing the stages, while the session's main model
-   orchestrates: briefs agents, routes findings, keeps the ledger, looks at every screenshot taken and opens the PR.
+   orchestrates: briefs agents, routes findings, keeps the ledger, looks at every screenshot taken (L: the subset `factory-test` names) and opens the PR.
    Stages: `factory-plan`, `factory-build`, `factory-verify`, `factory-test`, `factory-design-qa`; each skill says
    what it does per size. Whatever the size, auth/sessions, uploads/media, outbound fetches, AI provider calls and
    data deletion/restore/backup always get a security reviewer and a separate fixer agent.

@@ -23,7 +23,7 @@ Agents on one issue share one clone and one `backend/target/`. Raw commands are 
 pinned by `rust-toolchain.toml` and `.nvmrc`.
 
 ## Read first
-- The issue's `## Context pack` files first. Open `docs/SPEC.md` (plan + file ownership), `docs/API.md` (exact
+- The issue's Context pack files first. Open `docs/SPEC.md` (plan + file ownership), `docs/API.md` (exact
   contract) and `docs/REQUIREMENTS.md` (IDs) only for the sections, endpoints and IDs it names.
 - Existing code in the tree you own — reuse helpers; never duplicate one.
 
