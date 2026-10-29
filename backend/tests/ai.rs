@@ -334,3 +334,29 @@ async fn config_debug_hides_the_key_and_ai_enum_follows_config() {
         Err(AppError::AiDisabled)
     ));
 }
+
+#[tokio::test]
+async fn a_cook_plan_keeps_to_the_request_timeout_and_is_not_retried() {
+    let mock = MockAnthropic::start(vec![
+        common::anthropic::named_tool_reply("plan_cook", json!({ "steps": [] }))
+            .with_delay(Duration::from_millis(500)),
+    ])
+    .await;
+    let p = provider(&mock).with_request_timeout(Duration::from_millis(50));
+    let dishes = [domain::cook_plan::PlanDish {
+        recipe_id: uuid::Uuid::nil(),
+        title: "Soup".into(),
+        steps: vec!["Stir.".into()],
+        prep_minutes: None,
+        cook_minutes: None,
+        total_minutes: None,
+    }];
+    let err = ports::RecipeExtractor::plan_cook(&p, &dishes)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "The AI service did not answer in time. Try again."
+    );
+    assert_eq!(mock.requests().len(), 1);
+}

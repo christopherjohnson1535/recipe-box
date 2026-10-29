@@ -265,6 +265,13 @@ mod tests {
         async fn extract_text(&self, _: &str) -> DomainResult<Draft> {
             Err(DomainError::AiDisabled)
         }
+
+        async fn plan_cook(
+            &self,
+            _: &[domain::cook_plan::PlanDish],
+        ) -> DomainResult<domain::cook_plan::RawPlan> {
+            Err(DomainError::AiDisabled)
+        }
     }
 
     struct NoFetch;

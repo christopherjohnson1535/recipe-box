@@ -60,6 +60,13 @@ impl RecipeExtractor for Ai {
     async fn extract_text(&self, text: &str) -> DomainResult<domain::RecipeDraft> {
         self.inner().extract_text(text).await
     }
+
+    async fn plan_cook(
+        &self,
+        dishes: &[domain::cook_plan::PlanDish],
+    ) -> DomainResult<domain::cook_plan::RawPlan> {
+        self.inner().plan_cook(dishes).await
+    }
 }
 
 /// Any [`RecipeExtractor`], answering with the API's types. A seam for the integration tests only (they call
@@ -140,6 +147,10 @@ mod tests {
         ));
         assert!(matches!(
             ai.extract_images(&[], PhotoMode::Dish).await,
+            Err(domain::DomainError::AiDisabled)
+        ));
+        assert!(matches!(
+            ai.plan_cook(&[]).await,
             Err(domain::DomainError::AiDisabled)
         ));
     }

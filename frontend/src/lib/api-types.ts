@@ -153,6 +153,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cook/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggests the order to cook the recipes' steps in so they are ready together. Needs an AI provider. A suggestion
+         *     that does not add up comes back as the round-robin order (`source: roundRobin`) with a `reason`, never as an error.
+         */
+        post: operations["planCook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/export": {
         parameters: {
             query?: never;
@@ -778,6 +798,60 @@ export interface components {
             note: string;
             /** Format: uuid */
             recipeId: string;
+        };
+        /** @description A suggested order for a cook-together session: every step of every recipe exactly once. */
+        CookPlan: {
+            /** @description Why the order is round-robin; `null` for an AI plan. */
+            reason: string | null;
+            /**
+             * Format: date-time
+             * @description The requested `serveAt`, or `null`.
+             */
+            serveAt: string | null;
+            source: components["schemas"]["CookPlanSource"];
+            steps: components["schemas"]["CookPlanStep"][];
+            /**
+             * Format: int32
+             * @description Minutes from the first step until serving; `null` in a round-robin plan.
+             */
+            totalMinutes: number | null;
+        };
+        /** @description What to plan: the recipes of a cook-together session and, optionally, when to serve. */
+        CookPlanRequest: {
+            /** @description Two to four different recipe ids (a repeated id counts once). */
+            recipeIds: string[];
+            /**
+             * Format: date-time
+             * @description When everything should be on the table; RFC 3339 with an offset. Gives each step of a timed plan its `startAt`.
+             */
+            serveAt?: string | null;
+        };
+        /**
+         * @description Where a plan's order came from.
+         * @enum {string}
+         */
+        CookPlanSource: "ai" | "roundRobin";
+        /** @description One step of a plan, in the order to do it. */
+        CookPlanStep: {
+            /** @description A short tip from the AI (at most 200 characters, one line of plain text), or empty. Untrusted: show as text. */
+            note: string;
+            /** Format: uuid */
+            recipeId: string;
+            /**
+             * Format: date-time
+             * @description The clock time to start, when `serveAt` was given and the plan is timed.
+             */
+            startAt: string | null;
+            /**
+             * Format: int32
+             * @description Minutes after the start; `null` in a round-robin plan.
+             */
+            startOffsetMin: number | null;
+            /**
+             * Format: int32
+             * @description 0-based index into the recipe's `steps`.
+             */
+            stepIndex: number;
         };
         /**
          * @example {
@@ -1582,6 +1656,102 @@ export interface operations {
             };
             /** @description Something went wrong on the server (`internal`). */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planCook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CookPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description The plan: every step of every recipe exactly once, in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CookPlan"];
+                };
+            };
+            /** @description Fewer than two or more than four different recipes, or a malformed body (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A recipe is missing or deleted (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Body over the size limit (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No AI provider is configured (`ai_disabled`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many plans in ten minutes for this member (`rate_limited`, with `Retry-After`). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The AI provider failed or timed out (`ai_error`). */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

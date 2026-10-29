@@ -7,6 +7,7 @@
 
 mod auth;
 mod cook_log;
+mod cook_plan;
 mod export;
 mod google;
 mod grocery;
@@ -29,6 +30,7 @@ use ports::{
 
 pub use auth::{AuthService, NewSession};
 pub use cook_log::CookLogService;
+pub use cook_plan::{CookPlanService, PLANS_PER_WINDOW, WINDOW_SECS};
 pub use export::{ExportJob, ExportService, ImportReport};
 pub use google::{
     DisabledGoogleSignIn, DisabledGoogleTasks, GoogleExport, GoogleStatus, GoogleTasksService,
@@ -98,6 +100,7 @@ pub struct Services {
     pub tags: TagService,
     pub grocery: GroceryService,
     pub cook_log: CookLogService,
+    pub cook_plan: CookPlanService,
     pub google: GoogleTasksService,
     pub media: MediaService,
     pub imports: ImportService,
@@ -119,6 +122,7 @@ impl Services {
             google: GoogleTasksService::new(&d, grocery.clone()),
             grocery,
             cook_log: CookLogService::new(&d),
+            cook_plan: CookPlanService::new(&d),
             media: MediaService::new(&d),
             imports: ImportService::new(&d),
             export: ExportService::new(&d),

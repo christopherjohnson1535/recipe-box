@@ -7,7 +7,10 @@ use std::sync::Arc;
 use adapter_memory::MemoryStore;
 use async_trait::async_trait;
 use domain::{
-    AiProvider, DomainError, DomainResult, Image, PhotoMode, RecipeDraft, url::Url, uuid::Uuid,
+    AiProvider, DomainError, DomainResult, Image, PhotoMode, RecipeDraft,
+    cook_plan::{PlanDish, RawPlan},
+    url::Url,
+    uuid::Uuid,
 };
 use ports::{
     FetchedPage, ImageRepo, PageContent, PageFetcher, PageReader, RecipeExtractor, SpawnedTask,
@@ -91,6 +94,9 @@ pub fn draft(title: &str) -> RecipeDraft {
     }
 }
 
+/// The scripted answer to `plan_cook`.
+pub type PlanScript = Box<dyn Fn(&[PlanDish]) -> DomainResult<RawPlan> + Send + Sync>;
+
 /// An extractor whose answers are scripted. Defaults: a draft titled "AI soup" for text and images.
 pub struct FakeExtractor {
     pub provider: AiProvider,
@@ -101,6 +107,10 @@ pub struct FakeExtractor {
     pub seen_images: Mutex<Vec<usize>>,
     /// `extract_images` never answers (a request that is dropped while the AI is working).
     pub hang: bool,
+    /// The answer to `plan_cook`, given the dishes it was asked about. Default: an empty plan.
+    pub plan: PlanScript,
+    /// The dishes of every `plan_cook` call.
+    pub seen_plans: Mutex<Vec<Vec<PlanDish>>>,
 }
 
 impl FakeExtractor {
@@ -112,6 +122,8 @@ impl FakeExtractor {
             seen_text: Default::default(),
             seen_images: Default::default(),
             hang: false,
+            plan: Box::new(|_| Ok(RawPlan::default())),
+            seen_plans: Default::default(),
         }
     }
 }
@@ -133,6 +145,11 @@ impl RecipeExtractor for FakeExtractor {
     async fn extract_text(&self, text: &str) -> DomainResult<RecipeDraft> {
         self.seen_text.lock().unwrap().push(text.to_string());
         (self.text)()
+    }
+
+    async fn plan_cook(&self, dishes: &[PlanDish]) -> DomainResult<RawPlan> {
+        self.seen_plans.lock().unwrap().push(dishes.to_vec());
+        (self.plan)(dishes)
     }
 }
 

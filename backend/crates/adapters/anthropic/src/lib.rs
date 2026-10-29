@@ -7,13 +7,17 @@
 //! `retry-after` asks for more than [`MAX_RETRY_AFTER_SECS`]). The API key (a [`Secret`]) and image data are never
 //! logged.
 
+mod plan;
+
 use std::time::Duration;
 
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use domain::{
     AiProvider, DomainError, DomainResult, Ingredient, MAX_TEXT_INPUT_CHARS, PhotoMode,
-    RecipeDraft, Secret, SourceType, validate,
+    RecipeDraft, Secret, SourceType,
+    cook_plan::{MAX_PLAN_STEPS, PlanDish, RawPlan},
+    validate,
 };
 use ports::RecipeExtractor;
 use serde_json::{Value, json};
@@ -26,6 +30,8 @@ const MAX_IMAGE_EDGE: u32 = 1568;
 const MAX_RETRY_AFTER_SECS: u64 = 10;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120); // vision replies are slow
+/// A plan is text only and the cook is waiting at the stove: half the import timeout.
+const PLAN_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_MODEL_WARNINGS: usize = 10;
 const MAX_WARNING_CHARS: usize = 300;
 /// Durations above a week are nonsense for a recipe (same limit as `jsonld`).
@@ -55,6 +61,8 @@ pub struct AnthropicProvider {
     retry_delay_cap: Duration,
     /// Whole-request timeout; tests set it to a few milliseconds.
     request_timeout: Duration,
+    /// Whole-request timeout for a cook plan.
+    plan_timeout: Duration,
 }
 
 /// Why one attempt failed; `retry` says whether a second attempt makes sense.
@@ -108,6 +116,7 @@ impl AnthropicProvider {
             base_url: base_url.trim_end_matches('/').to_string(),
             retry_delay_cap: Duration::from_secs(MAX_RETRY_AFTER_SECS),
             request_timeout: REQUEST_TIMEOUT,
+            plan_timeout: PLAN_TIMEOUT,
         })
     }
 
@@ -117,10 +126,29 @@ impl AnthropicProvider {
         self
     }
 
-    /// Overrides the 120 s whole-request timeout (tests only need milliseconds).
+    /// Overrides the 120 s whole-request timeout (tests only need milliseconds). Cook plans keep to it too when it
+    /// is shorter than their own 60 s.
     pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
         self.request_timeout = timeout;
+        self.plan_timeout = self.plan_timeout.min(timeout);
         self
+    }
+
+    /// The input of the `tool` block in `reply`, or `unreadable`.
+    fn tool_input<'a>(reply: &'a Value, tool: &str) -> DomainResult<&'a Value> {
+        reply["content"]
+            .as_array()
+            .and_then(|blocks| {
+                blocks
+                    .iter()
+                    .find(|b| b["type"] == "tool_use" && b["name"] == tool)
+            })
+            .map(|b| &b["input"])
+            .filter(|i| i.is_object())
+            .ok_or_else(|| {
+                tracing::warn!("anthropic reply had no usable {tool} block");
+                unreadable()
+            })
     }
 
     /// Sends `content` as the user turn and returns the `record_recipe` input, coerced into a draft.
@@ -139,21 +167,9 @@ impl AnthropicProvider {
             "tool_choice": { "type": "tool", "name": TOOL },
             "messages": [{ "role": "user", "content": content }],
         });
-        let reply = self.send_with_retry(&body).await?;
+        let reply = self.send_with_retry(&body, self.request_timeout).await?;
         let max_tokens = reply["stop_reason"] == "max_tokens";
-        let input = reply["content"]
-            .as_array()
-            .and_then(|blocks| {
-                blocks
-                    .iter()
-                    .find(|b| b["type"] == "tool_use" && b["name"] == TOOL)
-            })
-            .map(|b| &b["input"])
-            .filter(|i| i.is_object())
-            .ok_or_else(|| {
-                tracing::warn!("anthropic reply had no usable {TOOL} block");
-                unreadable()
-            })?;
+        let input = Self::tool_input(&reply, TOOL)?;
         if !max_tokens {
             return coerce(input, source, dish);
         }
@@ -170,8 +186,8 @@ impl AnthropicProvider {
         }
     }
 
-    async fn send_with_retry(&self, body: &Value) -> DomainResult<Value> {
-        let mut failure = match self.send_once(body).await {
+    async fn send_with_retry(&self, body: &Value, timeout: Duration) -> DomainResult<Value> {
+        let mut failure = match self.send_once(body, timeout).await {
             Ok(v) => return Ok(v),
             Err(f) => f,
         };
@@ -181,7 +197,7 @@ impl AnthropicProvider {
             .flatten()
         {
             tokio::time::sleep(wait).await;
-            match self.send_once(body).await {
+            match self.send_once(body, timeout).await {
                 Ok(v) => return Ok(v),
                 Err(f) => failure = f,
             }
@@ -189,7 +205,7 @@ impl AnthropicProvider {
         Err(failure.err)
     }
 
-    async fn send_once(&self, body: &Value) -> Result<Value, Failure> {
+    async fn send_once(&self, body: &Value, timeout: Duration) -> Result<Value, Failure> {
         // Trimmed: a key copied with a stray newline or `\r` is not a valid header value.
         let mut key = reqwest::header::HeaderValue::from_str(self.api_key.expose().trim())
             .map_err(|_| {
@@ -207,7 +223,7 @@ impl AnthropicProvider {
             .post(format!("{}/v1/messages", self.base_url))
             .header("x-api-key", key)
             .header("anthropic-version", "2023-06-01")
-            .timeout(self.request_timeout)
+            .timeout(timeout)
             .json(body)
             .send()
             .await
@@ -329,6 +345,21 @@ impl RecipeExtractor for AnthropicProvider {
         ];
         self.extract(SYSTEM_RECIPE, content, SourceType::Text, false)
             .await
+    }
+
+    async fn plan_cook(&self, dishes: &[PlanDish]) -> DomainResult<RawPlan> {
+        let body = json!({
+            "model": self.model,
+            "max_tokens": plan::MAX_TOKENS,
+            "system": plan::SYSTEM,
+            "tools": [plan::tool_definition()],
+            "tool_choice": { "type": "tool", "name": plan::TOOL },
+            "messages": [{ "role": "user", "content": [{ "type": "text", "text": plan::user_text(dishes) }] }],
+        });
+        let reply = self.send_with_retry(&body, self.plan_timeout).await?;
+        // A plan cut off by max_tokens is missing steps: it fails the caller's check and falls back, no special case.
+        let input = Self::tool_input(&reply, plan::TOOL)?;
+        Ok(plan::read(input, MAX_PLAN_STEPS))
     }
 }
 
