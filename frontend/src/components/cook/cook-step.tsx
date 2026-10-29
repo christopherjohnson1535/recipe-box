@@ -33,6 +33,7 @@ export function renderCookStep(step: string, ingredients: string[], key: string,
           left={left}
           // A steady name: the countdown is visual (the live region says when it ends).
           aria-label={left ? `Timer running: ${part.text}` : `Start timer: ${part.text}`}
+          aria-disabled={left ? true : undefined}
           onClick={() => start(chip, part.text, seconds)}
         >
           {part.text}

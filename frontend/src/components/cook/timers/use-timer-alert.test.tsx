@@ -137,13 +137,17 @@ describe("timer alert in cook mode", () => {
   });
 
   it("restarts a finished chip's timer with a tap, as a fresh timer", () => {
-    fakeAudio();
+    const { disconnect } = fakeAudio();
     cook();
+    fireEvent.pointerDown(window);
     fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
     act(() => void vi.advanceTimersByTime(10 * 60_000));
     expect(within(screen.getByRole("group", { name: "Step 1 · 10 min" })).getByText("Done")).toBeTruthy();
+    expect(disconnect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
+    expect(disconnect).toHaveBeenCalled(); // the old timer's ring ends with it
     expect(screen.getAllByRole("group", { name: "Step 1 · 10 min" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Timer running: 10 minutes" }).getAttribute("aria-disabled")).toBe("true");
     expect(within(screen.getByRole("group", { name: "Step 1 · 10 min" })).getByText("10:00")).toBeTruthy();
   });
 });

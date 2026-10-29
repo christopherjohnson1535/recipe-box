@@ -49,11 +49,16 @@ export function useCookTimers(announce: (text: string) => void) {
     ring();
   }, [timers, announce, ring]);
 
-  const start = useCallback((key: string, label: string, seconds: number) => {
-    const t = Date.now();
-    setNow(t);
-    dispatch({ type: "start", key, label, seconds, now: t });
-  }, []);
+  const start = useCallback(
+    (key: string, label: string, seconds: number) => {
+      const t = Date.now();
+      // Restarting the only finished timer replaces it: its ring ends with it, as on Dismiss.
+      if (timers.some((x) => x.key === key && x.done) && !timers.some((x) => x.done && x.key !== key)) stop();
+      setNow(t);
+      dispatch({ type: "start", key, label, seconds, now: t });
+    },
+    [timers, stop],
+  );
   const dismiss = useCallback(
     (id: number) => {
       // Dismissing the last finished timer quiets the ring; one still running carries on.
