@@ -32,6 +32,7 @@ class Recipe:
         image_id (None | UUID):
         image_url (None | str):
         ingredients (list[Ingredient]):
+        is_favourite (bool): Whether the signed-in member starred it. Each member has their own favourites.
         notes (str):
         photo_image_ids (list[UUID]):
         photo_urls (list[str]):
@@ -57,6 +58,7 @@ class Recipe:
     image_id: None | UUID
     image_url: None | str
     ingredients: list[Ingredient]
+    is_favourite: bool
     notes: str
     photo_image_ids: list[UUID]
     photo_urls: list[str]
@@ -107,6 +109,8 @@ class Recipe:
         for ingredients_item_data in self.ingredients:
             ingredients_item = ingredients_item_data.to_dict()
             ingredients.append(ingredients_item)
+
+        is_favourite = self.is_favourite
 
         notes = self.notes
 
@@ -164,6 +168,7 @@ class Recipe:
                 "imageId": image_id,
                 "imageUrl": image_url,
                 "ingredients": ingredients,
+                "isFavourite": is_favourite,
                 "notes": notes,
                 "photoImageIds": photo_image_ids,
                 "photoUrls": photo_urls,
@@ -254,6 +259,8 @@ class Recipe:
 
             ingredients.append(ingredients_item)
 
+        is_favourite = d.pop("isFavourite")
+
         notes = d.pop("notes")
 
         photo_image_ids = []
@@ -340,6 +347,7 @@ class Recipe:
             image_id=image_id,
             image_url=image_url,
             ingredients=ingredients,
+            is_favourite=is_favourite,
             notes=notes,
             photo_image_ids=photo_image_ids,
             photo_urls=photo_urls,

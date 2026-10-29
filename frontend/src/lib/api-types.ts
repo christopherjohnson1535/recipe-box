@@ -556,6 +556,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/recipes/{id}/favourite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Stars a recipe for the signed-in member. Starring it again is fine. */
+        put: operations["addFavourite"];
+        post?: never;
+        /** Takes the signed-in member's star off a recipe. Not starred is fine. */
+        delete: operations["removeFavourite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/recipes/{id}/restore": {
         parameters: {
             query?: never;
@@ -980,6 +998,8 @@ export interface components {
             imageId: string | null;
             imageUrl: string | null;
             ingredients: components["schemas"]["Ingredient"][];
+            /** @description Whether the signed-in member starred it. Each member has their own favourites. */
+            isFavourite: boolean;
             notes: string;
             photoImageIds: string[];
             photoUrls: string[];
@@ -1124,6 +1144,8 @@ export interface components {
             /** @description As on `Recipe`. */
             imageDisplayUrl: string | null;
             imageUrl: string | null;
+            /** @description As on `Recipe`. */
+            isFavourite: boolean;
             /** @description Free text, as on `Recipe`. */
             servings: string | null;
             sourceType: components["schemas"]["SourceType"];
@@ -2757,6 +2779,8 @@ export interface operations {
                 q?: string;
                 /** @description Exact tag name, case-insensitive. */
                 tag?: string;
+                /** @description `true`: only the signed-in member's favourites (combined with `q`, `tag` and `sort`). */
+                favourite?: boolean;
                 /** @description Default `newest`, or relevance when `q` is set. */
                 sort?: components["schemas"]["RecipeSort"];
                 /** @description 1 to 200. */
@@ -2779,7 +2803,7 @@ export interface operations {
                     "application/json": components["schemas"]["RecipePage"];
                 };
             };
-            /** @description Bad `limit`, `offset` or `sort` (`validation`). */
+            /** @description Bad `limit`, `offset`, `sort` or `favourite` (`validation`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3236,6 +3260,120 @@ export interface operations {
                 };
             };
             /** @description No such recipe or entry, or the recipe is deleted (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    addFavourite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Recipe id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Starred. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed id (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No such recipe, or deleted (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Something went wrong on the server (`internal`). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    removeFavourite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Recipe id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not starred any more. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed id (`validation`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No or expired session (`unauthenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No such recipe, or deleted (`not_found`). */
             404: {
                 headers: {
                     [name: string]: unknown;
