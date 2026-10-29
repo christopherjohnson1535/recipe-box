@@ -6,7 +6,16 @@ description: Stage 3 of the software factory — build from docs/SPEC.md with a 
 # Build with an agent team
 
 You orchestrate; agents write the code. Agent model: Sonnet (the owner wants stage agents on a cheaper model) unless the owner says otherwise.
-For a small issue, one builder agent (or you, if the owner prefers) is enough — the rules below still apply.
+The rules below apply at every size.
+
+## By size (see `factory`)
+- **S:** one builder.
+- **M:** one builder per tree, in parallel (disjoint owned paths).
+- **L:** the waves below.
+
+Builders run scoped checks only: `cargo clippy -p <crate> --all-targets -- -D warnings`, `cargo test -p <crate>`,
+`npx vitest run <touched files>`, `npx tsc --noEmit`. Release builds belong to the tester. All builders in an issue
+share one clone and one `backend/target/`.
 
 ## Waves
 

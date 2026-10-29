@@ -5,10 +5,16 @@ description: Stage 7 of the software factory — deliver the verified build to t
 
 # Ship
 
+## By size (see `factory`)
+- **S / M / L:** the same steps; the PR carries the tier and the stage-timing line. Sections 2 and 4 apply only
+  when the owner asks for them.
+
 ## 1. Final state
 - Working tree clean; last commit message is a short subject plus a 1-3 line body saying what the round did. Commits end with the attribution trailer the
   session provides.
 - The fix ledger lives in the PR description: a line for every finding; open items listed.
+- The PR description states the tier and a stage-timing line (the PR template has both): minutes per stage
+  (plan · build · verify · test · ship) and the number of agents used. These numbers are how the tiers get tuned.
 
 ## 2. Deliver to the owner's machine (when building in a separate sandbox)
 - Copy source + `.git`, never `node_modules`, `.next`, `data`:

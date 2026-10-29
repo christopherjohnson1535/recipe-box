@@ -5,6 +5,11 @@ description: Stage 6 of the software factory — make the UI look professional a
 
 # Design QA
 
+## By size (see `factory`)
+- **S:** skip.
+- **M:** only for a new page or a shared UI component (`src/components/ui/*`); otherwise skip.
+- **L:** the full steps below.
+
 ## Skills (fetch with `sh scripts/factory/fetch-skills.sh` into the gitignored `.factory/vendor/`)
 - impeccable — https://github.com/pbakaus/impeccable (`plugin/skills/impeccable/`; use `critique`, `audit`,
   `polish`, `layout`, `typeset`, `craft-floor`). Recipe Box reading screens are **Read** mode: editorial,

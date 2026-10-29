@@ -19,6 +19,22 @@ body:
     attributes:
       label: Scope and notes
       description: SPEC sections, endpoints (docs/API.md), design decisions.
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      description: "Context pack. S: one tree, ≤ ~150 lines, no risky surface. M: both trees, a new endpoint, or a risky surface. L: architecture, design system, or ≥ 3 areas."
+      options:
+        - S
+        - M
+        - L
+    validations:
+      required: true
+  - type: textarea
+    id: read_first
+    attributes:
+      label: Read first
+      description: "Context pack. Requirement IDs, SPEC sections, endpoints, and the 3–6 files to read first."
   - type: textarea
     id: owned
     attributes:
