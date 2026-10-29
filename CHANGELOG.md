@@ -13,6 +13,11 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 ## [Unreleased]
 
 ### Added
+- Plan the evening (#83, KIT-7): with AI set up, cook together suggests an order that starts the slow dishes first so
+  everything is ready together, shown as a preview the cook uses or dismisses, with start times for an optional serve
+  time. `POST /api/cook/plan`; the AI's plan is checked (every step once, each recipe in order, start times that never go
+  back) and falls back to taking turns, with the reason, when it does not add up. Hidden with `AI_PROVIDER=none`;
+  greyed out offline.
 - Favourites (#22, REC-5): each member stars recipes for themselves, on the home cards and the recipe page, and
   **Favourites** in the tag row filters to them (with search and tags). `PUT`/`DELETE /api/recipes/{id}/favourite`,
   `GET /api/recipes?favourite=true`, and `isFavourite` on recipes. Favourites are kept on the device for offline reading
