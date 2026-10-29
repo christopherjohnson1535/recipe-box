@@ -6,6 +6,7 @@ import {
   CookStepItem, CookStepList, CookStepText, CookTextButton, CookTick, CookSoundToggle, CookToolbar, CookTopBar, CookViewToggle, CookVoiceToggle,
 } from "@/components/ui/CookKit";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { MadeIt } from "@/components/cook-log/MadeIt";
 import { ButtonLink } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { splitIngredient } from "@/lib/scale";
@@ -168,6 +169,7 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
         timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
       />
       <CookLive>{live.text}</CookLive>
+      {(all || next === undefined) && <MadeIt recipeId={id} />}
       <CookFooter next={next} summary={all ? `${ticks.steps.size} of ${count} steps done` : undefined}>
         {all ? (
           <CookPillLink href={`/recipes/${id}`}>Finish</CookPillLink>

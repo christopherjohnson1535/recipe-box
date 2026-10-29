@@ -373,3 +373,27 @@ describe("CookMode tick-off and views", () => {
     expect(screen.getByText(/Auto-Lock to Never/)).toBeTruthy();
   });
 });
+
+describe("CookMode made-it prompt (REC-6)", () => {
+  it("offers Made it on the last step and in the list of every step, not before", () => {
+    view();
+    expect(screen.queryByRole("button", { name: "Made it" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
+    expect(screen.queryByRole("button", { name: "Made it" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
+    expect(screen.getByRole("button", { name: "Made it" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Back/ }));
+    fireEvent.click(screen.getByRole("button", { name: "All steps" }));
+    expect(screen.getByRole("button", { name: "Made it" })).toBeTruthy();
+  });
+
+  it("arrow keys typed in the note do not change the step", () => {
+    localStorage.setItem("cook-view", "one");
+    view();
+    fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Made it" }));
+    fireEvent.keyDown(screen.getByLabelText("What I’d change"), { key: "ArrowLeft" });
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy();
+  });
+});

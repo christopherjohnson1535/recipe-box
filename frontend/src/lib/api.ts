@@ -26,6 +26,8 @@ export type RecipeSort = Schemas["RecipeSort"];
 export type RecipePage = Schemas["RecipePage"];
 export type ImportSummary = Schemas["ImportSummary"];
 export type GoogleStatus = Schemas["GoogleStatus"];
+export type CookLogEntry = Schemas["CookLogEntry"];
+export type NewCookLogEntry = Schemas["NewCookLogEntry"];
 export type GoogleExport = Schemas["GoogleExport"];
 /** Connecting is a full-page navigation (a link, not a fetch): Google's consent page, then back to /settings?google=connected|error. */
 export const GOOGLE_CONNECT_URL = "/api/integrations/google/connect";
@@ -128,6 +130,9 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, ini
     updateRecipe: (recipeId: string, body: RecipeInput) => request<Recipe>("PUT", `/api/recipes/${id(recipeId)}`, body),
     deleteRecipe: (recipeId: string) => request<void>("DELETE", `/api/recipes/${id(recipeId)}`),
     restoreRecipe: (recipeId: string) => request<Recipe>("POST", `/api/recipes/${id(recipeId)}/restore`),
+    listCookLog: (recipeId: string) => get<CookLogEntry[]>(`/api/recipes/${id(recipeId)}/cook-log`),
+    addCookLogEntry: (recipeId: string, body: NewCookLogEntry) => request<CookLogEntry>("POST", `/api/recipes/${id(recipeId)}/cook-log`, body),
+    deleteCookLogEntry: (recipeId: string, entryId: string) => request<void>("DELETE", `/api/recipes/${id(recipeId)}/cook-log/${id(entryId)}`),
 
     listTags: () => get<Tag[]>("/api/tags"),
 
