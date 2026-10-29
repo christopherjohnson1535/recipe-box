@@ -201,15 +201,32 @@ describe("timerReducer pause and +1 minute", () => {
 });
 
 describe("rackOrder", () => {
-  it("puts finished timers first, then the running ones by the time left", () => {
-    const t = (id: number, endsAt: number, done = false, pausedLeftMs: number | null = null) => ({ id, key: `k${id}`, label: `t${id}`, totalMs: 1, endsAt, done, pausedLeftMs });
-    expect(rackOrder([t(1, 900), t(2, 300), t(3, 500, true), t(4, 100, true)]).map((x) => x.id)).toEqual([4, 3, 2, 1]);
+  const t = (id: number, endsAt: number, done = false, pausedLeftMs: number | null = null) => ({ id, key: `k${id}`, label: `t${id}`, totalMs: 1, endsAt, done, pausedLeftMs });
+  const ids = (timers: ReturnType<typeof t>[], now: number) => rackOrder(timers, now).map((x) => x.id);
+
+  it("puts finished timers first, then the others by the time left", () => {
+    expect(ids([t(1, 900), t(2, 300), t(3, 500, true), t(4, 100, true)], 0)).toEqual([4, 3, 2, 1]);
   });
 
-  it("puts paused timers after the running ones, the one with least time left first", () => {
-    const t = (id: number, endsAt: number, done = false, pausedLeftMs: number | null = null) => ({ id, key: `k${id}`, label: `t${id}`, totalMs: 1, endsAt, done, pausedLeftMs });
-    // endsAt of a paused timer is stale (here the earliest of all) and must not decide its place.
-    expect(rackOrder([t(1, 10, false, 5000), t(2, 900), t(3, 500, true), t(4, 20, false, 1000)]).map((x) => x.id)).toEqual([3, 2, 4, 1]);
+  it("puts paused timers among the running ones by the time they hold, ignoring their stale end time", () => {
+    // At 100: 2 has 800 left, 4 holds 1000, 1 holds 5000. 4's end time (20) is the earliest of all and must not decide.
+    expect(ids([t(1, 10, false, 5000), t(2, 900), t(3, 500, true), t(4, 20, false, 1000)], 100)).toEqual([3, 2, 4, 1]);
+  });
+
+  it("does not move a timer when it is paused or resumed", () => {
+    const now = 1000;
+    const before = [t(1, now + 5000), t(2, now + 9000), t(3, now + 7000)];
+    const order = ids(before, now);
+    expect(order).toEqual([1, 3, 2]);
+    let state: TimerState = { nextId: 4, timers: before };
+    state = timerReducer(state, { type: "pause", id: 3, now });
+    expect(ids(state.timers, now)).toEqual(order);
+    state = timerReducer(state, { type: "resume", id: 3, now });
+    expect(ids(state.timers, now)).toEqual(order);
+  });
+
+  it("breaks ties by id", () => {
+    expect(ids([t(2, 500), t(1, 500, false, null), t(3, 100, false, 400)], 100)).toEqual([1, 2, 3]);
   });
 });
 

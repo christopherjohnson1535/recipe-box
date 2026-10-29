@@ -173,13 +173,14 @@ export function timerReducer(state: TimerState, action: TimerAction): TimerState
 }
 
 /**
- * Rack order: finished timers first (they need the cook), then the running ones, soonest to end first, then the paused
- * ones, least time left first. The first is the big ring.
+ * Rack order: finished timers first (they need the cook; the one finished longest ago first), then every other timer,
+ * running or paused, by the time left at `now` (paused ones by the time they were paused with), then by id. Pausing
+ * or resuming keeps the time left, so neither ever moves a timer under the cook's finger; +1 minute can. The first is
+ * the big ring.
  */
-export const rackOrder = (timers: readonly Timer[]): Timer[] => {
-  const rank = (t: Timer) => (t.done ? 0 : t.pausedLeftMs === null ? 1 : 2);
-  const due = (t: Timer) => t.pausedLeftMs ?? t.endsAt;
-  return [...timers].sort((a, b) => rank(a) - rank(b) || due(a) - due(b) || a.id - b.id);
+export const rackOrder = (timers: readonly Timer[], now: number): Timer[] => {
+  const key = (t: Timer) => (t.done ? t.endsAt : (t.pausedLeftMs ?? Math.max(0, t.endsAt - now)));
+  return [...timers].sort((a, b) => Number(!a.done) - Number(!b.done) || key(a) - key(b) || a.id - b.id);
 };
 
 export const remainingMs = (t: Timer, now: number) => (t.done ? 0 : t.pausedLeftMs ?? Math.max(0, t.endsAt - now));

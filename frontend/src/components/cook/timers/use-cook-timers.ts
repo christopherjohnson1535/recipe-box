@@ -86,10 +86,12 @@ export function useCookTimers(announce: (text: string) => void) {
       const t = Date.now();
       // +1 minute on the only finished timer sets it going again: its ring ends, as on Dismiss.
       if (timers.some((x) => x.id === id && x.done) && !timers.some((x) => x.done && x.id !== id)) stop();
+      const timer = timers.find((x) => x.id === id);
+      if (timer) announce(`Added a minute: ${timer.label}`);
       setNow(t);
       dispatch({ type: "addMinute", id, now: t });
     },
-    [timers, stop],
+    [timers, stop, announce],
   );
   return { timers, now, running, start, dismiss, pause, resume, addMinute, alert };
 }

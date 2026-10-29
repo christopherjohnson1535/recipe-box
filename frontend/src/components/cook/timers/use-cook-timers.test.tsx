@@ -46,13 +46,18 @@ describe("timer controls in cook mode", () => {
     expect(group("Step 1 · 10 min").getByText("9:00")).toBeTruthy();
     expect(group("Step 1 · 10 min").getByText("Paused")).toBeTruthy();
     expect(notes).not.toHaveBeenCalled();
-    // The chip in the step shows the frozen time and starting it again does nothing.
-    expect(screen.getByRole("button", { name: "Timer running: 10 minutes" }).textContent).toContain("9:00");
-    fireEvent.click(screen.getByRole("button", { name: "Timer running: 10 minutes" }));
+    // The chip in the step says it is paused and shows the frozen time, in the resting colours; starting it again does nothing.
+    const chip = screen.getByRole("button", { name: "Timer paused: 10 minutes" });
+    expect(chip.textContent).toContain("Paused 9:00");
+    expect(chip.className).not.toContain("bg-accent");
+    fireEvent.click(chip);
     expect(screen.getAllByRole("group", { name: "Step 1 · 10 min" })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Resume timer: Step 1 · 10 min" }));
     expect(screen.queryByText("Paused")).toBeNull();
+    const running = screen.getByRole("button", { name: "Timer running: 10 minutes" });
+    expect(running.className).toContain("bg-accent");
+    expect(running.textContent).not.toContain("Paused");
     advance(60_000);
     expect(group("Step 1 · 10 min").getByText("8:00")).toBeTruthy();
     advance(8 * 60_000);
@@ -64,17 +69,17 @@ describe("timer controls in cook mode", () => {
     cook();
     startTimer();
     advance(1000);
-    fireEvent.click(screen.getByRole("button", { name: "Add a minute: Step 1 · 10 min" }));
+    fireEvent.click(screen.getByRole("button", { name: "+1 min: Step 1 · 10 min" }));
     expect(group("Step 1 · 10 min").getByText("10:59")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Pause timer: Step 1 · 10 min" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add a minute: Step 1 · 10 min" }));
+    fireEvent.click(screen.getByRole("button", { name: "+1 min: Step 1 · 10 min" }));
     expect(group("Step 1 · 10 min").getByText("11:59")).toBeTruthy();
     expect(group("Step 1 · 10 min").getByText("Paused")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Resume timer: Step 1 · 10 min" }));
     advance(11 * 60_000 + 59_000);
     expect(group("Step 1 · 10 min").getByText("Done")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^(Pause|Resume) timer/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Add a minute: Step 1 · 10 min" }));
+    fireEvent.click(screen.getByRole("button", { name: "+1 min: Step 1 · 10 min" }));
     expect(group("Step 1 · 10 min").getByText("1:00")).toBeTruthy();
     expect(screen.getAllByRole("group", { name: "Step 1 · 10 min" })).toHaveLength(1);
   });
@@ -83,9 +88,48 @@ describe("timer controls in cook mode", () => {
     fakeAudio();
     cook();
     startTimer();
-    for (const name of ["Pause timer: Step 1 · 10 min", "Add a minute: Step 1 · 10 min", "Cancel timer: Step 1 · 10 min"]) {
+    for (const name of ["Pause timer: Step 1 · 10 min", "+1 min: Step 1 · 10 min", "Cancel timer: Step 1 · 10 min"]) {
       expect(screen.getByRole("button", { name }).className).toContain("min-h-control min-w-control");
     }
+  });
+
+  it("keeps a timer in place on Pause and Resume, and keeps focus on the control that was pressed", () => {
+    fakeAudio();
+    render(<CookMode id="r-two" title="Soup" ingredients={[]} steps={["Simmer 10 minutes, then bake 20 minutes."]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start timer: 20 minutes" }));
+    const order = () => screen.getAllByRole("group").map((g) => g.getAttribute("aria-label")).filter((n) => n?.startsWith("Step 1 ·"));
+    expect(order()).toEqual(["Step 1 · 10 min", "Step 1 · 20 min"]);
+    const pause = screen.getByRole("button", { name: "Pause timer: Step 1 · 10 min" });
+    pause.focus();
+    fireEvent.click(pause);
+    expect(order()).toEqual(["Step 1 · 10 min", "Step 1 · 20 min"]);
+    const resume = screen.getByRole("button", { name: "Resume timer: Step 1 · 10 min" });
+    expect(document.activeElement).toBe(resume);
+    resume.focus();
+    fireEvent.click(resume);
+    expect(order()).toEqual(["Step 1 · 10 min", "Step 1 · 20 min"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Pause timer: Step 1 · 10 min" }));
+  });
+
+  it("announces +1 minute and keeps focus on +1 min when it moves the timer", () => {
+    fakeAudio();
+    render(<CookMode id="r-two" title="Soup" ingredients={[]} steps={["Simmer 10 minutes, then bake 10 minutes and 30 seconds."]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes and 30 seconds" }));
+    const order = () => screen.getAllByRole("group").map((g) => g.getAttribute("aria-label")).filter((n) => n?.startsWith("Step 1 ·"));
+    expect(order()).toEqual(["Step 1 · 10 min", "Step 1 · 10 min 30 sec"]);
+    const more = screen.getByRole("button", { name: "+1 min: Step 1 · 10 min" });
+    more.focus();
+    // jsdom keeps focus when a node moves where a browser may drop it: check the rack asks for it.
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    fireEvent.click(more);
+    expect(focus.mock.contexts.at(-1)).toBe(screen.getByRole("button", { name: "+1 min: Step 1 · 10 min" }));
+    focus.mockRestore();
+    // 11:00 now outlasts 10:30, so the timer moves down the rack; the focus follows it.
+    expect(order()).toEqual(["Step 1 · 10 min 30 sec", "Step 1 · 10 min"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "+1 min: Step 1 · 10 min" }));
+    expect(screen.getByRole("status").textContent).toContain("Added a minute: Step 1 · 10 min");
   });
 });
 
@@ -124,6 +168,12 @@ describe("useCookTimers pause and +1 minute", () => {
     expect(hook.result.current.timers.filter((t) => t.done)).toHaveLength(2);
     act(() => hook.result.current.addMinute(hook.result.current.timers[0].id));
     expect(disconnect).not.toHaveBeenCalled();
+  });
+
+  it("announces +1 minute with the timer's name", () => {
+    const { announce, hook } = setup();
+    act(() => hook.result.current.addMinute(hook.result.current.timers[0].id));
+    expect(announce).toHaveBeenCalledWith("Added a minute: Soup");
   });
 
   it("stops ticking while the only timer is paused, and starts again when it resumes", () => {

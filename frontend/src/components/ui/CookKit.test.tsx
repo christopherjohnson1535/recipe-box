@@ -15,6 +15,7 @@ import {
   CookStepItem,
   CookStepText,
   CookTimer,
+  CookTimerButton,
   CookTimers,
   CookViewChoice,
 } from "./CookKit";
@@ -438,7 +439,7 @@ describe("cook together layout pieces", () => {
     const { rerender } = render(<CookTimer {...props} done={false} large />);
     for (const large of [true, false]) {
       rerender(<CookTimer {...props} done={false} large={large} />);
-      for (const name of ["Pause timer: Roast", "Add a minute: Roast", "Cancel timer: Roast"]) {
+      for (const name of ["Pause timer: Roast", "+1 min: Roast", "Cancel timer: Roast"]) {
         expect(screen.getByRole("button", { name }).className).toContain("min-h-control min-w-control");
       }
       expect(screen.queryByText("Paused")).toBeNull();
@@ -447,14 +448,41 @@ describe("cook together layout pieces", () => {
       expect(screen.getByText("Paused")).toBeTruthy();
       expect(screen.getByText("19:58")).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Resume timer: Roast" }));
-      fireEvent.click(screen.getByRole("button", { name: "Add a minute: Roast" }));
+      fireEvent.click(screen.getByRole("button", { name: "+1 min: Roast" }));
     }
     expect(onTogglePause).toHaveBeenCalledTimes(2);
     expect(onAddMinute).toHaveBeenCalledTimes(2);
     rerender(<CookTimer {...props} done large />);
     expect(screen.queryByRole("button", { name: /^(Pause|Resume) timer/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Add a minute: Roast" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "+1 min: Roast" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Dismiss timer: Roast" })).toBeTruthy();
+  });
+
+  it("CookTimer: every control's name holds its visible text (or starts with the action for an icon), in every layout", () => {
+    const props = { label: "Roast", digits: "19:58", fraction: 0.5, flash: false, onDismiss: () => {}, onTogglePause: () => {}, onAddMinute: () => {}, timerId: 7 };
+    const { rerender } = render(<CookTimer {...props} done={false} large />);
+    for (const [large, done, paused] of [[true, false, false], [false, false, false], [true, false, true], [false, false, true], [true, true, false], [false, true, false]]) {
+      rerender(<CookTimer {...props} large={large} done={done} paused={paused} />);
+      const group = screen.getByRole("group", { name: "Roast" });
+      expect(group.getAttribute("data-timer-id")).toBe("7");
+      for (const button of within(group).getAllByRole("button")) {
+        const name = button.getAttribute("aria-label") ?? "";
+        const text = button.textContent?.trim() ?? "";
+        // An icon button has no text: its name starts with the action. A text button's name contains what it shows.
+        if (text) expect(name.toLowerCase()).toContain(text.toLowerCase());
+        else expect(name).toMatch(/^(Pause|Resume) timer: /);
+        expect(button.getAttribute("data-control")).toBeTruthy();
+      }
+      expect(within(group).getByRole("button", { name: "+1 min: Roast" }).textContent).toBe("+1");
+    }
+  });
+
+  it("CookTimerButton: a chip with a paused timer says so and drops the running colours", () => {
+    const { rerender } = render(<CookTimerButton left="8:38">10 minutes</CookTimerButton>);
+    expect(screen.getByRole("button").className).toContain("bg-accent");
+    rerender(<CookTimerButton left="Paused 8:38" paused>10 minutes</CookTimerButton>);
+    expect(screen.getByRole("button").className).not.toContain("bg-accent");
+    expect(screen.getByRole("button").textContent).toContain("Paused 8:38");
   });
 
   it("CookColumns (not wide) names the ring inside it from 1024px, under it upright", () => {
