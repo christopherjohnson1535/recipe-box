@@ -1,6 +1,6 @@
 //! API types; they feed the OpenAPI spec (`docs/openapi.json`). JSON is camelCase.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -318,6 +318,49 @@ pub struct UpdateGroceryItem {
     /// Also remembered for the item's name, so the next list files it there.
     pub section: Option<GrocerySection>,
     pub staple: Option<bool>,
+}
+
+/// One "made it" entry: who cooked the recipe, on which day, and what they would change.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CookLogEntry {
+    pub id: Uuid,
+    pub recipe_id: Uuid,
+    /// The cook's own calendar day (`YYYY-MM-DD`).
+    pub cooked_on: NaiveDate,
+    /// What they would change next time; empty when they left no note.
+    pub note: String,
+    /// `null` once that member was removed.
+    #[schema(required = true)]
+    pub made_by: Option<UserRef>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<domain::CookLogEntry> for CookLogEntry {
+    fn from(e: domain::CookLogEntry) -> Self {
+        Self {
+            id: e.id,
+            recipe_id: e.recipe_id,
+            cooked_on: e.cooked_on,
+            note: e.note,
+            made_by: e.made_by.map(|u| UserRef {
+                id: u.id,
+                display_name: u.display_name,
+            }),
+            created_at: e.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NewCookLogEntry {
+    /// The cook's own calendar day (`YYYY-MM-DD`); not in the future.
+    pub cooked_on: NaiveDate,
+    /// What they would change next time; at most 2,000 characters once trimmed. Default empty.
+    #[serde(default)]
+    #[schema(max_length = 2000)]
+    pub note: String,
 }
 
 /// Whether this member can send the grocery list to Google Tasks.

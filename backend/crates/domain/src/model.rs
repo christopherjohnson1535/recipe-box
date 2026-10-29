@@ -1,7 +1,7 @@
 //! Domain types. JSON shape and OpenAPI schemas live on the HTTP types in the API crate's `models.rs`.
 //! Stored images are referred to by file name here; turning a file name into a `/media/...` URL is the HTTP layer's job.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 
 use crate::{ROLE_ADMIN, Secret};
@@ -200,6 +200,30 @@ pub struct NewUser {
     pub role: String,
     /// Already checked by [`crate::validate::email`].
     pub email: Option<String>,
+}
+
+/// One "made it" entry (REC-6): a member cooked a recipe on a day, with what they would change next time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CookLogEntry {
+    pub id: Uuid,
+    pub recipe_id: Uuid,
+    /// The cook's own calendar day, as their device saw it (the server does not know their time zone).
+    pub cooked_on: NaiveDate,
+    /// What they would change; empty when they left no note.
+    pub note: String,
+    /// `None` when the member was removed.
+    pub made_by: Option<UserRef>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// A "made it" entry to record. Already checked by [`crate::validate::cooked_on`] and
+/// [`crate::validate::cook_note`].
+#[derive(Debug, Clone)]
+pub struct NewCookLogEntry {
+    pub recipe_id: Uuid,
+    pub user_id: Uuid,
+    pub cooked_on: NaiveDate,
+    pub note: String,
 }
 
 /// A member's link to an identity provider's account (ACC-6): `subject` is the provider's stable id for the account,

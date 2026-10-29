@@ -308,6 +308,7 @@ mod tests {
             grocery: store.clone(),
             google_connections: store.clone(),
             identities: store.clone(),
+            cook_log: store.clone(),
             google_signin: Arc::new(app::DisabledGoogleSignIn),
             flows: Arc::new(app::DisabledGoogleSignIn),
             health: store.clone(),

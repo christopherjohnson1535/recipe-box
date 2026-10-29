@@ -6,6 +6,7 @@
 //! Build the lot with [`Services::new`] from a [`Deps`].
 
 mod auth;
+mod cook_log;
 mod export;
 mod google;
 mod grocery;
@@ -20,13 +21,14 @@ mod users;
 use std::sync::Arc;
 
 use ports::{
-    BackupFormat, Clock, FlowSealer, GoogleConnectionRepo, GoogleSignIn, GoogleTasks, GroceryRepo,
-    IdentityRepo, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader, PasswordHasher,
-    RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo, StorageHealth, TagRepo,
-    TaskSpawner, TokenCipher, UserRepo,
+    BackupFormat, Clock, CookLogRepo, FlowSealer, GoogleConnectionRepo, GoogleSignIn, GoogleTasks,
+    GroceryRepo, IdentityRepo, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader,
+    PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo,
+    StorageHealth, TagRepo, TaskSpawner, TokenCipher, UserRepo,
 };
 
 pub use auth::{AuthService, NewSession};
+pub use cook_log::CookLogService;
 pub use export::{ExportJob, ExportService, ImportReport};
 pub use google::{
     DisabledGoogleSignIn, DisabledGoogleTasks, GoogleExport, GoogleStatus, GoogleTasksService,
@@ -55,6 +57,7 @@ pub struct Deps {
     pub grocery: Arc<dyn GroceryRepo>,
     pub google_connections: Arc<dyn GoogleConnectionRepo>,
     pub identities: Arc<dyn IdentityRepo>,
+    pub cook_log: Arc<dyn CookLogRepo>,
     pub health: Arc<dyn StorageHealth>,
     pub media: Arc<dyn MediaStore>,
     pub backup: Arc<dyn BackupFormat>,
@@ -93,6 +96,7 @@ pub struct Services {
     pub settings: SettingsService,
     pub tags: TagService,
     pub grocery: GroceryService,
+    pub cook_log: CookLogService,
     pub google: GoogleTasksService,
     pub media: MediaService,
     pub imports: ImportService,
@@ -113,6 +117,7 @@ impl Services {
             tags: TagService::new(&d),
             google: GoogleTasksService::new(&d, grocery.clone()),
             grocery,
+            cook_log: CookLogService::new(&d),
             media: MediaService::new(&d),
             imports: ImportService::new(&d),
             export: ExportService::new(&d),

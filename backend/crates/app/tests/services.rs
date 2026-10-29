@@ -39,6 +39,7 @@ impl World {
             grocery: store.clone(),
             google_connections: store.clone(),
             identities: store.clone(),
+            cook_log: store.clone(),
             google_signin: Arc::new(app::DisabledGoogleSignIn),
             flows: Arc::new(app::DisabledGoogleSignIn),
             health: store.clone(),
@@ -784,4 +785,120 @@ async fn own_password_change_locks_per_user_and_leaves_admin_resets_alone() {
     w.clock.advance(Duration::seconds(30));
     // The reset changed the password, so the old "right" one is just wrong now (and the count carries on).
     assert!(is_wrong_login(change(PASSWORD).await));
+}
+
+fn cook_day(m: u32, d: u32) -> domain::chrono::NaiveDate {
+    domain::chrono::NaiveDate::from_ymd_opt(2026, m, d).unwrap()
+}
+
+#[tokio::test]
+async fn made_it_entries_are_checked_and_follow_the_recipe() {
+    let s = World::new().services(); // the clock reads 2026-01-01
+    let ann = user(&s, "ann", "admin").await;
+    let soup = s.recipes.create(ann.id, input("Soup")).await.unwrap().id;
+
+    let e = s
+        .cook_log
+        .add(&ann, soup, cook_day(1, 1), "  a little less salt ")
+        .await
+        .unwrap();
+    assert_eq!(e.note, "a little less salt");
+    assert!(
+        s.cook_log.add(&ann, soup, cook_day(1, 2), "").await.is_ok(),
+        "a day of slack"
+    );
+    assert!(is_validation(
+        s.cook_log.add(&ann, soup, cook_day(1, 3), "").await,
+        "cookedOn: can't be in the future."
+    ));
+    assert!(is_validation(
+        s.cook_log
+            .add(&ann, soup, cook_day(1, 1), &"x".repeat(2001))
+            .await,
+        "note: at most 2000 characters."
+    ));
+    assert_eq!(s.cook_log.list(soup).await.unwrap().len(), 2);
+
+    // A deleted recipe's log is hidden with it and comes back on restore.
+    s.recipes.delete(soup).await.unwrap();
+    for got in [
+        s.cook_log.list(soup).await.map(|_| ()),
+        s.cook_log
+            .add(&ann, soup, cook_day(1, 1), "")
+            .await
+            .map(|_| ()),
+        s.cook_log.delete(&ann, soup, e.id).await,
+    ] {
+        assert!(matches!(got, Err(DomainError::NotFound(_))), "{got:?}");
+    }
+    s.recipes.restore(soup).await.unwrap();
+    assert_eq!(s.cook_log.list(soup).await.unwrap().len(), 2);
+    assert!(matches!(
+        s.cook_log.list(Uuid::new_v4()).await,
+        Err(DomainError::NotFound(_))
+    ));
+}
+
+#[tokio::test]
+async fn only_the_cook_or_an_admin_deletes_an_entry() {
+    let s = World::new().services();
+    let ann = user(&s, "ann", "admin").await;
+    let bob = user(&s, "bob", "member").await;
+    let cy = user(&s, "cyd", "member").await;
+    let soup = s.recipes.create(ann.id, input("Soup")).await.unwrap().id;
+    let stew = s.recipes.create(ann.id, input("Stew")).await.unwrap().id;
+    let bobs = s
+        .cook_log
+        .add(&bob, soup, cook_day(1, 1), "")
+        .await
+        .unwrap();
+    let bobs2 = s
+        .cook_log
+        .add(&bob, soup, cook_day(1, 1), "")
+        .await
+        .unwrap();
+    let anns = s
+        .cook_log
+        .add(&ann, soup, cook_day(1, 1), "")
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        s.cook_log.delete(&cy, soup, bobs.id).await,
+        Err(DomainError::Forbidden(_))
+    ));
+    assert!(matches!(
+        s.cook_log.delete(&bob, soup, anns.id).await,
+        Err(DomainError::Forbidden(_))
+    ));
+    // The entry must belong to the recipe in the address.
+    assert!(matches!(
+        s.cook_log.delete(&bob, stew, bobs.id).await,
+        Err(DomainError::NotFound(_))
+    ));
+    s.cook_log.delete(&bob, soup, bobs.id).await.unwrap();
+    s.cook_log.delete(&ann, soup, bobs2.id).await.unwrap(); // an admin may tidy anyone's
+    assert!(matches!(
+        s.cook_log.delete(&bob, soup, bobs.id).await,
+        Err(DomainError::NotFound(_))
+    ));
+
+    // A removed member's entry stays, unsigned, and only an admin can delete it.
+    let cys = s
+        .cook_log
+        .add(&cy, soup, cook_day(1, 1), "more lemon")
+        .await
+        .unwrap();
+    s.users.remove(&ann, cy.id).await.unwrap();
+    let left = s.cook_log.list(soup).await.unwrap();
+    let kept = left.iter().find(|e| e.id == cys.id).expect("kept");
+    assert_eq!(
+        (kept.made_by.clone(), kept.note.as_str()),
+        (None, "more lemon")
+    );
+    assert!(matches!(
+        s.cook_log.delete(&bob, soup, cys.id).await,
+        Err(DomainError::Forbidden(_))
+    ));
+    s.cook_log.delete(&ann, soup, cys.id).await.unwrap();
 }

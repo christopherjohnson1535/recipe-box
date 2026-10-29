@@ -13,18 +13,18 @@ use std::{
 
 use async_trait::async_trait;
 use domain::{
-    DomainError, DomainResult, Identity, Image, NewIdentity, NewUser, Page, RESTORE_WINDOW_MINUTES,
-    ROLE_ADMIN, Recipe, RecipeInput, RecipeSummary, SearchQuery, Secret, Settings, SignInFlow,
-    Sort, TagCount, User, UserRef,
+    CookLogEntry, DomainError, DomainResult, Identity, Image, NewCookLogEntry, NewIdentity,
+    NewUser, Page, RESTORE_WINDOW_MINUTES, ROLE_ADMIN, Recipe, RecipeInput, RecipeSummary,
+    SearchQuery, Secret, Settings, SignInFlow, Sort, TagCount, User, UserRef,
     chrono::{DateTime, Duration, Utc},
     grocery::Section,
     uuid::Uuid,
 };
 use ports::{
-    Clock, Compute, EncodedImage, FlowSealer, GoogleConnection, GoogleConnectionRepo, GroceryItem,
-    GroceryList, GroceryRepo, IdentityRepo, ImageCodec, ImageRepo, ListedRecipe, MediaStore,
-    NewGroceryItem, PasswordHasher, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo,
-    StorageHealth, TagRepo, TokenCipher, UserRepo,
+    Clock, Compute, CookLogRepo, EncodedImage, FlowSealer, GoogleConnection, GoogleConnectionRepo,
+    GroceryItem, GroceryList, GroceryRepo, IdentityRepo, ImageCodec, ImageRepo, ListedRecipe,
+    MediaStore, NewGroceryItem, PasswordHasher, RecipeRepo, SessionRepo, SessionTokens,
+    SettingsRepo, StorageHealth, TagRepo, TokenCipher, UserRepo,
 };
 
 struct StoredUser {
@@ -40,6 +40,16 @@ struct StoredRecipe {
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     deleted_at: Option<DateTime<Utc>>,
+}
+
+/// A "made it" entry as stored: the member by id, so a rename shows and a removal clears it.
+struct StoredCookLog {
+    id: Uuid,
+    recipe_id: Uuid,
+    user_id: Option<Uuid>,
+    cooked_on: domain::chrono::NaiveDate,
+    note: String,
+    created_at: DateTime<Utc>,
 }
 
 struct StoredGroceryItem {
@@ -70,6 +80,8 @@ struct State {
     identities: Vec<Identity>,
     /// When each user's running export started.
     google_exports: HashMap<Uuid, DateTime<Utc>>,
+    /// "Made it" entries, in the order they were recorded.
+    cook_log: Vec<StoredCookLog>,
 }
 
 impl State {
@@ -99,6 +111,17 @@ impl State {
             id: u.id,
             display_name: u.display_name.clone(),
         })
+    }
+
+    fn cook_entry(&self, e: &StoredCookLog) -> CookLogEntry {
+        CookLogEntry {
+            id: e.id,
+            recipe_id: e.recipe_id,
+            cooked_on: e.cooked_on,
+            note: e.note.clone(),
+            made_by: self.user_ref(e.user_id),
+            created_at: e.created_at,
+        }
     }
 
     fn file(&self, id: Option<Uuid>) -> Option<&Image> {
@@ -198,6 +221,7 @@ impl MemoryStore {
                 google: HashMap::new(),
                 identities: Vec::new(),
                 google_exports: HashMap::new(),
+                cook_log: Vec::new(),
                 grocery: Grocery {
                     list: None,
                     recipes: Vec::new(),
@@ -344,9 +368,13 @@ impl RecipeRepo for MemoryStore {
         s.recipes
             .retain(|_, r| !r.deleted_at.is_some_and(|d| d < cutoff));
         let State {
-            recipes, grocery, ..
+            recipes,
+            grocery,
+            cook_log,
+            ..
         } = &mut *s;
         grocery.recipes.retain(|(id, ..)| recipes.contains_key(id));
+        cook_log.retain(|e| recipes.contains_key(&e.recipe_id));
         Ok((before - s.recipes.len()) as u64)
     }
 
@@ -655,6 +683,9 @@ impl UserRepo for MemoryStore {
         }
         for i in s.images.values_mut().filter(|i| i.created_by == gone) {
             i.created_by = None;
+        }
+        for e in s.cook_log.iter_mut().filter(|e| e.user_id == gone) {
+            e.user_id = None;
         }
         Ok(())
     }
@@ -1416,5 +1447,63 @@ impl ports::BackupFormat for MemoryBackup {
             recipes: Mutex::new(Some(recipes)),
             photos,
         }))
+    }
+}
+
+#[async_trait]
+impl CookLogRepo for MemoryStore {
+    async fn add(&self, entry: NewCookLogEntry) -> DomainResult<CookLogEntry> {
+        let now = self.clock.now();
+        let mut s = self.lock();
+        if !s
+            .recipes
+            .get(&entry.recipe_id)
+            .is_some_and(|r| r.deleted_at.is_none())
+        {
+            return Err(not_found());
+        }
+        let stored = StoredCookLog {
+            id: Uuid::new_v4(),
+            recipe_id: entry.recipe_id,
+            user_id: Some(entry.user_id),
+            cooked_on: entry.cooked_on,
+            note: entry.note,
+            created_at: now,
+        };
+        let out = s.cook_entry(&stored);
+        s.cook_log.push(stored);
+        Ok(out)
+    }
+
+    async fn list(&self, recipe_id: Uuid) -> DomainResult<Vec<CookLogEntry>> {
+        let s = self.lock();
+        let mut out: Vec<CookLogEntry> = s
+            .cook_log
+            .iter()
+            .filter(|e| e.recipe_id == recipe_id)
+            .map(|e| s.cook_entry(e))
+            .collect();
+        out.sort_by(|a, b| {
+            (b.cooked_on, b.created_at, b.id).cmp(&(a.cooked_on, a.created_at, a.id))
+        });
+        Ok(out)
+    }
+
+    async fn get(&self, id: Uuid) -> DomainResult<Option<CookLogEntry>> {
+        let s = self.lock();
+        Ok(s.cook_log
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| s.cook_entry(e)))
+    }
+
+    async fn delete(&self, id: Uuid) -> DomainResult<()> {
+        let mut s = self.lock();
+        let before = s.cook_log.len();
+        s.cook_log.retain(|e| e.id != id);
+        if s.cook_log.len() == before {
+            return Err(DomainError::NotFound("No such entry.".into()));
+        }
+        Ok(())
     }
 }

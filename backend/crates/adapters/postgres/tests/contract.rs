@@ -8,8 +8,8 @@ use std::{
 };
 
 use adapter_postgres::{
-    PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo, PgImageRepo, PgRecipeRepo,
-    PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo, migrate,
+    PgCookLogRepo, PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo, PgImageRepo,
+    PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo, migrate,
 };
 use domain::{
     grocery::{GeneratedItem, Section},
@@ -96,6 +96,7 @@ impl Schemas {
             grocery: Arc::new(PgGroceryRepo::new(pool.clone(), clock.clone())),
             google: Arc::new(PgGoogleConnectionRepo::new(pool.clone())),
             identities: Arc::new(PgIdentityRepo::new(pool.clone(), clock.clone())),
+            cook_log: Arc::new(PgCookLogRepo::new(pool.clone(), clock.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
         }
     }
@@ -161,6 +162,12 @@ async fn groceries_meet_the_contract() {
 async fn google_connections_meet_the_contract() {
     let Some(db) = Schemas::new() else { return };
     contract::google_connection_repo(|c| db.stack(c)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_cook_log_meets_the_contract() {
+    let Some(db) = Schemas::new() else { return };
+    contract::cook_log_repo(|c| db.stack(c)).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

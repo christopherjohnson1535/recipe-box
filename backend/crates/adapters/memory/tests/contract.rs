@@ -20,6 +20,7 @@ fn stack(clock: Arc<dyn Clock>) -> Stack {
         tags: store.clone(),
         grocery: store.clone(),
         google: store.clone(),
+        cook_log: store.clone(),
         identities: store,
     }
 }
@@ -56,6 +57,11 @@ async fn groceries_meet_the_contract() {
 #[tokio::test]
 async fn google_connections_meet_the_contract() {
     contract::google_connection_repo(stack).await;
+}
+
+#[tokio::test]
+async fn the_cook_log_meets_the_contract() {
+    contract::cook_log_repo(stack).await;
 }
 
 #[tokio::test]

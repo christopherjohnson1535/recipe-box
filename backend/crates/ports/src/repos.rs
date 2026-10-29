@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use domain::{
-    DomainResult, Identity, Image, Ingredient, NewIdentity, NewUser, Page, Recipe, RecipeInput,
-    RecipeSummary, SearchQuery, Settings, TagCount, User,
+    CookLogEntry, DomainResult, Identity, Image, Ingredient, NewCookLogEntry, NewIdentity, NewUser,
+    Page, Recipe, RecipeInput, RecipeSummary, SearchQuery, Settings, TagCount, User,
     chrono::{DateTime, Utc},
     grocery::{Amount, GeneratedItem, Section},
     uuid::Uuid,
@@ -160,6 +160,29 @@ pub trait UserRepo: Send + Sync {
     /// `NotFound` when there is no such user, `Forbidden` when it is the last admin (two concurrent removals
     /// cannot both pass this check).
     async fn remove(&self, id: Uuid) -> DomainResult<()>;
+}
+
+/// The household's "made it" log (REC-6). An entry belongs to a recipe and names the member who cooked it.
+///
+/// Entries outlive a soft delete of their recipe (a restore brings them back with it) and go when the recipe is
+/// purged. When a member is removed their entries stay, with `made_by` cleared. `made_by` carries the member's
+/// current display name. A repository stamps `created_at` with its [`crate::Clock`].
+#[async_trait]
+pub trait CookLogRepo: Send + Sync {
+    /// Records an entry and returns it. `NotFound` when the recipe is missing or deleted (checked in the same step
+    /// as the insert, so an entry never lands on a deleted recipe); nothing is saved then. Inputs are already
+    /// validated.
+    async fn add(&self, entry: NewCookLogEntry) -> DomainResult<CookLogEntry>;
+
+    /// Every entry of a recipe, newest first: `cooked_on` descending, then `created_at` descending, then id. It
+    /// does not look at whether the recipe is live; the caller decides that. An unknown recipe has none.
+    async fn list(&self, recipe_id: Uuid) -> DomainResult<Vec<CookLogEntry>>;
+
+    /// One entry, or `None`.
+    async fn get(&self, id: Uuid) -> DomainResult<Option<CookLogEntry>>;
+
+    /// Deletes an entry for good. `NotFound` when there is none.
+    async fn delete(&self, id: Uuid) -> DomainResult<()>;
 }
 
 /// Links from members to accounts at an identity provider (ACC-6). A link goes when its member does.
