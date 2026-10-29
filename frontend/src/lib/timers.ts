@@ -82,9 +82,20 @@ function durationOf(m: RegExpMatchArray): number | null {
 export const stepDurations = (step: string): { label: string; seconds: number }[] =>
   splitDurations(step).flatMap((s) => (s.seconds === null ? [] : [{ label: s.text, seconds: s.seconds }]));
 
-/** "Step 2 · 12 min": short enough for the ring. Cooking together the dish goes first: "Salad · Step 2 · 12 min". */
-export const timerLabel = (step: number, text: string, dish?: string) =>
-  `${dish ? `${dish} · ` : ""}Step ${step} · ${text.replace(/\s*minutes?\b/gi, " min").replace(/\s*hours?\b/gi, " hr").replace(/\s*seconds?\b/gi, " sec")}`;
+/**
+ * "Step 2 · 12 min": short enough for the ring. Cooking together the dish goes first: "Salad · Step 2 · 12 min". A time
+ * written in figures keeps its words, shortened ("10-12 min"); one written in words is set from its length ("half an
+ * hour" is "30 min").
+ */
+export function timerLabel(step: number, text: string, seconds: number, dish?: string): string {
+  const short = /^\d/.test(text)
+    ? text.replace(/\s*hours?\b/gi, " hr").replace(/\s*minutes?\b/gi, " min").replace(/\s*seconds?\b/gi, " sec")
+    : [[Math.floor(seconds / 3600), "hr"], [Math.floor((seconds % 3600) / 60), "min"], [seconds % 60, "sec"]]
+        .filter(([n]) => n)
+        .map(([n, unit]) => `${n} ${unit}`)
+        .join(" ");
+  return `${dish ? `${dish} · ` : ""}Step ${step} · ${short}`;
+}
 
 /** A running or finished timer. `key` names the chip it came from (dish, step and place in the step), so a chip has one timer. */
 export type Timer = { id: number; key: string; label: string; totalMs: number; endsAt: number; done: boolean };

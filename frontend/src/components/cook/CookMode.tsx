@@ -24,7 +24,7 @@ type Props = { id: string; title: string; ingredients: string[]; steps: string[]
 /**
  * Cook mode: one step at a time, or every step in a list. Step index and timers live here, above the step view, so
  * timers keep running when the step changes. Ticks are kept per recipe on this device (cook-store.ts); the screen wake
- * lock is use-wake-lock.ts; timers, the chime, announcements, keys and swipes are shared with cook-together (use-cook-*.ts).
+ * lock is use-wake-lock.ts; timers and their alert (timers/), announcements, keys and swipes are shared with cook-together.
  */
 export function CookMode({ id, title, ingredients, steps }: Props) {
   const [index, setIndex] = useState(0);
@@ -82,7 +82,7 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
   }
 
   const renderStep = (at: number) =>
-    renderCookStep(steps[at], ingredients, String(at), { timers, now, start: (key, text, seconds) => start(key, timerLabel(at + 1, text), seconds) });
+    renderCookStep(steps[at], ingredients, String(at), { timers, now, start: (key, text, seconds) => start(key, timerLabel(at + 1, text, seconds), seconds) });
 
   const lit = litIngredients(stepText, ingredients);
   const next = steps[index + 1];

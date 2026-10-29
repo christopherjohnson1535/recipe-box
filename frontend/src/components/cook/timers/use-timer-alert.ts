@@ -76,6 +76,11 @@ export function useTimerAlert(): TimerAlert {
       window.removeEventListener("keydown", unlock);
       void audio.current?.close();
       audio.current = null;
+      try {
+        navigator.vibrate?.(0); // leaving cook mode ends a buzz too
+      } catch {
+        // nothing to stop
+      }
     };
   }, []);
 

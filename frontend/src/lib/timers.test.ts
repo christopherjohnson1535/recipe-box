@@ -80,9 +80,15 @@ describe("splitDurations: what counts as a time", () => {
 
 describe("timerLabel", () => {
   it("shortens units and names the dish first when cooking together", () => {
-    expect(timerLabel(2, "12 minutes")).toBe("Step 2 · 12 min");
-    expect(timerLabel(1, "1 hour 30 minutes", "Ragu")).toBe("Ragu · Step 1 · 1 hr 30 min");
-    expect(timerLabel(3, "45 seconds")).toBe("Step 3 · 45 sec");
+    expect(timerLabel(2, "12 minutes", 720)).toBe("Step 2 · 12 min");
+    expect(timerLabel(1, "1 hour 30 minutes", 5400, "Ragu")).toBe("Ragu · Step 1 · 1 hr 30 min");
+    expect(timerLabel(3, "45 seconds", 45)).toBe("Step 3 · 45 sec");
+    expect(timerLabel(1, "10-12 minutes", 600)).toBe("Step 1 · 10-12 min");
+  });
+  it("sets a time written in words from its length", () => {
+    expect(timerLabel(2, "half an hour", 1800)).toBe("Step 2 · 30 min");
+    expect(timerLabel(1, "an hour and a half", 5400)).toBe("Step 1 · 1 hr 30 min");
+    expect(timerLabel(1, "Ten minutes", 600)).toBe("Step 1 · 10 min");
   });
 });
 
