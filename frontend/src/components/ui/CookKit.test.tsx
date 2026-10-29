@@ -431,7 +431,7 @@ describe("cook together layout pieces", () => {
     expect(screen.getByRole("button", { name: "Cancel timer: Roast 20 min" })).toBeTruthy();
   });
 
-  it("CookColumns (not wide) keeps the ring with its name inside it", () => {
+  it("CookColumns (not wide) names the ring inside it from 1024px, under it upright", () => {
     render(
       <CookColumns
         rail={<p>rail</p>}
@@ -443,7 +443,10 @@ describe("cook together layout pieces", () => {
         }
       />,
     );
-    expect(screen.getAllByText("Roast 20 min")).toHaveLength(1);
+    // Inside the ring from 1024px, under it upright (the ring is too small there); the group's name is read once.
+    const names = screen.getAllByText("Roast 20 min");
+    expect(names.map((n) => n.className.includes("max-lg:hidden") || n.className.includes("lg:hidden"))).toEqual([true, true]);
+    expect(names.filter((n) => n.getAttribute("aria-hidden") === "true")).toHaveLength(1);
     expect(screen.getByRole("group", { name: "Roast 20 min" }).className).not.toContain("lg:flex-row");
   });
 

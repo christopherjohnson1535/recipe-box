@@ -83,10 +83,16 @@ describe("CookMode", () => {
   it("keeps timers running across steps, finishes them and announces it", () => {
     view();
     fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
-    expect(screen.getByText("10:00")).toBeTruthy();
+    const timer = () => screen.getByRole("group", { name: "Step 1 · 10 min" });
+    expect(within(timer()).getByText("10:00")).toBeTruthy();
+    // The chip says its timer is running and shows the time left; tapping it again is not a second timer.
+    const chip = screen.getByRole("button", { name: "Timer running: 10 minutes" });
+    expect(chip.textContent).toContain("10:00");
+    fireEvent.click(chip);
+    expect(screen.getAllByRole("group", { name: /^Step 1 · / })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /Next step/ }));
     act(() => void vi.advanceTimersByTime(60_000));
-    expect(screen.getByText("9:00")).toBeTruthy();
+    expect(within(timer()).getByText("9:00")).toBeTruthy();
     act(() => void vi.advanceTimersByTime(9 * 60_000));
     expect(within(screen.getByRole("group", { name: "Step 1 · 10 min" })).getByText("Done")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("Timer finished: Step 1 · 10 min");
@@ -104,16 +110,12 @@ describe("CookMode", () => {
     const Ctor = vi.fn(function () { return ctx; });
     vi.stubGlobal("AudioContext", Ctor);
     const { unmount } = view();
-    expect(Ctor).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
-    act(() => void vi.advanceTimersByTime(10 * 60_000));
-    expect(start).not.toHaveBeenCalled(); // no gesture yet, so no sound
+    expect(Ctor).not.toHaveBeenCalled(); // nothing before a gesture
 
-    fireEvent.pointerDown(window);
-    expect(Ctor).toHaveBeenCalledTimes(1);
-    expect(ctx.resume).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: /Dismiss timer/ }));
+    // The tap on the chip is the gesture (its click; on an iPad a touch's pointerdown alone does not count).
     fireEvent.click(screen.getByRole("button", { name: "Start timer: 10 minutes" }));
+    expect(Ctor).toHaveBeenCalledTimes(1);
+    expect(ctx.resume).toHaveBeenCalled();
     act(() => void vi.advanceTimersByTime(10 * 60_000));
     expect(start).toHaveBeenCalled();
     expect(Ctor).toHaveBeenCalledTimes(1);

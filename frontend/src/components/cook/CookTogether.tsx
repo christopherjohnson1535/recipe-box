@@ -4,21 +4,21 @@ import { Fragment, useCallback, useEffect, useRef, useState, type MouseEvent } f
 import {
   CookColumns, CookDishColumn, CookDishColumns, CookDishLegend, CookDishMark, CookDishTabs, CookFooter, CookLive, CookMoveButtons, CookNudge,
   CookPill, CookPillLink, CookProgress, CookRail, CookRailRow, CookReorderList, CookStage, CookStepItem, CookStepText, CookTextButton, CookTick,
-  CookToolbar, CookTopBar, CookViewChoice, CookVoiceToggle,
+  CookSoundToggle, CookToolbar, CookTopBar, CookViewChoice, CookVoiceToggle,
 } from "@/components/ui/CookKit";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Text } from "@/components/ui/Text";
 import { splitIngredient } from "@/lib/scale";
+import { timerLabel } from "@/lib/timers";
 import { clampStep, litIngredients, railOrder } from "./cook-logic";
 import { renderCookStep } from "./cook-step";
 import { bringNext, canMove, dishInitials, dishNames, firstOpen, interleave, move, nextOfDish, ordinal, type DishStep } from "./cook-together-logic";
 import { readCookTicks, readCookTogetherOrder, useCookTogetherOrder, useCookTogetherView, useDishTicks, type CookTogetherView } from "./cook-store";
-import { CookTimerRack } from "./CookTimerRack";
 import { useCookWake } from "./CookWake";
-import { useCookAudio } from "./use-cook-audio";
 import { useAnnounce, useStepKeys, useSwipe } from "./use-cook-controls";
-import { timerLabel, useCookTimers } from "./use-cook-timers";
+import { CookTimerRack } from "./timers/CookTimerRack";
+import { useCookTimers } from "./timers/use-cook-timers";
 import { useVoice } from "./use-voice";
 
 export type Dish = { id: string; title: string; ingredients: string[]; steps: string[] };
@@ -46,8 +46,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const names = dishNames(dishes.map((d) => d.title));
   const [cursor, setCursor] = useState<DishStep | null>(null);
   const [live, announce] = useAnnounce();
-  const chime = useCookAudio();
-  const { timers, now, running, start, dismiss } = useCookTimers(announce, chime);
+  const { timers, now, running, start, dismiss, alert } = useCookTimers(announce);
   const [view, setView] = useCookTogetherView();
   const { order, setOrder, reset } = useCookTogetherOrder(ids, stepCounts);
   const { ticks, toggleIngredient, toggleStep, clearAll } = useDishTicks(
@@ -144,7 +143,12 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
     toggleStep(e.dish, e.step);
   };
 
-  const renderStep = (e: DishStep) => renderCookStep(textOf(e), dishes[e.dish].ingredients, (text, seconds) => start(timerLabel(e.step + 1, text, nameOf(e.dish)), seconds));
+  const renderStep = (e: DishStep) =>
+    renderCookStep(textOf(e), dishes[e.dish].ingredients, `${e.dish}:${e.step}`, {
+      timers,
+      now,
+      start: (key, text, seconds, nth) => start(key, timerLabel(e.step + 1, text, seconds, nameOf(e.dish), nth), seconds),
+    });
   const tick = (e: DishStep, onClick: () => void) => (
     <CookTick pressed={isDone(e)} aria-label={`${nameOf(e.dish)} step ${e.step + 1} done`} onClick={onClick}>
       Done
@@ -307,6 +311,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
               Clear ticks
             </CookTextButton>
           )}
+          {alert.supported && <CookSoundToggle muted={alert.muted} onChange={alert.setMuted} />}
           {wake.status}
         </div>
         {wake.note}

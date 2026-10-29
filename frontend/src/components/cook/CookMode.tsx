@@ -3,20 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CookColumns, CookFooter, CookLive, CookPill, CookPillLink, CookProgress, CookRail, CookRailRow, CookStage,
-  CookStepItem, CookStepList, CookStepText, CookTextButton, CookTick, CookToolbar, CookTopBar, CookViewToggle, CookVoiceToggle,
+  CookStepItem, CookStepList, CookStepText, CookTextButton, CookTick, CookSoundToggle, CookToolbar, CookTopBar, CookViewToggle, CookVoiceToggle,
 } from "@/components/ui/CookKit";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ButtonLink } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { splitIngredient } from "@/lib/scale";
+import { timerLabel } from "@/lib/timers";
 import { clampStep, litIngredients, railOrder } from "./cook-logic";
 import { renderCookStep } from "./cook-step";
 import { readCookTicks, useCookTicks, useCookView } from "./cook-store";
-import { CookTimerRack } from "./CookTimerRack";
 import { useCookWake } from "./CookWake";
-import { useCookAudio } from "./use-cook-audio";
 import { useAnnounce, useStepKeys, useSwipe } from "./use-cook-controls";
-import { timerLabel, useCookTimers } from "./use-cook-timers";
+import { CookTimerRack } from "./timers/CookTimerRack";
+import { useCookTimers } from "./timers/use-cook-timers";
 import { useVoice } from "./use-voice";
 
 type Props = { id: string; title: string; ingredients: string[]; steps: string[] };
@@ -24,13 +24,12 @@ type Props = { id: string; title: string; ingredients: string[]; steps: string[]
 /**
  * Cook mode: one step at a time, or every step in a list. Step index and timers live here, above the step view, so
  * timers keep running when the step changes. Ticks are kept per recipe on this device (cook-store.ts); the screen wake
- * lock is use-wake-lock.ts; timers, the chime, announcements, keys and swipes are shared with cook-together (use-cook-*.ts).
+ * lock is use-wake-lock.ts; timers and their alert (timers/), announcements, keys and swipes are shared with cook-together.
  */
 export function CookMode({ id, title, ingredients, steps }: Props) {
   const [index, setIndex] = useState(0);
   const [live, announce] = useAnnounce();
-  const chime = useCookAudio();
-  const { timers, now, running, start, dismiss } = useCookTimers(announce, chime);
+  const { timers, now, running, start, dismiss, alert } = useCookTimers(announce);
 
   const count = steps.length;
   const [view, setView] = useCookView();
@@ -82,7 +81,8 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
     );
   }
 
-  const renderStep = (at: number) => renderCookStep(steps[at], ingredients, (text, seconds) => start(timerLabel(at + 1, text), seconds));
+  const renderStep = (at: number) =>
+    renderCookStep(steps[at], ingredients, String(at), { timers, now, start: (key, text, seconds, nth) => start(key, timerLabel(at + 1, text, seconds, undefined, nth), seconds) });
 
   const lit = litIngredients(stepText, ingredients);
   const next = steps[index + 1];
@@ -105,6 +105,7 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
               Clear ticks
             </CookTextButton>
           )}
+          {alert.supported && <CookSoundToggle muted={alert.muted} onChange={alert.setMuted} />}
           {wake.status}
         </div>
         {wake.note}
