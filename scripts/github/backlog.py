@@ -2,7 +2,8 @@
 
 `python3 scripts/github/sync_backlog.py <owner/repo>` creates whatever is missing on GitHub (idempotent: issues are
 matched by title). Edit this file to add work, then re-run. Issue bodies point at docs/ so a fresh session has the
-full context.
+full context. Pass `size="S|M|L"` and/or `read=[...]` to `issue()` to add a `## Context pack` section (tier plus the
+requirement IDs, SPEC sections, endpoints and files to read first).
 """
 
 LABELS = {
@@ -40,12 +41,22 @@ COMMON = (
 )
 
 
-def issue(title, milestone, labels, goal, reqs, scope, owned, acceptance):
+def issue(title, milestone, labels, goal, reqs, scope, owned, acceptance, size=None, read=None):
+    if size not in (None, "S", "M", "L"):
+        raise ValueError(f"size must be S, M or L, got {size!r}")
+    pack = ""
+    if size or read:
+        pack = "\n\n## Context pack"
+        if size:
+            pack += f"\n**Size:** {size}"
+        if read:
+            pack += "\n**Read first:**\n" + "\n".join(f"- {r}" for r in read)
     body = (
         f"## Goal\n{goal}\n\n"
         f"**Requirements:** {reqs}\n\n"
         f"## Scope and notes\n{scope}\n\n"
-        f"## Owned paths\n{owned}\n\n"
+        f"## Owned paths\n{owned}"
+        f"{pack}\n\n"
         "## Acceptance\n"
         + "\n".join(f"- [ ] {a}" for a in acceptance)
         + "\n- [ ] Checks pass for every tree touched (see `CLAUDE.md`)\n- [ ] Docs / wiki page updated"
