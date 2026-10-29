@@ -37,13 +37,19 @@ When two or more dishes have to be ready together, cook them in one session. Up 
 - **Offline**: a session you have opened on the iPad is kept like a recipe, so it opens again without internet (the same dishes in the same order; a different combination is a different session and is not kept until you open it). Open the session while you are online before you rely on it.
 - Timers carry the dish's name ("Ragu · Step 2 · 10 min") and keep running when you change step, view or dish; the same time in two dishes is two timers. Swipe, arrow keys, voice and the screen staying awake work as in cooking mode (see below); swipe, arrows and voice move through *One step* only.
 
+### Made it
+On the last step (and in *All steps*), a line above the bottom bar asks **Cooked it?** Tap **Made it** to note it in the
+recipe's log with anything you'd change next time; it shows up under the method on the recipe page. The day is today on
+this iPad unless you pick another. If you go back a step, what you typed stays. Offline, the form still opens and keeps
+your note, but **Save to the log** stays off until you're back online: nothing is sent later on its own.
+
 ### Keeping the screen awake
 While cooking mode is open the screen won't lock; the top of the screen says **Screen stays on**. This needs the Home Screen app on iPadOS 18.4 or later, and a secure (https) address — see [[Deploying]]. If it can't keep the screen awake you'll see **Screen may sleep**; tap it for what to do. The simplest fallback is **Settings → Display & Brightness → Auto-Lock → Never** while you cook.
 
 ## Offline
 Recipes you've opened on the iPad stay readable without internet, photos and cooking mode included. Open the ones
 you'll cook from while you're online: opening a recipe once keeps it, its photo and its cooking mode.
-- With no connection a banner says **You're offline**. Saving, deleting, importing, search and settings need the
+- With no connection a banner says **You're offline**. Saving, deleting, importing, search, settings and the made-it log need the
   connection: **Save**, **Delete** and the import buttons are turned off, and Save and Import say why beside them. What you typed in a recipe stays on the page until
   you're back online.
 - A page that wasn't kept shows **You're offline** with the list of recipes this iPad can still open.

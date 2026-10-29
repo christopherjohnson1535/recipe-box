@@ -14,6 +14,9 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 
 ### Added
 - Step timers (#24, KIT-6): a time written in a step starts a timer from cook mode, alone or cooking together. Times in words ("twenty minutes", "half an hour", "an hour and a half") and "10-minute" now count; the running chip shows the time left; a finished timer comes first, chimes and vibrates (where the device can) for ten seconds, and stops on Dismiss; **Timer sound** mutes the chime per device. Detection lives in `frontend/src/lib/timers.ts`.
+- "Made it" log (#23, REC-6): log a cook from cooking mode or the recipe page, with the day and what you'd change; the recipe
+  page lists who made it and when. `GET`/`POST /api/recipes/{id}/cook-log` and `DELETE /api/recipes/{id}/cook-log/{entryId}`
+  (your own entry, or any as an admin). Entries follow their recipe through delete and undo, and stay unsigned when a member is removed.
 - Proxy header settings in the HTTPS guides (#17, #33): `TRUST_PROXY_HEADERS` / `TRUSTED_PROXIES` / `WEB_BIND` per access path in `docs/DEPLOY.md` and the Tailscale, VPS and Fly pages; `docker compose --profile https` now stops at once when `PUBLIC_HOSTNAME` is empty.
 - Backup and restore you can trust (#19): `scripts/backup.sh` checksums and verifies each backup, leaves out sign-in sessions and
   secrets, and prunes old ones (`BACKUP_KEEP`); `scripts/restore.sh` asks first, refuses to overwrite existing data without

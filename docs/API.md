@@ -158,6 +158,19 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
   `warnings` entry. One retry on 429/5xx/connect errors (not after
   a timeout, nor when `retry-after` asks for more than 10 s); otherwise 502 `ai_error`. A reply cut off at the token
   limit is kept when usable, with a warning. The API key is never logged or returned.
+- **Made-it log (REC-6).** Every signed-in member reads a recipe's log and adds to it.
+  - `GET /api/recipes/{id}/cook-log` → `200 [CookLogEntry]`, ordered by `cookedOn` descending, then `createdAt`
+    descending. `CookLogEntry` = `{id, recipeId, cookedOn: "YYYY-MM-DD", note, madeBy: {id, displayName} | null, createdAt}`.
+  - `POST /api/recipes/{id}/cook-log` `{cookedOn, note?}` → `201 CookLogEntry`, made by the caller. `cookedOn` is the cook's
+    own calendar day (the server does not know their time zone), so it may be at most one day past the server's UTC date;
+    later, or before 1900, is `400 validation` (`cookedOn: ...`). `note` (default empty) is trimmed, NUL bytes dropped, at
+    most 2,000 characters (`400`, `note: ...`). Unknown fields are `400`.
+  - `DELETE /api/recipes/{id}/cook-log/{entryId}` → `204`. Only the member who made the entry, or an admin: anyone else is
+    `403 forbidden` (an entry whose member was removed: admins only). An entry of another recipe, or none, is `404`.
+  - A soft-deleted recipe's log answers `404` on every route (as the recipe does); `restore` brings the entries back
+    unchanged, and the purge a day later removes them with the recipe. Removing a member keeps their entries with
+    `madeBy: null`. The log is not in the backup zip (`GET /api/export`, format version 1 holds recipes only); a database
+    backup (`scripts/backup.sh`) has it.
 - **Grocery list (GRO-1–4).** One active list for the household, shared by every signed-in member (no admin rights
   needed); `GET /api/grocery` creates it on first use. Every write answers with the new state, so two people shopping
   converge by refetching (`updatedAt` changes on every write). `GET` first rebuilds the items from the list's recipes

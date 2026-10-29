@@ -48,6 +48,18 @@ A recipe opens with the title, a one-line summary and who added it on the left a
 - A recipe's **notes** appear as a quotation: in a column beside the method on a wide screen (about 1440 pixels and up), under the method on a smaller one.
 - If your device is set to reduce motion, nothing slides, turns or draws; colours still change.
 
+## Made it
+Under the method, **Made it** keeps the household's log of when each recipe was cooked, newest first: the day, who made it
+("You" for your own), and what they'd change next time ("less salt", "a hotter oven"). The heading counts them ("Made 3 times").
+- **Made it** opens a short form: the day (today by default, on your device's calendar; any earlier day works too) and an
+  optional note of up to 2,000 characters. **Save to the log** adds it to the list.
+- You can **Delete** your own entries; an admin can delete anyone's. There is no undo.
+- When a recipe is deleted, its log goes with it, and **Undo** brings the log back. Once the recipe is gone for good (a day
+  after deleting), the log is gone too.
+- When a member is removed, their entries stay, signed "A former member".
+- Offline, the log shows what was there the last time the page was opened; adding and deleting wait for the connection.
+- The log isn't printed and isn't part of **Export** (the zip has the recipes only). The server backups (`scripts/backup.sh`) include it.
+
 ## Printing
 Print a recipe from your browser (Ctrl/Cmd+P). The menu, buttons, scale control, bottom bar and ticks are left out and times are plain words; you get black text on white
 with the ingredients, the numbered method, notes and the source address. Steps are kept whole across pages where possible.
