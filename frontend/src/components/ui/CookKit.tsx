@@ -796,7 +796,13 @@ export function CookTimer({
           {dismiss}
         </div>
       ) : (
-        dismiss
+        <>
+          {/* Upright the ring has no room for its name: it goes under the ring, so several timers can be told apart. */}
+          <p aria-hidden="true" className="label line-clamp-2 max-w-32 text-center text-ink-muted lg:hidden">
+            {label}
+          </p>
+          {dismiss}
+        </>
       )}
     </div>
   );

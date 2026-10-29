@@ -1,13 +1,13 @@
 import { CookTimer, CookTimers } from "@/components/ui/CookKit";
-import { formatClock, remainingMs, ringFraction, type Timer } from "@/lib/timers";
+import { formatClock, rackOrder, remainingMs, ringFraction, type Timer } from "@/lib/timers";
 import { FLASH_MS } from "./use-cook-timers";
 
-/** The timer column: a ring for the first three, compact rows after. */
+/** The timer column: a ring for the first three, compact rows after; a finished timer comes first, so it is never scrolled out of sight. */
 export function CookTimerRack({ timers, now, onDismiss }: { timers: Timer[]; now: number; onDismiss: (id: number) => void }) {
   const phase = Math.floor(now / 600) % 2 === 0;
   return (
     <CookTimers empty="Tap a time in the step to start a timer.">
-      {timers.map((t, i) => (
+      {rackOrder(timers).map((t, i) => (
         <CookTimer
           key={t.id}
           label={t.label}

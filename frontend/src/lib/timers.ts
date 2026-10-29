@@ -128,6 +128,10 @@ export function timerReducer(state: TimerState, action: TimerAction): TimerState
   }
 }
 
+/** Rack order: finished timers first (they need the cook), then the running ones, soonest to end first. The first is the big ring. */
+export const rackOrder = (timers: readonly Timer[]): Timer[] =>
+  [...timers].sort((a, b) => Number(b.done) - Number(a.done) || a.endsAt - b.endsAt || a.id - b.id);
+
 export const remainingMs = (t: Timer, now: number) => (t.done ? 0 : Math.max(0, t.endsAt - now));
 /** 0 to 1: how much of the ring is left. */
 export const ringFraction = (t: Timer, now: number) => (t.totalMs > 0 ? remainingMs(t, now) / t.totalMs : 0);

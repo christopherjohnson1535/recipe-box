@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, noTimers, remainingMs, ringFraction, splitDurations, stepDurations, timerLabel, timerReducer } from "./timers";
+import { formatClock, noTimers, rackOrder, remainingMs, ringFraction, splitDurations, stepDurations, timerLabel, timerReducer } from "./timers";
 
 const found = (text: string) => stepDurations(text).map((d) => [d.label, d.seconds]);
 
@@ -120,6 +120,13 @@ describe("timerReducer", () => {
     const done = timerReducer(s, { type: "tick", now: 60_000 });
     const again = timerReducer(done, start("a", 60, 70_000));
     expect(again.timers).toEqual([{ id: 2, key: "a", label: "a", totalMs: 60_000, endsAt: 130_000, done: false }]);
+  });
+});
+
+describe("rackOrder", () => {
+  it("puts finished timers first, then the running ones by the time left", () => {
+    const t = (id: number, endsAt: number, done = false) => ({ id, key: `k${id}`, label: `t${id}`, totalMs: 1, endsAt, done });
+    expect(rackOrder([t(1, 900), t(2, 300), t(3, 500, true), t(4, 100, true)]).map((x) => x.id)).toEqual([4, 3, 2, 1]);
   });
 });
 
