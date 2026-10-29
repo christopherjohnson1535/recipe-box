@@ -12,7 +12,7 @@ export type StepTimers = { start: (key: string, text: string, seconds: number, n
 /**
  * A step's text with its ingredients marked and each duration a chip. `key` names the step in the session ("r1:2", or
  * the dish and step cooking together); each chip's timer is keyed by it and the chip's place in the step. A chip whose
- * timer is running shows the time left.
+ * timer is running shows the time left; a paused one says "Paused" with the time it holds.
  */
 export function renderCookStep(step: string, ingredients: string[], key: string, { start, timers, now }: StepTimers): ReactNode {
   const parts = cookParts(step, ingredients);
@@ -25,7 +25,9 @@ export function renderCookStep(step: string, ingredients: string[], key: string,
       if (!seconds) return part.text;
       const chip = `${key}:${i}`;
       const running = timers.find((t) => t.key === chip && !t.done);
-      const left = running ? formatClock(remainingMs(running, now)) : undefined;
+      const paused = running?.pausedLeftMs != null;
+      const clock = running ? formatClock(remainingMs(running, now)) : undefined;
+      const left = clock && paused ? `Paused ${clock}` : clock;
       // Keep the full stop that follows on the chip's line.
       const next = parts[i + 1];
       const after = (next?.kind === "text" && LEADING_PUNCTUATION.exec(next.text)?.[0]) || "";
@@ -34,8 +36,9 @@ export function renderCookStep(step: string, ingredients: string[], key: string,
           key={i}
           after={after}
           left={left}
+          paused={paused}
           // A steady name: the countdown is visual (the live region says when it ends).
-          aria-label={left ? `Timer running: ${part.text}` : `Start timer: ${part.text}`}
+          aria-label={left ? `Timer ${paused ? "paused" : "running"}: ${part.text}` : `Start timer: ${part.text}`}
           aria-disabled={left ? true : undefined}
           onClick={() => start(chip, part.text, seconds, twice(i) ? ordinal(same(i)) : undefined)}
         >

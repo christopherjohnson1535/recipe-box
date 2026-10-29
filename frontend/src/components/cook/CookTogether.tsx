@@ -54,7 +54,7 @@ export function CookTogether({ dishes, planning = false }: { dishes: Dish[]; pla
   const names = dishNames(dishes.map((d) => d.title));
   const [cursor, setCursor] = useState<DishStep | null>(null);
   const [live, announce] = useAnnounce();
-  const { timers, now, running, start, dismiss, alert } = useCookTimers(announce);
+  const { timers, now, running, start, dismiss, pause, resume, addMinute, alert } = useCookTimers(announce);
   const [view, setView] = useCookTogetherView();
   const { order, setOrder, reset } = useCookTogetherOrder(ids, stepCounts);
   const { ticks, toggleIngredient, toggleStep, clearAll } = useDishTicks(
@@ -418,7 +418,7 @@ export function CookTogether({ dishes, planning = false }: { dishes: Dish[]; pla
             byDish
           )
         }
-        timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
+        timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} onPause={pause} onResume={resume} onAddMinute={addMinute} />}
       />
       <CookLive>{live.text}</CookLive>
       <CookFooter

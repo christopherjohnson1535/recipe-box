@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, noTimers, rackOrder, remainingMs, ringFraction, splitDurations, stepDurations, timerLabel, timerReducer } from "./timers";
+import { formatClock, noTimers, rackOrder, remainingMs, ringFraction, splitDurations, stepDurations, timerLabel, timerReducer, type TimerState } from "./timers";
 
 const found = (text: string) => stepDurations(text).map((d) => [d.label, d.seconds]);
 
@@ -130,14 +130,103 @@ describe("timerReducer", () => {
     expect(timerReducer(s, start("a", 60, 10_000))).toBe(s);
     const done = timerReducer(s, { type: "tick", now: 60_000 });
     const again = timerReducer(done, start("a", 60, 70_000));
-    expect(again.timers).toEqual([{ id: 2, key: "a", label: "a", totalMs: 60_000, endsAt: 130_000, done: false }]);
+    expect(again.timers).toEqual([{ id: 2, key: "a", label: "a", totalMs: 60_000, endsAt: 130_000, done: false, pausedLeftMs: null }]);
+  });
+});
+
+describe("timerReducer pause and +1 minute", () => {
+  const start = (seconds: number, now = 0) => timerReducer(noTimers, { type: "start", key: "a", label: "a", seconds, now });
+  const act = (s: TimerState, type: "pause" | "resume" | "addMinute", now: number, id = 1) => timerReducer(s, { type, id, now });
+
+  it("keeps the time left exactly across a pause of any length", () => {
+    const paused = act(start(600), "pause", 125_250);
+    expect(paused.timers[0].pausedLeftMs).toBe(474_750);
+    expect(remainingMs(paused.timers[0], 125_250)).toBe(474_750);
+    expect(remainingMs(paused.timers[0], 9_999_999)).toBe(474_750);
+    expect(ringFraction(paused.timers[0], 9_999_999)).toBeCloseTo(474_750 / 600_000);
+    const resumed = act(paused, "resume", 7_000_000);
+    expect(resumed.timers[0]).toMatchObject({ pausedLeftMs: null, endsAt: 7_474_750, done: false });
+    expect(remainingMs(resumed.timers[0], 7_000_000)).toBe(474_750);
+  });
+
+  it("never finishes a paused timer on a tick, and finishes it normally after it resumes", () => {
+    const paused = act(start(60), "pause", 10_000);
+    expect(timerReducer(paused, { type: "tick", now: 3_600_000 })).toBe(paused);
+    const resumed = act(paused, "resume", 3_600_000);
+    expect(timerReducer(resumed, { type: "tick", now: 3_649_999 })).toBe(resumed);
+    expect(timerReducer(resumed, { type: "tick", now: 3_650_000 }).timers[0].done).toBe(true);
+  });
+
+  it("ignores pause on a finished, paused or about-to-finish timer, resume on one not paused, and unknown ids", () => {
+    const running = start(60);
+    const done = timerReducer(running, { type: "tick", now: 60_000 });
+    const paused = act(running, "pause", 1000);
+    expect(act(done, "pause", 61_000)).toBe(done);
+    expect(act(paused, "pause", 2000)).toBe(paused);
+    expect(act(running, "pause", 60_000)).toBe(running);
+    expect(act(running, "resume", 1000)).toBe(running);
+    expect(act(done, "resume", 61_000)).toBe(done);
+    expect(act(running, "pause", 1000, 9)).toBe(running);
+    expect(act(running, "addMinute", 1000, 9)).toBe(running);
+  });
+
+  it("adds a minute to a running timer, and to the ring's total so the ring stays in proportion", () => {
+    const s = act(start(60), "addMinute", 30_000);
+    expect(s.timers[0]).toMatchObject({ endsAt: 120_000, totalMs: 120_000, done: false });
+    expect(remainingMs(s.timers[0], 30_000)).toBe(90_000);
+    expect(ringFraction(s.timers[0], 30_000)).toBeCloseTo(0.75);
+    // Past its end time but not ticked yet: a whole minute from now.
+    expect(act(start(60), "addMinute", 61_000).timers[0].endsAt).toBe(121_000);
+  });
+
+  it("adds a minute to a paused timer without resuming it", () => {
+    const s = act(act(start(60), "pause", 20_000), "addMinute", 500_000);
+    expect(s.timers[0]).toMatchObject({ pausedLeftMs: 100_000, totalMs: 120_000, done: false });
+    expect(remainingMs(s.timers[0], 900_000)).toBe(100_000);
+    expect(timerReducer(s, { type: "tick", now: 900_000 })).toBe(s);
+  });
+
+  it("runs a finished timer again for one minute, and it can finish again", () => {
+    const done = timerReducer(start(60), { type: "tick", now: 70_000 });
+    const again = act(done, "addMinute", 100_000);
+    expect(again.timers[0]).toMatchObject({ id: 1, key: "a", done: false, endsAt: 160_000, totalMs: 60_000, pausedLeftMs: null });
+    expect(ringFraction(again.timers[0], 100_000)).toBe(1);
+    expect(timerReducer(again, { type: "tick", now: 160_000 }).timers[0].done).toBe(true);
+  });
+
+  it("starting a chip whose timer is paused does nothing", () => {
+    const paused = act(start(60), "pause", 1000);
+    expect(timerReducer(paused, { type: "start", key: "a", label: "a", seconds: 60, now: 2000 })).toBe(paused);
   });
 });
 
 describe("rackOrder", () => {
-  it("puts finished timers first, then the running ones by the time left", () => {
-    const t = (id: number, endsAt: number, done = false) => ({ id, key: `k${id}`, label: `t${id}`, totalMs: 1, endsAt, done });
-    expect(rackOrder([t(1, 900), t(2, 300), t(3, 500, true), t(4, 100, true)]).map((x) => x.id)).toEqual([4, 3, 2, 1]);
+  const t = (id: number, endsAt: number, done = false, pausedLeftMs: number | null = null) => ({ id, key: `k${id}`, label: `t${id}`, totalMs: 1, endsAt, done, pausedLeftMs });
+  const ids = (timers: ReturnType<typeof t>[], now: number) => rackOrder(timers, now).map((x) => x.id);
+
+  it("puts finished timers first, then the others by the time left", () => {
+    expect(ids([t(1, 900), t(2, 300), t(3, 500, true), t(4, 100, true)], 0)).toEqual([4, 3, 2, 1]);
+  });
+
+  it("puts paused timers among the running ones by the time they hold, ignoring their stale end time", () => {
+    // At 100: 2 has 800 left, 4 holds 1000, 1 holds 5000. 4's end time (20) is the earliest of all and must not decide.
+    expect(ids([t(1, 10, false, 5000), t(2, 900), t(3, 500, true), t(4, 20, false, 1000)], 100)).toEqual([3, 2, 4, 1]);
+  });
+
+  it("does not move a timer when it is paused or resumed", () => {
+    const now = 1000;
+    const before = [t(1, now + 5000), t(2, now + 9000), t(3, now + 7000)];
+    const order = ids(before, now);
+    expect(order).toEqual([1, 3, 2]);
+    let state: TimerState = { nextId: 4, timers: before };
+    state = timerReducer(state, { type: "pause", id: 3, now });
+    expect(ids(state.timers, now)).toEqual(order);
+    state = timerReducer(state, { type: "resume", id: 3, now });
+    expect(ids(state.timers, now)).toEqual(order);
+  });
+
+  it("breaks ties by id", () => {
+    expect(ids([t(2, 500), t(1, 500, false, null), t(3, 100, false, 400)], 100)).toEqual([1, 2, 3]);
   });
 });
 

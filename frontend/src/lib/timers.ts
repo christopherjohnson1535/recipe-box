@@ -106,18 +106,39 @@ export function timerLabel(step: number, text: string, seconds: number, dish?: s
   return `${dish ? `${dish} · ` : ""}Step ${step} · ${short}${nth ? ` (${nth})` : ""}`;
 }
 
-/** A running or finished timer. `key` names the chip it came from (dish, step and place in the step), so a chip has one timer. */
-export type Timer = { id: number; key: string; label: string; totalMs: number; endsAt: number; done: boolean };
+const MINUTE_MS = 60_000;
+
+/**
+ * A running, paused or finished timer. `key` names the chip it came from (dish, step and place in the step), so a chip has
+ * one timer. `pausedLeftMs` is the time left when the cook paused it, or null while it is not paused; `endsAt` is only
+ * meaningful while it runs.
+ */
+export type Timer = { id: number; key: string; label: string; totalMs: number; endsAt: number; done: boolean; pausedLeftMs: number | null };
 export type TimerAction =
   | { type: "start"; key: string; label: string; seconds: number; now: number }
   | { type: "tick"; now: number }
+  | { type: "pause"; id: number; now: number }
+  | { type: "resume"; id: number; now: number }
+  | { type: "addMinute"; id: number; now: number }
   | { type: "dismiss"; id: number };
 export type TimerState = { nextId: number; timers: Timer[] };
 export const noTimers: TimerState = { nextId: 1, timers: [] };
 
+/** A timer counting down: neither finished nor paused. */
+export const isRunning = (t: Timer) => !t.done && t.pausedLeftMs === null;
+
+const change = (state: TimerState, id: number, edit: (t: Timer) => Timer | null): TimerState => {
+  const timer = state.timers.find((t) => t.id === id);
+  const next = timer && edit(timer);
+  return next ? { ...state, timers: state.timers.map((t) => (t === timer ? next : t)) } : state;
+};
+
 /**
  * Timers hold an end time, not a countdown, so they stay right when the page is throttled or the tab sleeps. Starting a
- * chip whose timer is running does nothing (a double tap); starting one whose timer finished starts it again.
+ * chip whose timer is running or paused does nothing (a double tap); starting one whose timer finished starts it again.
+ * Pausing keeps the exact time left and resuming sets a new end time from it, so a pause of any length costs nothing.
+ * Adding a minute lengthens a running or paused timer by 60 s (and its ring's total, so the ring stays in proportion);
+ * on a finished timer it runs again for one minute. A paused timer never finishes.
  */
 export function timerReducer(state: TimerState, action: TimerAction): TimerState {
   switch (action.type) {
@@ -125,23 +146,44 @@ export function timerReducer(state: TimerState, action: TimerAction): TimerState
       const same = state.timers.find((t) => t.key === action.key);
       if (same && !same.done) return state;
       const totalMs = action.seconds * 1000;
-      const timer = { id: state.nextId, key: action.key, label: action.label, totalMs, endsAt: action.now + totalMs, done: false };
+      const timer = { id: state.nextId, key: action.key, label: action.label, totalMs, endsAt: action.now + totalMs, done: false, pausedLeftMs: null };
       return { nextId: state.nextId + 1, timers: [...state.timers.filter((t) => t !== same), timer] };
     }
     case "tick": {
-      if (!state.timers.some((t) => !t.done && t.endsAt <= action.now)) return state;
-      return { ...state, timers: state.timers.map((t) => (!t.done && t.endsAt <= action.now ? { ...t, done: true } : t)) };
+      const due = (t: Timer) => isRunning(t) && t.endsAt <= action.now;
+      if (!state.timers.some(due)) return state;
+      return { ...state, timers: state.timers.map((t) => (due(t) ? { ...t, done: true } : t)) };
     }
+    // A timer past its end time that has not ticked yet is about to finish: leave it.
+    case "pause":
+      return change(state, action.id, (t) => (isRunning(t) && t.endsAt > action.now ? { ...t, pausedLeftMs: t.endsAt - action.now } : null));
+    case "resume":
+      return change(state, action.id, (t) => (t.pausedLeftMs === null ? null : { ...t, endsAt: action.now + t.pausedLeftMs, pausedLeftMs: null }));
+    case "addMinute":
+      return change(state, action.id, (t) => {
+        if (t.done) return { ...t, done: false, endsAt: action.now + MINUTE_MS, totalMs: MINUTE_MS };
+        const totalMs = t.totalMs + MINUTE_MS;
+        // Past its end time but not ticked yet: the minute counts from now, not from the missed end.
+        if (t.pausedLeftMs === null) return { ...t, totalMs, endsAt: Math.max(t.endsAt, action.now) + MINUTE_MS };
+        return { ...t, totalMs, pausedLeftMs: t.pausedLeftMs + MINUTE_MS };
+      });
     case "dismiss":
       return { ...state, timers: state.timers.filter((t) => t.id !== action.id) };
   }
 }
 
-/** Rack order: finished timers first (they need the cook), then the running ones, soonest to end first. The first is the big ring. */
-export const rackOrder = (timers: readonly Timer[]): Timer[] =>
-  [...timers].sort((a, b) => Number(b.done) - Number(a.done) || a.endsAt - b.endsAt || a.id - b.id);
+/**
+ * Rack order: finished timers first (they need the cook; the one finished longest ago first), then every other timer,
+ * running or paused, by the time left at `now` (paused ones by the time they were paused with), then by id. Pausing
+ * or resuming keeps the time left, so neither ever moves a timer under the cook's finger; +1 minute can. The first is
+ * the big ring.
+ */
+export const rackOrder = (timers: readonly Timer[], now: number): Timer[] => {
+  const key = (t: Timer) => (t.done ? t.endsAt : (t.pausedLeftMs ?? Math.max(0, t.endsAt - now)));
+  return [...timers].sort((a, b) => Number(!a.done) - Number(!b.done) || key(a) - key(b) || a.id - b.id);
+};
 
-export const remainingMs = (t: Timer, now: number) => (t.done ? 0 : Math.max(0, t.endsAt - now));
+export const remainingMs = (t: Timer, now: number) => (t.done ? 0 : t.pausedLeftMs ?? Math.max(0, t.endsAt - now));
 /** 0 to 1: how much of the ring is left. */
 export const ringFraction = (t: Timer, now: number) => (t.totalMs > 0 ? remainingMs(t, now) / t.totalMs : 0);
 

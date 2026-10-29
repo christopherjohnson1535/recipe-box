@@ -15,6 +15,7 @@ import {
   CookStepItem,
   CookStepText,
   CookTimer,
+  CookTimerButton,
   CookTimers,
   CookViewChoice,
   CookPill,
@@ -422,7 +423,7 @@ describe("cook together layout pieces", () => {
         step={<p>step</p>}
         timers={
           <CookTimers empty="none">
-            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} />
+            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} onTogglePause={() => {}} onAddMinute={() => {}} />
           </CookTimers>
         }
       />,
@@ -432,6 +433,80 @@ describe("cook together layout pieces", () => {
     expect(screen.getByRole("button", { name: "Cancel timer: Roast 20 min" })).toBeTruthy();
   });
 
+  it("CookTimer: Pause / Resume (not on a finished one) and +1 min, 44px, in the ring, strip and compact layouts", () => {
+    const onTogglePause = vi.fn();
+    const onAddMinute = vi.fn();
+    const props = { label: "Roast", digits: "19:58", fraction: 0.5, flash: false, onDismiss: () => {}, onTogglePause, onAddMinute };
+    const { rerender } = render(<CookTimer {...props} done={false} large />);
+    for (const large of [true, false]) {
+      rerender(<CookTimer {...props} done={false} large={large} />);
+      for (const name of ["Pause timer: Roast", "+1 min: Roast", "Cancel timer: Roast"]) {
+        expect(screen.getByRole("button", { name }).className).toContain("min-h-control min-w-control");
+      }
+      expect(screen.queryByText("Paused")).toBeNull();
+      rerender(<CookTimer {...props} done={false} large={large} paused />);
+      expect(screen.queryByRole("button", { name: "Pause timer: Roast" })).toBeNull();
+      expect(screen.getByText("Paused")).toBeTruthy();
+      expect(screen.getByText("19:58")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Resume timer: Roast" }));
+      fireEvent.click(screen.getByRole("button", { name: "+1 min: Roast" }));
+    }
+    expect(onTogglePause).toHaveBeenCalledTimes(2);
+    expect(onAddMinute).toHaveBeenCalledTimes(2);
+    rerender(<CookTimer {...props} done large />);
+    expect(screen.queryByRole("button", { name: /^(Pause|Resume) timer/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "+1 min: Roast" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dismiss timer: Roast" })).toBeTruthy();
+  });
+
+  it("CookTimer: every control's name holds its visible text (or starts with the action for an icon), in every layout", () => {
+    const props = { label: "Roast", digits: "19:58", fraction: 0.5, flash: false, onDismiss: () => {}, onTogglePause: () => {}, onAddMinute: () => {}, timerId: 7 };
+    const { rerender } = render(<CookTimer {...props} done={false} large />);
+    for (const [large, done, paused] of [[true, false, false], [false, false, false], [true, false, true], [false, false, true], [true, true, false], [false, true, false]]) {
+      rerender(<CookTimer {...props} large={large} done={done} paused={paused} />);
+      const group = screen.getByRole("group", { name: "Roast" });
+      expect(group.getAttribute("data-timer-id")).toBe("7");
+      for (const button of within(group).getAllByRole("button")) {
+        const name = button.getAttribute("aria-label") ?? "";
+        const text = button.textContent?.trim() ?? "";
+        // An icon button has no text: its name starts with the action. A text button's name contains what it shows.
+        if (text) expect(name.toLowerCase()).toContain(text.toLowerCase());
+        else expect(name).toMatch(/^(Pause|Resume) timer: /);
+        expect(button.getAttribute("data-control")).toBeTruthy();
+      }
+      expect(within(group).getByRole("button", { name: "+1 min: Roast" }).textContent).toBe("+1");
+    }
+  });
+
+  it("CookTimer: below lg Cancel is an aria-hidden x icon in one uncapped row; from lg it reads Cancel; Dismiss stays text", () => {
+    const props = { label: "Roast", digits: "19:58", fraction: 0.5, flash: false, onDismiss: () => {}, onTogglePause: () => {}, onAddMinute: () => {} };
+    const { rerender } = render(<CookTimer {...props} done={false} large />);
+    for (const large of [true, false]) {
+      rerender(<CookTimer {...props} done={false} large={large} />);
+      const cancel = screen.getByRole("button", { name: "Cancel timer: Roast" });
+      const icon = cancel.querySelector("svg");
+      expect(icon?.getAttribute("aria-hidden")).toBe("true");
+      expect(icon?.getAttribute("class")).toContain("lg:hidden");
+      expect(cancel.querySelector("span")?.className).toContain("max-lg:hidden");
+      expect(cancel.className).toContain("min-h-control min-w-control");
+      // One row, no width cap and no gap: Pause, +1 and Cancel sit side by side.
+      const row = cancel.parentElement as HTMLElement;
+      expect(row.className).not.toMatch(/max-w-|flex-wrap|gap-/);
+    }
+    rerender(<CookTimer {...props} done large />);
+    const dismiss = screen.getByRole("button", { name: "Dismiss timer: Roast" });
+    expect(dismiss.querySelector("svg")).toBeNull();
+    expect(dismiss.textContent).toBe("Dismiss");
+  });
+
+  it("CookTimerButton: a chip with a paused timer says so and drops the running colours", () => {
+    const { rerender } = render(<CookTimerButton left="8:38">10 minutes</CookTimerButton>);
+    expect(screen.getByRole("button").className).toContain("bg-accent");
+    rerender(<CookTimerButton left="Paused 8:38" paused>10 minutes</CookTimerButton>);
+    expect(screen.getByRole("button").className).not.toContain("bg-accent");
+    expect(screen.getByRole("button").textContent).toContain("Paused 8:38");
+  });
+
   it("CookColumns (not wide) names the ring inside it from 1024px, under it upright", () => {
     render(
       <CookColumns
@@ -439,7 +514,7 @@ describe("cook together layout pieces", () => {
         step={<p>step</p>}
         timers={
           <CookTimers empty="none">
-            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} />
+            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} onTogglePause={() => {}} onAddMinute={() => {}} />
           </CookTimers>
         }
       />,

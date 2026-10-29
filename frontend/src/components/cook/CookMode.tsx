@@ -30,7 +30,7 @@ type Props = { id: string; title: string; ingredients: string[]; steps: string[]
 export function CookMode({ id, title, ingredients, steps }: Props) {
   const [index, setIndex] = useState(0);
   const [live, announce] = useAnnounce();
-  const { timers, now, running, start, dismiss, alert } = useCookTimers(announce);
+  const { timers, now, running, start, dismiss, pause, resume, addMinute, alert } = useCookTimers(announce);
 
   const count = steps.length;
   const [view, setView] = useCookView();
@@ -170,7 +170,7 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
             <MadeIt recipeId={id} show={all || next === undefined} />
           </>
         }
-        timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
+        timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} onPause={pause} onResume={resume} onAddMinute={addMinute} />}
       />
       <CookLive>{live.text}</CookLive>
       <CookFooter next={next} summary={all ? `${ticks.steps.size} of ${count} steps done` : undefined}>
