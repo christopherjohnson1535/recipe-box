@@ -5,7 +5,7 @@ import { Alert } from "@/components/ui/Alert";
 import { CookPlanList, CookPlanPanel, CookPlanRow, CookPlanSummary, CookServeAt, CookTextButton } from "@/components/ui/CookKit";
 import { Pending } from "@/components/ui/Pending";
 import type { CookPlan } from "@/lib/api";
-import { clockLabel, duration, offsetLabel, serveTime, startTimes } from "./cook-plan-logic";
+import { clockLabel, duration, offsetLabel, serveTime, startTimes, tooLate } from "./cook-plan-logic";
 import { ordinal } from "./cook-together-logic";
 import type { PlanState } from "./use-cook-plan";
 
@@ -58,11 +58,14 @@ export function CookPlanner({ state, ids, names, mark, stepText, onRetry, serveA
   const serve = timed ? serveTime(serveAt, now) : null;
   const starts = startTimes(plan, serve);
   const first = starts[0];
+  const late = tooLate(plan, serve, now);
   const summary = !timed
     ? plan.reason ?? "The dishes take turns, one step each."
-    : serve && first
-      ? `Start at ${clockLabel(first)} to serve at ${clockLabel(serve)}.`
-      : `Ready to serve ${duration(plan.totalMinutes ?? 0)} after you start.`;
+    : late
+      ? `That start was ${duration(late.minutesAgo)} ago. The soonest you can serve is ${clockLabel(late.soonest)}.`
+      : serve && first
+        ? `Start at ${clockLabel(first)} to serve at ${clockLabel(serve)}.`
+        : `Ready to serve ${duration(plan.totalMinutes ?? 0)} after you start.`;
 
   return (
     <CookPlanPanel
@@ -80,7 +83,7 @@ export function CookPlanner({ state, ids, names, mark, stepText, onRetry, serveA
         ) : undefined
       }
     >
-      <CookPlanSummary>{summary}</CookPlanSummary>
+      <CookPlanSummary warn={late !== null}>{summary}</CookPlanSummary>
       <CookPlanList label="Suggested order">
         {plan.steps.map((s, i) => {
           const dish = ids.indexOf(s.recipeId);

@@ -70,6 +70,7 @@ describe("Plan the evening", () => {
     expect(order()).toBeUndefined();
     fireEvent.click(screen.getByRole("button", { name: "Use this order" }));
     expect(order()).toEqual([[1, 0], [1, 1], [0, 0], [0, 1]]);
+    await waitFor(() => expect(document.activeElement).toBe(planButton())); // focus goes back to the action
     expect(screen.queryByRole("list", { name: "Suggested order" })).toBeNull();
     expect(screen.getByText("Step 1 of 2 · 1st of 4").parentElement?.parentElement?.textContent).toContain("Roast"); // the first step of the new order is current
     expect(screen.getByRole("status").textContent).toContain("Using the suggested order");
@@ -92,6 +93,20 @@ describe("Plan the evening", () => {
     expect(listed()[0]).toMatch(/^Start/);
   });
 
+  it("warns when the first step would already have started, with the soonest serve time", async () => {
+    answer(() => HttpResponse.json(AI_PLAN));
+    view();
+    fireEvent.click(planButton()!);
+    await screen.findByRole("list", { name: "Suggested order" });
+    // 12:00 now, a 100-minute plan, serving at 1 PM: it should have started at 11:20.
+    fireEvent.change(screen.getByLabelText("Serve at"), { target: { value: "13:00" } });
+    const summary = screen.getByText("That start was 40 min ago. The soonest you can serve is 1:40 PM.");
+    expect(summary.getAttribute("role")).toBe("status");
+    expect(summary.getAttribute("data-warn")).toBe("true");
+    fireEvent.change(screen.getByLabelText("Serve at"), { target: { value: "13:40" } });
+    expect(screen.getByText("Start at 12:00 PM to serve at 1:40 PM.").getAttribute("data-warn")).toBeNull();
+  });
+
   it("keeps the cook's order on Keep my order", async () => {
     answer(() => HttpResponse.json(AI_PLAN));
     view();
@@ -100,6 +115,7 @@ describe("Plan the evening", () => {
     fireEvent.click(screen.getByRole("button", { name: "Keep my order" }));
     expect(screen.queryByRole("list", { name: "Suggested order" })).toBeNull();
     expect(order()).toBeUndefined();
+    await waitFor(() => expect(document.activeElement).toBe(planButton()));
     expect(screen.getByText(/Wash the/)).toBeTruthy();
     expect(planButton()!.disabled).toBe(false);
   });

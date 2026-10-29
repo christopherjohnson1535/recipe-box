@@ -41,6 +41,21 @@ export function duration(minutes: number): string {
 /** A step's offset as a label: "Start" at 0, else "+25 min". */
 export const offsetLabel = (minutes: number) => (minutes === 0 ? "Start" : `+${duration(minutes)}`);
 
-const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-/** "5:20 PM", in the device's own time zone and style. */
-export const clockLabel = (at: Date) => clock.format(at);
+/**
+ * A clock time in the device's own style, as its time input shows it: "5:20 PM" in the US, "17:20" where the day has 24
+ * hours. `locale` is for tests; the page passes nothing, so the browser's own locale and hour cycle decide.
+ */
+export const clockLabel = (at: Date, locale?: string) => new Intl.DateTimeFormat(locale, { timeStyle: "short" }).format(at);
+
+/**
+ * When the plan's first step would already have started by `now`: how many minutes ago, and the soonest serve time from
+ * now (`now` plus the plan's total, rounded up to the next 5 minutes). Null when there is no serve time, the plan is not
+ * timed, or the first start is still ahead.
+ */
+export function tooLate(plan: CookPlan, serveAt: Date | null, now: Date): { minutesAgo: number; soonest: Date } | null {
+  const first = startTimes(plan, serveAt)[0];
+  if (!first || plan.totalMinutes === null || first.getTime() >= now.getTime()) return null;
+  const step = 5 * 60_000;
+  const soonest = new Date(Math.ceil((now.getTime() + plan.totalMinutes * 60_000) / step) * step);
+  return { minutesAgo: Math.ceil((now.getTime() - first.getTime()) / 60_000), soonest };
+}

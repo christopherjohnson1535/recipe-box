@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CookPlan } from "@/lib/api";
-import { clockLabel, duration, offsetLabel, planOrder, serveTime, startTimes } from "./cook-plan-logic";
+import { clockLabel, duration, offsetLabel, planOrder, serveTime, startTimes, tooLate } from "./cook-plan-logic";
 
 const step = (recipeId: string, stepIndex: number, startOffsetMin: number | null) => ({ recipeId, stepIndex, startOffsetMin, startAt: null, note: "" });
 const plan = (steps: CookPlan["steps"], totalMinutes: number | null = 100): CookPlan => ({ source: "ai", reason: null, totalMinutes, serveAt: null, steps });
@@ -51,6 +51,29 @@ describe("labels", () => {
   it("reads durations, offsets and clock times", () => {
     expect([0, 45, 60, 100].map(duration)).toEqual(["0 min", "45 min", "1 hr", "1 hr 40 min"]);
     expect([0, 25, 90].map(offsetLabel)).toEqual(["Start", "+25 min", "+1 hr 30 min"]);
-    expect(clockLabel(new Date("2026-10-22T17:20:00Z"))).toBe("5:20 PM");
+  });
+
+  it("sets clock times in the locale's own hour cycle, as the time input does", () => {
+    const at = new Date("2026-10-22T18:10:00Z");
+    expect(clockLabel(at, "en-US")).toBe("6:10 PM");
+    expect(clockLabel(at, "en-GB")).toBe("18:10");
+    expect(clockLabel(at, "de-DE")).toBe("18:10");
+    expect(clockLabel(at)).toBe("6:10 PM"); // tests run with LANG en_US, like the owner's devices
+  });
+});
+
+describe("tooLate", () => {
+  const now = new Date("2026-10-22T12:00:00Z");
+  const p = plan([step("a", 0, 0), step("b", 0, 75)], 100);
+  it("says how long ago the first start was and the soonest serve time, rounded up to 5 minutes", () => {
+    const late = tooLate(p, new Date("2026-10-22T13:00:00Z"), now);
+    expect(late?.minutesAgo).toBe(40);
+    expect(late?.soonest.toISOString()).toBe("2026-10-22T13:40:00.000Z");
+    expect(tooLate(p, new Date("2026-10-22T13:00:00Z"), new Date("2026-10-22T12:02:00Z"))?.soonest.toISOString()).toBe("2026-10-22T13:45:00.000Z");
+  });
+  it("is null when the first start is still ahead, or nothing is timed", () => {
+    expect(tooLate(p, new Date("2026-10-22T13:40:00Z"), now)).toBeNull();
+    expect(tooLate(p, null, now)).toBeNull();
+    expect(tooLate(plan([step("a", 0, null)], null), new Date("2026-10-22T12:30:00Z"), now)).toBeNull();
   });
 });

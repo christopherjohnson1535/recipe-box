@@ -911,9 +911,16 @@ export function CookServeAt({ value, onChange, hint }: { value: string; onChange
   );
 }
 
-/** The plan's one-line summary ("Ready to serve in 1 hr 40 min."), or why the dishes take turns. */
-export function CookPlanSummary({ children }: { children: ReactNode }) {
-  return <p className="font-text text-deck text-ink italic [overflow-wrap:anywhere]">{children}</p>;
+/**
+ * The plan's one-line summary ("Ready to serve in 1 hr 40 min."), or why the dishes take turns. A polite live region, so a
+ * new serve time's answer is read out; `warn` (a start time already past) sets it in the accent.
+ */
+export function CookPlanSummary({ warn = false, children }: { warn?: boolean; children: ReactNode }) {
+  return (
+    <p role="status" data-warn={warn || undefined} className={cx("font-text text-deck italic [overflow-wrap:anywhere]", warn ? "text-accent" : "text-ink")}>
+      {children}
+    </p>
+  );
 }
 
 /** The suggested order: one `CookPlanRow` per step. */
