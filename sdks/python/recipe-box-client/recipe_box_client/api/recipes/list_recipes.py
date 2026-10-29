@@ -15,6 +15,7 @@ def _get_kwargs(
     *,
     q: str | Unset = UNSET,
     tag: str | Unset = UNSET,
+    favourite: bool | Unset = UNSET,
     sort: RecipeSort | Unset = UNSET,
     limit: int | Unset = UNSET,
     offset: int | Unset = UNSET,
@@ -25,6 +26,8 @@ def _get_kwargs(
     params["q"] = q
 
     params["tag"] = tag
+
+    params["favourite"] = favourite
 
     json_sort: str | Unset = UNSET
     if not isinstance(sort, Unset):
@@ -90,6 +93,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     q: str | Unset = UNSET,
     tag: str | Unset = UNSET,
+    favourite: bool | Unset = UNSET,
     sort: RecipeSort | Unset = UNSET,
     limit: int | Unset = UNSET,
     offset: int | Unset = UNSET,
@@ -99,6 +103,7 @@ def sync_detailed(
     Args:
         q (str | Unset):
         tag (str | Unset):
+        favourite (bool | Unset):
         sort (RecipeSort | Unset): Sort orders for `GET /api/recipes`; the handler matches the raw
             string, so anything else is a 400.
         limit (int | Unset):
@@ -115,6 +120,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         q=q,
         tag=tag,
+        favourite=favourite,
         sort=sort,
         limit=limit,
         offset=offset,
@@ -132,6 +138,7 @@ def sync(
     client: AuthenticatedClient,
     q: str | Unset = UNSET,
     tag: str | Unset = UNSET,
+    favourite: bool | Unset = UNSET,
     sort: RecipeSort | Unset = UNSET,
     limit: int | Unset = UNSET,
     offset: int | Unset = UNSET,
@@ -141,6 +148,7 @@ def sync(
     Args:
         q (str | Unset):
         tag (str | Unset):
+        favourite (bool | Unset):
         sort (RecipeSort | Unset): Sort orders for `GET /api/recipes`; the handler matches the raw
             string, so anything else is a 400.
         limit (int | Unset):
@@ -158,6 +166,7 @@ def sync(
         client=client,
         q=q,
         tag=tag,
+        favourite=favourite,
         sort=sort,
         limit=limit,
         offset=offset,
@@ -169,6 +178,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     q: str | Unset = UNSET,
     tag: str | Unset = UNSET,
+    favourite: bool | Unset = UNSET,
     sort: RecipeSort | Unset = UNSET,
     limit: int | Unset = UNSET,
     offset: int | Unset = UNSET,
@@ -178,6 +188,7 @@ async def asyncio_detailed(
     Args:
         q (str | Unset):
         tag (str | Unset):
+        favourite (bool | Unset):
         sort (RecipeSort | Unset): Sort orders for `GET /api/recipes`; the handler matches the raw
             string, so anything else is a 400.
         limit (int | Unset):
@@ -194,6 +205,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         q=q,
         tag=tag,
+        favourite=favourite,
         sort=sort,
         limit=limit,
         offset=offset,
@@ -209,6 +221,7 @@ async def asyncio(
     client: AuthenticatedClient,
     q: str | Unset = UNSET,
     tag: str | Unset = UNSET,
+    favourite: bool | Unset = UNSET,
     sort: RecipeSort | Unset = UNSET,
     limit: int | Unset = UNSET,
     offset: int | Unset = UNSET,
@@ -218,6 +231,7 @@ async def asyncio(
     Args:
         q (str | Unset):
         tag (str | Unset):
+        favourite (bool | Unset):
         sort (RecipeSort | Unset): Sort orders for `GET /api/recipes`; the handler matches the raw
             string, so anything else is a 400.
         limit (int | Unset):
@@ -236,6 +250,7 @@ async def asyncio(
             client=client,
             q=q,
             tag=tag,
+            favourite=favourite,
             sort=sort,
             limit=limit,
             offset=offset,

@@ -72,9 +72,12 @@ pub trait RecipeRepo: Send + Sync {
     ///   crumble"), whatever the words.
     /// - **Tag names**: the whole text matches a tag name that starts with it (`din` finds recipes tagged `dinner`).
     ///   Words are not combined across fields: `weeknight lasag` finds nothing when `weeknight` is only a tag.
+    /// - **`favourite_of`** keeps only recipes that member starred ([`FavouriteRepo`]), combined with the rest by AND.
     /// - **Literal characters**: `%` and `_` (and quotes, backslashes, SQL) are ordinary characters, never
     ///   wildcards, and never an error. Text with no usable word matches nothing (it is not "everything").
     /// - **`tag`** keeps only recipes carrying that exact tag name (any case), combined with the text by AND.
+    ///
+    /// Summaries leave `is_favourite` false: the service fills it for whoever is reading.
     ///
     /// Order, with `Sort::Default` and text: recipes whose title starts with the text first, then better
     /// relevance (the adapter's measure of how often the words occur), then newest first, then id. Without text,
@@ -183,6 +186,24 @@ pub trait CookLogRepo: Send + Sync {
 
     /// Deletes an entry for good. `NotFound` when there is none.
     async fn delete(&self, id: Uuid) -> DomainResult<()>;
+}
+
+/// Each member's own starred recipes (REC-5). Stars are private: nothing here lists another member's.
+///
+/// A star outlives a soft delete of its recipe (a restore brings it back) and goes when the recipe is purged; a
+/// member's stars go when the member is removed. A repository stamps `created_at` with its [`crate::Clock`].
+#[async_trait]
+pub trait FavouriteRepo: Send + Sync {
+    /// Stars a recipe for `user_id`. Starring one already starred does nothing. `NotFound` when the recipe is missing
+    /// or deleted (checked in the same step as the insert, so a star never lands on a deleted recipe);
+    /// `Unauthenticated` when the member no longer exists. Nothing is saved in either case.
+    async fn add(&self, user_id: Uuid, recipe_id: Uuid) -> DomainResult<()>;
+
+    /// Takes the star off. Not an error when there is none. It does not look at whether the recipe is live.
+    async fn remove(&self, user_id: Uuid, recipe_id: Uuid) -> DomainResult<()>;
+
+    /// Which of `recipe_ids` the member starred (whatever the recipes' state). Empty `recipe_ids` gives an empty set.
+    async fn among(&self, user_id: Uuid, recipe_ids: &[Uuid]) -> DomainResult<HashSet<Uuid>>;
 }
 
 /// Links from members to accounts at an identity provider (ACC-6). A link goes when its member does.

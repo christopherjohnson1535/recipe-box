@@ -21,10 +21,10 @@ use domain::{
     uuid::Uuid,
 };
 use ports::{
-    Clock, Compute, CookLogRepo, EncodedImage, FlowSealer, GoogleConnection, GoogleConnectionRepo,
-    GroceryItem, GroceryList, GroceryRepo, IdentityRepo, ImageCodec, ImageRepo, ListedRecipe,
-    MediaStore, NewGroceryItem, PasswordHasher, RecipeRepo, SessionRepo, SessionTokens,
-    SettingsRepo, StorageHealth, TagRepo, TokenCipher, UserRepo,
+    Clock, Compute, CookLogRepo, EncodedImage, FavouriteRepo, FlowSealer, GoogleConnection,
+    GoogleConnectionRepo, GroceryItem, GroceryList, GroceryRepo, IdentityRepo, ImageCodec,
+    ImageRepo, ListedRecipe, MediaStore, NewGroceryItem, PasswordHasher, RecipeRepo, SessionRepo,
+    SessionTokens, SettingsRepo, StorageHealth, TagRepo, TokenCipher, UserRepo,
 };
 
 struct StoredUser {
@@ -82,6 +82,8 @@ struct State {
     google_exports: HashMap<Uuid, DateTime<Utc>>,
     /// "Made it" entries, in the order they were recorded.
     cook_log: Vec<StoredCookLog>,
+    /// Stars: `(user id, recipe id)`.
+    favourites: HashSet<(Uuid, Uuid)>,
 }
 
 impl State {
@@ -167,6 +169,7 @@ impl State {
             updated_by: self.user_ref(r.updated_by),
             created_at: r.created_at,
             updated_at: r.updated_at,
+            is_favourite: false,
         }
     }
 
@@ -185,6 +188,7 @@ impl State {
                 .and_then(|f| f.display_file_name.clone()),
             source_type: i.source_type,
             updated_at: r.updated_at,
+            is_favourite: false,
         }
     }
 
@@ -222,6 +226,7 @@ impl MemoryStore {
                 identities: Vec::new(),
                 google_exports: HashMap::new(),
                 cook_log: Vec::new(),
+                favourites: HashSet::new(),
                 grocery: Grocery {
                     list: None,
                     recipes: Vec::new(),
@@ -371,10 +376,12 @@ impl RecipeRepo for MemoryStore {
             recipes,
             grocery,
             cook_log,
+            favourites,
             ..
         } = &mut *s;
         grocery.recipes.retain(|(id, ..)| recipes.contains_key(id));
         cook_log.retain(|e| recipes.contains_key(&e.recipe_id));
+        favourites.retain(|(_, r)| recipes.contains_key(r));
         Ok((before - s.recipes.len()) as u64)
     }
 
@@ -390,6 +397,10 @@ impl RecipeRepo for MemoryStore {
                 q.tag
                     .as_ref()
                     .is_none_or(|t| r.input.tags.iter().any(|x| x.to_lowercase() == *t))
+            })
+            .filter(|r| {
+                q.favourite_of
+                    .is_none_or(|u| s.favourites.contains(&(u, r.id)))
             })
             .filter_map(|r| match &matcher {
                 None => Some((r, search::Rank::default())),
@@ -687,6 +698,7 @@ impl UserRepo for MemoryStore {
         for e in s.cook_log.iter_mut().filter(|e| e.user_id == gone) {
             e.user_id = None;
         }
+        s.favourites.retain(|(u, _)| *u != id);
         Ok(())
     }
 }
@@ -1508,5 +1520,38 @@ impl CookLogRepo for MemoryStore {
             return Err(DomainError::NotFound("No such entry.".into()));
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl FavouriteRepo for MemoryStore {
+    async fn add(&self, user_id: Uuid, recipe_id: Uuid) -> DomainResult<()> {
+        let mut s = self.lock();
+        if !s
+            .recipes
+            .get(&recipe_id)
+            .is_some_and(|r| r.deleted_at.is_none())
+        {
+            return Err(DomainError::NotFound("Recipe not found.".into()));
+        }
+        if !s.users.contains_key(&user_id) {
+            return Err(DomainError::Unauthenticated("Please sign in."));
+        }
+        s.favourites.insert((user_id, recipe_id));
+        Ok(())
+    }
+
+    async fn remove(&self, user_id: Uuid, recipe_id: Uuid) -> DomainResult<()> {
+        self.lock().favourites.remove(&(user_id, recipe_id));
+        Ok(())
+    }
+
+    async fn among(&self, user_id: Uuid, recipe_ids: &[Uuid]) -> DomainResult<HashSet<Uuid>> {
+        let s = self.lock();
+        Ok(recipe_ids
+            .iter()
+            .copied()
+            .filter(|r| s.favourites.contains(&(user_id, *r)))
+            .collect())
     }
 }

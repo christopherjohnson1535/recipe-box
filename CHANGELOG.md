@@ -13,6 +13,11 @@ To release: move the `[Unreleased]` entries under `## [x.y.z] - YYYY-MM-DD`, mer
 ## [Unreleased]
 
 ### Added
+- Favourites (#22, REC-5): each member stars recipes for themselves, on the home cards and the recipe page, and
+  **Favourites** in the tag row filters to them (with search and tags). `PUT`/`DELETE /api/recipes/{id}/favourite`,
+  `GET /api/recipes?favourite=true`, and `isFavourite` on recipes. Favourites are kept on the device for offline reading
+  without being opened first (KIT-5); starring needs the server. Stars follow their recipe through delete and undo and go
+  with a removed member.
 - Step timers (#24, KIT-6): a time written in a step starts a timer from cook mode, alone or cooking together. Times in words ("twenty minutes", "half an hour", "an hour and a half") and "10-minute" now count; the running chip shows the time left; a finished timer comes first, chimes and vibrates (where the device can) for ten seconds, and stops on Dismiss; **Timer sound** mutes the chime per device. Detection lives in `frontend/src/lib/timers.ts`.
 - "Made it" log (#23, REC-6): log a cook from cooking mode or the recipe page, with the day and what you'd change; the recipe
   page lists who made it and when. `GET`/`POST /api/recipes/{id}/cook-log` and `DELETE /api/recipes/{id}/cook-log/{entryId}`

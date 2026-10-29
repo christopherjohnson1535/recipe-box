@@ -97,6 +97,9 @@ pub struct Recipe {
     pub updated_by: Option<UserRef>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Whether the member reading it starred it (REC-5). Storage always leaves it `false`: the service that knows who
+    /// is reading fills it in.
+    pub is_favourite: bool,
 }
 
 /// A recipe as it sits in a backup archive: its id there and its content. `image_id` and `photo_image_ids` are the
@@ -146,6 +149,8 @@ pub struct RecipeSummary {
     pub image_display_file: Option<String>,
     pub source_type: SourceType,
     pub updated_at: DateTime<Utc>,
+    /// As on `Recipe`.
+    pub is_favourite: bool,
 }
 
 /// What an import returns; never saved by the import itself.
@@ -287,10 +292,13 @@ pub enum Sort {
     Time,
 }
 
+#[derive(Debug, Clone)]
 pub struct SearchQuery {
     pub text: Option<String>,
     /// Exact tag name, case-insensitive.
     pub tag: Option<String>,
+    /// Only the recipes this member starred.
+    pub favourite_of: Option<Uuid>,
     pub sort: Sort,
     pub limit: i64,
     pub offset: i64,
@@ -301,6 +309,7 @@ impl Default for SearchQuery {
         Self {
             text: None,
             tag: None,
+            favourite_of: None,
             sort: Sort::Default,
             limit: 50,
             offset: 0,

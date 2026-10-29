@@ -37,7 +37,7 @@ export type Identity = Schemas["Identity"];
 export const googleSignInUrl = (next: string) => `/api/auth/google/start?next=${encodeURIComponent(next)}`;
 /** Linking a Google account to the signed-in member; the API sends them back to /settings?signin=linked|taken|error. */
 export const GOOGLE_LINK_URL = "/api/auth/google/start?link=1";
-export type RecipeQuery = { q?: string; tag?: string; sort?: RecipeSort; limit?: number; offset?: number };
+export type RecipeQuery = { q?: string; tag?: string; favourite?: boolean; sort?: RecipeSort; limit?: number; offset?: number };
 
 /** Dispatched on `window` after every grocery write, so the nav badge (and any other open view) refetches. */
 export const GROCERY_CHANGED = "grocery:changed";
@@ -121,7 +121,7 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, ini
 
     listRecipes: (query: RecipeQuery = {}) => {
       const params = new URLSearchParams();
-      for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "") params.set(k, String(v));
+      for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "" && v !== false) params.set(k, String(v));
       const qs = params.toString();
       return get<RecipePage>(`/api/recipes${qs ? `?${qs}` : ""}`);
     },
@@ -132,6 +132,8 @@ export function createApi({ baseUrl = "", cookie, fetch: fetchImpl = (input, ini
     restoreRecipe: (recipeId: string) => request<Recipe>("POST", `/api/recipes/${id(recipeId)}/restore`),
     listCookLog: (recipeId: string) => get<CookLogEntry[]>(`/api/recipes/${id(recipeId)}/cook-log`),
     addCookLogEntry: (recipeId: string, body: NewCookLogEntry) => request<CookLogEntry>("POST", `/api/recipes/${id(recipeId)}/cook-log`, body),
+    addFavourite: (recipeId: string) => request<void>("PUT", `/api/recipes/${id(recipeId)}/favourite`),
+    removeFavourite: (recipeId: string) => request<void>("DELETE", `/api/recipes/${id(recipeId)}/favourite`),
     deleteCookLogEntry: (recipeId: string, entryId: string) => request<void>("DELETE", `/api/recipes/${id(recipeId)}/cook-log/${id(entryId)}`),
 
     listTags: () => get<Tag[]>("/api/tags"),

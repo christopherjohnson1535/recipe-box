@@ -37,6 +37,21 @@ describe("offline banner and notes", () => {
 });
 
 describe("SavedRecipes", () => {
+  it("lists the reader's favourites first, then the rest", async () => {
+    render(
+      <SavedRecipes
+        load={async () => [
+          { href: "/recipes/a", title: "Lasagne", favourite: false },
+          { href: "/recipes/b", title: "Lentil soup", favourite: true },
+        ]}
+      />,
+    );
+    const favourites = await screen.findByRole("complementary", { name: "Your favourites" });
+    expect(favourites.textContent).toContain("Lentil soup");
+    expect(favourites.textContent).not.toContain("Lasagne");
+    expect(screen.getByRole("complementary", { name: "Also kept on this device" }).textContent).toContain("Lasagne");
+  });
+
   it("lists the recipes kept on this device", async () => {
     render(<SavedRecipes load={async () => [{ href: "/recipes/a", title: "Lasagne" }]} />);
     expect(await screen.findByRole("link", { name: /Lasagne/ })).toHaveProperty("pathname", "/recipes/a");
@@ -101,9 +116,21 @@ describe("keptRecipes", () => {
     };
     vi.stubGlobal("caches", { open: async () => cache });
     expect(await keptRecipes()).toEqual([
-      { href: `/recipes/${id(2)}`, title: "Stew" },
-      { href: `/recipes/${id(1)}`, title: "Soup" },
+      { href: `/recipes/${id(2)}`, title: "Stew", favourite: false },
+      { href: `/recipes/${id(1)}`, title: "Soup", favourite: false },
     ]);
+  });
+
+  it("marks the pages of recipes the reader starred", async () => {
+    const { keptRecipes } = await import("./SavedRecipes");
+    const { FAVOURITE_MARKER } = await import("./rules");
+    const url = "http://localhost:3000/recipes/0f8e2b4c-1a2b-4c3d-8e9f-012345678901";
+    const cache = {
+      keys: async () => [{ url }],
+      match: async () => ({ text: async () => `<title>Soup · Recipe Box</title><meta ${FAVOURITE_MARKER} content="1">` }),
+    };
+    vi.stubGlobal("caches", { open: async () => cache });
+    expect(await keptRecipes()).toEqual([{ href: "/recipes/0f8e2b4c-1a2b-4c3d-8e9f-012345678901", title: "Soup", favourite: true }]);
   });
 
   it("is empty without Cache Storage", async () => {
@@ -119,6 +146,17 @@ describe("KeepOffline", () => {
     const { KEEP_MARKER } = await import("./rules");
     const { container } = render(<KeepOffline />);
     expect(container.innerHTML.includes(KEEP_MARKER) || document.head.innerHTML.includes(KEEP_MARKER)).toBe(true);
+  });
+
+  it("adds the favourite marker only for a starred recipe", async () => {
+    const { KeepOffline } = await import("./KeepOffline");
+    const { FAVOURITE_MARKER } = await import("./rules");
+    const html = () => document.documentElement.innerHTML;
+    const { unmount } = render(<KeepOffline />);
+    expect(html().includes(FAVOURITE_MARKER)).toBe(false);
+    unmount();
+    render(<KeepOffline isFavourite />);
+    expect(html().includes(FAVOURITE_MARKER)).toBe(true);
   });
 });
 

@@ -159,6 +159,10 @@ Anything else needs a one-line reason in the agent's report.
   on delete set null, cooked_on date (the cook's own calendar day), note text default '', created_at timestamptz)` + index
   `(recipe_id, cooked_on desc, created_at desc)`. Entries stay hidden with a soft-deleted recipe, return on restore and go
   with the purge; a removed member's entries stay with `user_id` null.
+- Favourites (`0007_favourites.sql`, REC-5): `favourites(user_id fk users on delete cascade, recipe_id fk recipes on
+  delete cascade, created_at timestamptz, pk (user_id, recipe_id))` + index `(recipe_id)`. Per member, never shared. A star
+  stays hidden with a soft-deleted recipe (its routes answer 404), returns on restore and goes with the purge; a removed
+  member's stars go with them. Not in the export zip (format v1 is recipes only); `scripts/backup.sh` has them.
 - Soft delete: `DELETE /api/recipes/:id` sets `deleted_at`; `POST /api/recipes/:id/restore` clears it within 10 min
   (REC-2); a periodic task purges rows deleted > 1 day.
 
@@ -171,9 +175,10 @@ Anything else needs a one-line reason in the agent's report.
 | POST `/api/auth/login` / POST `/api/auth/logout` / GET `/api/auth/me` | —/s/s | ACC-1/3 | done |
 | GET `/api/auth/providers` → `{google}`, GET `/api/auth/google/start`, GET `/api/auth/google/callback` | — | ACC-6 | #26 |
 | GET `/api/auth/identities`, DELETE `/api/auth/identities/:id` | s | ACC-6 | #26 |
-| GET `/api/recipes?q=&tag=&sort=&limit=&offset=` | s | FND-1–4 | list + paging done; `q` full-text and `sort` → issue |
+| GET `/api/recipes?q=&tag=&favourite=&sort=&limit=&offset=` | s | FND-1–4, REC-5 | list + paging done; `q` full-text and `sort` → issue |
 | POST `/api/recipes`, GET/PUT/DELETE `/api/recipes/:id`, POST `/api/recipes/:id/restore` | s | REC-1/2 | done |
 | GET/POST `/api/recipes/:id/cook-log`, DELETE `/api/recipes/:id/cook-log/:entryId` | s | REC-6 | #23 |
+| PUT/DELETE `/api/recipes/:id/favourite` | s | REC-5 | #22 |
 | GET `/api/tags` → `[{name, count}]` | s | FND-3 | done |
 | POST `/api/media` (multipart `file`) → image | s | PHO-1 | done (re-encode, resize) |
 | GET `/media/:file` | s | — | done |
@@ -265,7 +270,14 @@ Where new code goes: `CLAUDE.md` → *Where new backend code goes*.
     page also keeps the photos it names and its cooking mode), `GET /api/recipes/:id` and `GET /api/grocery` (network-first; grocery writes are never kept, and the page ignores a kept copy older than the list it already shows), `/media/*` (cache-first: names
     are content ids). Everything else is network-only; a document with no copy falls back to `/offline`, which lists
     the recipes kept on the device.
-  - Caps: 60 pages, 30 API responses, 200 photos, 30 days since last use, purge on quota error.
+  - Favourites (#22): after the app loads, the reader's 30 newest favourites are asked for with `CACHE_URLS` (four at a
+    time, skipping pages already kept), so they read offline without being opened first, with their photos and cooking
+    mode; a page whose star changes is fetched again so its kept copy shows the star as it is. A starred page carries a
+    second marker (`rb-favourite`) and `/offline` lists those first; a kept page whose mark no longer matches (starred or
+    unstarred on another device) is fetched again. A device out of room (storage over 90% used, or a batch that did not
+    land) is not asked again for the rest of the session. Starring needs the server: offline the star is off,
+    with the reason, and nothing is queued.
+  - Caps: 100 pages, 30 API responses, 400 photos, 30 days since last use, purge on quota error.
   - Signed out never comes from cache: a GET answered 401, a page navigation answered with a redirect (the sign-in
     gate, `/setup`) or a redirect to `/login` wipes the `rb-*` caches (the worker does not see POSTs, so a wrong
     password does not); Sign out and a successful sign-in wipe them too; `/login`, `/setup`, lists, search and

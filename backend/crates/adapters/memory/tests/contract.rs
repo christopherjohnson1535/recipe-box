@@ -21,6 +21,7 @@ fn stack(clock: Arc<dyn Clock>) -> Stack {
         grocery: store.clone(),
         google: store.clone(),
         cook_log: store.clone(),
+        favourites: store.clone(),
         identities: store,
     }
 }
@@ -94,4 +95,9 @@ fn the_manual_clock_moves_only_when_told() {
         clock.now(),
         contract::epoch() + domain::chrono::Duration::seconds(5)
     );
+}
+
+#[tokio::test]
+async fn favourites_meet_the_contract() {
+    contract::favourite_repo(stack).await;
 }

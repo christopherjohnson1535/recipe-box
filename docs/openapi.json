@@ -2010,6 +2010,15 @@
             }
           },
           {
+            "name": "favourite",
+            "in": "query",
+            "description": "`true`: only the signed-in member's favourites (combined with `q`, `tag` and `sort`).",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "description": "Default `newest`, or relevance when `q` is set.",
@@ -2054,7 +2063,7 @@
             }
           },
           "400": {
-            "description": "Bad `limit`, `offset` or `sort` (`validation`).",
+            "description": "Bad `limit`, `offset`, `sort` or `favourite` (`validation`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2650,6 +2659,146 @@
           },
           "404": {
             "description": "No such recipe or entry, or the recipe is deleted (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/recipes/{id}/favourite": {
+      "put": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Stars a recipe for the signed-in member. Starring it again is fine.",
+        "operationId": "addFavourite",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Recipe id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Starred."
+          },
+          "400": {
+            "description": "Malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such recipe, or deleted (`not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong on the server (`internal`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Takes the signed-in member's star off a recipe. Not starred is fine.",
+        "operationId": "removeFavourite",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Recipe id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Not starred any more."
+          },
+          "400": {
+            "description": "Malformed id (`validation`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or expired session (`unauthenticated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such recipe, or deleted (`not_found`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -4328,7 +4477,8 @@
           "createdBy",
           "updatedBy",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "isFavourite"
         ],
         "properties": {
           "cookMinutes": {
@@ -4384,6 +4534,10 @@
             "items": {
               "$ref": "#/components/schemas/Ingredient"
             }
+          },
+          "isFavourite": {
+            "type": "boolean",
+            "description": "Whether the signed-in member starred it. Each member has their own favourites."
           },
           "notes": {
             "type": "string"
@@ -4778,7 +4932,8 @@
           "imageUrl",
           "imageDisplayUrl",
           "sourceType",
-          "updatedAt"
+          "updatedAt",
+          "isFavourite"
         ],
         "properties": {
           "description": {
@@ -4800,6 +4955,10 @@
               "string",
               "null"
             ]
+          },
+          "isFavourite": {
+            "type": "boolean",
+            "description": "As on `Recipe`."
           },
           "servings": {
             "type": [

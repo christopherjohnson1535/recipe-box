@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NoMatches } from "./ResultSummary";
 import { SEARCH_DEBOUNCE_MS, SearchControls } from "./SearchControls";
-import { homeHref, parseSort, resultSummary } from "./url";
+import { homeHref, parseFavourite, parseSort, resultSummary } from "./url";
 
 const push = vi.fn();
 const replace = vi.fn();
@@ -21,6 +21,12 @@ describe("url helpers", () => {
     expect(homeHref({})).toBe("/");
     expect(homeHref({ q: "  lasagne ", tag: "dinner", sort: "time" })).toBe("/?q=lasagne&tag=dinner&sort=time");
     expect(homeHref({ q: "a&b" })).toBe("/?q=a%26b");
+    expect(homeHref({ q: "soup", favourite: true, sort: "title" })).toBe("/?q=soup&favourite=true&sort=title");
+    expect(homeHref({ favourite: false })).toBe("/");
+  });
+  it("reads the favourites filter only from true", () => {
+    expect(parseFavourite("true")).toBe(true);
+    for (const v of ["1", "yes", "", undefined]) expect(parseFavourite(v)).toBe(false);
   });
   it("accepts only known sorts", () => {
     expect(parseSort("title")).toBe("title");
@@ -32,6 +38,8 @@ describe("url helpers", () => {
     expect(resultSummary(1, "lasagne", "")).toBe("1 recipe matches “lasagne”");
     expect(resultSummary(2, "", "dinner")).toBe("2 recipes tagged dinner");
     expect(resultSummary(2, "soup", "dinner")).toBe("2 recipes match “soup” tagged dinner");
+    expect(resultSummary(2, "soup", "", true)).toBe("2 of your favourites match “soup”");
+    expect(resultSummary(1, "", "dinner", true)).toBe("1 of your favourites tagged dinner");
   });
 });
 
@@ -111,5 +119,25 @@ describe("empty state", () => {
     expect(screen.getByRole("heading", { name: "No recipes match" })).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("Nothing matches “zzz” tagged dinner.");
     expect(screen.getByRole("link", { name: "Clear search" }).getAttribute("href")).toBe("/");
+  });
+});
+
+describe("favourites filter", () => {
+  it("keeps the filter in the no-JS form and in typed searches", () => {
+    render(<SearchControls q="" tag="" favourite />);
+    expect(screen.getByRole("search").querySelector<HTMLInputElement>('input[name="favourite"]')?.value).toBe("true");
+    type("soup");
+    act(() => void vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS));
+    expect(replace).toHaveBeenCalledWith("/?q=soup&favourite=true", { scroll: false });
+  });
+
+  it("says how to star when there are no favourites yet, and how to search when none match", () => {
+    const { unmount } = render(<NoMatches q="" tag="" favourite />);
+    expect(screen.getByRole("heading", { name: "No favourites yet" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Show all recipes" }).getAttribute("href")).toBe("/");
+    unmount();
+    render(<NoMatches q="soup" tag="" favourite />);
+    expect(screen.getByRole("heading", { name: "None of your favourites match" })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Nothing matches “soup” among your favourites. Try a different word or another tag.");
   });
 });

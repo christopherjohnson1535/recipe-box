@@ -21,6 +21,7 @@ class RecipeSummary:
         id (UUID):
         image_display_url (None | str): As on `Recipe`.
         image_url (None | str):
+        is_favourite (bool): As on `Recipe`.
         servings (None | str): Free text, as on `Recipe`.
         source_type (SourceType):
         tags (list[str]):
@@ -33,6 +34,7 @@ class RecipeSummary:
     id: UUID
     image_display_url: None | str
     image_url: None | str
+    is_favourite: bool
     servings: None | str
     source_type: SourceType
     tags: list[str]
@@ -51,6 +53,8 @@ class RecipeSummary:
 
         image_url: None | str
         image_url = self.image_url
+
+        is_favourite = self.is_favourite
 
         servings: None | str
         servings = self.servings
@@ -74,6 +78,7 @@ class RecipeSummary:
                 "id": id,
                 "imageDisplayUrl": image_display_url,
                 "imageUrl": image_url,
+                "isFavourite": is_favourite,
                 "servings": servings,
                 "sourceType": source_type,
                 "tags": tags,
@@ -106,6 +111,8 @@ class RecipeSummary:
 
         image_url = _parse_image_url(d.pop("imageUrl"))
 
+        is_favourite = d.pop("isFavourite")
+
         def _parse_servings(data: object) -> None | str:
             if data is None:
                 return data
@@ -133,6 +140,7 @@ class RecipeSummary:
             id=id,
             image_display_url=image_display_url,
             image_url=image_url,
+            is_favourite=is_favourite,
             servings=servings,
             source_type=source_type,
             tags=tags,

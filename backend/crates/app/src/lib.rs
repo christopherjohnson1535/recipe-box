@@ -21,10 +21,10 @@ mod users;
 use std::sync::Arc;
 
 use ports::{
-    BackupFormat, Clock, CookLogRepo, FlowSealer, GoogleConnectionRepo, GoogleSignIn, GoogleTasks,
-    GroceryRepo, IdentityRepo, ImageCodec, ImageRepo, MediaStore, PageFetcher, PageReader,
-    PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo, SessionTokens, SettingsRepo,
-    StorageHealth, TagRepo, TaskSpawner, TokenCipher, UserRepo,
+    BackupFormat, Clock, CookLogRepo, FavouriteRepo, FlowSealer, GoogleConnectionRepo,
+    GoogleSignIn, GoogleTasks, GroceryRepo, IdentityRepo, ImageCodec, ImageRepo, MediaStore,
+    PageFetcher, PageReader, PasswordHasher, RecipeExtractor, RecipeRepo, SessionRepo,
+    SessionTokens, SettingsRepo, StorageHealth, TagRepo, TaskSpawner, TokenCipher, UserRepo,
 };
 
 pub use auth::{AuthService, NewSession};
@@ -40,7 +40,7 @@ pub use imports::{
 };
 pub use maintenance::{BackfillReport, Maintenance, PurgeReport};
 pub use media::{MediaService, Stored};
-pub use recipes::{RecipeService, SettingsService, TagService};
+pub use recipes::{ListRequest, RecipeService, SettingsService, TagService};
 pub use signin::{Callback, FLOW_MAX_AGE, SignInOutcome, SignInService, Started};
 pub use throttle::{Attempt, Scope, Throttle};
 pub use users::UserService;
@@ -58,6 +58,7 @@ pub struct Deps {
     pub google_connections: Arc<dyn GoogleConnectionRepo>,
     pub identities: Arc<dyn IdentityRepo>,
     pub cook_log: Arc<dyn CookLogRepo>,
+    pub favourites: Arc<dyn FavouriteRepo>,
     pub health: Arc<dyn StorageHealth>,
     pub media: Arc<dyn MediaStore>,
     pub backup: Arc<dyn BackupFormat>,

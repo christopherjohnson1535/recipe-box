@@ -109,6 +109,8 @@ pub struct Recipe {
     pub updated_by: Option<UserRef>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Whether the signed-in member starred it. Each member has their own favourites.
+    pub is_favourite: bool,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -130,6 +132,8 @@ pub struct RecipeSummary {
     pub image_display_url: Option<String>,
     pub source_type: SourceType,
     pub updated_at: DateTime<Utc>,
+    /// As on `Recipe`.
+    pub is_favourite: bool,
 }
 
 /// What the import endpoints return; never saved by them. The client POSTs the reviewed draft to `/api/recipes`.
@@ -489,6 +493,7 @@ impl From<domain::Recipe> for Recipe {
             updated_by: user_ref(r.updated_by),
             created_at: r.created_at,
             updated_at: r.updated_at,
+            is_favourite: r.is_favourite,
         }
     }
 }
@@ -506,6 +511,7 @@ impl From<domain::RecipeSummary> for RecipeSummary {
             image_display_url: r.image_display_file.as_deref().map(media_url),
             source_type: r.source_type.into(),
             updated_at: r.updated_at,
+            is_favourite: r.is_favourite,
         }
     }
 }

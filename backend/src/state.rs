@@ -5,14 +5,16 @@ use adapter_google::{GoogleSignInClient, GoogleTasksClient};
 use adapter_html::HtmlPageReader;
 use adapter_http_fetch::HttpPageFetcher;
 use adapter_postgres::{
-    PgCookLogRepo, PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo, PgImageRepo, PgPool,
-    PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo,
+    PgCookLogRepo, PgFavouriteRepo, PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo,
+    PgImageRepo, PgPool, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo,
+    PgUserRepo,
 };
 use app::{Deps, DisabledGoogleSignIn, DisabledGoogleTasks, Services};
 use ports::{
-    CookLogRepo, FlowSealer, GoogleConnectionRepo, GoogleSignIn, GoogleTasks, GroceryRepo,
-    IdentityRepo, ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo, SessionRepo,
-    SettingsRepo, SpawnedTask, StorageHealth, TagRepo, TaskSpawner, TokenCipher, UserRepo,
+    CookLogRepo, FavouriteRepo, FlowSealer, GoogleConnectionRepo, GoogleSignIn, GoogleTasks,
+    GroceryRepo, IdentityRepo, ImageRepo, MediaStore, PageFetcher, RecipeExtractor, RecipeRepo,
+    SessionRepo, SettingsRepo, SpawnedTask, StorageHealth, TagRepo, TaskSpawner, TokenCipher,
+    UserRepo,
 };
 
 use crate::{
@@ -49,6 +51,7 @@ pub struct AppState {
     pub google_connections: Arc<dyn GoogleConnectionRepo>,
     pub identities: Arc<dyn IdentityRepo>,
     pub cook_log: Arc<dyn CookLogRepo>,
+    pub favourites: Arc<dyn FavouriteRepo>,
     pub media: Arc<dyn MediaStore>,
     pub health: Arc<dyn StorageHealth>,
     pub config: Arc<Config>,
@@ -89,6 +92,7 @@ impl AppState {
             google_connections: self.google_connections.clone(),
             identities: self.identities.clone(),
             cook_log: self.cook_log.clone(),
+            favourites: self.favourites.clone(),
             google_signin: self.google_signin.clone(),
             flows: self.flows.clone(),
             health: self.health.clone(),
@@ -139,6 +143,7 @@ impl AppState {
             google_connections: Arc::new(PgGoogleConnectionRepo::new(pool.clone())),
             identities: Arc::new(PgIdentityRepo::new(pool.clone(), port_clock.clone())),
             cook_log: Arc::new(PgCookLogRepo::new(pool.clone(), port_clock.clone())),
+            favourites: Arc::new(PgFavouriteRepo::new(pool.clone(), port_clock.clone())),
             media: Arc::new(FsMediaStore::new(config.media_dir.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
             config: Arc::new(config),

@@ -10,9 +10,9 @@ export const OFFLINE_URL = "/offline";
 
 /** Size caps. iOS may evict any of it under storage pressure; the server is always the real copy. */
 export const LIMITS = {
-  pages: 60, // a recipe page and its cooking mode count separately
+  pages: 100, // a recipe page and its cooking mode count separately; favourites (up to FAVOURITES_KEPT) are kept as well
   api: 30,
-  media: 200, // a recipe has its photos plus their display renditions
+  media: 400, // a recipe has its photos plus their display renditions; 30 favourites of up to 6 photos each fit
   maxAgeSeconds: 30 * 24 * 60 * 60,
   networkTimeoutSeconds: 5,
 } as const;
@@ -36,6 +36,12 @@ export const MEDIA = /^\/media\/[0-9a-f-]{36}(?:\.display)?\.jpg$/;
  * it (the "can't reach the server" message) must not replace a good copy.
  */
 export const KEEP_MARKER = 'name="rb-offline"';
+
+/** Rendered beside the keep marker when the reader starred the recipe, so the offline page can list favourites first. */
+export const FAVOURITE_MARKER = 'name="rb-favourite"';
+
+/** How many of the reader's favourites (newest first) are kept on the device without being opened (KIT-5). */
+export const FAVOURITES_KEPT = 30;
 
 /** Whether a fetched page may be kept: a real 200 recipe render, never a redirect (to /login) or an error page. */
 export function keepablePage(res: { status: number; redirected: boolean }, html: string): boolean {

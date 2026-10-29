@@ -6,12 +6,12 @@ import type { Capabilities, CookLogEntry, GoogleExport, GoogleStatus, Health, Im
 // "*/api/..." matches both the browser's relative URLs and server-side absolute ones.
 export const user: User = { id: "u1", username: "chris", displayName: "Chris", role: "admin", email: null, createdAt: "2026-01-01T00:00:00Z" };
 export const summary: RecipeSummary = {
-  id: "r1", title: "Soup", description: "", totalMinutes: 30, tags: [], imageUrl: null, imageDisplayUrl: null, servings: null, sourceType: "manual", updatedAt: "2026-01-01T00:00:00Z",
+  id: "r1", title: "Soup", description: "", totalMinutes: 30, tags: [], imageUrl: null, imageDisplayUrl: null, servings: null, sourceType: "manual", updatedAt: "2026-01-01T00:00:00Z", isFavourite: false,
 };
 export const recipe: Recipe = {
   id: "r1", title: "Soup", description: "", ingredients: [], steps: [], servings: null, prepMinutes: null, cookMinutes: null,
   totalMinutes: null, notes: "", sourceUrl: null, sourceName: null, sourceType: "manual", imageId: null, photoImageIds: [], tags: [],
-  imageUrl: null, imageDisplayUrl: null, photoUrls: [], createdBy: null, updatedBy: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
+  imageUrl: null, imageDisplayUrl: null, photoUrls: [], createdBy: null, updatedBy: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", isFavourite: false,
 };
 export const draft: RecipeDraft = {
   title: "Pancakes", description: "", ingredients: [], steps: [], servings: null, prepMinutes: null, cookMinutes: null,
@@ -45,6 +45,8 @@ export const handlers = [
     return HttpResponse.json<CookLogEntry>({ ...cookLogEntry, id: "c-new", cookedOn: body.cookedOn, note: body.note ?? "", createdAt: "2026-10-22T12:00:00Z" }, { status: 201 });
   }),
   http.delete("*/api/recipes/:id/cook-log/:entryId", () => new HttpResponse(null, { status: 204 })),
+  http.put("*/api/recipes/:id/favourite", () => new HttpResponse(null, { status: 204 })),
+  http.delete("*/api/recipes/:id/favourite", () => new HttpResponse(null, { status: 204 })),
   http.get("*/api/tags", () => HttpResponse.json<Tag[]>([{ name: "dinner", count: 1 }])),
   http.post("*/api/media", () => HttpResponse.json(image, { status: 201 })),
   http.get("*/api/import/capabilities", () => HttpResponse.json<Capabilities>({ ai: false, provider: "none" })),

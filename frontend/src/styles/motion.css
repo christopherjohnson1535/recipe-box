@@ -41,6 +41,10 @@
 @keyframes fade-in {
   from { opacity: 0; }
 }
+@keyframes star-pop {
+  from { scale: 0.6; rotate: -18deg; }
+  60% { scale: 1.18; }
+}
 @keyframes target-flash {
   from { background-color: var(--target-bg); box-shadow: inset 3px 0 0 var(--qty-fg); }
   to { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
@@ -242,5 +246,14 @@ html:has(.selection-bar) main {
   ::view-transition-old(*),
   ::view-transition-new(*) {
     animation: none;
+  }
+}
+
+/* Favourites (ui/FavouriteKit): a star the reader just turned on lands with a small press. Stars that are on when the
+   page loads do not play it (the class is only set after a tap). */
+@media (prefers-reduced-motion: no-preference) {
+  .star-pop {
+    transform-origin: center;
+    animation: star-pop var(--duration-base) var(--ease-out) both;
   }
 }

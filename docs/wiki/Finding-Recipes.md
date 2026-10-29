@@ -32,6 +32,18 @@ tags fold into one **Tag** row: tap it to open the list. Tags and search
 combine: search "pie" with the tag *dessert* to see dessert pies. Tap **All** to drop the tag, or **Clear search** on
 the empty-results page to start over.
 
+## Favourites
+Tap the star on a recipe card, or **Favourite** on the recipe page, to star it. Stars are yours alone: everyone in the
+household has their own favourites, and nobody else sees yours. Tap the star again to take it off.
+
+**Favourites**, the outlined button with a star before the tags, shows only the recipes you starred; it fills in while
+it's on. It combines with the search and a tag: search "soup" with Favourites on to see your favourite soups. While it's
+on, the tags leave out their counts (those count the whole household's recipes). Tap **Favourites** again to see every
+recipe. Your favourites
+also stay readable on the iPad without internet (see [[Using-on-iPad]]).
+
+If a starred recipe is deleted, its star comes back with it when you press **Undo**.
+
 ## Sorting
 The menu next to the box offers **Best match** (only while searching), **Newest**, **A–Z** and **Quickest** (shortest
 total time first; recipes with no time are last). The choice is kept in the page address, so you can bookmark it.

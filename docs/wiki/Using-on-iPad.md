@@ -48,13 +48,16 @@ While cooking mode is open the screen won't lock; the top of the screen says **S
 
 ## Offline
 Recipes you've opened on the iPad stay readable without internet, photos and cooking mode included. Open the ones
-you'll cook from while you're online: opening a recipe once keeps it, its photo and its cooking mode.
+you'll cook from while you're online: opening a recipe once keeps it, its photo and its cooking mode. Your
+**favourites** (the recipes you starred, up to the 30 newest) are kept as well, even ones you never opened on this iPad:
+open Recipe Box once while you're online and it fetches them in the background.
 - With no connection a banner says **You're offline**. Saving, deleting, importing, search, settings and the made-it log need the
   connection: **Save**, **Delete** and the import buttons are turned off, and Save and Import say why beside them. What you typed in a recipe stays on the page until
   you're back online.
-- A page that wasn't kept shows **You're offline** with the list of recipes this iPad can still open.
+- A page that wasn't kept shows **You're offline** with the list of recipes this iPad can still open, your favourites first.
+- Starring a recipe needs the connection: offline the star is dimmed and turned off. Nothing is saved to send later.
 - Online, you always see the server's latest copy; the kept copy is only used when the server can't be reached.
-- The iPad keeps about the last 60 recipe pages and 200 photos, each for up to 30 days after you last opened it.
+- The iPad keeps about the last 100 recipe pages and 400 photos, each for up to 30 days after you last opened it.
 - **Sign out** removes every kept recipe and photo from the iPad, and so does an expired sign-in. Nothing is shown
   from the offline copy to someone who isn't signed in.
 - Offline needs the Home Screen app or Safari on the **HTTPS** address (see [[Deploying]]). iPadOS may clear offline

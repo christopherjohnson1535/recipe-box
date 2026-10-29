@@ -87,7 +87,8 @@ const LIST_WHERE: &str = "
            or r.title ilike $3
            or r.search @@ to_tsquery('simple', $4)
            or exists (select 1 from recipe_tags rt join tags t on t.id = rt.tag_id
-                      where rt.recipe_id = r.id and t.name::text ilike $3))";
+                      where rt.recipe_id = r.id and t.name::text ilike $3))
+      and ($5::uuid is null or exists (select 1 from favourites f where f.recipe_id = r.id and f.user_id = $5))";
 
 /// `$3`: the query as an escaped `ilike` title prefix. `$4`: a prefix tsquery (`weeknight & lasag:*`) so a
 /// half-typed word finds "Weeknight lasagne"; none when the query uses websearch operators, which keep their
@@ -151,6 +152,7 @@ impl From<SummaryRow> for RecipeSummary {
             image_display_file: r.image_display_file,
             source_type: source_type(&r.source_type),
             updated_at: r.updated_at,
+            is_favourite: false,
         }
     }
 }
@@ -217,6 +219,7 @@ impl From<RecipeRow> for Recipe {
             updated_by: user_ref(r.updated_by, r.updated_by_name),
             created_at: r.created_at,
             updated_at: r.updated_at,
+            is_favourite: false,
         }
     }
 }
@@ -508,12 +511,13 @@ impl RecipeRepo for PgRecipeRepo {
         let prefix = prefix.flatten();
 
         // `order` is one of the fixed strings above, never user input.
-        let sql = format!("{SUMMARY_SELECT} {LIST_WHERE} order by {order} limit $5 offset $6");
+        let sql = format!("{SUMMARY_SELECT} {LIST_WHERE} order by {order} limit $6 offset $7");
         let rows = sqlx::query_as::<_, SummaryRow>(AssertSqlSafe(sql))
             .bind(&q.tag)
             .bind(&q.text)
             .bind(&like)
             .bind(&prefix)
+            .bind(q.favourite_of)
             .bind(q.limit)
             .bind(q.offset)
             .fetch_all(&self.pool)
@@ -525,6 +529,7 @@ impl RecipeRepo for PgRecipeRepo {
             .bind(&q.text)
             .bind(&like)
             .bind(&prefix)
+            .bind(q.favourite_of)
             .fetch_one(&self.pool)
             .await
             .map_err(db)?;

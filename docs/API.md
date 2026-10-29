@@ -171,6 +171,15 @@ Shapes (fields, nullability, enums) are in the spec; read these for rules.
     unchanged, and the purge a day later removes them with the recipe. Removing a member keeps their entries with
     `madeBy: null`. The log is not in the backup zip (`GET /api/export`, format version 1 holds recipes only); a database
     backup (`scripts/backup.sh`) has it.
+- **Favourites (REC-5).** Each member stars recipes for themselves; nobody sees anyone else's stars.
+  - `PUT /api/recipes/{id}/favourite` → `204`: the caller stars the recipe (again is fine). `DELETE` → `204`: the star comes
+    off (none is fine). A missing or soft-deleted recipe is `404` on both, as on every route of a deleted recipe.
+  - `Recipe` and every `RecipeSummary` carry `isFavourite`: whether the caller starred it.
+  - `GET /api/recipes?favourite=true` lists only the caller's favourites, combined with `q`, `tag`, `sort` and paging as
+    usual (`total` counts the favourites that match). `false` or absent means every recipe; any other value is `400`.
+  - Soft delete keeps the stars hidden with the recipe, `restore` brings them back, and the purge a day later removes them.
+    Removing a member removes their stars. The backup zip (format version 1, recipes only) has no favourites; a database
+    backup (`scripts/backup.sh`) does.
 - **Grocery list (GRO-1–4).** One active list for the household, shared by every signed-in member (no admin rights
   needed); `GET /api/grocery` creates it on first use. Every write answers with the new state, so two people shopping
   converge by refetching (`updatedAt` changes on every write). `GET` first rebuilds the items from the list's recipes

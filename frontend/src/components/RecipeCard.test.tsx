@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RecipeCard } from "./RecipeCard";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 describe("RecipeCard", () => {
   it("links to the recipe and shows title, time and tags", () => {
@@ -17,6 +19,7 @@ describe("RecipeCard", () => {
           servings: null,
           sourceType: "link",
           updatedAt: "2026-10-21T10:00:00Z",
+          isFavourite: false,
         }}
       />,
     );
@@ -40,7 +43,7 @@ describe("RecipeCard motion", () => {
 });
 
 describe("RecipeCard plate", () => {
-  const base = { id: "r3", title: "Tart", description: "", totalMinutes: null, tags: [] as string[], servings: null, sourceType: "manual" as const, updatedAt: "2026-10-21T10:00:00Z" };
+  const base = { id: "r3", title: "Tart", description: "", totalMinutes: null, tags: [] as string[], servings: null, sourceType: "manual" as const, updatedAt: "2026-10-21T10:00:00Z", isFavourite: false };
   it("shows the display rendition when present", () => {
     const { container } = render(<RecipeCard recipe={{ ...base, imageUrl: "/media/o.jpg", imageDisplayUrl: "/media/p.jpg" }} />);
     expect(container.querySelector("img")?.getAttribute("src")).toBe("/media/p.jpg");
