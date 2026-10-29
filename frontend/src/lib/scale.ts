@@ -5,7 +5,7 @@ const GLYPHS: Record<string, number> = { "½": 1 / 2, "⅓": 1 / 3, "⅔": 2 / 3
 const EIGHTHS = ["", "⅛", "¼", "⅜", "½", "⅝", "¾", "⅞"];
 const G = Object.keys(GLYPHS).join("");
 
-/** Regex source for one number: "1,000", "1 1/2", "1-1/2", "1½", "1 ½", "1/2", "2.5", "½", "3". Reused by the duration finder in recipe.ts. */
+/** Regex source for one number: "1,000", "1 1/2", "1-1/2", "1½", "1 ½", "1/2", "2.5", "½", "3". Reused by the duration finder in timers.ts. */
 export const NUMBER = `\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+\\s+\\d+/\\d+|\\d+-\\d+/\\d+|\\d+\\s*[${G}]|\\d+/\\d+|\\d+(?:\\.\\d+)?|[${G}]`;
 const RANGE = "(?:\\s*[-–]\\s*|\\s+to\\s+)";
 const UNIT =

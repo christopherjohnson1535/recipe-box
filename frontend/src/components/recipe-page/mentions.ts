@@ -1,4 +1,4 @@
-import { splitDurations } from "@/lib/recipe";
+import { splitDurations } from "@/lib/timers";
 import { splitIngredient } from "@/lib/scale";
 
 /** A piece of step text: plain, a timer ("12 minutes"), or the name of ingredient number `ingredient`. */
@@ -55,7 +55,7 @@ export function annotateStep(text: string, lines: string[]): StepPart[] {
   const names = lines.map(ingredientNames);
   const parts: StepPart[] = [];
   for (const seg of splitDurations(text)) {
-    if (seg.minutes !== null) parts.push({ kind: "timer", text: seg.text });
+    if (seg.seconds !== null) parts.push({ kind: "timer", text: seg.text });
     else parts.push(...mentionsIn(seg.text, names));
   }
   return parts;

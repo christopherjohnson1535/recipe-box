@@ -658,13 +658,19 @@ export function CookMention({ children }: { children: ReactNode }) {
   return <span className="text-accent underline decoration-1 underline-offset-[0.2em]">{children}</span>;
 }
 
-/** A duration in the step: tap to start a timer. 44px tall. `after` is the punctuation that follows it, kept on its line. */
-export function CookTimerButton({ children, after = "", ...rest }: Omit<ComponentProps<"button">, "type"> & { after?: string }) {
+/**
+ * A duration in the step: tap to start a timer. 44px tall. `after` is the punctuation that follows it, kept on its line.
+ * `left` ("8:38") marks the chip whose timer is running: accent, with the time left after the text.
+ */
+export function CookTimerButton({ children, after = "", left, ...rest }: Omit<ComponentProps<"button">, "type"> & { after?: string; left?: string }) {
   return (
     <span className="whitespace-nowrap">
       <button
         type="button"
-        className="inline-flex min-h-control items-center gap-2 rounded-full border border-rule-strong bg-(--timer-bg) px-4 align-middle text-[0.7em] leading-none text-(--timer-fg) hover:border-accent"
+        className={cx(
+          "inline-flex min-h-control items-center gap-2 rounded-full border px-4 align-middle text-[0.7em] leading-none transition-colors duration-150",
+          left ? "border-accent bg-accent text-on-accent" : "border-rule-strong bg-(--timer-bg) text-(--timer-fg) hover:border-accent",
+        )}
         {...rest}
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[0.9em]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -672,9 +678,28 @@ export function CookTimerButton({ children, after = "", ...rest }: Omit<Componen
           <path d="M12 9v4l2.5 1.5M9.5 2.5h5" />
         </svg>
         {children}
+        {left && <span className="border-l border-current/40 pl-2 [font-variant-numeric:lining-nums_tabular-nums]">{left}</span>}
       </button>
       {after}
     </span>
+  );
+}
+
+/** Timer sound on or off: a pressed-state text button like the voice switch, 44px tall. */
+export function CookSoundToggle({ muted, onChange }: { muted: boolean; onChange: (muted: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={!muted}
+      onClick={() => onChange(!muted)}
+      className="label inline-flex min-h-control items-center gap-2 rounded-control px-2 whitespace-nowrap text-ink-muted hover:text-ink"
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 9v6h4l5 4V5L8 9H4z" />
+        {muted ? <path d="M17 9l5 6M22 9l-5 6" /> : <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />}
+      </svg>
+      {muted ? "Timer sound off" : "Timer sound on"}
+    </button>
   );
 }
 
