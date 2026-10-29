@@ -1,6 +1,7 @@
-//! The Anthropic Messages API as a [`ports::RecipeExtractor`] (PHO-2–6, LNK-3).
+//! The Anthropic Messages API as a [`ports::RecipeExtractor`] (PHO-2–6, LNK-3, KIT-7).
 //!
 //! [`AnthropicProvider`] calls the Messages API with one forced tool, `record_recipe`, so the reply is structured.
+//! Cook-together planning (KIT-7) is a second call with its own forced tool, `plan_cook` (see the `plan` module).
 //! The reply is never trusted: [`coerce`] reads it leniently, trims, drops blanks, applies the same limits the save
 //! endpoint enforces (so a draft always saves) and adds a warning for everything it cut. Photos are shrunk to
 //! <= 1568 px before sending. One retry on 429, 5xx and connect errors (not on a timeout, and not when

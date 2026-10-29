@@ -252,6 +252,23 @@ async fn too_many_steps_are_not_sent_to_the_ai() {
 }
 
 #[tokio::test]
+async fn recipes_without_steps_are_not_sent_and_say_so() {
+    let w = World::with(ai(slow_first));
+    let a = w.recipe("A", 0).await;
+    let b = w.recipe("B", 0).await;
+    let plan = w
+        .services
+        .cook_plan
+        .plan(w.user, &[a, b], None)
+        .await
+        .unwrap();
+    assert_eq!(plan.source, PlanSource::RoundRobin);
+    assert!(plan.steps.is_empty());
+    assert!(plan.reason.unwrap().contains("no steps"));
+    assert!(w.extractor.seen_plans.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn ai_off_is_refused_before_anything_else() {
     let w = World::with(FakeExtractor {
         provider: AiProvider::None,
@@ -291,6 +308,15 @@ async fn the_recipes_are_checked() {
             "{what}: {err:?}"
         );
     }
+    // A body full of ids is refused at the fifth distinct one, whatever follows.
+    let many: Vec<Uuid> = (0..100_000).map(|_| Uuid::new_v4()).collect();
+    let err = w
+        .services
+        .cook_plan
+        .plan(w.user, &many, None)
+        .await
+        .unwrap_err();
+    assert!(matches!(&err, DomainError::Validation(_)), "{err:?}");
     let err = w
         .services
         .cook_plan

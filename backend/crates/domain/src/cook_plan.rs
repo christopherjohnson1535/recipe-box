@@ -85,6 +85,8 @@ pub struct CookPlan {
 pub enum PlanProblem {
     /// Too many steps to ask about.
     TooManySteps,
+    /// None of the recipes has a step.
+    NoSteps,
     /// A step is missing, repeated, unknown or out of its recipe's order.
     Incomplete,
     /// A start time is missing, negative, past a day, or earlier than the step before.
@@ -98,6 +100,7 @@ impl PlanProblem {
             Self::TooManySteps => {
                 "There are too many steps to plan, so the dishes take turns, one step each."
             }
+            Self::NoSteps => "These recipes have no steps yet, so there is nothing to plan.",
             Self::Incomplete | Self::BadTiming => {
                 "The suggested order didn't add up, so the dishes take turns, one step each."
             }

@@ -97,16 +97,23 @@ impl CookPlanService {
         if self.extractor.provider() == AiProvider::None {
             return Err(DomainError::AiDisabled);
         }
-        let mut ids: Vec<Uuid> = Vec::with_capacity(recipe_ids.len());
+        let too_many_or_few = || {
+            DomainError::validation(format!(
+                "recipeIds: choose {MIN_PLAN_DISHES} to {MAX_PLAN_DISHES} different recipes."
+            ))
+        };
+        // Stops at the first id past the limit, so a body full of ids costs nothing to refuse.
+        let mut ids: Vec<Uuid> = Vec::with_capacity(MAX_PLAN_DISHES);
         for id in recipe_ids {
             if !ids.contains(id) {
+                if ids.len() == MAX_PLAN_DISHES {
+                    return Err(too_many_or_few());
+                }
                 ids.push(*id);
             }
         }
-        if !(MIN_PLAN_DISHES..=MAX_PLAN_DISHES).contains(&ids.len()) {
-            return Err(DomainError::validation(format!(
-                "recipeIds: choose {MIN_PLAN_DISHES} to {MAX_PLAN_DISHES} different recipes."
-            )));
+        if ids.len() < MIN_PLAN_DISHES {
+            return Err(too_many_or_few());
         }
         let found = self.recipes.get_many(&ids).await?;
         if found.len() != ids.len() {
@@ -131,7 +138,7 @@ impl CookPlanService {
         }
         if steps == 0 {
             // Nothing to order; not worth a paid call.
-            return Ok(fallback(&dishes, PlanProblem::Incomplete));
+            return Ok(fallback(&dishes, PlanProblem::NoSteps));
         }
         self.limiter
             .take(user, self.clock.now())

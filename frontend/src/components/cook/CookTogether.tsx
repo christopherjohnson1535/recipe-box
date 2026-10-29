@@ -209,7 +209,7 @@ export function CookTogether({ dishes, planning = false }: { dishes: Dish[]; pla
     // The panel goes away; focus goes back to the action that opened it (or the toolbar while it is disabled).
     requestAnimationFrame(() => (planAction.current && !planAction.current.disabled ? planAction.current : toolbar.current)?.focus());
   };
-  const usePlan = () => {
+  const acceptPlan = () => {
     if (!suggested) return;
     setOrder(suggested);
     const first = suggested[firstOpen(suggested, ticks.map((t) => t.steps))];
@@ -427,10 +427,14 @@ export function CookTogether({ dishes, planning = false }: { dishes: Dish[]; pla
       >
         {planOpen ? (
           <>
-            <CookPill variant="secondary" onClick={() => closePlan("Kept your order")}>
+            <CookPill variant="secondary" short="Keep mine" onClick={() => closePlan("Kept your order")}>
               Keep my order
             </CookPill>
-            {suggested && <CookPill onClick={usePlan}>Use this order</CookPill>}
+            {suggested && (
+              <CookPill short="Use this" onClick={acceptPlan}>
+                Use this order
+              </CookPill>
+            )}
           </>
         ) : view !== "one" ? (
           <CookPillLink href={finishHref}>Finish</CookPillLink>

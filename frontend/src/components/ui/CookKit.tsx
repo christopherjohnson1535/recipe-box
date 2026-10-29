@@ -843,9 +843,24 @@ const pillVariant = {
   secondary: "border border-(--button-secondary-border) text-(--button-secondary-fg) hover:border-(--button-secondary-hover) hover:text-(--button-secondary-hover)",
 };
 
-/** Back / Next step pill, 60px tall. */
-export function CookPill({ variant = "primary", className, ...rest }: { variant?: keyof typeof pillVariant } & Omit<ComponentProps<"button">, "type">) {
-  return <button type="button" className={cx(pill, pillVariant[variant], className)} {...rest} />;
+/** Back / Next step pill, 60px tall. With `short`, a phone shows that instead of `children` (a string, which stays the name). */
+export function CookPill({ variant = "primary", className, short, children, ...rest }: { variant?: keyof typeof pillVariant; short?: string } & Omit<ComponentProps<"button">, "type">) {
+  return (
+    <button type="button" className={cx(pill, pillVariant[variant], className)} aria-label={short && typeof children === "string" ? children : undefined} {...rest}>
+      {short ? (
+        <>
+          <span aria-hidden="true" className="sm:hidden">
+            {short}
+          </span>
+          <span aria-hidden="true" className="max-sm:hidden">
+            {children}
+          </span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
+  );
 }
 
 export function CookPillLink({ variant = "primary", className, ...rest }: { variant?: keyof typeof pillVariant } & ComponentProps<typeof Link>) {

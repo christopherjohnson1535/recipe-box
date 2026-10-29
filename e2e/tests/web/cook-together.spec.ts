@@ -337,3 +337,15 @@ test("a session opened before loads offline, and another combination does not", 
   await page.goto(`/cook?recipes=${b.id},${a.id}`);
   await expect(page.getByRole("heading", { name: "You’re offline", level: 1 })).toBeVisible();
 });
+
+test("without an AI provider there is no Plan the evening, and the API says it is not configured", async ({ memberPage: page, member }) => {
+  const { a, b } = await twoDishes(member.client);
+  await page.goto(`/cook?recipes=${a.id},${b.id}`);
+  await hydrated(view(page, "One step"));
+  await expect(stage(page).getByText("Chop the onions.", { exact: true })).toBeVisible();
+  await expect(stage(page).getByRole("button", { name: "Plan the evening" })).toHaveCount(0);
+
+  const res = await member.client.request.post("/api/cook/plan", { data: { recipeIds: [a.id, b.id] } });
+  expect(res.status()).toBe(422);
+  expect((await res.json()).error.code).toBe("ai_disabled");
+});
