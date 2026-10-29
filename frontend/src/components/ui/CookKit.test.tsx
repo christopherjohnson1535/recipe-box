@@ -477,6 +477,27 @@ describe("cook together layout pieces", () => {
     }
   });
 
+  it("CookTimer: below lg Cancel is an aria-hidden x icon in one uncapped row; from lg it reads Cancel; Dismiss stays text", () => {
+    const props = { label: "Roast", digits: "19:58", fraction: 0.5, flash: false, onDismiss: () => {}, onTogglePause: () => {}, onAddMinute: () => {} };
+    const { rerender } = render(<CookTimer {...props} done={false} large />);
+    for (const large of [true, false]) {
+      rerender(<CookTimer {...props} done={false} large={large} />);
+      const cancel = screen.getByRole("button", { name: "Cancel timer: Roast" });
+      const icon = cancel.querySelector("svg");
+      expect(icon?.getAttribute("aria-hidden")).toBe("true");
+      expect(icon?.getAttribute("class")).toContain("lg:hidden");
+      expect(cancel.querySelector("span")?.className).toContain("max-lg:hidden");
+      expect(cancel.className).toContain("min-h-control min-w-control");
+      // One row, no width cap and no gap: Pause, +1 and Cancel sit side by side.
+      const row = cancel.parentElement as HTMLElement;
+      expect(row.className).not.toMatch(/max-w-|flex-wrap|gap-/);
+    }
+    rerender(<CookTimer {...props} done large />);
+    const dismiss = screen.getByRole("button", { name: "Dismiss timer: Roast" });
+    expect(dismiss.querySelector("svg")).toBeNull();
+    expect(dismiss.textContent).toBe("Dismiss");
+  });
+
   it("CookTimerButton: a chip with a paused timer says so and drops the running colours", () => {
     const { rerender } = render(<CookTimerButton left="8:38">10 minutes</CookTimerButton>);
     expect(screen.getByRole("button").className).toContain("bg-accent");

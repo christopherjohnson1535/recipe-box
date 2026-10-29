@@ -728,8 +728,9 @@ const C = 2 * Math.PI * R;
  * only (`flash` flips about once a second), so reduced motion keeps it. `digits` is "8:38". Running and paused timers have a
  * Pause / Resume icon button, every timer a "+1" button (its name is "+1 min: ..."), then Cancel / Dismiss, each 44px and
  * named for the action and the timer; a paused timer shows its frozen digits and the word "Paused" (the ring is muted as
- * well, but the word carries it). Upright the controls wrap under the ring and stay as narrow as it. `timerId` marks the
- * group (`data-timer-id`) and each control (`data-control`) so the rack can give focus back after a move.
+ * well, but the word carries it). Upright the controls are one row under the ring, uncapped: below lg Cancel is an × icon, so
+ * the row stays one line on a phone. `timerId` marks the group (`data-timer-id`) and each control (`data-control`) so the
+ * rack can give focus back after a move.
  */
 export function CookTimer({
   timerId,
@@ -766,7 +767,7 @@ export function CookTimer({
   const button = "label inline-flex min-h-control min-w-control items-center justify-center px-2 whitespace-nowrap text-ink-muted hover:text-ink";
   const icon = { "aria-hidden": true, viewBox: "0 0 24 24", className: "size-4", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
   const controls = (className?: string) => (
-    <div className={cx("flex flex-wrap items-center", className)}>
+    <div className={cx("flex items-center", className)}>
       {!done && (
         <button type="button" data-control="toggle" onClick={onTogglePause} aria-label={`${paused ? "Resume" : "Pause"} timer: ${label}`} className={button}>
           <svg {...icon}>{paused ? <path d="M8 5l11 7-11 7z" /> : <path d="M9 5v14M15 5v14" />}</svg>
@@ -776,7 +777,16 @@ export function CookTimer({
         +1
       </button>
       <button type="button" data-control="dismiss" onClick={onDismiss} aria-label={`${done ? "Dismiss" : "Cancel"} timer: ${label}`} className={button}>
-        {done ? "Dismiss" : "Cancel"}
+        {done ? (
+          "Dismiss"
+        ) : (
+          <>
+            <svg {...icon} className="size-4 lg:hidden">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+            <span className="max-lg:hidden">Cancel</span>
+          </>
+        )}
       </button>
     </div>
   );
@@ -811,7 +821,7 @@ export function CookTimer({
         <div className="text-center">
           <p className={cx("font-display leading-none", wide ? (small ? "text-[1.5rem] lg:text-[1.25rem]" : "text-[1.75rem] lg:text-[1.25rem]") : small ? "text-[1.5rem] lg:text-[2.25rem]" : "text-[1.75rem] lg:text-[3.25rem]", "[font-variant-numeric:lining-nums_tabular-nums]")}>{done ? "Done" : digits}</p>
           {paused && <p className="label mt-1">Paused</p>}
-          {!wide && <p className={cx("label mt-1 line-clamp-2 max-lg:hidden", small ? "max-w-20 lg:max-w-28" : "max-w-28 lg:max-w-44")}>{label}</p>}
+          {!wide && <p className={cx("label mt-1 line-clamp-2 max-lg:hidden", small ? (paused ? "max-w-20" : "max-w-20 lg:max-w-28") : "max-w-28 lg:max-w-44")}>{label}</p>}
         </div>
       </div>
       {wide ? (
@@ -827,7 +837,7 @@ export function CookTimer({
           <p aria-hidden="true" className={cx("label line-clamp-3 text-center text-ink-muted lg:hidden", small ? "max-w-24" : "max-w-28")}>
             {label}
           </p>
-          {controls(cx("justify-center lg:max-w-none", small ? "max-w-24" : "max-w-28"))}
+          {controls("justify-center")}
         </>
       )}
     </div>
