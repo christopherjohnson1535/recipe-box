@@ -421,7 +421,7 @@ describe("cook together layout pieces", () => {
         step={<p>step</p>}
         timers={
           <CookTimers empty="none">
-            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} />
+            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} onTogglePause={() => {}} onAddMinute={() => {}} />
           </CookTimers>
         }
       />,
@@ -431,6 +431,32 @@ describe("cook together layout pieces", () => {
     expect(screen.getByRole("button", { name: "Cancel timer: Roast 20 min" })).toBeTruthy();
   });
 
+  it("CookTimer: Pause / Resume (not on a finished one) and +1 min, 44px, in the ring, strip and compact layouts", () => {
+    const onTogglePause = vi.fn();
+    const onAddMinute = vi.fn();
+    const props = { label: "Roast", digits: "19:58", fraction: 0.5, flash: false, onDismiss: () => {}, onTogglePause, onAddMinute };
+    const { rerender } = render(<CookTimer {...props} done={false} large />);
+    for (const large of [true, false]) {
+      rerender(<CookTimer {...props} done={false} large={large} />);
+      for (const name of ["Pause timer: Roast", "Add a minute: Roast", "Cancel timer: Roast"]) {
+        expect(screen.getByRole("button", { name }).className).toContain("min-h-control min-w-control");
+      }
+      expect(screen.queryByText("Paused")).toBeNull();
+      rerender(<CookTimer {...props} done={false} large={large} paused />);
+      expect(screen.queryByRole("button", { name: "Pause timer: Roast" })).toBeNull();
+      expect(screen.getByText("Paused")).toBeTruthy();
+      expect(screen.getByText("19:58")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Resume timer: Roast" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add a minute: Roast" }));
+    }
+    expect(onTogglePause).toHaveBeenCalledTimes(2);
+    expect(onAddMinute).toHaveBeenCalledTimes(2);
+    rerender(<CookTimer {...props} done large />);
+    expect(screen.queryByRole("button", { name: /^(Pause|Resume) timer/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add a minute: Roast" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dismiss timer: Roast" })).toBeTruthy();
+  });
+
   it("CookColumns (not wide) names the ring inside it from 1024px, under it upright", () => {
     render(
       <CookColumns
@@ -438,7 +464,7 @@ describe("cook together layout pieces", () => {
         step={<p>step</p>}
         timers={
           <CookTimers empty="none">
-            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} />
+            <CookTimer label="Roast 20 min" digits="19:58" fraction={0.5} done={false} flash={false} large onDismiss={() => {}} onTogglePause={() => {}} onAddMinute={() => {}} />
           </CookTimers>
         }
       />,

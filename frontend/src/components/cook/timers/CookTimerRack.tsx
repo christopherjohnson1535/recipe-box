@@ -16,9 +16,23 @@ const useReducedMotion = () => useSyncExternalStore(subscribe, () => window.matc
 
 /**
  * The timer column: a ring for the first three, compact rows after; a finished timer comes first, so it is never scrolled
- * out of sight. A finished timer blinks the accent for ten seconds, then holds it; with reduced motion it holds it at once.
+ * out of sight, and paused ones come last. A finished timer blinks the accent for ten seconds, then holds it; with reduced motion it holds it at once.
  */
-export function CookTimerRack({ timers, now, onDismiss }: { timers: Timer[]; now: number; onDismiss: (id: number) => void }) {
+export function CookTimerRack({
+  timers,
+  now,
+  onDismiss,
+  onPause,
+  onResume,
+  onAddMinute,
+}: {
+  timers: Timer[];
+  now: number;
+  onDismiss: (id: number) => void;
+  onPause: (id: number) => void;
+  onResume: (id: number) => void;
+  onAddMinute: (id: number) => void;
+}) {
   const still = useReducedMotion();
   const phase = Math.floor(now / 600) % 2 === 0;
   return (
@@ -33,7 +47,10 @@ export function CookTimerRack({ timers, now, onDismiss }: { timers: Timer[]; now
           flash={still || (t.done && now - t.endsAt >= FLASH_MS) ? true : phase}
           large={i < 3}
           small={i > 0}
+          paused={t.pausedLeftMs !== null}
           onDismiss={() => onDismiss(t.id)}
+          onTogglePause={() => (t.pausedLeftMs === null ? onPause(t.id) : onResume(t.id))}
+          onAddMinute={() => onAddMinute(t.id)}
         />
       ))}
     </CookTimers>

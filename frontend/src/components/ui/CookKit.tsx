@@ -724,7 +724,9 @@ const C = 2 * Math.PI * R;
 
 /**
  * A timer. `large` is a ring with big tabular digits; otherwise a compact row. A finished timer flashes the accent colour: colour
- * only (`flash` flips about once a second), so reduced motion keeps it. `digits` is "8:38".
+ * only (`flash` flips about once a second), so reduced motion keeps it. `digits` is "8:38". Running and paused timers have a
+ * Pause / Resume button, every timer a "+1 min" button, each 44px; a paused timer shows its frozen digits and the word
+ * "Paused" (the ring is muted as well, but the word carries it).
  */
 export function CookTimer({
   label,
@@ -734,7 +736,10 @@ export function CookTimer({
   flash,
   large,
   small = false,
+  paused = false,
   onDismiss,
+  onTogglePause,
+  onAddMinute,
 }: {
   label: string;
   digits: string;
@@ -744,27 +749,40 @@ export function CookTimer({
   large: boolean;
   /** A ring beside the first one: smaller. */
   small?: boolean;
+  /** Counting stopped by the cook: the digits stay as they were. */
+  paused?: boolean;
   onDismiss: () => void;
+  onTogglePause: () => void;
+  onAddMinute: () => void;
 }) {
   const alert = done && flash;
   const wide = useContext(WideContext); // a strip above the step area: small rings, the name beside Cancel
-  const dismiss = (
-    <button
-      type="button"
-      onClick={onDismiss}
-      aria-label={`${done ? "Dismiss" : "Cancel"} timer: ${label}`}
-      className="label inline-flex min-h-control min-w-control items-center justify-center px-2 text-ink-muted hover:text-ink"
-    >
-      {done ? "Dismiss" : "Cancel"}
-    </button>
+  const button = "label inline-flex min-h-control min-w-control items-center justify-center px-2 whitespace-nowrap text-ink-muted hover:text-ink";
+  const controls = (
+    <div className="flex items-center">
+      {!done && (
+        <button type="button" onClick={onTogglePause} aria-label={`${paused ? "Resume" : "Pause"} timer: ${label}`} className={button}>
+          {paused ? "Resume" : "Pause"}
+        </button>
+      )}
+      <button type="button" onClick={onAddMinute} aria-label={`Add a minute: ${label}`} className={button}>
+        +1 min
+      </button>
+      <button type="button" onClick={onDismiss} aria-label={`${done ? "Dismiss" : "Cancel"} timer: ${label}`} className={button}>
+        {done ? "Dismiss" : "Cancel"}
+      </button>
+    </div>
   );
   const tone = alert ? "bg-accent text-on-accent" : "bg-transparent text-ink";
   if (!large) {
     return (
-      <div role="group" aria-label={label} className={cx("flex items-center justify-between gap-3 border-t border-rule px-2 py-1 transition-colors duration-150", tone)}>
-        <span className="label min-w-0 truncate">{label}</span>
-        <span className="text-deck [font-variant-numeric:lining-nums_tabular-nums]">{done ? "Done" : digits}</span>
-        {dismiss}
+      <div role="group" aria-label={label} className={cx("flex flex-wrap items-center justify-between gap-x-3 border-t border-rule px-2 py-1 transition-colors duration-150", tone)}>
+        <span className="label min-w-24 flex-1 truncate">{label}</span>
+        <span className="text-deck [font-variant-numeric:lining-nums_tabular-nums]">
+          {paused && <span className="label mr-2">Paused</span>}
+          {done ? "Done" : digits}
+        </span>
+        {controls}
       </div>
     );
   }
@@ -777,7 +795,7 @@ export function CookTimer({
             cx="100"
             cy="100"
             r={R}
-            className={alert ? "stroke-on-accent" : "stroke-accent"}
+            className={alert ? "stroke-on-accent" : paused ? "stroke-ink-muted" : "stroke-accent"}
             strokeLinecap="round"
             strokeDasharray={C}
             strokeDashoffset={C * (1 - fraction)}
@@ -785,15 +803,16 @@ export function CookTimer({
         </svg>
         <div className="text-center">
           <p className={cx("font-display leading-none", wide ? (small ? "text-[1.5rem] lg:text-[1.25rem]" : "text-[1.75rem] lg:text-[1.25rem]") : small ? "text-[1.5rem] lg:text-[2.25rem]" : "text-[1.75rem] lg:text-[3.25rem]", "[font-variant-numeric:lining-nums_tabular-nums]")}>{done ? "Done" : digits}</p>
+          {paused && <p className="label mt-1">Paused</p>}
           {!wide && <p className={cx("label mt-1 line-clamp-2 max-lg:hidden", small ? "max-w-20 lg:max-w-28" : "max-w-28 lg:max-w-44")}>{label}</p>}
         </div>
       </div>
       {wide ? (
-        <div className="flex items-center gap-1">
-          <p className="label hidden max-w-32 min-w-0 lg:line-clamp-2" title={label}>
+        <div className="flex flex-col items-center lg:items-start">
+          <p className="label hidden max-w-48 min-w-0 lg:line-clamp-2" title={label}>
             {label}
           </p>
-          {dismiss}
+          {controls}
         </div>
       ) : (
         <>
@@ -801,7 +820,7 @@ export function CookTimer({
           <p aria-hidden="true" className={cx("label line-clamp-3 text-center text-ink-muted lg:hidden", small ? "max-w-24" : "max-w-28")}>
             {label}
           </p>
-          {dismiss}
+          {controls}
         </>
       )}
     </div>

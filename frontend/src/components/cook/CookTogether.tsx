@@ -46,7 +46,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
   const names = dishNames(dishes.map((d) => d.title));
   const [cursor, setCursor] = useState<DishStep | null>(null);
   const [live, announce] = useAnnounce();
-  const { timers, now, running, start, dismiss, alert } = useCookTimers(announce);
+  const { timers, now, running, start, dismiss, pause, resume, addMinute, alert } = useCookTimers(announce);
   const [view, setView] = useCookTogetherView();
   const { order, setOrder, reset } = useCookTogetherOrder(ids, stepCounts);
   const { ticks, toggleIngredient, toggleStep, clearAll } = useDishTicks(
@@ -345,7 +345,7 @@ export function CookTogether({ dishes }: { dishes: Dish[] }) {
           </CookDishTabs>
         }
         step={view === "one" ? oneStep : view === "all" ? allSteps : byDish}
-        timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
+        timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} onPause={pause} onResume={resume} onAddMinute={addMinute} />}
       />
       <CookLive>{live.text}</CookLive>
       <CookFooter next={next ? `${nameOf(next.dish)}: ${textOf(next)}` : undefined} summary={view === "one" ? undefined : `${doneCount} of ${total} steps done`}>
