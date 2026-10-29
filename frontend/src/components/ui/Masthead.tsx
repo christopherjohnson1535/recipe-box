@@ -27,7 +27,8 @@ export function Masthead({ children }: { children: ReactNode }) {
 
 const navItem =
   "label-quiet inline-flex min-h-control items-end whitespace-nowrap border-b-2 pb-2 max-sm:ps-0 max-sm:pe-3 max-sm:text-[0.8125rem] max-sm:tracking-[0.07em] sm:px-2.5 transition-[border-color,color] duration-150 ease-out";
-const idle = "border-transparent text-(--nav-fg) hover:border-(--nav-underline-hover) hover:text-(--nav-fg-active)";
+// The hover underline is for a mouse only: on a touch screen a tap would leave it under the link until the next tap.
+const idle = "border-transparent text-(--nav-fg) pointer-fine:hover:border-(--nav-underline-hover) pointer-fine:hover:text-(--nav-fg-active)";
 
 /** A section link in the masthead; `active` marks the current section. */
 export function NavLink({ href, active, children }: { href: string; active?: boolean; children: ReactNode }) {

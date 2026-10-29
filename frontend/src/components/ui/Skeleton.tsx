@@ -171,12 +171,15 @@ export function RecipeSkeleton() {
             </div>
           }
         >
-          <div className="flex max-w-measure flex-col gap-6">
-            <TextBar type="font-display text-title" className="w-40" />
+          {/* The method spans the column like the page's; only the step text keeps the reading measure. */}
+          <div className="flex min-w-0 flex-col gap-6">
+            <div className="border-b border-(--rule-double) pb-3">
+              <TextBar type="font-display text-title" className="w-40" />
+            </div>
             {[0, 1, 2].map((i) => (
-              <div key={i} className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[2.75rem_minmax(0,1fr)]">
+              <div key={i} className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-4 xl:grid-cols-[6rem_minmax(0,1fr)] xl:gap-6">
                 <TextBar type="font-display text-numeral" className="w-6" />
-                <div className="flex flex-col gap-2">
+                <div className="flex max-w-measure flex-col gap-2">
                   <TextBar type="text-body" className="w-full" />
                   <TextBar type="text-body" className="w-3/4" />
                 </div>

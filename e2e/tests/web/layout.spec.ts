@@ -1,5 +1,5 @@
 import type { Locator } from "@playwright/test";
-import { expect, hydrated, test } from "../../support/fixtures.ts";
+import { expect, hydrated, test, unique } from "../../support/fixtures.ts";
 
 // The side-column breakpoints (xl: 1280px, md: 768px) are CSS, which jsdom cannot lay out, so they are checked here at
 // the three projects' real widths: web-desktop 1280 (xl applies), web-ipad 1194 (md and lg, not xl), web-phone 393.
@@ -47,4 +47,27 @@ test("the import help sits beside the form on a wide screen, under it on an iPad
   await page.goto("/import");
   await hydrated(page.getByLabel("Recipe link"));
   await expectImportHelp(page.getByRole("complementary", { name: "How importing works", includeHidden: true }), testInfo.project.name);
+});
+
+// #137: Method runs to the same right edge as the numerals band above it at every project width (desktop 1280, iPad 1194,
+// phone 393), with the recipe's note under it in the same column rather than in a margin column.
+test("the method and its note reach the numerals band's right edge", async ({ memberPage: page, member }) => {
+  const recipe = await member.client.createRecipe({
+    title: unique("Stew "),
+    servings: "4",
+    prepMinutes: 20,
+    cookMinutes: 90,
+    notes: "Better the next day.",
+    ingredients: [{ text: "1 kg beef", section: null }],
+    steps: [{ text: "Brown the beef in batches, then braise it slowly until it falls apart.", section: null }],
+  });
+  await page.goto(`/recipes/${recipe.id}`);
+  const method = page.getByRole("region", { name: "Method" });
+  await hydrated(page.getByRole("button", { name: /1 kg beef/ }));
+  const numerals = page.getByText("Serves", { exact: true }).locator("xpath=ancestor::dl[1]");
+  const note = page.getByRole("figure").filter({ hasText: "Better the next day." });
+  const [methodBox, bandBox, noteBox] = [await boxOf(method), await boxOf(numerals), await boxOf(note)];
+  expect(Math.abs(methodBox.x + methodBox.width - (bandBox.x + bandBox.width))).toBeLessThanOrEqual(2);
+  expect(Math.abs(noteBox.x - methodBox.x)).toBeLessThanOrEqual(1); // same column
+  expect(noteBox.y).toBeGreaterThanOrEqual(methodBox.y + methodBox.height); // under the method
 });

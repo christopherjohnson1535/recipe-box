@@ -20,27 +20,23 @@ describe("recipe spread plate", () => {
 });
 
 describe("SidebarLayout", () => {
-  it("keeps the method and the note in one column beside the ingredients (no margin column), so the method spans to the edge", () => {
+  // The geometry (Method reaching the numerals band's right edge, the note under it) is CSS, checked in
+  // e2e/tests/web/layout.spec.ts at real widths. Here: the order the pieces are read in.
+  it("reads ingredients, then the method, then the note", () => {
     const { container } = render(
       <SidebarLayout sidebar={<aside>Ingredients</aside>} rail={<figure>Note</figure>}>
         <section>Method</section>
       </SidebarLayout>,
     );
-    const grid = container.firstElementChild!;
-    expect(grid.className).not.toMatch(/col-start-3|90rem\]:grid-cols/);
-    const [sidebar, method, rail] = Array.from(grid.children);
-    expect(sidebar.className).toContain("md:row-span-2");
-    expect(method.textContent).toBe("Method");
-    expect(rail.className).toContain("md:col-start-2");
+    expect(Array.from(container.firstElementChild!.children).map((c) => c.textContent)).toEqual(["Ingredients", "Method", "Note"]);
   });
 
-  it("has no spare row without a note", () => {
+  it("has no note slot without a note", () => {
     const { container } = render(
       <SidebarLayout sidebar={<aside>Ingredients</aside>}>
         <section>Method</section>
       </SidebarLayout>,
     );
-    expect(container.firstElementChild!.className).not.toContain("grid-rows");
-    expect(container.firstElementChild!.children).toHaveLength(2);
+    expect(Array.from(container.firstElementChild!.children).map((c) => c.textContent)).toEqual(["Ingredients", "Method"]);
   });
 });

@@ -172,21 +172,25 @@ body {
     border-bottom: 1px solid var(--rule-double);
   }
 
-  /* A quiet 1px underline in the link's own colour at 40%, set a little lower than the browser's; on hover the line
-     comes up to full strength with the text. The text keeps full accent contrast, so the faint line is never the only cue. */
+  /* A quiet 1px underline in the link's own colour at 80%, set a little lower than the browser's; on hover the line
+     comes up to full strength with the text. In running text the accent is close to the ink (2.6:1 by day), so the
+     underline is the link's cue: 80% keeps it at 3:1 or more on paper and paper-deep in both editions (tokens.test.ts,
+     LINK_UNDERLINE). The hover is for a mouse only: on a touch screen a tap would leave it stuck on. */
   .link {
     color: var(--link-fg);
     text-decoration-line: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 0.22em;
-    text-decoration-color: color-mix(in srgb, var(--link-fg) 40%, transparent);
+    text-decoration-color: color-mix(in srgb, var(--link-fg) 80%, transparent);
     transition-property: color, text-decoration-color;
     transition-duration: var(--duration-quick);
     transition-timing-function: var(--ease-out);
   }
-  .link:hover {
-    color: var(--link-fg-hover);
-    text-decoration-color: var(--link-fg-hover);
+  @media (hover: hover) and (pointer: fine) {
+    .link:hover {
+      color: var(--link-fg-hover);
+      text-decoration-color: var(--link-fg-hover);
+    }
   }
 }
 

@@ -135,6 +135,10 @@ Motion marks a change of state or place. It never decorates.
 - Loading skeletons are a static tint: they do not shimmer or pulse.
 - Arrival staggers (list entries rising in) run once per visit and never when the person goes Back.
 - `prefers-reduced-motion` removes movement (rises, draws, morphs); colour changes stay.
+- Hover feedback is for a mouse: gate it with `pointer-fine:hover:` (or `@media (hover: hover) and (pointer: fine)` in CSS) so
+  a tap on the iPad never leaves an underline, band or colour stuck on. `.link`, `ArrowLink`, the masthead nav and the
+  ingredient-row band follow this (#137); Tailwind's plain `hover:` only waits for `(hover: hover)`, which some touch
+  screens report.
 
 | Token | Value | Use |
 |---|---|---|
@@ -189,8 +193,10 @@ photo), **Disconnect** (Google), **Empty list** and **Clear ticked**, and **Disc
   starts with an orphan dot.
 - `.drop-cap`: accent drop cap on a lede paragraph.
 - `.rule-double`: thin double rule, 1px line, 3px gap, 1px line (masthead, ingredient sidebar).
-- `.link`: accent text link with a quiet underline: 1px, set 0.22em below the text, in the link colour at 40%; on hover
-  the text turns `--link-fg-hover` and the line comes up to full strength over 150ms (#137).
+- `.link`: accent text link with a quiet underline: 1px, set 0.22em below the text, in the link colour at 80%; on hover
+  the text turns `--link-fg-hover` and the line comes up to full strength over 150ms (#137). In running text the accent is
+  close to the ink (2.6:1 by day), so the underline is the link's cue: 80% holds it at 3:1 or more on paper and paper-deep
+  in both appearances (checked in `tokens.test.ts`; 40% was 1.8:1).
 
 ## Components (`src/components/ui`)
 Text and structure:
@@ -220,7 +226,8 @@ Controls and states:
   `danger` brick-red fill (the confirm step only), `danger-text` (every destructive text action, see "Destructive
   actions" below). Labels are `.label`. At least 44px tall; below `sm` long labels wrap (centred) instead of overflowing.
   `ArrowLink` (#137): a secondary action set as italic Crimson Pro at deck size over a 1px rule, with a `→` that slides
-  4px right on hover (not under reduced motion); ink, turning accent on hover; 44px tall. Used beside a solid primary
+  4px right on hover (not under reduced motion); ink, turning accent on hover; 44px tall, the rule on the text (an inner
+  span) rather than at the foot of the box. Used beside a solid primary
   button where a second box would compete with it (the recipe opener's Cook together and Edit). Never for a destructive
   action.
 - `ui/PageHeader`: `kicker`, `title` (display headline), `description` (italic deck), `byline`, `actions`,
@@ -372,7 +379,8 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   when the session is gone. `(app)/not-found.tsx` (from `notFound()`
   in a signed-in route) renders inside the full shell and shows the same `NotFoundContent`.
 - **Loading**: `HomeSkeleton` and `RecipeSkeleton` are static tints in the shape of the page (featured recipe, ruled
-  tiles beside the 22rem sidebar; opener, numerals under a double rule, ingredient panel and method). Nothing moves.
+  tiles beside the 22rem sidebar; opener, numerals under a double rule, ingredient panel and method, the method's rule
+  spanning the column like the page's and its text bars kept to the measure). Nothing moves.
 
 ## Dos
 - Keep body text at `text-body` (20px Crimson Pro) and reading columns at `max-w-measure`.

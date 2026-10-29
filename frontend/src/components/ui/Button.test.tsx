@@ -72,8 +72,12 @@ describe("ArrowLink", () => {
     expect(link.getAttribute("href")).toBe("/recipes/a/edit");
     expect(link.className).toContain("min-h-control");
     expect(link.className).toContain("italic");
+    // The rule is on the text, not at the foot of the 44px box, and every hover waits for a fine pointer.
+    expect(link.className).not.toContain("border-b");
+    expect(link.className).not.toMatch(/(^|\s)hover:/);
+    expect(link.firstElementChild!.className).toContain("border-b");
     const arrow = link.querySelector("[aria-hidden]")!;
     expect(arrow.textContent).toBe("→");
-    expect(arrow.className).toContain("motion-safe:group-hover/arrow:translate-x-1");
+    expect(arrow.className).toContain("pointer-fine:motion-safe:group-hover/arrow:translate-x-1");
   });
 });
