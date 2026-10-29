@@ -8,8 +8,9 @@ use std::{
 };
 
 use adapter_postgres::{
-    PgCookLogRepo, PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo, PgImageRepo,
-    PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo, migrate,
+    PgCookLogRepo, PgFavouriteRepo, PgGoogleConnectionRepo, PgGroceryRepo, PgIdentityRepo,
+    PgImageRepo, PgRecipeRepo, PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo,
+    PgUserRepo, migrate,
 };
 use domain::{
     grocery::{GeneratedItem, Section},
@@ -97,6 +98,7 @@ impl Schemas {
             google: Arc::new(PgGoogleConnectionRepo::new(pool.clone())),
             identities: Arc::new(PgIdentityRepo::new(pool.clone(), clock.clone())),
             cook_log: Arc::new(PgCookLogRepo::new(pool.clone(), clock.clone())),
+            favourites: Arc::new(PgFavouriteRepo::new(pool.clone(), clock.clone())),
             health: Arc::new(PgStorageHealth::new(pool)),
         }
     }
@@ -287,4 +289,10 @@ async fn overlapping_recomputes_cannot_overwrite_each_other() {
         .collect();
     keys.sort();
     assert_eq!(keys, ["apple", "pear"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn favourites_meet_the_contract() {
+    let Some(db) = Schemas::new() else { return };
+    contract::favourite_repo(|c| db.stack(c)).await;
 }

@@ -7,6 +7,7 @@
 mod accounts;
 mod cook_log;
 mod error;
+mod favourites;
 mod google;
 mod grocery;
 mod identities;
@@ -15,6 +16,7 @@ mod recipes;
 
 pub use accounts::{PgSessionRepo, PgSettingsRepo, PgStorageHealth, PgTagRepo, PgUserRepo};
 pub use cook_log::PgCookLogRepo;
+pub use favourites::PgFavouriteRepo;
 pub use google::PgGoogleConnectionRepo;
 pub use grocery::PgGroceryRepo;
 pub use identities::PgIdentityRepo;

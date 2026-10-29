@@ -37,6 +37,7 @@ impl World {
             google_connections: store.clone(),
             identities: store.clone(),
             cook_log: store.clone(),
+            favourites: store.clone(),
             google_signin: Arc::new(app::DisabledGoogleSignIn),
             flows: Arc::new(app::DisabledGoogleSignIn),
             health: store,
@@ -479,7 +480,7 @@ async fn a_deleted_recipe_leaves_the_list_and_comes_back_when_restored() {
     assert_eq!(names(&list), ["flour"]);
     assert_eq!(list.recipes.len(), 1);
     is_not_found(w.services.grocery.add_recipe(a, None).await);
-    w.services.recipes.restore(a).await.unwrap();
+    w.services.recipes.restore(Uuid::new_v4(), a).await.unwrap();
     let list = w.services.grocery.get().await.unwrap();
     assert_eq!(names(&list), ["onions", "flour"]);
     assert_eq!(list.recipes.len(), 2);

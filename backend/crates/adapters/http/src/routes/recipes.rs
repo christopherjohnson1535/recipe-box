@@ -1,3 +1,4 @@
+use app::ListRequest;
 use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
@@ -28,6 +29,8 @@ pub struct ListQuery {
     q: Option<String>,
     /// Exact tag name, case-insensitive.
     tag: Option<String>,
+    /// `true`: only the signed-in member's favourites (combined with `q`, `tag` and `sort`).
+    favourite: bool,
     /// Default `newest`, or relevance when `q` is set.
     #[param(value_type = Option<RecipeSort>)]
     sort: Option<String>,
@@ -44,6 +47,7 @@ impl Default for ListQuery {
         Self {
             q: None,
             tag: None,
+            favourite: false,
             sort: None,
             limit: 50,
             offset: 0,
@@ -60,17 +64,27 @@ pub struct RecipePage {
 /// Live recipes, searchable and sortable.
 #[utoipa::path(get, path = "/api/recipes", operation_id = "listRecipes", tag = "recipes", security(("session" = [])), params(ListQuery), responses(
     (status = 200, description = "A page of recipes; `total` counts all matches.", body = RecipePage),
-    (status = 400, description = "Bad `limit`, `offset` or `sort` (`validation`).", body = ErrorBody),
+    (status = 400, description = "Bad `limit`, `offset`, `sort` or `favourite` (`validation`).", body = ErrorBody),
 ))]
 pub async fn list(
     State(state): State<HttpState>,
-    _user: CurrentUser,
+    CurrentUser(user): CurrentUser,
     AppQuery(q): AppQuery<ListQuery>,
 ) -> AppResult<Json<RecipePage>> {
     let page = state
         .services
         .recipes
-        .search(q.q, q.tag, q.sort.as_deref(), q.limit, q.offset)
+        .search(
+            user.id,
+            ListRequest {
+                text: q.q,
+                tag: q.tag,
+                favourites: q.favourite,
+                sort: q.sort,
+                limit: q.limit,
+                offset: q.offset,
+            },
+        )
         .await?;
     Ok(Json(RecipePage {
         items: page.items.into_iter().map(Into::into).collect(),
@@ -101,10 +115,10 @@ pub async fn create(
 ))]
 pub async fn get(
     State(state): State<HttpState>,
-    _user: CurrentUser,
+    CurrentUser(user): CurrentUser,
     AppPath(id): AppPath<Uuid>,
 ) -> AppResult<Json<Recipe>> {
-    Ok(Json(state.services.recipes.get(id).await?.into()))
+    Ok(Json(state.services.recipes.get(user.id, id).await?.into()))
 }
 
 /// Replaces every field of a live recipe.
@@ -154,8 +168,10 @@ pub async fn remove(
 ))]
 pub async fn restore(
     State(state): State<HttpState>,
-    _user: CurrentUser,
+    CurrentUser(user): CurrentUser,
     AppPath(id): AppPath<Uuid>,
 ) -> AppResult<Json<Recipe>> {
-    Ok(Json(state.services.recipes.restore(id).await?.into()))
+    Ok(Json(
+        state.services.recipes.restore(user.id, id).await?.into(),
+    ))
 }

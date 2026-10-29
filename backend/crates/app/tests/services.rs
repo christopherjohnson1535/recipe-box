@@ -8,7 +8,7 @@ use std::sync::Arc;
 use adapter_memory::{
     FakeImageCodec, FakePasswordHasher, FakeSessionTokens, MemoryMedia, MemoryStore,
 };
-use app::{Deps, NoneExtractor, Services};
+use app::{Deps, ListRequest, NoneExtractor, Services};
 use async_trait::async_trait;
 use domain::Image;
 use domain::{
@@ -40,6 +40,7 @@ impl World {
             google_connections: store.clone(),
             identities: store.clone(),
             cook_log: store.clone(),
+            favourites: store.clone(),
             google_signin: Arc::new(app::DisabledGoogleSignIn),
             flows: Arc::new(app::DisabledGoogleSignIn),
             health: store.clone(),
@@ -102,7 +103,17 @@ fn is_wrong_login<T>(r: DomainResult<T>) -> bool {
 #[tokio::test]
 async fn search_reports_limit_then_offset_then_sort() {
     let s = World::new().services();
-    let search = |sort, limit, offset| s.recipes.search(None, None, sort, limit, offset);
+    let search = |sort: Option<&str>, limit, offset| {
+        s.recipes.search(
+            Uuid::new_v4(),
+            ListRequest {
+                sort: sort.map(Into::into),
+                limit,
+                offset,
+                ..Default::default()
+            },
+        )
+    };
     assert!(is_validation(
         search(Some("bogus"), 0, 0).await,
         "limit: 1–200."
@@ -123,7 +134,16 @@ async fn search_reports_limit_then_offset_then_sort() {
 #[tokio::test]
 async fn search_checks_limit_then_offset() {
     let s = World::new().services();
-    let search = |limit, offset| s.recipes.search(None, None, None, limit, offset);
+    let search = |limit, offset| {
+        s.recipes.search(
+            Uuid::new_v4(),
+            ListRequest {
+                limit,
+                offset,
+                ..Default::default()
+            },
+        )
+    };
     assert!(is_validation(search(0, 0).await, "limit: 1–200."));
     assert!(is_validation(search(201, 0).await, "limit: 1–200."));
     assert!(is_validation(search(0, -1).await, "limit: 1–200."));
@@ -147,7 +167,7 @@ async fn recipes_are_validated_before_saving() {
         s.recipes.update(r.id, u.id, input("")).await,
         Err(DomainError::Validation(_))
     ));
-    assert_eq!(s.recipes.get(r.id).await.unwrap().title, "Soup");
+    assert_eq!(s.recipes.get(u.id, r.id).await.unwrap().title, "Soup");
 }
 
 #[tokio::test]
@@ -175,8 +195,16 @@ async fn plate_rule_hides_the_rendition_everywhere_when_off() {
     };
     let shown = |r: &Recipe| r.image_display_file.is_some();
     let r = s.recipes.create(u.id, with_image()).await.unwrap();
-    assert!(shown(&r) && shown(&s.recipes.get(r.id).await.unwrap()));
-    let listed = || s.recipes.search(None, None, None, 10, 0);
+    assert!(shown(&r) && shown(&s.recipes.get(u.id, r.id).await.unwrap()));
+    let listed = || {
+        s.recipes.search(
+            u.id,
+            ListRequest {
+                limit: 10,
+                ..Default::default()
+            },
+        )
+    };
     assert!(
         listed().await.unwrap().items[0]
             .image_display_file
@@ -189,7 +217,7 @@ async fn plate_rule_hides_the_rendition_everywhere_when_off() {
         })
         .await
         .unwrap();
-    assert!(!shown(&s.recipes.get(r.id).await.unwrap()));
+    assert!(!shown(&s.recipes.get(u.id, r.id).await.unwrap()));
     assert!(
         listed().await.unwrap().items[0]
             .image_display_file
@@ -200,16 +228,23 @@ async fn plate_rule_hides_the_rendition_everywhere_when_off() {
         &s.recipes.update(r.id, u.id, with_image()).await.unwrap()
     ));
     s.recipes.delete(r.id).await.unwrap();
-    assert!(!shown(&s.recipes.restore(r.id).await.unwrap()));
+    assert!(!shown(&s.recipes.restore(u.id, r.id).await.unwrap()));
     // The original is untouched.
-    assert!(s.recipes.get(r.id).await.unwrap().image_file.is_some());
+    assert!(
+        s.recipes
+            .get(u.id, r.id)
+            .await
+            .unwrap()
+            .image_file
+            .is_some()
+    );
 }
 
 #[tokio::test]
 async fn missing_recipe_is_not_found() {
     let s = World::new().services();
     assert!(matches!(
-        s.recipes.get(Uuid::new_v4()).await,
+        s.recipes.get(Uuid::new_v4(), Uuid::new_v4()).await,
         Err(DomainError::NotFound(m)) if m == "Recipe not found."
     ));
 }
@@ -224,10 +259,10 @@ async fn restore_works_inside_the_window_only() {
     s.recipes.delete(quick).await.unwrap();
     s.recipes.delete(slow).await.unwrap();
     w.clock.advance(Duration::minutes(9));
-    assert!(s.recipes.restore(quick).await.is_ok());
+    assert!(s.recipes.restore(u.id, quick).await.is_ok());
     w.clock.advance(Duration::minutes(1));
     assert!(matches!(
-        s.recipes.restore(slow).await,
+        s.recipes.restore(u.id, slow).await,
         Err(DomainError::Conflict(_))
     ));
 }
@@ -831,7 +866,7 @@ async fn made_it_entries_are_checked_and_follow_the_recipe() {
     ] {
         assert!(matches!(got, Err(DomainError::NotFound(_))), "{got:?}");
     }
-    s.recipes.restore(soup).await.unwrap();
+    s.recipes.restore(ann.id, soup).await.unwrap();
     assert_eq!(s.cook_log.list(soup).await.unwrap().len(), 2);
     assert!(matches!(
         s.cook_log.list(Uuid::new_v4()).await,
@@ -901,4 +936,85 @@ async fn only_the_cook_or_an_admin_deletes_an_entry() {
         Err(DomainError::Forbidden(_))
     ));
     s.cook_log.delete(&ann, soup, cys.id).await.unwrap();
+}
+
+#[tokio::test]
+async fn favourites_are_each_members_own() {
+    let s = World::new().services();
+    let ann = user(&s, "ann", "admin").await;
+    let bob = user(&s, "bob", "member").await;
+    let soup = s
+        .recipes
+        .create(ann.id, input("Lentil soup"))
+        .await
+        .unwrap()
+        .id;
+    let stew = s
+        .recipes
+        .create(ann.id, input("Lentil stew"))
+        .await
+        .unwrap()
+        .id;
+    let cake = s.recipes.create(ann.id, input("Cake")).await.unwrap().id;
+    s.recipes.favourite(ann.id, soup).await.unwrap();
+    s.recipes.favourite(ann.id, cake).await.unwrap();
+    s.recipes.favourite(ann.id, cake).await.unwrap(); // again is fine
+    s.recipes.favourite(bob.id, stew).await.unwrap();
+
+    let list = |viewer: Uuid, text: Option<&str>, favourites| {
+        s.recipes.search(
+            viewer,
+            ListRequest {
+                text: text.map(Into::into),
+                favourites,
+                sort: Some("title".into()),
+                limit: 50,
+                ..Default::default()
+            },
+        )
+    };
+    let starred = |page: domain::Page<domain::RecipeSummary>| {
+        page.items
+            .into_iter()
+            .map(|r| (r.title, r.is_favourite))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        starred(list(ann.id, None, false).await.unwrap()),
+        [
+            ("Cake".to_string(), true),
+            ("Lentil soup".into(), true),
+            ("Lentil stew".into(), false)
+        ],
+        "each row marked for the viewer"
+    );
+    assert_eq!(
+        starred(list(bob.id, Some("lentil"), true).await.unwrap()),
+        [("Lentil stew".to_string(), true)],
+        "the filter combines with search, and is per member"
+    );
+    assert!(s.recipes.get(ann.id, soup).await.unwrap().is_favourite);
+    assert!(!s.recipes.get(bob.id, soup).await.unwrap().is_favourite);
+
+    // Deleted: the star can't be changed (404 like every route of the recipe); restore brings it back.
+    s.recipes.delete(soup).await.unwrap();
+    for got in [
+        s.recipes.favourite(ann.id, soup).await,
+        s.recipes.unfavourite(ann.id, soup).await,
+        s.recipes.favourite(ann.id, Uuid::new_v4()).await,
+        s.recipes.unfavourite(ann.id, Uuid::new_v4()).await,
+    ] {
+        assert!(matches!(got, Err(DomainError::NotFound(_))), "{got:?}");
+    }
+    assert!(s.recipes.restore(ann.id, soup).await.unwrap().is_favourite);
+    // An update answers with the editor's own star.
+    let edited = s.recipes.update(soup, bob.id, input("Lentil soup")).await;
+    assert!(!edited.unwrap().is_favourite);
+
+    s.recipes.unfavourite(ann.id, soup).await.unwrap();
+    s.recipes.unfavourite(ann.id, soup).await.unwrap(); // not starred is fine
+    assert_eq!(
+        starred(list(ann.id, None, true).await.unwrap()),
+        [("Cake".to_string(), true)]
+    );
 }

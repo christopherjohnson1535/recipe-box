@@ -10,6 +10,7 @@ use crate::{HttpConfig, HttpState, error::AppError};
 pub mod auth;
 pub mod cook_log;
 pub mod export;
+pub mod favourites;
 pub mod grocery;
 pub mod health;
 pub mod imports;
@@ -73,6 +74,10 @@ where
         .route(
             "/api/recipes/{id}/cook-log/{entryId}",
             delete(cook_log::remove),
+        )
+        .route(
+            "/api/recipes/{id}/favourite",
+            put(favourites::add).delete(favourites::remove),
         )
         .route("/api/settings", get(settings::get).put(settings::update))
         .route("/api/grocery", get(grocery::get).delete(grocery::clear))
