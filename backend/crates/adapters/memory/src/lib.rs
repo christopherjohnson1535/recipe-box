@@ -284,6 +284,18 @@ impl RecipeRepo for MemoryStore {
             .map(|r| s.recipe(r)))
     }
 
+    async fn get_many(&self, ids: &[Uuid]) -> DomainResult<Vec<Recipe>> {
+        let s = self.lock();
+        let mut once = HashSet::new();
+        Ok(ids
+            .iter()
+            .filter(|id| once.insert(**id))
+            .filter_map(|id| s.recipes.get(id))
+            .filter(|r| r.deleted_at.is_none())
+            .map(|r| s.recipe(r))
+            .collect())
+    }
+
     async fn update(&self, id: Uuid, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe> {
         let mut s = self.lock();
         s.check_images(&input)?;

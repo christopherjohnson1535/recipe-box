@@ -333,34 +333,36 @@ fn image_gone_or_db(e: sqlx::Error) -> DomainError {
     }
 }
 
+/// A recipe with tags, photos and user refs; callers add the `where` clause (always `r.deleted_at is null`).
+const RECIPE_SELECT: &str = "
+    select r.id, r.title, r.description, r.ingredients, r.steps, r.servings, r.prep_minutes,
+           r.cook_minutes, r.total_minutes, r.notes, r.source_url, r.source_name, r.source_type,
+           r.image_id, i.file_name as image_file,
+           i.display_file_name as image_display_file,
+           coalesce((select array_agg(t.name::text order by t.name)
+                     from recipe_tags rt join tags t on t.id = rt.tag_id where rt.recipe_id = r.id), '{}') as tags,
+           coalesce((select array_agg(rp.image_id order by rp.position)
+                     from recipe_photos rp where rp.recipe_id = r.id), '{}') as photo_image_ids,
+           coalesce((select array_agg(pi.file_name order by rp.position)
+                     from recipe_photos rp join images pi on pi.id = rp.image_id
+                     where rp.recipe_id = r.id), '{}') as photo_files,
+           r.created_by, cu.display_name as created_by_name,
+           r.updated_by, uu.display_name as updated_by_name,
+           r.created_at, r.updated_at
+    from recipes r
+    left join images i on i.id = r.image_id
+    left join users cu on cu.id = r.created_by
+    left join users uu on uu.id = r.updated_by";
+
 impl PgRecipeRepo {
     /// Loads a live (not deleted) recipe with tags, photos and user refs.
     async fn load(&self, id: Uuid) -> DomainResult<Option<Recipe>> {
-        let row = sqlx::query_as::<_, RecipeRow>(
-            "select r.id, r.title, r.description, r.ingredients, r.steps, r.servings, r.prep_minutes,
-                    r.cook_minutes, r.total_minutes, r.notes, r.source_url, r.source_name, r.source_type,
-                    r.image_id, i.file_name as image_file,
-                    i.display_file_name as image_display_file,
-                    coalesce((select array_agg(t.name::text order by t.name)
-                              from recipe_tags rt join tags t on t.id = rt.tag_id where rt.recipe_id = r.id), '{}') as tags,
-                    coalesce((select array_agg(rp.image_id order by rp.position)
-                              from recipe_photos rp where rp.recipe_id = r.id), '{}') as photo_image_ids,
-                    coalesce((select array_agg(pi.file_name order by rp.position)
-                              from recipe_photos rp join images pi on pi.id = rp.image_id
-                              where rp.recipe_id = r.id), '{}') as photo_files,
-                    r.created_by, cu.display_name as created_by_name,
-                    r.updated_by, uu.display_name as updated_by_name,
-                    r.created_at, r.updated_at
-             from recipes r
-             left join images i on i.id = r.image_id
-             left join users cu on cu.id = r.created_by
-             left join users uu on uu.id = r.updated_by
-             where r.id = $1 and r.deleted_at is null",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(db)?;
+        let sql = format!("{RECIPE_SELECT} where r.id = $1 and r.deleted_at is null");
+        let row = sqlx::query_as::<_, RecipeRow>(AssertSqlSafe(sql))
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(db)?;
         Ok(row.map(Into::into))
     }
 }
@@ -403,6 +405,22 @@ impl RecipeRepo for PgRecipeRepo {
 
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>> {
         self.load(id).await
+    }
+
+    async fn get_many(&self, ids: &[Uuid]) -> DomainResult<Vec<Recipe>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // `array_position` is the first mention, so the input order holds and a repeated id is one row anyway.
+        let sql = format!(
+            "{RECIPE_SELECT} where r.id = any($1) and r.deleted_at is null order by array_position($1, r.id)"
+        );
+        let rows = sqlx::query_as::<_, RecipeRow>(AssertSqlSafe(sql))
+            .bind(ids)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(db)?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 
     async fn update(&self, id: Uuid, user_id: Uuid, input: RecipeInput) -> DomainResult<Recipe> {

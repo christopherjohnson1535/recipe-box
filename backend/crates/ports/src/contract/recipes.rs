@@ -13,6 +13,7 @@ use crate::Clock;
 /// Runs every `RecipeRepo` case against a fresh stack each.
 pub async fn recipe_repo<F: Fn(Arc<dyn Clock>) -> Stack>(make: F, caps: Capabilities) {
     create_and_get(&make).await;
+    get_many_reads_a_batch(&make).await;
     update_replaces_everything(&make).await;
     unknown_images_are_refused(&make).await;
     create_many_is_all_or_nothing(&make).await;
@@ -237,6 +238,52 @@ async fn create_and_get<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
     assert_eq!(got.image_display_file.as_deref(), Some("main.display.jpg"));
 
     assert!(c.s.recipes.get(Uuid::new_v4()).await.unwrap().is_none());
+}
+
+async fn get_many_reads_a_batch<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {
+    let c = Ctx::new(make).await;
+    let (main, photo) = (image("main.jpg"), image("p.jpg"));
+    let (main_id, photo_id) = (main.id, photo.id);
+    c.s.images.add(main).await.unwrap();
+    c.s.images.add(photo).await.unwrap();
+    let full =
+        c.s.recipes
+            .create(
+                c.user,
+                RecipeInput {
+                    image_id: Some(main_id),
+                    photo_image_ids: vec![photo_id, main_id],
+                    tags: vec!["soup".into(), "dinner".into()],
+                    ..Ctx::input("Full")
+                },
+            )
+            .await
+            .unwrap()
+            .id;
+    let plain = c.add("Plain", &["salt"], None, &[]).await;
+    let deleted = c.add("Deleted", &[], None, &[]).await;
+    c.s.recipes.soft_delete(deleted).await.unwrap();
+
+    let got =
+        c.s.recipes
+            .get_many(&[plain, Uuid::new_v4(), deleted, full, plain])
+            .await
+            .unwrap();
+    let ids: Vec<Uuid> = got.iter().map(|r| r.id).collect();
+    assert_eq!(
+        ids,
+        [plain, full],
+        "input order, missing and deleted left out, a repeat once"
+    );
+    for r in &got {
+        let one = c.s.recipes.get(r.id).await.unwrap().unwrap();
+        assert_eq!(format!("{r:?}"), format!("{one:?}"), "the same as `get`");
+    }
+    assert_eq!(got[1].tags, ["dinner", "soup"]);
+    assert_eq!(got[1].photo_files, ["p.jpg", "main.jpg"]);
+
+    assert!(c.s.recipes.get_many(&[]).await.unwrap().is_empty());
+    assert!(c.s.recipes.get_many(&[deleted]).await.unwrap().is_empty());
 }
 
 async fn update_replaces_everything<F: Fn(Arc<dyn Clock>) -> Stack>(make: &F) {

@@ -32,6 +32,12 @@ pub trait RecipeRepo: Send + Sync {
     /// applied by the service, not here.
     async fn get(&self, id: Uuid) -> DomainResult<Option<Recipe>>;
 
+    /// The live recipes among `ids`, each exactly as [`RecipeRepo::get`] returns it, in the order of their first
+    /// mention in `ids`. Ids with no live recipe (never existed, deleted, purged) are left out and a repeated id
+    /// gives the recipe once. Meant for a page of ids at a time (the export reads 200): one round trip, not one
+    /// per recipe. Empty `ids` gives an empty list.
+    async fn get_many(&self, ids: &[Uuid]) -> DomainResult<Vec<Recipe>>;
+
     /// Replaces every field, the tags and the photo links of a live recipe as one unit (a full replace, not a
     /// patch) and returns it. `user_id` becomes `updated_by`. `NotFound` for a missing or deleted recipe,
     /// `Validation` for an unknown image; nothing is changed in either case.
