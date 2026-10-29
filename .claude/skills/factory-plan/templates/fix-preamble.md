@@ -8,8 +8,7 @@ First read the builder preamble (`agent-preamble.md`) and follow it — except t
 - Re-read the cited lines and confirm the failing case first. If a finding is wrong, skip it and say why.
 - Smallest fix that works. Every data-safety fix (save, delete/restore, import, backup/restore) gets a test
   that fails without the fix.
-- After fixing: your paths clean in tsc and eslint; full `npx vitest run` passes (note other agents' failures,
-  don't fix them).
+- After fixing: your paths clean in tsc and eslint; your tests pass (`npx vitest run <touched files>`; the tester runs the full suite and release builds).
 - Commit per finding group ("Fix R1-01: copy to temp name then rename"). Append one line per finding to
   `<SCRATCH_DIR>/FIXES.md`: `R1-01 fixed — <how>` or `R1-07 skipped — <why>` (append with `>>`).
 - Report (under 150 words): fixed/skipped counts, anything needing the owner's decision or another owner's file.

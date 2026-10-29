@@ -24,6 +24,12 @@ How this project is built, end to end, by an orchestrator and a team of agents. 
 | 6 Design QA | `factory-design-qa` | `design-audit.md` in the run folder, before/after screenshots |
 | 7 Ship | `factory-ship` | PR / push to GitHub, owner's copy updated, owner report |
 
+## Sizing the loop
+The orchestrator picks S, M or L before starting, states it in its first message and the PR, and runs only that
+tier's loop; the size sets how many agents run and how much is tested, not which model they use. Definitions, the
+per-tier loop and the risky-surface override (a security reviewer and a separate fixer, at least M) are in
+`.claude/skills/factory/SKILL.md`, the single source of truth.
+
 ## Setup
 1. `sh scripts/factory/fetch-skills.sh` — puts ponytail, tastemaker, impeccable and refactoring-ui-skill in
    `.factory/vendor/` (gitignored). In the preambles, `<SKILLS_DIR>` = `.factory/vendor`.

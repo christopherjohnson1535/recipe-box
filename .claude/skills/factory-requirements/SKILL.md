@@ -7,6 +7,9 @@ description: Stage 1 of the software factory — turn a described workflow or fe
 
 Goal: a short, numbered requirements document the owner can read in five minutes and say yes to.
 
+## By size (see `factory`)
+This stage runs per project or phase, not per issue; issues cite existing requirement IDs (all sizes).
+
 ## Steps
 
 1. **Restate the current workflow** as numbered steps in the owner's words (e.g. "find a recipe on a blog →
