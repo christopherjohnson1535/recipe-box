@@ -10,9 +10,11 @@ import { MadeItForm } from "./MadeItForm";
 /**
  * Cook mode's "Made it" (REC-6), shown above the footer on the last step and in the list of every step: a one-line
  * prompt that opens the form in place, then a confirmation once the entry is saved. Escape closes the form and focus
- * returns to the button. Offline the form still opens: it keeps the note and says why Save is off.
+ * returns to the button. Offline the form still opens: it keeps the note and says why Save is off. It stays mounted
+ * while hidden (`show` false, an earlier step), so stepping back keeps a half-typed note and a saved cook is not offered
+ * twice.
  */
-export function MadeIt({ recipeId }: { recipeId: string }) {
+export function MadeIt({ recipeId, show }: { recipeId: string; show: boolean }) {
   const [open, setOpen] = useState(false);
   const [logged, setLogged] = useState<CookLogEntry | null>(null);
   const opener = useRef<HTMLButtonElement>(null);
@@ -21,18 +23,20 @@ export function MadeIt({ recipeId }: { recipeId: string }) {
   const reopen = useRef(false);
 
   useEffect(() => {
+    if (!show) return;
     if (logged) done.current?.focus({ preventScroll: true });
     else if (open) panel.current?.focus({ preventScroll: true });
     else if (reopen.current) opener.current?.focus({ preventScroll: true });
-  }, [open, logged]);
+  }, [show, open, logged]);
 
   const close = () => {
     reopen.current = true;
     setOpen(false);
   };
 
+  let body;
   if (logged) {
-    return (
+    body = (
       <MadeItPanel ref={panel} label="Made it">
         <MadeItDone ref={done} title="In the log.">
           {dayLabel(logged.cookedOn)}
@@ -40,9 +44,8 @@ export function MadeIt({ recipeId }: { recipeId: string }) {
         </MadeItDone>
       </MadeItPanel>
     );
-  }
-  if (!open) {
-    return (
+  } else if (!open) {
+    body = (
       <MadeItPrompt
         action={
           <Button ref={opener} variant="secondary" aria-expanded={false} onClick={() => setOpen(true)}>
@@ -53,19 +56,25 @@ export function MadeIt({ recipeId }: { recipeId: string }) {
         Cooked it? Note it in the log, with anything you’d change.
       </MadeItPrompt>
     );
+  } else {
+    body = (
+      <MadeItPanel ref={panel} label="Made it">
+        <div
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              close();
+            }
+          }}
+        >
+          <MadeItForm recipeId={recipeId} onSaved={setLogged} onCancel={close} />
+        </div>
+      </MadeItPanel>
+    );
   }
   return (
-    <MadeItPanel ref={panel} label="Made it">
-      <div
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.stopPropagation();
-            close();
-          }
-        }}
-      >
-        <MadeItForm recipeId={recipeId} onSaved={setLogged} onCancel={close} />
-      </div>
-    </MadeItPanel>
+    <div hidden={!show} className="flex shrink-0 flex-col">
+      {body}
+    </div>
   );
 }

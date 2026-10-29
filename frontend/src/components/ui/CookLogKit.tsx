@@ -6,7 +6,8 @@ import { Heading } from "./Heading";
 
 /**
  * The made-it form's frame: a paper-deep block under a thin ink rule. In cook mode it sits above the footer (the stage
- * pins the evening edition, so it reads dark there); on the recipe page it opens under the log's heading.
+ * pins the evening edition, so it reads dark there); on the recipe page it opens under the log's heading. Never more than
+ * half the screen tall: on a phone held sideways the form scrolls inside it, so the step and the footer stay.
  */
 export function MadeItPanel({ ref, label, children }: { ref?: Ref<HTMLElement>; label: string; children: ReactNode }) {
   return (
@@ -14,7 +15,7 @@ export function MadeItPanel({ ref, label, children }: { ref?: Ref<HTMLElement>; 
       ref={ref}
       tabIndex={-1}
       aria-label={label}
-      className="flex shrink-0 flex-col gap-4 border-t border-(--rule-double) bg-(--panel-bg) px-5 py-5 focus:outline-none motion-safe:animate-[arrive_var(--duration-base)_var(--ease-out)_both] sm:px-6"
+      className="flex max-h-[50dvh] shrink-0 flex-col gap-4 overflow-y-auto overscroll-contain border-t border-(--rule-double) bg-(--panel-bg) px-5 py-5 focus:outline-none motion-safe:animate-[arrive_var(--duration-base)_var(--ease-out)_both] sm:px-6"
     >
       {children}
     </section>

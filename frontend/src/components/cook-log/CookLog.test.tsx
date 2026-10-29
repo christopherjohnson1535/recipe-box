@@ -40,10 +40,10 @@ describe("CookLog (recipe page)", () => {
 
   it("an admin may delete anyone's entry; a member only their own", () => {
     const { unmount } = render(<CookLog recipeId="r1" initial={LOG} me={member} />);
-    expect(screen.getAllByRole("button", { name: /^Delete the entry/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Delete .*entry for/ })).toHaveLength(1);
     unmount();
     render(<CookLog recipeId="r1" initial={LOG} me={{ id: "u9", role: "admin" }} />);
-    expect(screen.getAllByRole("button", { name: /^Delete the entry/ })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Delete .*entry for/ })).toHaveLength(3);
   });
 
   it("adds an entry in date order and announces it", async () => {
@@ -61,13 +61,13 @@ describe("CookLog (recipe page)", () => {
 
   it("deletes an entry, and says so when the server refuses", async () => {
     render(<CookLog recipeId="r1" initial={LOG} me={member} />);
-    fireEvent.click(screen.getByRole("button", { name: "Delete the entry for Tue, Oct 20 by You" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete your entry for Tue, Oct 20" }));
     expect(await screen.findByText("Removed the entry for Tue, Oct 20.")).toBeTruthy();
     expect(rows()).toHaveLength(2);
 
     server.use(http.delete("*/api/recipes/r1/cook-log/:entryId", () => HttpResponse.json({ error: { code: "forbidden", message: "Only the member who made an entry, or an admin, can delete it." } }, { status: 403 })));
     const { unmount } = render(<CookLog recipeId="r1" initial={[entry({ id: "x" })]} me={member} />);
-    fireEvent.click(screen.getAllByRole("button", { name: "Delete the entry for Tue, Oct 20 by You" }).at(-1)!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete your entry for Tue, Oct 20" }).at(-1)!);
     expect((await screen.findByRole("alert")).textContent).toContain("Only the member who made an entry");
     unmount();
   });
@@ -87,6 +87,8 @@ describe("CookLog (recipe page)", () => {
     act(() => void window.dispatchEvent(new Event("offline")));
     expect(rows()).toHaveLength(3);
     expect((screen.getByRole("button", { name: "Made it" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: /^Delete the entry/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /^Delete .*entry for/ }) as HTMLButtonElement).disabled).toBe(true);
+    const made = screen.getByRole("button", { name: "Made it" });
+    expect(document.getElementById(made.getAttribute("aria-describedby")!)?.textContent).toMatch(/offline.*last visit/i);
   });
 });

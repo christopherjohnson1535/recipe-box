@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CookLogEntry } from "@/lib/api";
-import { canDelete, cookName, dayLabel, newestFirst, today } from "./cook-log-logic";
+import { canDelete, cookName, dayLabel, deleteLabel, newestFirst, today } from "./cook-log-logic";
 
 const entry = (over: Partial<CookLogEntry> = {}): CookLogEntry => ({
   id: "c1", recipeId: "r1", cookedOn: "2026-10-20", note: "", madeBy: { id: "u1", displayName: "Sam" }, createdAt: "2026-10-20T19:00:00Z", ...over,
@@ -24,6 +24,12 @@ describe("cook log logic", () => {
     expect(cookName(entry(), null)).toBe("Sam");
     expect(cookName(entry(), { id: "u1" })).toBe("You");
     expect(cookName(entry({ madeBy: null }), { id: "u1" })).toBe("A former member");
+  });
+
+  it("names the Delete button by whose entry it is", () => {
+    expect(deleteLabel(entry(), { id: "u1" }, "Today")).toBe("Delete your entry for Today");
+    expect(deleteLabel(entry(), { id: "u2" }, "Today")).toBe("Delete Sam’s entry for Today");
+    expect(deleteLabel(entry({ madeBy: null }), null, "Today")).toBe("Delete a former member’s entry for Today");
   });
 
   it("lets the cook or an admin delete, nobody else", () => {

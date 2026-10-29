@@ -21,7 +21,7 @@ const captured = () => {
 describe("MadeIt (cook mode)", () => {
   it("opens in place, saves today's cook with the note, and confirms", async () => {
     const bodies = captured();
-    render(<MadeIt recipeId="r1" />);
+    render(<MadeIt recipeId="r1" show />);
     const open = screen.getByRole("button", { name: "Made it" });
     expect(open.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(open);
@@ -37,7 +37,7 @@ describe("MadeIt (cook mode)", () => {
   });
 
   it("Escape and Not now close the form and give focus back to the button", async () => {
-    render(<MadeIt recipeId="r1" />);
+    render(<MadeIt recipeId="r1" show />);
     fireEvent.click(screen.getByRole("button", { name: "Made it" }));
     fireEvent.keyDown(screen.getByLabelText("What I’d change"), { key: "Escape" });
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Made it" })));
@@ -48,7 +48,7 @@ describe("MadeIt (cook mode)", () => {
 
   it("refuses a future day and an over-long note before sending anything", () => {
     const bodies = captured();
-    render(<MadeIt recipeId="r1" />);
+    render(<MadeIt recipeId="r1" show />);
     fireEvent.click(screen.getByRole("button", { name: "Made it" }));
     fireEvent.change(screen.getByLabelText("Cooked on"), { target: { value: "2026-10-23" } });
     expect(screen.getByText("Pick a day up to today.")).toBeTruthy();
@@ -64,7 +64,7 @@ describe("MadeIt (cook mode)", () => {
 
   it("shows the server's refusal and keeps the note", async () => {
     server.use(http.post("*/api/recipes/r1/cook-log", () => HttpResponse.json({ error: { code: "not_found", message: "Recipe not found." } }, { status: 404 })));
-    render(<MadeIt recipeId="r1" />);
+    render(<MadeIt recipeId="r1" show />);
     fireEvent.click(screen.getByRole("button", { name: "Made it" }));
     fireEvent.change(screen.getByLabelText("What I’d change"), { target: { value: "Less salt" } });
     fireEvent.click(screen.getByRole("button", { name: "Save to the log" }));
@@ -73,9 +73,19 @@ describe("MadeIt (cook mode)", () => {
     expect((screen.getByRole("button", { name: "Save to the log" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("keeps a half-typed note while hidden on an earlier step", () => {
+    const { rerender } = render(<MadeIt recipeId="r1" show />);
+    fireEvent.click(screen.getByRole("button", { name: "Made it" }));
+    fireEvent.change(screen.getByLabelText("What I’d change"), { target: { value: "Rest it longer" } });
+    rerender(<MadeIt recipeId="r1" show={false} />);
+    expect(screen.getByLabelText("What I’d change").closest("[hidden]")).not.toBeNull(); // hidden from everyone
+    rerender(<MadeIt recipeId="r1" show />);
+    expect((screen.getByLabelText("What I’d change") as HTMLTextAreaElement).value).toBe("Rest it longer");
+  });
+
   it("offline: the form opens and keeps the note, Save is off with the reason, and comes back online", () => {
     const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
-    render(<MadeIt recipeId="r1" />);
+    render(<MadeIt recipeId="r1" show />);
     act(() => void window.dispatchEvent(new Event("offline")));
     fireEvent.click(screen.getByRole("button", { name: "Made it" }));
     fireEvent.change(screen.getByLabelText("What I’d change"), { target: { value: "Hotter oven" } });

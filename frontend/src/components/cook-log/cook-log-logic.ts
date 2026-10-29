@@ -32,6 +32,12 @@ export function canDelete(entry: CookLogEntry, me: Pick<User, "id" | "role"> | n
   return me.role === "admin" || entry.madeBy?.id === me.id;
 }
 
+/** The Delete button's name: "Delete your entry for Yesterday", or "Delete Sam’s entry for Yesterday". */
+export function deleteLabel(entry: CookLogEntry, me: Pick<User, "id"> | null, day: string): string {
+  const who = cookName(entry, me);
+  return who === "You" ? `Delete your entry for ${day}` : `Delete ${who === "A former member" ? "a former member’s" : `${who}’s`} entry for ${day}`;
+}
+
 /** Newest first, as the API returns them: cooking day, then when recorded, then id. For merging in a new entry. */
 export function newestFirst(entries: CookLogEntry[]): CookLogEntry[] {
   return [...entries].sort((a, b) => b.cookedOn.localeCompare(a.cookedOn) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));

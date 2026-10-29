@@ -59,10 +59,17 @@ export function MadeItForm({ recipeId, onSaved, onCancel }: { recipeId: string; 
         <Field
           label="What I’d change"
           htmlFor={`${id}-note`}
-          hint={tooLong ? undefined : "Optional. Less salt, a hotter oven, double the sauce."}
           error={tooLong ? `Keep it to ${MAX_NOTE.toLocaleString("en-US")} characters.` : undefined}
         >
-          <Textarea id={`${id}-note`} rows={2} value={note} aria-invalid={tooLong || undefined} aria-describedby={`${id}-note-msg`} onChange={(e) => setNote(e.target.value)} />
+          <Textarea
+            id={`${id}-note`}
+            rows={2}
+            value={note}
+            placeholder="Optional: less salt, a hotter oven…"
+            aria-invalid={tooLong || undefined}
+            aria-describedby={tooLong ? `${id}-note-msg` : undefined}
+            onChange={(e) => setNote(e.target.value)}
+          />
         </Field>
       </MadeItFields>
       {failure && (

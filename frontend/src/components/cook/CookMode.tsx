@@ -169,7 +169,7 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
         timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
       />
       <CookLive>{live.text}</CookLive>
-      {(all || next === undefined) && <MadeIt recipeId={id} />}
+      <MadeIt recipeId={id} show={all || next === undefined} />
       <CookFooter next={next} summary={all ? `${ticks.steps.size} of ${count} steps done` : undefined}>
         {all ? (
           <CookPillLink href={`/recipes/${id}`}>Finish</CookPillLink>

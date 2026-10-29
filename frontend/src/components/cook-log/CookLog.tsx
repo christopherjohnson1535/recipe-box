@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { OfflineNote } from "@/components/offline/OfflineNote";
 import { useOnline } from "@/components/offline/use-online";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { CookLogEmpty, CookLogHeader, CookLogItem, CookLogList, MadeItPanel } from "@/components/ui/CookLogKit";
 import { ApiError, api, type CookLogEntry, type User } from "@/lib/api";
-import { canDelete, cookName, dayLabel, newestFirst } from "./cook-log-logic";
+import { canDelete, cookName, dayLabel, deleteLabel, newestFirst } from "./cook-log-logic";
 import { MadeItForm } from "./MadeItForm";
 
 const noop = () => () => undefined;
@@ -68,12 +69,13 @@ export function CookLog({ recipeId, initial, me }: Props) {
         count={entries.length}
         action={
           !adding && (
-            <Button ref={addButton} variant="secondary" disabled={!online} title={online ? undefined : "You’re offline"} onClick={() => setAdding(true)}>
+            <Button ref={addButton} variant="secondary" disabled={!online} aria-describedby={online ? undefined : "made-it-offline"} onClick={() => setAdding(true)}>
               Made it
             </Button>
           )
         }
       />
+      <OfflineNote id="made-it-offline">You’re offline. The log shows what was there on your last visit; adding to it needs the server.</OfflineNote>
       {adding && (
         <MadeItPanel ref={panel} label="Log a cook">
           <div
@@ -110,7 +112,7 @@ export function CookLog({ recipeId, initial, me }: Props) {
               note={e.note || undefined}
               action={
                 canDelete(e, me) && (
-                  <Button variant="danger-text" pending={deleting === e.id} disabled={!online} aria-label={`Delete the entry for ${dayLabel(e.cookedOn, now)} by ${cookName(e, me)}`} onClick={() => remove(e)}>
+                  <Button variant="danger-text" pending={deleting === e.id} disabled={!online} aria-label={deleteLabel(e, me, dayLabel(e.cookedOn, now))} onClick={() => remove(e)}>
                     Delete
                   </Button>
                 )
