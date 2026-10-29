@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { OfflineNote } from "@/components/offline/OfflineNote";
 import { useOnline } from "@/components/offline/use-online";
 import { FavouriteToggle, TileStar } from "@/components/ui/FavouriteKit";
 import { ApiError, api as browserApi } from "@/lib/api";
@@ -79,15 +78,12 @@ export function FavouriteStar({ recipeId, title, initial, variant, api = browser
       ) : (
         <FavouriteToggle {...shared} aria-label={variant === "featured" ? `Favourite: ${title}` : undefined} />
       )}
-      {variant === "tile" ? (
-        // The reason sits off screen on a tile (no room on the kicker line); the page says it out loud beside the button.
-        !online && (
-          <span id={offlineId} className="sr-only">
-            You’re offline. Starring needs the server.
-          </span>
-        )
-      ) : (
-        <OfflineNote id={offlineId}>You’re offline. Starring needs the server.</OfflineNote>
+      {/* The reason is read with the star, not shown: the offline banner already says it, the star is dimmed, and a
+          visible line here would split the opener's actions (Delete keeps its own visible note). */}
+      {!online && (
+        <span id={offlineId} className="sr-only">
+          You’re offline. Starring needs the server.
+        </span>
       )}
       <span role="status" className="sr-only">
         {status}

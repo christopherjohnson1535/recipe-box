@@ -55,7 +55,7 @@ open Recipe Box once while you're online and it fetches them in the background.
   connection: **Save**, **Delete** and the import buttons are turned off, and Save and Import say why beside them. What you typed in a recipe stays on the page until
   you're back online.
 - A page that wasn't kept shows **You're offline** with the list of recipes this iPad can still open, your favourites first.
-- Starring a recipe needs the connection: offline the star is turned off and says why. Nothing is saved to send later.
+- Starring a recipe needs the connection: offline the star is dimmed and turned off. Nothing is saved to send later.
 - Online, you always see the server's latest copy; the kept copy is only used when the server can't be reached.
 - The iPad keeps about the last 100 recipe pages and 300 photos, each for up to 30 days after you last opened it.
 - **Sign out** removes every kept recipe and photo from the iPad, and so does an expired sign-in. Nothing is shown
