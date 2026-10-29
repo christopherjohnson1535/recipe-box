@@ -8,7 +8,7 @@ import { dayLabel } from "./cook-log-logic";
 import { MadeItForm } from "./MadeItForm";
 
 /**
- * Cook mode's "Made it" (REC-6), shown above the footer on the last step and in the list of every step: a one-line
+ * Cook mode's "Made it" (REC-6), shown under the step on the last step and after the list of every step: a one-line
  * prompt that opens the form in place, then a confirmation once the entry is saved. Escape closes the form and focus
  * returns to the button. Offline the form still opens: it keeps the note and says why Save is off. It stays mounted
  * while hidden (`show` false, an earlier step), so stepping back keeps a half-typed note and a saved cook is not offered
@@ -24,8 +24,9 @@ export function MadeIt({ recipeId, show }: { recipeId: string; show: boolean }) 
 
   useEffect(() => {
     if (!show) return;
-    if (logged) done.current?.focus({ preventScroll: true });
-    else if (open) panel.current?.focus({ preventScroll: true });
+    // Focus scrolls the step column so the form (or the confirmation) is in view on a small screen.
+    if (logged) done.current?.focus();
+    else if (open) panel.current?.focus();
     else if (reopen.current) opener.current?.focus({ preventScroll: true });
   }, [show, open, logged]);
 
@@ -73,7 +74,7 @@ export function MadeIt({ recipeId, show }: { recipeId: string; show: boolean }) 
     );
   }
   return (
-    <div hidden={!show} className="flex shrink-0 flex-col">
+    <div hidden={!show} className="mt-8 flex shrink-0 flex-col">
       {body}
     </div>
   );

@@ -307,7 +307,7 @@ App components (`src/components/*.tsx`, `src/components/recipe-form/*`, no styli
   ("More to cook", then the band-coloured "Haven’t cooked in a while" panel; sticky while the grid scrolls) that drops below the grid under 1024px.
   Logic (featured pick, slices) is in `components/home/home-plan.ts`. Without a photo recipe the plain "Recipes" head
   replaces the featured recipe; while searching or filtering the featured recipe, ticker and sidebar are hidden and
-  the band above is unchanged. Until the Made-it log (#23) exists, `updatedAt` stands in for "last cooked" and there is
+  the band above is unchanged. The home page does not read the Made-it log (#23) yet: `updatedAt` stands in for "last cooked" and there is
   no cooked-count sticker. Copy is for a long-lived box: "Featured", "More to cook", no issue, volume, edition,
   "cover story" or "the collection" wording.
 - **Recipe**: the split opener (tags kicker, headline, deck if the description is 160 characters

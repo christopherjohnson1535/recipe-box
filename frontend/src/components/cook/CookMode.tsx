@@ -127,7 +127,8 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
           </CookRail>
         }
         step={
-          all ? (
+          <>
+            {all ? (
             <CookStepList>
               {steps.map((_, i) => (
                 <CookStepItem
@@ -164,12 +165,14 @@ export function CookMode({ id, title, ingredients, steps }: Props) {
             >
               {renderStep(index)}
             </CookStepText>
-          )
+            )}
+            {/* Under the step, in the step column that scrolls; one place in both views, so a half-typed note survives a switch. */}
+            <MadeIt recipeId={id} show={all || next === undefined} />
+          </>
         }
         timers={<CookTimerRack timers={timers} now={now} onDismiss={dismiss} />}
       />
       <CookLive>{live.text}</CookLive>
-      <MadeIt recipeId={id} show={all || next === undefined} />
       <CookFooter next={next} summary={all ? `${ticks.steps.size} of ${count} steps done` : undefined}>
         {all ? (
           <CookPillLink href={`/recipes/${id}`}>Finish</CookPillLink>

@@ -5,9 +5,9 @@ import { Heading } from "./Heading";
 // shared `arrive` rise (motion.css); under reduced motion they simply appear.
 
 /**
- * The made-it form's frame: a paper-deep block under a thin ink rule. In cook mode it sits above the footer (the stage
- * pins the evening edition, so it reads dark there); on the recipe page it opens under the log's heading. Never more than
- * half the screen tall: on a phone held sideways the form scrolls inside it, so the step and the footer stay.
+ * The made-it form's frame: a paper-deep block under a thin ink rule. In cook mode it sits under the step, in the
+ * step column (the stage pins the evening edition, so it reads dark there); on the recipe page it opens under the log's
+ * heading. Never more than half the screen tall, so a phone held sideways keeps the step in sight.
  */
 export function MadeItPanel({ ref, label, children }: { ref?: Ref<HTMLElement>; label: string; children: ReactNode }) {
   return (
@@ -27,7 +27,7 @@ export function MadeItFields({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">{children}</div>;
 }
 
-/** The collapsed strip above cook mode's footer: a short line and the button that opens the form. */
+/** The collapsed strip under the step in cook mode: a short line and the button that opens the form. */
 export function MadeItPrompt({ children, action }: { children: ReactNode; action: ReactNode }) {
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-(--rule-hair) py-3">
