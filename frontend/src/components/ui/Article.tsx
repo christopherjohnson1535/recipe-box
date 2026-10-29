@@ -9,22 +9,22 @@ export function Lede({ children }: { children: ReactNode }) {
 }
 
 /**
- * The ingredient sidebar beside the method, on the same edges as the masthead; stacked on phones. From 1440px a third
- * column holds the `rail` (the recipe's note, set as a margin note); below that the rail follows the method in the
- * method's column. The method keeps its own reading measure whichever columns are showing.
+ * The ingredient sidebar beside the method, on the same edges as the masthead; stacked on phones. The method fills the
+ * rest of the width, so its rule meets the numerals band's right edge; the `rail` (the recipe's note) follows the method
+ * in the same column. Reading text inside the method keeps its own line length.
  */
 export function SidebarLayout({ sidebar, rail, children }: { sidebar: ReactNode; rail?: ReactNode; children: ReactNode }) {
   return (
     <div
       className={cx(
-        "grid w-full max-w-page grid-cols-1 gap-x-14 gap-y-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] min-[90rem]:grid-cols-[minmax(0,22rem)_minmax(0,38rem)_minmax(0,1fr)]",
+        "grid w-full max-w-page grid-cols-1 gap-x-14 gap-y-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)]",
         // Two rows only when there is a rail to put under the method; otherwise a spare row adds a gap under the page.
-        Boolean(rail) && "md:grid-rows-[auto_1fr] md:gap-y-8",
+        Boolean(rail) && "md:grid-rows-[auto_1fr] md:gap-y-12",
       )}
     >
       <div className={cx(Boolean(rail) && "md:row-span-2")}>{sidebar}</div>
       {children}
-      {rail && <div className="min-w-0 md:col-start-2 md:max-w-measure min-[90rem]:max-w-none min-[90rem]:col-start-3 min-[90rem]:row-start-1">{rail}</div>}
+      {rail && <div className="min-w-0 md:col-start-2">{rail}</div>}
     </div>
   );
 }
