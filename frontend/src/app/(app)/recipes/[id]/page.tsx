@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Arrive } from "@/components/ui/Arrive";
 import { Lede, PlateCaption, SidebarLayout } from "@/components/ui/Article";
-import { ButtonLink } from "@/components/ui/Button";
+import { ArrowLink, ButtonLink } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Chip";
 import { DotList } from "@/components/ui/DotList";
 import { ExternalLink } from "@/components/ui/ExternalLink";
@@ -133,12 +133,8 @@ export default async function RecipePage({ params }: Params) {
               <ButtonLink href={`/recipes/${id}/cook`} className="w-full sm:w-auto">
                 Start cooking
               </ButtonLink>
-              <ButtonLink href={cookTogetherHref([id])} variant="secondary" className="w-full sm:w-auto">
-                Cook together
-              </ButtonLink>
-              <ButtonLink href={`/recipes/${id}/edit`} variant="secondary">
-                Edit
-              </ButtonLink>
+              <ArrowLink href={cookTogetherHref([id])}>Cook together</ArrowLink>
+              <ArrowLink href={`/recipes/${id}/edit`}>Edit</ArrowLink>
               <DeleteRecipeButton id={id} title={recipe.title} />
             </>
           }
@@ -159,7 +155,7 @@ export default async function RecipePage({ params }: Params) {
             ) : undefined
           }
         >
-          <section aria-labelledby="steps" className="flex max-w-measure flex-col gap-8">
+          <section aria-labelledby="steps" className="flex min-w-0 flex-col gap-8">
             <MethodHeader steps={recipe.steps.length} />
             {recipe.steps.length === 0 && <Text variant="note">No steps listed.</Text>}
             {stepGroups.map((g, i) => (

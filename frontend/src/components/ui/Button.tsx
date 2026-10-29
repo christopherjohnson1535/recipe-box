@@ -45,6 +45,31 @@ export function ButtonLink({ variant, className, ...rest }: ComponentProps<typeo
 }
 
 /**
+ * A secondary action set as a line of italic text over a 1px rule, with an arrow that slides 4px on hover (it stays put under
+ * reduced motion). Ink, turning accent on hover; the hover is for a mouse only, so a tap on a touch screen leaves nothing
+ * stuck on. The link is a 44px target; the rule sits on the text inside it, not at the foot of the box. The primary action
+ * beside it stays a solid button.
+ */
+export function ArrowLink({ className, children, ...rest }: ComponentProps<typeof Link>) {
+  return (
+    <Link
+      className={cx(
+        "group/arrow inline-flex min-h-control items-center self-center font-text text-deck leading-none text-(--button-ghost-fg) italic transition-[color] duration-150 ease-out pointer-fine:hover:text-(--button-ghost-hover)",
+        className,
+      )}
+      {...rest}
+    >
+      <span className="inline-flex items-baseline gap-2 border-b border-(--button-ghost-underline) pb-1 transition-[border-color] duration-150 ease-out pointer-fine:group-hover/arrow:border-(--button-ghost-hover)">
+        {children}
+        <span aria-hidden="true" className="not-italic transition-transform duration-150 ease-out pointer-fine:motion-safe:group-hover/arrow:translate-x-1">
+          →
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+/**
  * A link that leaves the app for a full page load (the API's connect address, which answers with a redirect to Google), so
  * not next/link, which would prefetch it. With a `variant` it is set as that button; without, as an inline link.
  */

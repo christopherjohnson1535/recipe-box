@@ -9,7 +9,7 @@ const paragraphs = (children: ReactNode) => (typeof children === "string" ? typo
 
 /**
  * The recipe's note, set between a thin double rule and a hairline. A short note is a display-type quotation; a longer one keeps
- * the same frame at body size, one paragraph per line break.
+ * the same frame at body size, one paragraph per line break. The rules run the column's width; the words keep a reading measure.
  */
 export function PullQuote({ caption, short, children }: { caption: string; short: boolean; children: ReactNode }) {
   return (
@@ -18,7 +18,7 @@ export function PullQuote({ caption, short, children }: { caption: string; short
       <blockquote
         className={cx(
           "text-ink [overflow-wrap:anywhere]",
-          short ? "font-display text-[1.75rem] leading-[1.2] sm:text-[2.125rem]" : "flex max-w-measure flex-col gap-3 text-body",
+          short ? "max-w-measure font-display text-[1.75rem] leading-[1.2] sm:text-[2.125rem]" : "flex max-w-measure flex-col gap-3 text-body",
         )}
       >
         {short ? <>&ldquo;{text(children)}&rdquo;</> : paragraphs(children).map((p, i) => <p key={i}>{p}</p>)}

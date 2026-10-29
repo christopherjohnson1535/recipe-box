@@ -49,7 +49,7 @@ export function SpreadOpener({ title, kicker, deck, byline, actions, photo, icon
         </Morph>
         {deck && <p className="max-w-measure text-deck text-ink-muted italic [overflow-wrap:anywhere]">{deck}</p>}
         {byline && <div className="label text-ink-muted">{byline}</div>}
-        {actions && <div id={OPENER_ACTIONS_ID} className="mt-2 flex w-full flex-wrap gap-3 print:hidden">{actions}</div>}
+        {actions && <div id={OPENER_ACTIONS_ID} className="mt-2 flex w-full flex-wrap items-center gap-x-6 gap-y-3 print:hidden">{actions}</div>}
       </div>
       {photo && (
         <Morph name={morphId ? photoName(morphId) : undefined}>

@@ -40,6 +40,7 @@
   --nav-fg: var(--color-ink-muted);
   --nav-fg-active: var(--color-ink);
   --nav-underline-active: var(--color-accent);
+  --nav-underline-hover: var(--color-rule-strong); /* a quiet underline under the link the pointer is on */
 
   /* Alert */
   --alert-bg: var(--color-paper-deep);

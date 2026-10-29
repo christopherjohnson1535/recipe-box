@@ -70,6 +70,12 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/** `fg` laid over `bg` at `alpha` (0-1), as color-mix(in srgb, fg alpha, transparent) is drawn over that ground. */
+function blend(fg: string, bg: string, alpha: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  return "#" + [1, 3, 5].map((i) => Math.round(ch(fg, i) * alpha + ch(bg, i) * (1 - alpha)).toString(16).padStart(2, "0")).join("");
+}
+
 // The contract from .tastemaker/style-lock.md, plus each component's own pairings. [foreground, background]
 const TEXT: [string, string][] = [
   ["--color-ink", "--color-paper"],
@@ -151,6 +157,7 @@ const UI: [string, string][] = [
   ["--button-secondary-border", "--color-paper"],
   ["--chip-underline-selected", "--color-paper"],
   ["--nav-underline-active", "--color-paper"],
+  ["--nav-underline-hover", "--color-paper"],
   ["--alert-rule-error", "--alert-bg"],
   ["--progress-fg", "--alert-bg"],
   ["--editor-heading-rule", "--color-paper"],
@@ -354,6 +361,13 @@ describe("design tokens", () => {
     });
     it.each(UI)(`${t}: control %s on %s is at least 3:1`, (fg, bg) => {
       expect(contrast(hex(t, fg), hex(t, bg))).toBeGreaterThanOrEqual(3);
+    });
+    // The .link underline is the link's cue in running text (the accent is close to the ink), so its blended colour is
+    // held to 3:1 on the grounds a link sits on. The percentage is read from globals.css, so the two cannot drift.
+    it.each(["--color-paper", "--color-paper-deep"])(`${t}: the .link underline on %s is at least 3:1`, (bg) => {
+      const pct = Number(read("../app/globals.css").match(/text-decoration-color:\s*color-mix\(in srgb, var\(--link-fg\) (\d+)%, transparent\)/)?.[1]);
+      expect(pct, "the .link underline is a color-mix of --link-fg").toBeGreaterThan(0);
+      expect(contrast(blend(hex(t, "--link-fg"), hex(t, bg), pct / 100), hex(t, bg))).toBeGreaterThanOrEqual(3);
     });
   }
 });

@@ -15,14 +15,17 @@ export function MethodHeader({ steps }: { steps: number }) {
   );
 }
 
-/** One step: a large accent numeral hanging in the margin, the text beside it. */
+/**
+ * One step: a large accent numeral hanging in the margin, the text beside it. The step spans the method's column; the
+ * text keeps the reading measure (about 72 characters). From 1280px the numeral column widens so the numbers carry more of the width.
+ */
 export function MethodStep({ number, children }: { number: number; children: ReactNode }) {
   return (
-    <li className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-4">
-      <span aria-hidden="true" className="font-display text-[2.75rem] leading-[0.85] text-(--numeral-fg) [font-variant-numeric:lining-nums] sm:text-[4rem]">
+    <li className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-4 xl:grid-cols-[6rem_minmax(0,1fr)] xl:gap-6">
+      <span aria-hidden="true" className="font-display text-[2.75rem] leading-[0.85] text-(--numeral-fg) [font-variant-numeric:lining-nums] sm:text-[4rem] xl:text-[5rem]">
         {number}
       </span>
-      <p className="max-w-[34rem] text-body [overflow-wrap:anywhere]">{children}</p>
+      <p className="max-w-measure text-body [overflow-wrap:anywhere]">{children}</p>
     </li>
   );
 }

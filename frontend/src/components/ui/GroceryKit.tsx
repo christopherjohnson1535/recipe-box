@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { cx } from "./cx";
+import { PlusMark } from "./Disclosure";
 import { SpotIcon } from "./SpotIcon";
 import type { SpotName } from "./spot-icons";
 
@@ -72,9 +73,8 @@ export function RecipeShelf({ summary, defaultOpen = true, children }: { summary
     <details open={open} className="group">
       <summary className="label flex min-h-control cursor-pointer list-none items-center justify-between border-b border-(--rule-hair) text-ink-muted [&::-webkit-details-marker]:hidden">
         <span>{summary}</span>
-        <span aria-hidden="true" className="px-1 text-body">
-          <span className="group-open:hidden">+</span>
-          <span className="hidden group-open:inline">−</span>
+        <span className="px-1">
+          <PlusMark />
         </span>
       </summary>
       {children}

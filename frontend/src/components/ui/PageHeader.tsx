@@ -22,11 +22,11 @@ type PageHeaderProps = {
   morphId?: string;
 };
 
-/** Article-style page head: kicker, display headline, italic deck, byline, then a hairline. */
+/** Article-style page head: kicker, display headline, italic deck, byline, then a 1px ink rule. */
 export function PageHeader({ title, kicker, description, byline, actions, align = "start", reserveDeck, liveDescription, rise, morphId }: PageHeaderProps) {
   const centered = align === "center";
   return (
-    <header className={cx("relative flex flex-col gap-4 pb-[calc(2rem+1px)]", centered && "items-center text-center")}>
+    <header className={cx("relative flex flex-col gap-4 pb-[calc(clamp(1.75rem,3.5vw,3rem)+1px)]", centered && "items-center text-center")}>
       {kicker && <div className="label text-(--kicker-fg)">{kicker}</div>}
       <Morph name={morphId ? titleName(morphId) : undefined}>
         <h1 className="min-w-0 max-w-measure-wide font-display text-headline text-ink [overflow-wrap:anywhere]">
@@ -50,8 +50,8 @@ export function PageHeader({ title, kicker, description, byline, actions, align 
       )}
       {byline && <div className="label text-ink-muted">{byline}</div>}
       {actions && <div className={cx("mt-2 flex flex-wrap gap-3 print:hidden", centered && "justify-center")}>{actions}</div>}
-      {/* The closing hairline; it draws in from the left on a first visit. */}
-      <div className="draw-rule absolute inset-x-0 bottom-0 h-px bg-(--rule-hair) print:border-t print:border-(--rule-hair)" aria-hidden="true" />
+      {/* The closing rule, 1px in full ink (muted ink in the evening, like the double rule); it draws in from the left on a first visit. */}
+      <div className="draw-rule absolute inset-x-0 bottom-0 h-px bg-(--rule-double) print:border-t print:border-(--rule-double)" aria-hidden="true" />
     </header>
   );
 }
